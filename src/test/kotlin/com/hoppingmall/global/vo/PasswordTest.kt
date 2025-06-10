@@ -14,11 +14,15 @@ class PasswordTest {
     }
 
     @Test
-    fun `비밀번호는 encode와 matches로 비교할 수 있다`() {
-        val rawPassword = "secure123"
-        val password = Password.encode(rawPassword)
+    fun `비밀번호 해시화 후 비교 성공`() {
+        val raw = "securePass123"
+        val hashed = Password.encode(raw)
+        assertTrue(Password.matches(raw, hashed))
+    }
 
-        assertTrue(Password.matches(rawPassword, password))
-        assertFalse(Password.matches("wrongpass", password))
+    @Test
+    fun `비밀번호 해시화 후 비교 실패`() {
+        val hashed = Password.encode("realPass123")
+        assertFalse(Password.matches("wrongPass", hashed))
     }
 }
