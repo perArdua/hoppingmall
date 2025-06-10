@@ -1,0 +1,14 @@
+package com.hoppingmall.global.common.error.code
+
+import org.springframework.http.HttpStatus
+
+enum class ErrorCode(
+    val code: String,
+    val message: String,
+    val status: HttpStatus
+){
+    INVALID_INPUT("C001", "잘못된 입력입니다.", HttpStatus.BAD_REQUEST),
+    UNAUTHORIZED("A001", "인증이 필요합니다.", HttpStatus.UNAUTHORIZED),
+    FORBIDDEN("A002", "접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
+    INTERNAL_ERROR("S001", "서버 내부 오류입니다.", HttpStatus.INTERNAL_SERVER_ERROR)
+}
