@@ -1,23 +1,35 @@
 feat:
-  - 'module-*/**/*.kt'
-  - '**/application-*.yml'
+  - changed-files:
+      any-glob-to-any-file:
+        - "module-*/**/*.kt"
+        - "**/application-*.yml"
 
 fix:
-  - '*/**/*.kt'
-  - '**/*.md'
+  - changed-files:
+      any-glob-to-any-file:
+        - "*/**/*.kt"
+        - "**/*.md"
 
 refactor:
-  - '*/**/*.kt'
+  - changed-files:
+      any-glob-to-any-file:
+        - "*/**/*.kt"
 
 test:
-  - '*/**/test/**/*.kt'
-  - '**/test/**'
+  - changed-files:
+      any-glob-to-any-file:
+        - "*/**/test/**/*.kt"
+        - "**/test/**"
 
 docs:
-  - '**/*.md'
-  - 'README.md'
+  - changed-files:
+      any-glob-to-any-file:
+        - "**/*.md"
+        - "README.md"
 
 chore:
-  - '**/.gitignore'
-  - '**/build.gradle.kts'
-  - '**/settings.gradle.kts'
+  - changed-files:
+      any-glob-to-any-file:
+        - "**/.gitignore"
+        - "**/build.gradle.kts"
+        - "**/settings.gradle.kts"
