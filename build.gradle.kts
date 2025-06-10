@@ -94,7 +94,8 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/global/common/entity/**",
 	"**/com/hoppingmall/global/common/response/**",
 	"**/com/hoppingmall/global/common/error/**",
-	"**/com/hoppingmall/global/enums/**"
+	"**/com/hoppingmall/global/enums/**",
+	"**/com/hoppingmall/global/vo/**"
 )
 
 tasks.jacocoTestReport {
