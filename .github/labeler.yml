@@ -1,0 +1,23 @@
+feat:
+  - 'module-*/**/*.kt'
+  - '**/application-*.yml'
+
+fix:
+  - '*/**/*.kt'
+  - '**/*.md'
+
+refactor:
+  - '*/**/*.kt'
+
+test:
+  - '*/**/test/**/*.kt'
+  - '**/test/**'
+
+docs:
+  - '**/*.md'
+  - 'README.md'
+
+chore:
+  - '**/.gitignore'
+  - '**/build.gradle.kts'
+  - '**/settings.gradle.kts'
