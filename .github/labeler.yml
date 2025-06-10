@@ -1,29 +1,35 @@
 feat:
-  - changed-files:
+  changed-files:
+    any:
       - "module-*/**/*.kt"
       - "**/application-*.yml"
 
 fix:
-  - changed-files:
+  changed-files:
+    any:
       - "*/**/*.kt"
       - "**/*.md"
 
 refactor:
-  - changed-files:
+  changed-files:
+    any:
       - "*/**/*.kt"
 
 test:
-  - changed-files:
+  changed-files:
+    any:
       - "*/**/test/**/*.kt"
       - "**/test/**"
 
 docs:
-  - changed-files:
+  changed-files:
+    any:
       - "**/*.md"
       - "README.md"
 
 chore:
-  - changed-files:
+  changed-files:
+    any:
       - "**/.gitignore"
       - "**/build.gradle.kts"
       - "**/settings.gradle.kts"
