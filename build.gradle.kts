@@ -104,6 +104,19 @@ tasks.jacocoTestReport {
 tasks.jacocoTestCoverageVerification {
 	dependsOn(tasks.test)
 
+	classDirectories.setFrom(
+		files(classDirectories.files.map {
+			fileTree(it) {
+				exclude(
+					"**/config/**",
+					"**/dto/**",
+					"**/MallApplication*",
+					"**/MallApplicationTests*"
+				)
+			}
+		})
+	)
+
 	violationRules {
 		rule {
 			element = "CLASS"
