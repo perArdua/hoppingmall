@@ -93,7 +93,8 @@ tasks.jacocoTestReport {
 				exclude(
 					"**/config/**",
 					"**/dto/**",
-					"**/MallApplication*"
+					"**/MallApplication*",
+					"**/MallApplicationTests*",
 				)
 			}
 		})
