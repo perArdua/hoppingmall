@@ -1,23 +1,29 @@
-"feat":
-  - "module-*/**/*.kt"
-  - "**/application-*.yml"
+feat:
+  - changed-files:
+      - "module-*/**/*.kt"
+      - "**/application-*.yml"
 
-"fix":
-  - "*/**/*.kt"
-  - "**/*.md"
+fix:
+  - changed-files:
+      - "*/**/*.kt"
+      - "**/*.md"
 
-"refactor":
-  - "*/**/*.kt"
+refactor:
+  - changed-files:
+      - "*/**/*.kt"
 
-"test":
-  - "*/**/test/**/*.kt"
-  - "**/test/**"
+test:
+  - changed-files:
+      - "*/**/test/**/*.kt"
+      - "**/test/**"
 
-"docs":
-  - "**/*.md"
-  - "README.md"
+docs:
+  - changed-files:
+      - "**/*.md"
+      - "README.md"
 
-"chore":
-  - "**/.gitignore"
-  - "**/build.gradle.kts"
-  - "**/settings.gradle.kts"
+chore:
+  - changed-files:
+      - "**/.gitignore"
+      - "**/build.gradle.kts"
+      - "**/settings.gradle.kts"
