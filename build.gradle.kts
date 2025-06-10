@@ -47,6 +47,9 @@ dependencies {
 	// MySQL 드라이버
 	runtimeOnly("com.mysql:mysql-connector-j")
 
+	// h2
+	runtimeOnly("com.h2database:h2")
+
 	// 컴파일 타임 설정 프로세서
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 

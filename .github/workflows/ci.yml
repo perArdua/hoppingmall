@@ -14,9 +14,9 @@ jobs:
       - name: 소스 체크아웃
         uses: actions/checkout@v3
 
-      - name: applicaion_local 디코딩 후 파일에 넣기
-        run: |
-          echo "${{ secrets.APPLICATION_LOCAL_BASE64 }}" | base64 -d > ./src/main/resources/application-local.yml
+#      - name: applicaion_local 디코딩 후 파일에 넣기
+#        run: |
+#          echo "${{ secrets.APPLICATION_LOCAL_BASE64 }}" | base64 -d > ./src/main/resources/application-local.yml
 
       - name: gradlew에 실행 권한 부여
         run: chmod +x ./gradlew
