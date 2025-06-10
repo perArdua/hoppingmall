@@ -86,41 +86,48 @@ tasks.test {
 	finalizedBy(tasks.jacocoTestReport)
 }
 
+val jacocoExcludedDirs = listOf(
+	"**/config/**",
+	"**/dto/**",
+	"**/MallApplication*",
+	"**/MallApplicationTests*"
+)
+
 tasks.jacocoTestReport {
-	classDirectories.setFrom(
-		files(classDirectories.files.map {
+	dependsOn(tasks.test)
+
+	val filteredClassDirs = files(
+		classDirectories.files.map {
 			fileTree(it) {
-				exclude(
-					"**/config/**",
-					"**/dto/**",
-					"**/MallApplication*",
-					"**/MallApplicationTests*",
-				)
+				exclude(jacocoExcludedDirs)
 			}
-		})
+		}
 	)
+
+	classDirectories.setFrom(filteredClassDirs)
+
+	reports {
+		xml.required.set(true)
+		html.required.set(true)
+	}
 }
 
 tasks.jacocoTestCoverageVerification {
 	dependsOn(tasks.test)
 
-	classDirectories.setFrom(
-		files(classDirectories.files.map {
+	val filteredClassDirs = files(
+		classDirectories.files.map {
 			fileTree(it) {
-				exclude(
-					"**/config/**",
-					"**/dto/**",
-					"**/MallApplication*",
-					"**/MallApplicationTests*"
-				)
+				exclude(jacocoExcludedDirs)
 			}
-		})
+		}
 	)
+
+	classDirectories.setFrom(filteredClassDirs)
 
 	violationRules {
 		rule {
 			element = "CLASS"
-
 			limit {
 				counter = "LINE"
 				value = "COVEREDRATIO"
