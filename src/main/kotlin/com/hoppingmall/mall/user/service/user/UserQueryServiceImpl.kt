@@ -1,11 +1,12 @@
 package com.hoppingmall.mall.user.service.user
 
+import com.hoppingmall.mall.global.jwt.TokenProvider
 import com.hoppingmall.mall.global.vo.email.Email
+import com.hoppingmall.mall.global.vo.password.PasswordVerifier
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.user.LoginRequest
 import com.hoppingmall.mall.user.dto.response.user.LoginResponse
 import com.hoppingmall.mall.user.exception.user.UserLoginFailedException
-import com.hoppingmall.mall.user.jwt.TokenProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -13,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class UserQueryServiceImpl(
     private val userRepository: UserRepository,
-    private val tokenProvider: TokenProvider
+    private val tokenProvider: TokenProvider,
+    private val passwordVerifier: PasswordVerifier
 ) : UserQueryService {
 
     override fun login(request: LoginRequest): LoginResponse {
@@ -21,7 +23,7 @@ class UserQueryServiceImpl(
         val user = userRepository.findByEmail(email)
             ?: throw UserLoginFailedException()
 
-        if (!user.isPasswordMatch(request.password)) {
+        if (!passwordVerifier.matches(request.password, user.getPassword())) {
             throw UserLoginFailedException()
         }
 
