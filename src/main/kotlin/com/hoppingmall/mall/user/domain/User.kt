@@ -33,6 +33,10 @@ class User private constructor(
         }
     }
 
+    fun isPasswordMatch(rawPassword: String): Boolean {
+        return this.password.matches(rawPassword)
+    }
+
     fun updatePassword(newPassword: Password) {
         this.password = newPassword
     }
