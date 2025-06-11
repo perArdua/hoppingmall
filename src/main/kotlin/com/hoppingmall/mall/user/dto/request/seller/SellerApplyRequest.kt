@@ -1,4 +1,4 @@
-package com.hoppingmall.mall.user.dto.request
+package com.hoppingmall.mall.user.dto.request.seller
 
 import jakarta.validation.constraints.NotBlank
 
