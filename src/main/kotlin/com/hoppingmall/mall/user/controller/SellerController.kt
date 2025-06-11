@@ -1,7 +1,7 @@
 package com.hoppingmall.mall.user.controller
 
 import com.hoppingmall.mall.global.common.response.ApiResponse
-import com.hoppingmall.mall.user.dto.request.SellerApplyRequest
+import com.hoppingmall.mall.user.dto.request.seller.SellerApplyRequest
 import com.hoppingmall.mall.user.service.seller.SellerCommandService
 import jakarta.validation.Valid
 import org.springframework.security.core.annotation.AuthenticationPrincipal
