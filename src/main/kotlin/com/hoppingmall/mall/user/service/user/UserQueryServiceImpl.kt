@@ -2,7 +2,6 @@ package com.hoppingmall.mall.user.service.user
 
 import com.hoppingmall.mall.global.jwt.TokenProvider
 import com.hoppingmall.mall.global.vo.email.Email
-import com.hoppingmall.mall.global.vo.password.PasswordVerifier
 import com.hoppingmall.mall.global.vo.password.service.PasswordVerifier
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.user.LoginRequest

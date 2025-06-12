@@ -4,8 +4,8 @@ import com.hoppingmall.mall.user.domain.Seller
 import com.hoppingmall.mall.user.domain.repository.SellerRepository
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.seller.SellerApplyRequest
-import com.hoppingmall.mall.user.exception.seller.SellerBusinessNumberDuplicateException
 import com.hoppingmall.mall.user.exception.seller.SellerAlreadyAppliedException
+import com.hoppingmall.mall.user.exception.seller.SellerBusinessNumberDuplicateException
 import com.hoppingmall.mall.user.exception.user.UserNotFoundException
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
