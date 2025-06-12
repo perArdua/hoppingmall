@@ -11,6 +11,7 @@ import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.user.LoginRequest
 import com.hoppingmall.mall.user.dto.response.user.LoginResponse
 import com.hoppingmall.mall.user.exception.user.UserLoginFailedException
+import com.hoppingmall.mall.support.fixture.fixture
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
@@ -33,20 +34,19 @@ class UserQueryServiceImplTest {
         val rawPassword = "secure123"
         val hashedPassword = Password("encoded")
 
-        val user = User.create(
+        val user = User.fixture(
             email = Email("login@example.com"),
             password = hashedPassword,
-            name = "로그인유저",
             role = Role.BUYER
         ).withId(1L)
 
-        whenever(userRepository.findByEmail(Email("login@example.com"))).thenReturn(user)
+        whenever(userRepository.findByEmail(user.email)).thenReturn(user)
         whenever(passwordVerifier.matches(rawPassword, hashedPassword)).thenReturn(true)
         whenever(tokenProvider.generateToken(user.id!!, user.getRole())).thenReturn("token")
 
         // when
         val response: LoginResponse = userQueryService.login(
-            LoginRequest("login@example.com", rawPassword)
+            LoginRequest(user.email.value, rawPassword)
         )
 
         // then
@@ -55,20 +55,17 @@ class UserQueryServiceImplTest {
 
     @Test
     fun `비밀번호가 일치하지 않으면 예외가 발생한다`() {
-        // given
-        val user = User.create(
+        val user = User.fixture(
             email = Email("fail@example.com"),
             password = Password("encoded"),
-            name = "실패유저",
             role = Role.SELLER
         ).withId(2L)
 
-        whenever(userRepository.findByEmail(Email("fail@example.com"))).thenReturn(user)
+        whenever(userRepository.findByEmail(user.email)).thenReturn(user)
         doThrow(UserLoginFailedException()).whenever(passwordVerifier).assertMatches("wrongpass", user.getPassword())
 
-        // expect
         assertThrows(UserLoginFailedException::class.java) {
-            userQueryService.login(LoginRequest("fail@example.com", "wrongpass"))
+            userQueryService.login(LoginRequest(user.email.value, "wrongpass"))
         }
     }
 }
