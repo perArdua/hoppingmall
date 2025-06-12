@@ -1,4 +1,4 @@
-package com.hoppingmall.mall.user.controller
+package com.hoppingmall.mall.user.controller.seller
 
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.user.dto.request.seller.SellerApplyRequest
@@ -6,7 +6,10 @@ import com.hoppingmall.mall.user.service.seller.SellerCommandService
 import jakarta.validation.Valid
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/sellers")
@@ -21,6 +24,6 @@ class SellerController(
     ): ApiResponse<Unit> {
         val userId = userDetails.username.toLong()
         sellerCommandService.apply(userId, request)
-        return ApiResponse.success(Unit)
+        return ApiResponse.Companion.success(Unit)
     }
 }
