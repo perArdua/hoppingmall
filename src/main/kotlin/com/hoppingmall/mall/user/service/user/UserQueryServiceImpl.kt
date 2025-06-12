@@ -3,6 +3,7 @@ package com.hoppingmall.mall.user.service.user
 import com.hoppingmall.mall.global.jwt.TokenProvider
 import com.hoppingmall.mall.global.vo.email.Email
 import com.hoppingmall.mall.global.vo.password.PasswordVerifier
+import com.hoppingmall.mall.global.vo.password.service.PasswordVerifier
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.user.LoginRequest
 import com.hoppingmall.mall.user.dto.response.user.LoginResponse
@@ -23,9 +24,7 @@ class UserQueryServiceImpl(
         val user = userRepository.findByEmail(email)
             ?: throw UserLoginFailedException()
 
-        if (!passwordVerifier.matches(request.password, user.getPassword())) {
-            throw UserLoginFailedException()
-        }
+        passwordVerifier.assertMatches(request.password, user.getPassword())
 
         val token = tokenProvider.generateToken(user.id!!, user.getRole())
 
