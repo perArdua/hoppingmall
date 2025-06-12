@@ -19,6 +19,6 @@ class AdminController(
         @RequestBody request: SellerApprovalRequest
     ): ApiResponse<Unit> {
         adminCommandService.updateSellerApprovalStatus(id, request)
-        return ApiResponse.success()
+        return ApiResponse.success(Unit)
     }
 }
