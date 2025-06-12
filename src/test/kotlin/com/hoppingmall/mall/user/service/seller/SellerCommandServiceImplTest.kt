@@ -48,7 +48,7 @@ class SellerCommandServiceImplTest {
         val request = SellerApplyRequest("111-22-33333")
 
         whenever(userRepository.findNullableById(userId)).thenReturn(mock())
-        whenever(sellerRepository.findNullableByUserId(userId)).thenReturn(mock())  // ✅ 여기!
+        whenever(sellerRepository.findNullableByUserId(userId)).thenReturn(mock())
 
         // when & then
         assertThrows(SellerAlreadyAppliedException::class.java) {
