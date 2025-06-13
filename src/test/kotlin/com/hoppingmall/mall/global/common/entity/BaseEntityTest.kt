@@ -20,7 +20,7 @@ class BaseEntityTest @Autowired constructor(
         val entity = testRepository.save(TestEntity())
 
         assertThat(entity.createdAt).isNotNull
-        assertThat(entity.updatedAt).isNull()
+        assertThat(entity.updatedAt).isNotNull
     }
 
     @Test
