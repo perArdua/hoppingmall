@@ -1,7 +1,4 @@
 spring:
-  profiles:
-    active: local
-
   jackson:
     property-naming-strategy: SNAKE_CASE
 
@@ -20,6 +17,7 @@ spring:
       hibernate:
         format_sql: true
         show_sql: true
+        legacy_id_generator_strategy: true
 
   devtools:
     restart:
@@ -28,4 +26,10 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+    org.hibernate.orm.schema: debug
+    org.hibernate.tool.hbm2ddl: debug
     org.hibernate.type.descriptor.sql.BasicBinder: trace
+
+jwt:
+  secret: my-secret-secret-secret-secret-secret-key-123456789
+  expiration-ms: 3600000  # 1 hour
