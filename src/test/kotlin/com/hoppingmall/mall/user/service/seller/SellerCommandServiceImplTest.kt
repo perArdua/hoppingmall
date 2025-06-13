@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.user.service.seller
 
 import com.hoppingmall.mall.user.domain.Seller
+import com.hoppingmall.mall.user.domain.User
 import com.hoppingmall.mall.user.domain.repository.SellerRepository
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.seller.SellerApplyRequest
