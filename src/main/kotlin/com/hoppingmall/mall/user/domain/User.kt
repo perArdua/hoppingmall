@@ -25,12 +25,6 @@ class User private constructor(
     @Column(nullable = false)
     private var role: Role = Role.BUYER,
 
-    @OneToOne(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    var seller: Seller? = null,
-
-    @OneToOne(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    var buyer: Buyer? = null
-
 ) : BaseEntity() {
 
     companion object {
