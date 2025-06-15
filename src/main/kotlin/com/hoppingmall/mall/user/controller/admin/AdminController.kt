@@ -3,7 +3,9 @@ package com.hoppingmall.mall.user.controller.admin
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.user.dto.request.admin.SellerApprovalRequest
 import com.hoppingmall.mall.user.service.admin.AdminCommandService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -13,10 +15,9 @@ class AdminController(
 ) {
 
     @PatchMapping("/sellers/{id}/approve")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun updateSellerApprovalStatus(
         @PathVariable id: Long,
-        @RequestBody request: SellerApprovalRequest
+        @RequestBody @Valid request: SellerApprovalRequest
     ): ApiResponse<Unit> {
         adminCommandService.updateSellerApprovalStatus(id, request)
         return ApiResponse.Companion.success(Unit)
