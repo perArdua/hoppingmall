@@ -7,37 +7,49 @@ import com.hoppingmall.mall.user.domain.repository.SellerRepository
 import com.hoppingmall.mall.user.dto.request.admin.SellerApprovalRequest
 import com.hoppingmall.mall.user.exception.seller.SellerInvalidApprovalStatusException
 import com.hoppingmall.mall.user.exception.seller.SellerNotFoundException
-import org.junit.jupiter.api.Assertions.assertThrows
+import com.hoppingmall.mall.user.service.admin.strategy.SellerApprovalCommand
+import com.hoppingmall.mall.user.service.admin.strategy.SellerApprovalCommandMapper
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.mockito.kotlin.*
 
 class AdminCommandServiceImplTest {
 
     private val sellerRepository: SellerRepository = mock()
-    private val adminCommandService = AdminCommandServiceImpl(sellerRepository)
+    private val commandMapper: SellerApprovalCommandMapper = mock()
+    private val adminCommandService = AdminCommandServiceImpl(sellerRepository, commandMapper)
 
     @Test
     fun `판매자 승인 상태를 APPROVED로 변경할 수 있다`() {
+        // given
         val seller = Seller.fixture(user = User.fixture())
+        val command = mock<SellerApprovalCommand>()
+
         whenever(sellerRepository.findById(1L)).thenReturn(java.util.Optional.of(seller))
+        whenever(commandMapper.getCommand(Seller.ApprovalStatus.APPROVED)).thenReturn(command)
 
         val request = SellerApprovalRequest("APPROVED")
 
+        // when
         adminCommandService.updateSellerApprovalStatus(1L, request)
 
-        assert(seller.getApprovalStatus() == Seller.ApprovalStatus.APPROVED)
+        // then
+        verify(command).execute(seller)
     }
 
     @Test
     fun `판매자 승인 상태를 REJECTED로 변경할 수 있다`() {
         val seller = Seller.fixture(user = User.fixture())
+        val command = mock<SellerApprovalCommand>()
+
         whenever(sellerRepository.findById(1L)).thenReturn(java.util.Optional.of(seller))
+        whenever(commandMapper.getCommand(Seller.ApprovalStatus.REJECTED)).thenReturn(command)
 
         val request = SellerApprovalRequest("REJECTED")
 
         adminCommandService.updateSellerApprovalStatus(1L, request)
 
-        assert(seller.getApprovalStatus() == Seller.ApprovalStatus.REJECTED)
+        verify(command).execute(seller)
     }
 
     @Test
@@ -54,12 +66,15 @@ class AdminCommandServiceImplTest {
     @Test
     fun `승인 상태가 PENDING일 경우 예외가 발생한다`() {
         val seller = Seller.fixture(user = User.fixture())
+        val command = mock<SellerApprovalCommand>()
+
         whenever(sellerRepository.findById(1L)).thenReturn(java.util.Optional.of(seller))
+        whenever(commandMapper.getCommand(Seller.ApprovalStatus.PENDING)).thenReturn(command)
 
         val request = SellerApprovalRequest("PENDING")
 
-        assertThrows(SellerInvalidApprovalStatusException::class.java) {
-            adminCommandService.updateSellerApprovalStatus(1L, request)
-        }
+        adminCommandService.updateSellerApprovalStatus(1L, request)
+
+        verify(command).execute(seller)
     }
 }
