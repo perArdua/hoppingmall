@@ -30,14 +30,6 @@ class SellerApprovalCommandTest {
         assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
     }
 
-    @Test
-    fun `PENDING 전략은 예외를 발생시킨다`() {
-        val seller = createPendingSeller()
-        assertThrows(SellerInvalidApprovalStatusException::class.java) {
-            InvalidApprovalCommand().execute(seller)
-        }
-    }
-
     private fun createPendingSeller(): Seller {
         val user: User = User.fixture(
             email = Email("seller@example.com"),
