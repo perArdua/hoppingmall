@@ -17,10 +17,12 @@ class AdminCommandServiceImpl(
 ) : AdminCommandService {
 
     override fun updateSellerApprovalStatus(sellerId: Long, request: SellerApprovalRequest) {
-        val seller = sellerRepository.findById(sellerId)
-            .orElseThrow { SellerNotFoundException() }
+        val seller = findSellerById(sellerId)
 
         val command = commandMapper.getCommand(request.toApprovalStatus())
         command.execute(seller)
     }
+
+    private fun findSellerById(sellerId: Long): Seller =
+        sellerRepository.findById(sellerId).orElseThrow { SellerNotFoundException() }
 }
