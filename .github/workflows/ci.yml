@@ -38,7 +38,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Gradle 빌드 및 테스트
-        run: ./gradlew build jacocoTestReport jacocoTestCoverageVerification --no-daemon
+        run: ./gradlew build jacocoTestReport jacocoTestCoverageVerification --no-daemon --build-cache --quiet
 
       - name: 커버리지 업로드
         uses: codecov/codecov-action@v5
