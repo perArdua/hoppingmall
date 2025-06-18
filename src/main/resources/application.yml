@@ -32,4 +32,5 @@ logging:
 
 jwt:
   secret: my-secret-secret-secret-secret-secret-key-123456789
-  expiration-ms: 3600000  # 1 hour
+  access-expiration-ms: 3600000 # 1 hour
+  refresh-expiration-ms: 86400000 # 24 hour
