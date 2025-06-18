@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.user.controller.user
 
+import com.hoppingmall.mall.global.auth.service.AuthService
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.global.enums.Role
 import com.hoppingmall.mall.user.dto.request.user.SignInRequest
@@ -16,11 +17,11 @@ import org.mockito.kotlin.whenever
 class UserControllerTest {
 
     private val userCommandService: UserCommandService = mock()
-    private val userQueryService: UserQueryService = mock()
+    private val authService: AuthService = mock()
 
     private val controller = UserController(
         userCommandService = userCommandService,
-        userQueryService = userQueryService
+        authService = authService
     )
 
     @Test
@@ -60,10 +61,11 @@ class UserControllerTest {
         )
 
         val expectedResponse = SignInResponse(
-            accessToken = "access-token"
+            accessToken = "access-token",
+            refreshToken = "refresh-token"
         )
 
-        whenever(userQueryService.login(request)).thenReturn(expectedResponse)
+        whenever(authService.login(request)).thenReturn(expectedResponse)
 
         // when
         val response: ApiResponse<SignInResponse> = controller.login(request)
