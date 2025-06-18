@@ -1,72 +1,84 @@
 package com.hoppingmall.mall.global.jwt
 
+import com.hoppingmall.mall.global.auth.exception.InvalidTokenException
 import com.hoppingmall.mall.global.enums.Role
-import io.jsonwebtoken.Jwts
-import io.jsonwebtoken.SignatureAlgorithm
-import io.jsonwebtoken.security.Keys
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.util.*
 
 class TokenProviderTest {
 
     private lateinit var tokenProvider: TokenProviderImpl
-    private val secret = "verysecretkeyverysecretkeyverysecretkey12"
-    private val expirationMs = 1000L * 60 * 60
 
     @BeforeEach
     fun setUp() {
-        tokenProvider = TokenProviderImpl(secret, expirationMs)
+        val props = JwtProperties().apply {
+            secret = "secret-key".repeat(10)
+            accessExpirationMs = 3600L
+            refreshExpirationMs = 86400000L
+        }
+        tokenProvider = TokenProviderImpl(props)
     }
 
     @Test
-    fun `JWT 생성 후 유효성 검증과 정보 추출이 정상 동작해야 한다`() {
-        val token = tokenProvider.generateToken(42L, Role.SELLER)
-        val claims = tokenProvider.parseClaims(token)
+    fun `액세스 토큰 생성과 파싱이 정상 동작해야 한다`() {
+        val token = tokenProvider.generateAccessToken(1L, Role.SELLER)
 
         assertTrue(tokenProvider.validateToken(token))
-        assertEquals(42L, tokenProvider.getUserIdFromToken(token))
+        assertEquals(1L, tokenProvider.parseAccessToken(token))
+        assertEquals(1L, tokenProvider.getUserIdFromToken(token))
         assertEquals(Role.SELLER, tokenProvider.getUserRoleFromToken(token))
-        assertEquals("SELLER", claims["role"])
     }
 
     @Test
-    fun `만료된 토큰은 유효하지 않다고 판단해야 한다`() {
-        val expiredToken = Jwts.builder()
-            .setSubject("99")
-            .claim("role", "BUYER")
-            .setIssuedAt(Date(System.currentTimeMillis() - 20000))
-            .setExpiration(Date(System.currentTimeMillis() - 10000))
-            .signWith(Keys.hmacShaKeyFor(secret.toByteArray()), SignatureAlgorithm.HS256)
-            .compact()
+    fun `리프레시 토큰 생성과 파싱이 정상 동작해야 한다`() {
+        val token = tokenProvider.generateRefreshToken(2L)
 
-        assertFalse(tokenProvider.validateToken(expiredToken))
+        assertTrue(tokenProvider.validateToken(token))
+        assertEquals(2L, tokenProvider.parseRefreshToken(token))
     }
 
     @Test
-    fun `서명이 잘못된 토큰은 유효하지 않다고 판단해야 한다`() {
-        val fakeSecret = "differentkeydifferentkeydifferentkey!!"
-        val invalidToken = Jwts.builder()
-            .setSubject("100")
-            .claim("role", "ADMIN")
-            .setIssuedAt(Date())
-            .setExpiration(Date(System.currentTimeMillis() + 100000))
-            .signWith(Keys.hmacShaKeyFor(fakeSecret.toByteArray()), SignatureAlgorithm.HS256)
-            .compact()
+    fun `유저 정보를 통해 UserPrincipal을 추출할 수 있어야 한다`() {
+        val token = tokenProvider.generateAccessToken(3L, Role.BUYER)
 
-        assertFalse(tokenProvider.validateToken(invalidToken))
+        val principal = tokenProvider.getUserPrincipal(token)
+
+        assertEquals(3L, principal.getUserId())
+        assertEquals(Role.BUYER.name, principal.authorities.first().authority.removePrefix("ROLE_"))
     }
 
     @Test
-    fun `형식이 잘못된 토큰은 예외가 발생하며 false를 반환한다`() {
-        val malformedToken = "this.is.not.jwt"
-        assertFalse(tokenProvider.validateToken(malformedToken))
+    fun `만료된 토큰은 InvalidTokenException이 발생한다`() {
+        val shortLivedProvider = TokenProviderImpl(
+            JwtProperties().apply {
+                secret = "secret-key".repeat(10)
+                accessExpirationMs = 1L
+                refreshExpirationMs = 1L
+            }
+        )
+        val token = shortLivedProvider.generateAccessToken(99L, Role.ADMIN)
+
+        Thread.sleep(10)
+
+        assertThrows(InvalidTokenException::class.java) {
+            shortLivedProvider.validateToken(token)
+        }
     }
 
     @Test
-    fun `지원되지 않는 알고리즘을 가진 토큰은 유효하지 않다`() {
-        val invalidToken = "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxMjM0NTYifQ."
-        assertFalse(tokenProvider.validateToken(invalidToken))
+    fun `형식이 잘못된 토큰은 InvalidTokenException이 발생한다`() {
+        val invalidToken = "this.is.not.valid.token"
+        assertThrows(InvalidTokenException::class.java) {
+            tokenProvider.validateToken(invalidToken)
+        }
+
+        assertThrows(InvalidTokenException::class.java) {
+            tokenProvider.getUserIdFromToken(invalidToken)
+        }
+
+        assertThrows(InvalidTokenException::class.java) {
+            tokenProvider.getUserRoleFromToken(invalidToken)
+        }
     }
 }
