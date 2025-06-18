@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.global.jwt
 
 import com.hoppingmall.mall.global.auth.UserPrincipal
+import com.hoppingmall.mall.global.auth.exception.InvalidTokenException
 import com.hoppingmall.mall.global.enums.Role
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
@@ -12,16 +13,14 @@ import java.util.*
 
 @Component
 class TokenProviderImpl(
-    @Value("\${jwt.secret}") private val secret: String,
-    @Value("\${jwt.expiration-ms:3600000}") private val expirationMs: Long
+    private val jwtProperties: JwtProperties
 ) : TokenProvider {
 
-    private val key = Keys.hmacShaKeyFor(secret.toByteArray())
+    private val key = Keys.hmacShaKeyFor(jwtProperties.secret.toByteArray())
 
-    override fun generateToken(userId: Long, role: Role): String {
+    override fun generateAccessToken(userId: Long, role: Role): String {
         val now = Date()
-        val expiry = Date(now.time + expirationMs)
-
+        val expiry = Date(now.time + jwtProperties.accessExpirationMs)
         return Jwts.builder()
             .setSubject(userId.toString())
             .claim("role", role.name)
@@ -31,23 +30,38 @@ class TokenProviderImpl(
             .compact()
     }
 
+    override fun generateRefreshToken(userId: Long): String {
+        val now = Date()
+        val expiry = Date(now.time + jwtProperties.refreshExpirationMs)
+        return Jwts.builder()
+            .setSubject(userId.toString())
+            .setIssuedAt(now)
+            .setExpiration(expiry)
+            .signWith(key, SignatureAlgorithm.HS256)
+            .compact()
+    }
+
+    override fun parseAccessToken(token: String): Long =
+        parseClaims(token).subject.toLong()
+
+    override fun parseRefreshToken(token: String): Long =
+        parseClaims(token).subject.toLong()
+
     override fun validateToken(token: String): Boolean {
-        return try {
-            val claims = parseClaims(token)
-            !claims.expiration.before(Date())
-        } catch (e: Exception) {
-            false
+        val claims = parseClaims(token)
+
+        if (claims.expiration.before(Date())) {
+            throw InvalidTokenException()
         }
+        return true
     }
 
     override fun getUserIdFromToken(token: String): Long {
-        val claims = parseClaims(token)
-        return claims.subject.toLong()
+        return parseClaims(token).subject.toLong()
     }
 
     override fun getUserRoleFromToken(token: String): Role {
-        val claims = parseClaims(token)
-        return Role.valueOf(claims["role"] as String)
+        return Role.valueOf(parseClaims(token)["role"] as String)
     }
 
     override fun getUserPrincipal(token: String): UserPrincipal {
@@ -56,11 +70,15 @@ class TokenProviderImpl(
         return UserPrincipal.of(userId, role.name)
     }
 
-    internal fun parseClaims(token: String): Claims {
-        return Jwts.parserBuilder()
-            .setSigningKey(key)
-            .build()
-            .parseClaimsJws(token)
-            .body
+    fun parseClaims(token: String): Claims {
+        return try {
+            Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .body
+        } catch (ex: Exception) {
+            throw InvalidTokenException()
+        }
     }
 }
