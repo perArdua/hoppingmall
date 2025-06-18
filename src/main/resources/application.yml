@@ -19,6 +19,11 @@ spring:
         show_sql: true
         legacy_id_generator_strategy: true
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   devtools:
     restart:
       enabled: true
