@@ -19,6 +19,11 @@ spring:
         show_sql: true
         legacy_id_generator_strategy: true
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   devtools:
     restart:
       enabled: true
@@ -32,4 +37,5 @@ logging:
 
 jwt:
   secret: my-secret-secret-secret-secret-secret-key-123456789
-  expiration-ms: 3600000  # 1 hour
+  access-expiration-ms: 3600000 # 1 hour
+  refresh-expiration-ms: 86400000 # 24 hour
