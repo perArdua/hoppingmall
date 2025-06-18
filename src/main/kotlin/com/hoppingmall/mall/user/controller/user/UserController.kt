@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.user.controller.user
 
+import com.hoppingmall.mall.global.auth.service.AuthService
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.user.dto.request.user.SignInRequest
 import com.hoppingmall.mall.user.dto.request.user.SignUpRequest
@@ -17,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/users")
 class UserController(
     private val userCommandService: UserCommandService,
-    private val userQueryService: UserQueryService
+    private val authService: AuthService
 ) {
 
     @PostMapping("/signup")
@@ -32,7 +33,7 @@ class UserController(
     fun login(
         @RequestBody @Valid request: SignInRequest
     ): ApiResponse<SignInResponse> {
-        val response = userQueryService.login(request)
+        val response = authService.login(request)
         return ApiResponse.Companion.success(response)
     }
 }
