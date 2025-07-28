@@ -4,41 +4,45 @@ import com.hoppingmall.mall.global.auth.dto.request.TokenRefreshRequest
 import com.hoppingmall.mall.global.auth.dto.response.TokenRefreshResponse
 import com.hoppingmall.mall.global.auth.service.AuthService
 import com.hoppingmall.mall.global.common.response.ApiResponse
+import org.junit.jupiter.api.*
+import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 
+@DisplayName("AuthController")
+@DisplayNameGeneration(ReplaceUnderscores::class)
 class AuthControllerTest {
 
     private val authService: AuthService = mock()
     private val authController = AuthController(authService)
 
-    @Test
-    fun `리프레시 토큰 재발급 요청이 성공하면 새로운 액세스 토큰과 리프레시 토큰을 반환한다`() {
-        // given
-        val request = TokenRefreshRequest("old-refresh-token")
-        val expected = TokenRefreshResponse("new-access-token", "new-refresh-token")
+    @Nested
+    @DisplayName("refreshAccessToken")
+    inner class RefreshAccessToken {
+        @Test
+        fun 리프레시_토큰_재발급_요청이_성공하면_새로운_액세스_토큰과_리프레시_토큰을_반환한다() {
+            val request = TokenRefreshRequest("old-refresh-token")
+            val expected = TokenRefreshResponse("new-access-token", "new-refresh-token")
+            whenever(authService.refreshAccessToken("old-refresh-token")).thenReturn(expected)
 
-        whenever(authService.refreshAccessToken("old-refresh-token")).thenReturn(expected)
+            val response = authController.refreshAccessToken(request)
 
-        // when
-        val response = authController.refreshAccessToken(request)
-
-        // then
-        verify(authService).refreshAccessToken("old-refresh-token")
-        assertEquals(ApiResponse.success(expected), response)
+            verify(authService).refreshAccessToken("old-refresh-token")
+            assertEquals(ApiResponse.success(expected), response)
+        }
     }
 
-    @Test
-    fun `Authorization 헤더가 주어지면 accessToken을 추출하여 로그아웃 처리한다`() {
-        // given
-        val bearerToken = "Bearer access-token-123"
+    @Nested
+    @DisplayName("logout")
+    inner class Logout {
+        @Test
+        fun Authorization_헤더가_주어지면_accessToken을_추출하여_로그아웃_처리한다() {
+            val bearerToken = "Bearer access-token-123"
 
-        // when
-        val response = authController.logout(bearerToken)
+            val response = authController.logout(bearerToken)
 
-        // then
-        verify(authService).logout("access-token-123")
-        assertEquals(ApiResponse.success(Unit), response)
+            verify(authService).logout("access-token-123")
+            assertEquals(ApiResponse.success(Unit), response)
+        }
     }
 }

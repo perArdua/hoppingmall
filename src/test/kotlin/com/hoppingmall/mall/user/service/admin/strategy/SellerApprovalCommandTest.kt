@@ -1,42 +1,64 @@
 package com.hoppingmall.mall.user.service.admin.strategy
 
-import com.hoppingmall.mall.global.enums.Role
-import com.hoppingmall.mall.global.vo.email.Email
-import com.hoppingmall.mall.global.vo.password.Password
 import com.hoppingmall.mall.support.fixture.fixture
-import com.hoppingmall.mall.support.withId
 import com.hoppingmall.mall.user.domain.Seller
-import com.hoppingmall.mall.user.domain.User
-import com.hoppingmall.mall.user.exception.seller.SellerInvalidApprovalStatusException
+import com.hoppingmall.mall.user.exception.seller.SellerInvalidApprovalCommandException
+import org.junit.jupiter.api.*
+import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Test
 
-@DisplayName("SellerApprovalCommand 전략 테스트")
+@DisplayName("SellerApprovalCommand")
+@DisplayNameGeneration(ReplaceUnderscores::class)
 class SellerApprovalCommandTest {
 
-    @Test
-    fun `APPROVED 전략은 seller 승인 상태로 변경한다`() {
-        val seller = createPendingSeller()
-        ApproveSellerCommand().execute(seller)
-        assertEquals(Seller.ApprovalStatus.APPROVED, seller.getApprovalStatus())
+    private lateinit var mapper: SellerApprovalCommandMapper
+    private lateinit var approveCommand: ApproveSellerCommand
+    private lateinit var rejectCommand: RejectSellerCommand
+
+    @BeforeEach
+    fun setUp() {
+        approveCommand = ApproveSellerCommand()
+        rejectCommand = RejectSellerCommand()
+        mapper = SellerApprovalCommandMapper(approveCommand, rejectCommand)
     }
 
-    @Test
-    fun `REJECTED 전략은 seller 거절 상태로 변경한다`() {
-        val seller = createPendingSeller()
-        RejectSellerCommand().execute(seller)
-        assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
+    @Nested
+    @DisplayName("ApproveSellerCommand")
+    inner class ApproveSellerCommandTest {
+        @Test
+        fun APPROVED_전략은_seller_승인_상태로_변경한다() {
+            val seller = Seller.fixture()
+            val command = mapper.getCommand(Seller.ApprovalStatus.APPROVED)
+            
+            command.execute(seller)
+            
+            assertEquals(Seller.ApprovalStatus.APPROVED, seller.getApprovalStatus())
+        }
     }
 
-    private fun createPendingSeller(): Seller {
-        val user: User = User.fixture(
-            email = Email("seller@example.com"),
-            password = Password("encodedPassword123!"),
-            name = "판매자테스트",
-            role = Role.SELLER
-        ).withId(1L)
-        return Seller.fixture(user)
+    @Nested
+    @DisplayName("RejectSellerCommand")
+    inner class RejectSellerCommandTest {
+        @Test
+        fun REJECTED_전략은_seller_거절_상태로_변경한다() {
+            val seller = Seller.fixture()
+            val command = mapper.getCommand(Seller.ApprovalStatus.REJECTED)
+            
+            command.execute(seller)
+            
+            assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
+        }
+    }
+
+    @Nested
+    @DisplayName("SellerApprovalCommandMapper")
+    inner class SellerApprovalCommandMapperTest {
+        @Test
+        fun PENDING_상태로_Command를_요청하면_예외가_발생한다() {
+            assertThrows(SellerInvalidApprovalCommandException::class.java) {
+                mapper.getCommand(Seller.ApprovalStatus.PENDING)
+            }
+        }
     }
 }

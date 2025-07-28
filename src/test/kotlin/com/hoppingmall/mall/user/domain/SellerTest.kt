@@ -4,46 +4,50 @@ import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.global.vo.email.Email
 import com.hoppingmall.mall.global.vo.password.Password
 import com.hoppingmall.mall.global.enums.Role
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.*
+import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
+import org.junit.jupiter.api.Assertions.assertEquals
 
+@DisplayName("Seller")
+@DisplayNameGeneration(ReplaceUnderscores::class)
 class SellerTest {
 
-    @Test
-    fun `Seller 생성 시 기본 승인 상태는 PENDING이다`() {
-        val user = User.fixture(
-            email = Email("seller@example.com"),
-            password = Password("encoded"),
-            name = "판매자",
-            role = Role.SELLER
-        )
+    @Nested
+    @DisplayName("생성")
+    inner class Creation {
+        @Test
+        fun Seller_생성_시_기본_승인_상태는_PENDING이다() {
+            val seller = Seller.fixture()
 
-        val seller = Seller.fixture(user = user)
-
-        assertEquals(Seller.ApprovalStatus.PENDING, seller.getApprovalStatus())
-        assertEquals("123-45-67890", seller.businessNumber)
-        assertEquals(user, seller.user)
+            assertEquals(Seller.ApprovalStatus.PENDING, seller.getApprovalStatus())
+            assertEquals("123-45-67890", seller.businessNumber)
+            assertEquals(Role.SELLER, seller.user.getRole())
+        }
     }
 
-    @Test
-    fun `approve 호출 시 상태가 APPROVED로 변경된다`() {
-        val seller = Seller.fixture(
-            user = User.fixture(role = Role.SELLER)
-        )
+    @Nested
+    @DisplayName("approve")
+    inner class Approve {
+        @Test
+        fun approve_호출_시_상태가_APPROVED로_변경된다() {
+            val seller = Seller.fixture()
 
-        seller.approve()
+            seller.approve()
 
-        assertEquals(Seller.ApprovalStatus.APPROVED, seller.getApprovalStatus())
+            assertEquals(Seller.ApprovalStatus.APPROVED, seller.getApprovalStatus())
+        }
     }
 
-    @Test
-    fun `reject 호출 시 상태가 REJECTED로 변경된다`() {
-        val seller = Seller.fixture(
-            user = User.fixture(role = Role.SELLER)
-        )
+    @Nested
+    @DisplayName("reject")
+    inner class Reject {
+        @Test
+        fun reject_호출_시_상태가_REJECTED로_변경된다() {
+            val seller = Seller.fixture()
 
-        seller.reject()
+            seller.reject()
 
-        assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
+            assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
+        }
     }
 }

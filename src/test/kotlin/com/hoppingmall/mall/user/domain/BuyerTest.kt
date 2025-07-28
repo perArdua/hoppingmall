@@ -4,22 +4,23 @@ import com.hoppingmall.mall.global.enums.Role
 import com.hoppingmall.mall.global.vo.email.Email
 import com.hoppingmall.mall.global.vo.password.Password
 import com.hoppingmall.mall.support.fixture.fixture
+import org.junit.jupiter.api.*
+import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
 
+@DisplayName("Buyer")
+@DisplayNameGeneration(ReplaceUnderscores::class)
 class BuyerTest {
 
-    @Test
-    fun `Buyer 생성 시 User 정보가 정확히 연결되어야 한다`() {
-        val user = User.fixture(
-            email = Email("buyer@example.com"),
-            password = Password("encoded"),
-            name = "구매자",
-            role = Role.BUYER
-        )
+    @Nested
+    @DisplayName("생성")
+    inner class Creation {
+        @Test
+        fun Buyer_생성_시_User_정보가_정확히_연결되어야_한다() {
+            val buyer = Buyer.fixture()
 
-        val buyer = Buyer.fixture(user)
-
-        assertEquals(user, buyer.user)
+            assertEquals(Role.BUYER, buyer.user.getRole())
+            assertEquals("구매자", buyer.user.getName())
+        }
     }
 }
