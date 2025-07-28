@@ -9,11 +9,14 @@ import com.hoppingmall.mall.user.dto.response.user.SignInResponse
 import com.hoppingmall.mall.user.dto.response.user.SignUpResponse
 import com.hoppingmall.mall.user.service.user.UserCommandService
 import com.hoppingmall.mall.user.service.user.UserQueryService
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.*
+import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
+@DisplayName("UserController")
+@DisplayNameGeneration(ReplaceUnderscores::class)
 class UserControllerTest {
 
     private val userCommandService: UserCommandService = mock()
@@ -24,55 +27,57 @@ class UserControllerTest {
         authService = authService
     )
 
-    @Test
-    fun `회원가입 요청이 성공하면 응답 코드와 사용자 정보가 반환된다`() {
-        // given
-        val request = SignUpRequest(
-            email = "test@example.com",
-            password = "password123",
-            name = "테스트",
-            role = Role.SELLER
-        )
+    @Nested
+    @DisplayName("signUp")
+    inner class SignUp {
+        @Test
+        fun 회원가입_요청이_성공하면_응답_코드와_사용자_정보가_반환된다() {
+            val request = SignUpRequest(
+                email = "test@example.com",
+                password = "password123",
+                name = "테스트",
+                role = Role.SELLER
+            )
 
-        val expectedResponse = SignUpResponse(
-            id = 1L,
-            email = "test@example.com",
-            name = "테스트",
-            role = Role.SELLER
-        )
+            val expectedResponse = SignUpResponse(
+                id = 1L,
+                email = "test@example.com",
+                name = "테스트",
+                role = Role.SELLER
+            )
 
-        whenever(userCommandService.signUp(request)).thenReturn(expectedResponse)
+            whenever(userCommandService.signUp(request)).thenReturn(expectedResponse)
 
-        // when
-        val response: ApiResponse<SignUpResponse> = controller.signUp(request)
+            val response: ApiResponse<SignUpResponse> = controller.signUp(request)
 
-        // then
-        assertEquals("SUCCESS", response.code)
-        assertEquals("성공", response.message)
-        assertEquals(expectedResponse, response.data)
+            assertEquals("SUCCESS", response.code)
+            assertEquals("성공", response.message)
+            assertEquals(expectedResponse, response.data)
+        }
     }
 
-    @Test
-    fun `로그인 요청이 성공하면 토큰 정보가 포함된 응답이 반환된다`() {
-        // given
-        val request = SignInRequest(
-            email = "test@example.com",
-            password = "password123"
-        )
+    @Nested
+    @DisplayName("login")
+    inner class Login {
+        @Test
+        fun 로그인_요청이_성공하면_토큰_정보가_포함된_응답이_반환된다() {
+            val request = SignInRequest(
+                email = "test@example.com",
+                password = "password123"
+            )
 
-        val expectedResponse = SignInResponse(
-            accessToken = "access-token",
-            refreshToken = "refresh-token"
-        )
+            val expectedResponse = SignInResponse(
+                accessToken = "access-token",
+                refreshToken = "refresh-token"
+            )
 
-        whenever(authService.login(request)).thenReturn(expectedResponse)
+            whenever(authService.login(request)).thenReturn(expectedResponse)
 
-        // when
-        val response: ApiResponse<SignInResponse> = controller.login(request)
+            val response: ApiResponse<SignInResponse> = controller.login(request)
 
-        // then
-        assertEquals("SUCCESS", response.code)
-        assertEquals("성공", response.message)
-        assertEquals(expectedResponse, response.data)
+            assertEquals("SUCCESS", response.code)
+            assertEquals("성공", response.message)
+            assertEquals(expectedResponse, response.data)
+        }
     }
 }
