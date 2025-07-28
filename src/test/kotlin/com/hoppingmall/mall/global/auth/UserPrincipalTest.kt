@@ -28,7 +28,7 @@ class UserPrincipalTest {
         fun 역할을_생략하면_기본값_USER로_설정된다() {
             val userId = 1L
 
-            val principal = UserPrincipal.of(userId)
+            val principal = UserPrincipal.of(userId, "USER")
 
             assertEquals("ROLE_USER", principal.authorities.first().authority)
             assertEquals(userId.toString(), principal.username)

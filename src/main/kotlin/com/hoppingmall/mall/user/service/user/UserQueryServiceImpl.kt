@@ -36,7 +36,7 @@ class UserQueryServiceImpl(
             id = user.id!!,
             email = user.email.value,
             name = user.getName(),
-            role = user.getRole()
+            role = user.getRole().name
         )
     }
 }
