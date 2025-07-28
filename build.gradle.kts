@@ -96,11 +96,12 @@ val jacocoExcludedDirs = listOf(
 	"**/dto/**",
 	"**/MallApplication*",
 	"**/com/hoppingmall/mall/MallApplicationTests*",
-	"**/com/hoppingmall/global/common/entity/**",
-	"**/com/hoppingmall/global/common/response/**",
-	"**/com/hoppingmall/global/common/error/**",
-	"**/com/hoppingmall/global/enums/**",
-	"**/com/hoppingmall/global/vo/**"
+	"**/com/hoppingmall/mall/global/common/entity/**",
+	"**/com/hoppingmall/mall/global/common/response/**",
+	"**/com/hoppingmall/mall/global/common/error/**",
+	"**/com/hoppingmall/mall/global/enums/**",
+	"**/com/hoppingmall/mall/global/vo/**",
+	"**/com/hoppingmall/mall/global/jwt/TokenProviderImpl*"
 )
 
 tasks.jacocoTestReport {
