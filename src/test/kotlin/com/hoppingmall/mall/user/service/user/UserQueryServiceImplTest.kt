@@ -9,7 +9,9 @@ import com.hoppingmall.mall.support.withId
 import com.hoppingmall.mall.user.domain.User
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.user.SignInRequest
+import com.hoppingmall.mall.user.dto.response.user.UserProfileResponse
 import com.hoppingmall.mall.user.exception.user.UserLoginFailedException
+import com.hoppingmall.mall.user.exception.user.UserNotFoundException
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -79,6 +81,39 @@ class UserQueryServiceImplTest {
             assertThrows(UserLoginFailedException::class.java) {
                 userQueryService.authenticate(SignInRequest(email.value, "irrelevant"))
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("getUserProfile")
+    inner class GetUserProfile {
+        @Test
+        fun 존재하는_사용자_ID로_프로필_조회_성공() {
+            val userId = 1L
+            val user = User.fixture().withId(userId)
+
+            whenever(userRepository.findNullableById(userId)).thenReturn(user)
+
+            val result = userQueryService.getUserProfile(userId)
+
+            assertEquals(user.id, result.id)
+            assertEquals(user.email.value, result.email)
+            assertEquals(user.getName(), result.name)
+            assertEquals(user.getRole().name, result.role)
+            verify(userRepository).findNullableById(userId)
+        }
+
+        @Test
+        fun 존재하지_않는_사용자_ID로_프로필_조회_시_예외_발생() {
+            val userId = 999L
+
+            whenever(userRepository.findNullableById(userId)).thenReturn(null)
+
+            assertThrows(UserNotFoundException::class.java) {
+                userQueryService.getUserProfile(userId)
+            }
+
+            verify(userRepository).findNullableById(userId)
         }
     }
 }

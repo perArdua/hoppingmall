@@ -4,11 +4,14 @@ import com.hoppingmall.mall.global.enums.Role
 import com.hoppingmall.mall.global.vo.email.Email
 import com.hoppingmall.mall.global.vo.password.Password
 import com.hoppingmall.mall.global.vo.password.service.PasswordCreator
+import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.withId
 import com.hoppingmall.mall.user.domain.User
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.user.SignUpRequest
+import com.hoppingmall.mall.user.dto.request.user.UpdateUserRequest
 import com.hoppingmall.mall.user.exception.user.UserAlreadyExistsException
+import com.hoppingmall.mall.user.exception.user.UserNotFoundException
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -66,6 +69,52 @@ class UserCommandServiceImplTest {
 
             assertThrows(UserAlreadyExistsException::class.java) {
                 userCommandService.signUp(request)
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("updateUserProfile")
+    inner class UpdateUserProfile {
+
+        @Test
+        fun 존재하는_사용자_정보_수정_성공() {
+            val userId = 1L
+            val request = UpdateUserRequest("새로운이름", "newPassword123!")
+            val user = User.fixture().withId(userId)
+            val encodedPassword = Password("encodedNewPassword")
+
+            whenever(userRepository.findNullableById(userId)).thenReturn(user)
+            whenever(passwordCreator.encode(request.password!!)).thenReturn(encodedPassword)
+
+            userCommandService.updateUserProfile(userId, request)
+
+            assertEquals("새로운이름", user.getName())
+            assertEquals(encodedPassword, user.getPassword())
+        }
+
+        @Test
+        fun 비밀번호_없이_이름만_수정_성공() {
+            val userId = 1L
+            val request = UpdateUserRequest("새로운이름", null)
+            val user = User.fixture().withId(userId)
+
+            whenever(userRepository.findNullableById(userId)).thenReturn(user)
+
+            userCommandService.updateUserProfile(userId, request)
+
+            assertEquals("새로운이름", user.getName())
+        }
+
+        @Test
+        fun 존재하지_않는_사용자_ID로_수정_시도_시_예외_발생() {
+            val userId = 999L
+            val request = UpdateUserRequest("새로운이름", "newPassword123!")
+
+            whenever(userRepository.findNullableById(userId)).thenReturn(null)
+
+            assertThrows(UserNotFoundException::class.java) {
+                userCommandService.updateUserProfile(userId, request)
             }
         }
     }
