@@ -21,7 +21,7 @@ class SellerTest {
 
             assertEquals(Seller.ApprovalStatus.PENDING, seller.getApprovalStatus())
             assertEquals("123-45-67890", seller.businessNumber)
-            assertEquals(Role.SELLER, seller.user.getRole())
+            assertEquals(1L, seller.userId)
         }
     }
 

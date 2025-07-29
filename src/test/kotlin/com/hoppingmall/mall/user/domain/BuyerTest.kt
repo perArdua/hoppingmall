@@ -16,11 +16,10 @@ class BuyerTest {
     @DisplayName("생성")
     inner class Creation {
         @Test
-        fun Buyer_생성_시_User_정보가_정확히_연결되어야_한다() {
+        fun Buyer_생성_시_User_ID가_정확히_연결되어야_한다() {
             val buyer = Buyer.fixture()
 
-            assertEquals(Role.BUYER, buyer.user.getRole())
-            assertEquals("구매자", buyer.user.getName())
+            assertEquals(1L, buyer.userId)
         }
     }
 }

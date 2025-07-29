@@ -40,7 +40,7 @@ class SellerCommandServiceImplTest {
 
             verify(sellerRepository).save(any())
             val savedSeller = captor.firstValue
-            assert(savedSeller.user == user)
+            assert(savedSeller.userId == user.id)
             assert(savedSeller.businessNumber == request.businessNumber)
         }
 
