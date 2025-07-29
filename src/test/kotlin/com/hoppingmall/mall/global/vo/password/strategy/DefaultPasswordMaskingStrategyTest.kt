@@ -7,10 +7,7 @@ class DefaultPasswordMaskingStrategyTest {
 
     @Test
     fun `비밀번호는 항상 마스킹된 값으로 리턴된다`() {
-        // given
-        val originalPassword = "MySecret123!"
-
-        // when
+        // given & when
         val masked = DefaultPasswordMaskingStrategy.mask()
 
         // then
