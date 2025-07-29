@@ -8,9 +8,8 @@ import org.hibernate.annotations.Filter
 @Entity
 @Table(name = "sellers")
 class Seller private constructor(
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    val user: User,
+    @Column(name = "user_id", nullable = false)
+    val userId: Long,
 
     @Column(name = "business_number", unique = true, nullable = false)
     val businessNumber: String,
@@ -33,7 +32,7 @@ class Seller private constructor(
 
     companion object {
         fun create(user: User, businessNumber: String): Seller {
-            return Seller(user, businessNumber, ApprovalStatus.PENDING)
+            return Seller(user.id!!, businessNumber, ApprovalStatus.PENDING)
         }
     }
 

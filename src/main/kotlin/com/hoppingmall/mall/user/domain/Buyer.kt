@@ -10,15 +10,14 @@ import org.hibernate.annotations.Filter
 @Table(name = "buyers")
 class Buyer private constructor(
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    val user: User
+    @Column(name = "user_id", nullable = false)
+    val userId: Long
 
 ) : BaseEntity() {
 
     companion object {
         fun create(user: User): Buyer {
-            return Buyer(user)
+            return Buyer(user.id!!)
         }
     }
 }
