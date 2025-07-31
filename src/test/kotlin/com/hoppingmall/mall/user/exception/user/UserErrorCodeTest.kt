@@ -1,10 +1,9 @@
 package com.hoppingmall.mall.user.exception.user
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.springframework.http.HttpStatus
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 @DisplayName("UserErrorCode")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -22,18 +21,18 @@ class UserErrorCodeTest {
             )
 
             expected.forEach { (errorCode, expectedValues) ->
-                assertEquals(expectedValues.first, errorCode.code)
-                assertEquals(expectedValues.second, errorCode.message)
-                assertEquals(expectedValues.third, errorCode.status)
+                assertThat(errorCode.code).isEqualTo(expectedValues.first)
+                assertThat(errorCode.message).isEqualTo(expectedValues.second)
+                assertThat(errorCode.status).isEqualTo(expectedValues.third)
             }
         }
 
         @Test
         fun 모든_에러코드는_ErrorCode_인터페이스를_구현한다() {
             UserErrorCode.values().forEach { errorCode ->
-                assertNotNull(errorCode.code)
-                assertNotNull(errorCode.message)
-                assertNotNull(errorCode.status)
+                assertThat(errorCode.code).isNotNull()
+                assertThat(errorCode.message).isNotNull()
+                assertThat(errorCode.status).isNotNull()
             }
         }
     }
