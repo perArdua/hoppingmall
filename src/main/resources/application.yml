@@ -39,3 +39,17 @@ jwt:
   secret: my-secret-secret-secret-secret-secret-key-123456789
   access-expiration-ms: 3600000 # 1 hour
   refresh-expiration-ms: 86400000 # 24 hour
+
+file:
+  upload:
+    base-upload-dir: D:/hoppingmall
+    max-file-size: 5242880 # 5MB
+    allowed-extensions:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - webp
+    allowed-domains:
+      - product
+    sub-directory: images
