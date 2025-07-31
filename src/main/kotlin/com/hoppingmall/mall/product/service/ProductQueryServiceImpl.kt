@@ -1,9 +1,11 @@
 package com.hoppingmall.mall.product.service
 
-import com.hoppingmall.mall.product.domain.Product
+import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
+import com.hoppingmall.mall.product.dto.response.ProductResponse
 import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -11,22 +13,49 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class ProductQueryServiceImpl(
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val productImageRepository: ProductImageRepository
 ): ProductQueryService {
 
-    override fun getProducts(pageable: Pageable): Page<Product> {
-        return productRepository.findAll(pageable)
+    override fun getProducts(pageable: Pageable): Page<ProductResponse> {
+        val productPage = productRepository.findAll(pageable)
+        
+        val productResponses = productPage.content.map { product ->
+            val image = productImageRepository.findByProductId(product.id!!)
+            ProductResponse.from(product, image)
+        }
+        
+        return PageImpl(
+            productResponses,
+            pageable,
+            productPage.totalElements
+        )
     }
 
-    override fun getProductById(productId: Long): Product {
-        return productRepository.findNullableById(productId)
+    override fun getProductById(productId: Long): ProductResponse {
+        val product = productRepository.findNullableById(productId)
             ?: throw ProductNotFoundException()
+        
+        val image = productImageRepository.findByProductId(productId)
+        
+        return ProductResponse.from(product, image)
     }
 
     override fun getProductsBySellerId(
         sellerId: Long,
         pageable: Pageable
-    ): Page<Product> {
-        return productRepository.findBySellerId(sellerId, pageable)
+    ): Page<ProductResponse> {
+        val productPage = productRepository.findBySellerId(sellerId, pageable)
+        
+        val productResponses = productPage.content.map { product ->
+            val image = productImageRepository.findByProductId(product.id!!)
+            ProductResponse.from(product, image)
+        }
+        
+        return PageImpl(
+            productResponses,
+            pageable,
+            productPage.totalElements
+        )
     }
 }
