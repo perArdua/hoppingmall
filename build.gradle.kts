@@ -61,6 +61,7 @@ dependencies {
 	testImplementation("org.springframework.security:spring-security-test")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+	testImplementation("org.assertj:assertj-core:3.24.2")
 
 	// token provider용
 	implementation("io.jsonwebtoken:jjwt-api:0.11.5")
@@ -101,7 +102,8 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/global/common/error/**",
 	"**/com/hoppingmall/mall/global/enums/**",
 	"**/com/hoppingmall/mall/global/vo/**",
-	"**/com/hoppingmall/mall/global/jwt/TokenProviderImpl*"
+	"**/com/hoppingmall/mall/global/jwt/TokenProviderImpl*",
+	"**/exception/**"
 )
 
 tasks.jacocoTestReport {
