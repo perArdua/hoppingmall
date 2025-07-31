@@ -2,11 +2,7 @@ package com.hoppingmall.mall.product.domain
 
 import com.hoppingmall.mall.global.common.entity.BaseEntity
 import com.hoppingmall.mall.global.enums.ProductStatus
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
-import jakarta.persistence.Table
+import jakarta.persistence.*
 import org.hibernate.annotations.Filter
 
 @Entity

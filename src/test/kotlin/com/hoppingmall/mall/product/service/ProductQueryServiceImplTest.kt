@@ -5,20 +5,20 @@ import com.hoppingmall.mall.product.domain.Product
 import com.hoppingmall.mall.product.domain.ProductImage
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
-import com.hoppingmall.mall.product.dto.response.ProductResponse
 import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import com.hoppingmall.mall.support.withId
-import org.junit.jupiter.api.*
-import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.DisplayNameGeneration
+import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Pageable
 
 @DisplayName("ProductQueryServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
