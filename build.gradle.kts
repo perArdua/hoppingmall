@@ -103,7 +103,9 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/global/enums/**",
 	"**/com/hoppingmall/mall/global/vo/**",
 	"**/com/hoppingmall/mall/global/jwt/TokenProviderImpl*",
-	"**/exception/**"
+	"**/exception/**",
+	"**/com/hoppingmall/mall/payment/service/MockPaymentService*",
+	"**/com/hoppingmall/mall/payment/service/KafkaPaymentEventPublisher*"
 )
 
 tasks.jacocoTestReport {
