@@ -1,0 +1,28 @@
+package com.hoppingmall.mall.notification.domain
+
+import com.hoppingmall.mall.global.common.entity.BaseEntity
+import com.hoppingmall.mall.notification.enum.NotificationType
+import jakarta.persistence.*
+
+@Entity
+@Table(name = "notifications")
+class Notification(
+    @Column(nullable = false)
+    val userId: Long,
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    val type: NotificationType,
+
+    @Column(nullable = false)
+    val title: String,
+
+    @Column(columnDefinition = "TEXT")
+    val content: String,
+
+    @Column(columnDefinition = "TEXT")
+    val metadata: String? = null,
+
+    @Column
+    var isRead: Boolean = false
+) : BaseEntity() 
