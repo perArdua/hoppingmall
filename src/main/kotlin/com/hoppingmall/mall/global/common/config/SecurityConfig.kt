@@ -27,7 +27,7 @@ class SecurityConfig(
             .exceptionHandling { it.authenticationEntryPoint(jwtAuthenticationEntryPoint) }
             .authorizeHttpRequests {
                 it.requestMatchers("/api/v1/users/signup", "/api/v1/users/login").permitAll()
-                it.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                it.requestMatchers("/api/v1/admin/**", "/api/v1/point-policies/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/**").authenticated()
                 it.anyRequest().denyAll()
             }
