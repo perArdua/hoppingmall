@@ -4,6 +4,7 @@ import com.hoppingmall.mall.notification.domain.Notification
 import com.hoppingmall.mall.notification.domain.NotificationRepository
 import com.hoppingmall.mall.notification.dto.event.NotificationEvent
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -15,11 +16,10 @@ class NotificationEventConsumer(
     
     @KafkaListener(topics = ["notification"], groupId = "notification-service")
     fun handleNotificationEvent(
-        event: NotificationEvent,
-        key: String? = null
+        @Payload event: NotificationEvent
     ) {
         // Key 기반 파티셔닝으로 같은 userId의 알림은 같은 파티션에서 순차 처리
-        println("알림 처리: userId=${event.userId}, type=${event.type}, key=$key")
+        println("알림 처리: userId=${event.userId}, type=${event.type}")
         
         val notification = Notification(
             userId = event.userId,
