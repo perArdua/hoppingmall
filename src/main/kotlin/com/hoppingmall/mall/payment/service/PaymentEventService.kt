@@ -45,13 +45,22 @@ class PaymentEventService(
     }
     
     fun publishPaymentCompletedNotification(payment: Payment) {
+        val metadata = """
+            {
+                "orderId": ${payment.orderId},
+                "paymentId": ${payment.id},
+                "amount": "${payment.amount}",
+                "method": "${payment.method}",
+                "transactionId": "${payment.transactionId}"
+            }
+        """.trimIndent()
+        
         val event = NotificationEvent(
             userId = payment.userId,
             type = NotificationType.PAYMENT_COMPLETED,
             title = "결제가 완료되었습니다",
             content = "주문번호 ${payment.orderId}의 결제가 성공적으로 완료되었습니다. 결제 금액: ${payment.amount}원",
-            orderId = payment.orderId,
-            paymentId = payment.id!!
+            metadata = metadata
         )
         kafkaTemplate.send("notification", payment.userId.toString(), event)
     }

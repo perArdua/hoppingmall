@@ -49,6 +49,16 @@ class PointEventConsumer(
                 )
             )
 
+            val metadata = """
+                {
+                    "orderId": ${event.orderId},
+                    "paymentId": ${event.paymentId},
+                    "earnAmount": "${event.earnAmount}",
+                    "reason": "${event.reason}",
+                    "currentBalance": "${savedPoint.balance}"
+                }
+            """.trimIndent()
+
             kafkaTemplate.send(
                 "notification", event.userId.toString(),
                 NotificationEvent(
@@ -56,9 +66,7 @@ class PointEventConsumer(
                     type = NotificationType.POINT_EARNED,
                     title = "포인트가 적립되었습니다",
                     content = "주문번호 ${event.orderId}의 포인트 ${event.earnAmount}점이 적립되었습니다. 현재 잔액: ${savedPoint.balance}점",
-                    orderId = event.orderId,
-                    paymentId = event.paymentId,
-                    pointAmount = event.earnAmount
+                    metadata = metadata
                 )
             )
         } catch (e: Exception) {
