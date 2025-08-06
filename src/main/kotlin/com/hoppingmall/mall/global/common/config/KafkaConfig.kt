@@ -18,6 +18,15 @@ class KafkaConfig {
     @Value("\${spring.kafka.bootstrap-servers}")
     private lateinit var bootstrapServers: String
 
+    @Value("\${spring.kafka.consumer.group-id:hoppingmall-group}")
+    private lateinit var groupId: String
+
+    @Value("\${spring.kafka.consumer.auto-offset-reset:earliest}")
+    private lateinit var autoOffsetReset: String
+
+    @Value("\${spring.kafka.listener.concurrency:1}")
+    private var concurrency: Int = 4
+
     @Bean
     fun producerFactory(): ProducerFactory<String, Any> {
         val configProps = HashMap<String, Any>()
@@ -36,8 +45,8 @@ class KafkaConfig {
     fun consumerFactory(): ConsumerFactory<String, Any> {
         val configProps = HashMap<String, Any>()
         configProps[ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
-        configProps[ConsumerConfig.GROUP_ID_CONFIG] = "hoppingmall-group"
-        configProps[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = "earliest"
+        configProps[ConsumerConfig.GROUP_ID_CONFIG] = groupId
+        configProps[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = autoOffsetReset
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
         configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = JsonDeserializer::class.java
         configProps[JsonDeserializer.TRUSTED_PACKAGES] = "*"
@@ -48,7 +57,7 @@ class KafkaConfig {
     fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
-        factory.setConcurrency(1)
+        factory.setConcurrency(concurrency)
         return factory
     }
 } 
