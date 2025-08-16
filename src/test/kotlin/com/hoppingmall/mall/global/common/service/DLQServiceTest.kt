@@ -143,7 +143,7 @@ class DLQServiceTest {
             assertTrue(result)
             verify(kafkaTemplate).send(
                 eq(dlqMessage.originalTopic),
-                eq(dlqMessage.originalKey),
+                eq(dlqMessage.originalKey ?: ""),
                 any()
             )
             verify(dlqMessageRepository, times(2)).save(dlqMessage) // incrementRetry + markAsProcessed
@@ -359,7 +359,6 @@ class DLQServiceTest {
             this.retryCount = retryCount
         }
         
-        // id 설정을 위한 리플렉션 (테스트용)
         id?.let {
             val idField = DLQMessage::class.java.superclass.getDeclaredField("id")
             idField.isAccessible = true

@@ -52,43 +52,31 @@ class DLQMessage(
     
 ) : BaseEntity() {
     
-    /**
-     * 재시도 시도
-     */
     fun incrementRetry() {
         this.retryCount++
         this.lastRetryAt = System.currentTimeMillis()
         this.status = DLQStatus.RETRYING
     }
     
-    /**
-     * 처리 완료 처리
-     */
     fun markAsProcessed(notes: String? = null) {
         this.status = DLQStatus.PROCESSED
         this.processedAt = System.currentTimeMillis()
         this.notes = notes
     }
     
-    /**
-     * 실패 처리
-     */
     fun markAsFailed(notes: String? = null) {
         this.status = DLQStatus.FAILED
         this.notes = notes
     }
     
-    /**
-     * 메시지 키 생성 (중복 방지용)
-     */
     fun getMessageKey(): String {
         return "${originalTopic}:${originalPartition}:${originalOffset}"
     }
 }
 
 enum class DLQStatus {
-    PENDING,    // 대기 중
-    RETRYING,   // 재시도 중
-    PROCESSED,  // 처리 완료
-    FAILED      // 최종 실패
+    PENDING,
+    RETRYING,
+    PROCESSED,
+    FAILED
 }

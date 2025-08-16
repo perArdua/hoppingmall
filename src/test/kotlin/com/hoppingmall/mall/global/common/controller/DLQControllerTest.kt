@@ -116,7 +116,7 @@ class DLQControllerTest {
             )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpected(jsonPath("$.data.topic").value(topic))
+                .andExpect(jsonPath("$.data.topic").value(topic))
                 .andExpect(jsonPath("$.data.totalAttempted").value(10))
                 .andExpect(jsonPath("$.data.successCount").value(8))
                 .andExpect(jsonPath("$.data.failureCount").value(2))
@@ -137,7 +137,7 @@ class DLQControllerTest {
                 "errors" to emptyList<String>()
             )
             
-            whenever(dlqService.retryDLQMessagesByTopic(topic, 50)) // 기본값
+            whenever(dlqService.retryDLQMessagesByTopic(topic, 50))
                 .thenReturn(expectedResult)
             
             // when & then
@@ -214,7 +214,7 @@ class DLQControllerTest {
             )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpected(jsonPath("$.data").value("처리 완료된 DLQ 메시지 삭제: payment (삭제된 메시지: 25개)"))
+                .andExpect(jsonPath("$.data").value("처리 완료된 DLQ 메시지 삭제: payment (삭제된 메시지: 25개)"))
             
             verify(dlqService).clearProcessedDLQMessages(topic)
         }
