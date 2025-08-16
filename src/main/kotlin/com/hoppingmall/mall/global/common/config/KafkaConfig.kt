@@ -9,8 +9,11 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.serializer.JsonDeserializer
 import org.springframework.kafka.support.serializer.JsonSerializer
+import org.springframework.util.backoff.FixedBackOff
+import com.hoppingmall.mall.global.common.service.DLQService
 
 @Configuration
 class KafkaConfig {
@@ -54,10 +57,55 @@ class KafkaConfig {
     }
 
     @Bean
-    fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
+    fun kafkaListenerContainerFactory(dlqService: DLQService): ConcurrentKafkaListenerContainerFactory<String, Any> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
         factory.setConcurrency(concurrency)
+        
+        // DLQ 에러 핸들러 설정
+        val errorHandler = DefaultErrorHandler(
+            { record, exception ->
+                // 실패한 메시지를 DB에 저장
+                sendToDLQ(record, exception, dlqService)
+            },
+            FixedBackOff(1000L, 3) // 1초 간격으로 3번 재시도
+        )
+        factory.setCommonErrorHandler(errorHandler)
+        
         return factory
     }
-} 
+
+    private fun sendToDLQ(
+        record: org.apache.kafka.clients.consumer.ConsumerRecord<*, *>, 
+        exception: Exception,
+        dlqService: DLQService
+    ) {
+        try {
+            val dlqMessage = DeadLetterMessage(
+                originalTopic = record.topic(),
+                originalPartition = record.partition(),
+                originalOffset = record.offset(),
+                originalKey = record.key()?.toString(),
+                originalValue = record.value()?.toString(),
+                exception = exception.message,
+                timestamp = System.currentTimeMillis()
+            )
+            
+            // DB에 DLQ 메시지 저장
+            dlqService.saveDLQMessage(dlqMessage)
+        } catch (e: Exception) {
+            // DLQ 저장 실패 시에도 메시지 손실 방지를 위해 로깅만 수행
+            println("DLQ 저장 실패: ${e.message}")
+        }
+    }
+}
+
+data class DeadLetterMessage(
+    val originalTopic: String,
+    val originalPartition: Int,
+    val originalOffset: Long,
+    val originalKey: String?,
+    val originalValue: String?,
+    val exception: String?,
+    val timestamp: Long
+) 
