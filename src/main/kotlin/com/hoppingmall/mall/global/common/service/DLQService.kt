@@ -22,15 +22,10 @@ class DLQService(
     
     private val logger = LoggerFactory.getLogger(DLQService::class.java)
     
-    // 동시성 처리를 위한 메시지 처리 중 상태 추적
     private val processingMessages = ConcurrentHashMap<String, Boolean>()
     
-    /**
-     * DLQ 메시지 저장
-     */
     fun saveDLQMessage(deadLetterMessage: DeadLetterMessage) {
         try {
-            // 중복 메시지 체크
             val exists = dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
                 deadLetterMessage.originalTopic,
                 deadLetterMessage.originalPartition,
@@ -63,27 +58,18 @@ class DLQService(
         }
     }
     
-    /**
-     * 토픽별 DLQ 메시지 조회
-     */
     @Transactional(readOnly = true)
     fun getDLQMessages(topic: String, page: Int = 0, size: Int = 100): Page<DLQMessage> {
         val pageable = PageRequest.of(page, size)
         return dlqMessageRepository.findByOriginalTopicOrderByCreatedAtDesc(topic, pageable)
     }
     
-    /**
-     * 상태별 DLQ 메시지 조회
-     */
     @Transactional(readOnly = true)
     fun getDLQMessagesByStatus(status: DLQStatus, page: Int = 0, size: Int = 100): Page<DLQMessage> {
         val pageable = PageRequest.of(page, size)
         return dlqMessageRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
     }
     
-    /**
-     * DLQ 통계 조회
-     */
     @Transactional(readOnly = true)
     fun getDLQStats(): Map<String, Any> {
         val totalCount = dlqMessageRepository.count()
@@ -111,13 +97,9 @@ class DLQService(
         )
     }
     
-    /**
-     * DLQ 메시지 재처리
-     */
     fun retryDLQMessage(dlqMessageId: Long): Boolean {
         val messageKey = "dlq:$dlqMessageId"
         
-        // 중복 처리 방지
         if (processingMessages.putIfAbsent(messageKey, true) != null) {
             logger.warn("이미 처리 중인 DLQ 메시지: id={}", dlqMessageId)
             return false
@@ -135,7 +117,6 @@ class DLQService(
                 return false
             }
             
-            // 재시도 횟수 체크
             if (dlqMessage.retryCount >= 3) {
                 dlqMessage.markAsFailed("최대 재시도 횟수 초과")
                 dlqMessageRepository.save(dlqMessage)
@@ -145,15 +126,12 @@ class DLQService(
             
             logger.info("DLQ 메시지 재처리 시작: id={}, topic={}", dlqMessageId, dlqMessage.originalTopic)
             
-            // 재시도 카운트 증가
             dlqMessage.incrementRetry()
             dlqMessageRepository.save(dlqMessage)
             
-            // 원본 토픽으로 메시지 재전송
             val originalValue = reconstructOriginalMessage(dlqMessage)
-            kafkaTemplate.send(dlqMessage.originalTopic, dlqMessage.originalKey, originalValue)
+            kafkaTemplate.send(dlqMessage.originalTopic, dlqMessage.originalKey ?: "", originalValue)
             
-            // 처리 완료 처리
             dlqMessage.markAsProcessed("수동 재처리 성공")
             dlqMessageRepository.save(dlqMessage)
             
@@ -163,7 +141,6 @@ class DLQService(
         } catch (e: Exception) {
             logger.error("DLQ 메시지 재처리 실패: id={}, error={}", dlqMessageId, e.message, e)
             
-            // 실패 시 상태 업데이트
             try {
                 val dlqMessage = dlqMessageRepository.findById(dlqMessageId).orElse(null)
                 dlqMessage?.let {
@@ -180,9 +157,6 @@ class DLQService(
         }
     }
     
-    /**
-     * 토픽별 DLQ 메시지 일괄 재처리
-     */
     fun retryDLQMessagesByTopic(topic: String, maxCount: Int = 50): Map<String, Any> {
         val pageable = PageRequest.of(0, maxCount)
         val pendingMessages = dlqMessageRepository.findByOriginalTopicAndStatusOrderByCreatedAtDesc(
@@ -207,13 +181,10 @@ class DLQService(
             "totalAttempted" to pendingMessages.content.size,
             "successCount" to successCount,
             "failureCount" to failureCount,
-            "errors" to errors.take(10) // 최대 10개 에러만 표시
+            "errors" to errors.take(10)
         )
     }
     
-    /**
-     * 토픽별 DLQ 메시지 삭제 (PROCESSED 상태만)
-     */
     fun clearProcessedDLQMessages(topic: String): Long {
         val processedMessages = dlqMessageRepository.findByOriginalTopicAndStatusOrderByCreatedAtDesc(
             topic, DLQStatus.PROCESSED, PageRequest.of(0, 1000)
@@ -232,9 +203,9 @@ class DLQService(
         return try {
             dlqMessage.originalValue?.let { value ->
                 when {
-                    value.startsWith("{") && value.endsWith("}") -> value // JSON 객체
-                    value.startsWith("[") && value.endsWith("]") -> value // JSON 배열
-                    else -> value // 일반 문자열
+                    value.startsWith("{") && value.endsWith("}") -> value
+                    value.startsWith("[") && value.endsWith("]") -> value
+                    else -> value
                 }
             }
         } catch (e: Exception) {

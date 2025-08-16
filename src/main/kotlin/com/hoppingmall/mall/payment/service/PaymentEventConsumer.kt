@@ -15,19 +15,17 @@ class PaymentEventConsumer {
         try {
             logger.info("결제 이벤트 처리 시작: ${paymentEvent.orderId}")
             
-            // 결제 처리 로직
             processPayment(paymentEvent)
             
             logger.info("결제 이벤트 처리 완료: ${paymentEvent.orderId}")
             
         } catch (e: Exception) {
             logger.error("결제 이벤트 처리 실패: ${paymentEvent.orderId}, 오류: ${e.message}")
-            throw e // DLQ로 전송되도록 예외를 다시 던짐
+            throw e
         }
     }
     
     private fun processPayment(paymentEvent: PaymentEvent) {
-        // 실제 결제 처리 로직
         when (paymentEvent.paymentType) {
             PaymentType.CREDIT_CARD -> processCreditCardPayment(paymentEvent)
             PaymentType.BANK_TRANSFER -> processBankTransferPayment(paymentEvent)
@@ -36,7 +34,6 @@ class PaymentEventConsumer {
     }
     
     private fun processCreditCardPayment(paymentEvent: PaymentEvent) {
-        // 신용카드 결제 처리
         if (paymentEvent.amount > 1000000) {
             throw RuntimeException("대금액 결제는 별도 승인이 필요합니다")
         }
@@ -44,12 +41,10 @@ class PaymentEventConsumer {
     }
     
     private fun processBankTransferPayment(paymentEvent: PaymentEvent) {
-        // 계좌이체 결제 처리
         logger.info("계좌이체 결제 처리: ${paymentEvent.orderId}")
     }
     
     private fun processVirtualAccountPayment(paymentEvent: PaymentEvent) {
-        // 가상계좌 결제 처리
         logger.info("가상계좌 결제 처리: ${paymentEvent.orderId}")
     }
 }

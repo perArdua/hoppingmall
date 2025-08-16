@@ -33,9 +33,9 @@ class DLQMessageRepositoryTest {
             // given
             val topic = "payment"
             val dlqMessage1 = createAndSaveDLQMessage(topic = topic)
-            Thread.sleep(10) // 생성 시간 차이를 위한 대기
+            Thread.sleep(10)
             val dlqMessage2 = createAndSaveDLQMessage(topic = topic)
-            createAndSaveDLQMessage(topic = "order") // 다른 토픽
+            createAndSaveDLQMessage(topic = "order")
             
             val pageable = PageRequest.of(0, 10)
             
@@ -153,9 +153,9 @@ class DLQMessageRepositoryTest {
             )
             createAndSaveDLQMessage(
                 status = DLQStatus.PENDING,
-                retryCount = 3 // 최대 재시도 횟수 초과
+                retryCount = 3
             )
-            createAndSaveDLQMessage(status = DLQStatus.PROCESSED) // 다른 상태
+            createAndSaveDLQMessage(status = DLQStatus.PROCESSED)
             
             val pageable = PageRequest.of(0, 10)
             
@@ -202,7 +202,7 @@ class DLQMessageRepositoryTest {
             
             // when
             val exists = dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
-                "payment", 0, 12346L // 다른 오프셋
+                "payment", 0, 12346L
             )
             
             // then
@@ -220,12 +220,10 @@ class DLQMessageRepositoryTest {
             val paymentTopic = "payment"
             val orderTopic = "order"
             
-            // payment 토픽 메시지들
             createAndSaveDLQMessage(topic = paymentTopic, status = DLQStatus.PENDING)
             createAndSaveDLQMessage(topic = paymentTopic, status = DLQStatus.PROCESSED)
             createAndSaveDLQMessage(topic = paymentTopic, status = DLQStatus.FAILED)
             
-            // order 토픽 메시지들
             createAndSaveDLQMessage(topic = orderTopic, status = DLQStatus.PENDING)
             createAndSaveDLQMessage(topic = orderTopic, status = DLQStatus.PENDING)
             
@@ -252,7 +250,7 @@ class DLQMessageRepositoryTest {
     private fun createAndSaveDLQMessage(
         topic: String = "test-topic",
         partition: Int = 0,
-        offset: Long = System.nanoTime(), // 유니크 오프셋을 위해 nanoTime 사용
+        offset: Long = System.nanoTime(),
         key: String? = "test-key",
         value: String? = "test-value",
         exception: String? = "Test exception",
