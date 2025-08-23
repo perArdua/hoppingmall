@@ -41,8 +41,8 @@ class RedisConfig {
         }
     }
 
-    @Bean
-    fun stringRedisTemplate(connectionFactory: RedisConnectionFactory): RedisTemplate<String, String> {
+    @Bean("customStringRedisTemplate")
+    fun customStringRedisTemplate(connectionFactory: RedisConnectionFactory): RedisTemplate<String, String> {
         return RedisTemplate<String, String>().apply {
             setConnectionFactory(connectionFactory)
             keySerializer = StringRedisSerializer()
