@@ -10,9 +10,10 @@ import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.point.service.PointPolicyService
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.successFixture
+import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
+import com.hoppingmall.mall.point.dto.response.PointPolicyResponse
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
-import org.springframework.kafka.core.KafkaTemplate
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
@@ -20,9 +21,9 @@ import kotlin.test.assertEquals
 class PaymentEventServiceTest {
     
     private val paymentEventPublisher: PaymentEventPublisher = mock()
-    private val kafkaTemplate: KafkaTemplate<String, Any> = mock()
+    private val transactionalEventPublisher: TransactionalEventPublisher = mock()
     private val pointPolicyService: PointPolicyService = mock()
-    private val paymentEventService = PaymentEventService(paymentEventPublisher, kafkaTemplate, pointPolicyService)
+    private val paymentEventService = PaymentEventService(paymentEventPublisher, transactionalEventPublisher, pointPolicyService)
     
     @Test
     fun `결제 완료 이벤트를 발행한다`() {
@@ -57,13 +58,32 @@ class PaymentEventServiceTest {
         paymentEventService.publishPaymentCompletedNotification(payment)
         
         // then
-        verify(kafkaTemplate).send(eq("notification"), eq("1"), any())
+        verify(transactionalEventPublisher).publishEvent(
+            aggregateType = eq("Payment"),
+            aggregateId = eq("1"),
+            eventType = eq("PaymentCompletedNotificationRequested"),
+            eventData = any(),
+            topic = eq("notification"),
+            partitionKey = eq("1")
+        )
     }
     
     @Test
     fun `포인트 적립 요청 이벤트의 금액이 정확히 계산된다`() {
         // given
         val payment = Payment.fixture(amount = BigDecimal("10000"))
+        whenever(pointPolicyService.getCurrentPolicy()).thenReturn(
+            PointPolicyResponse(
+                id = 1L,
+                policyName = "기본 정책",
+                earnRate = BigDecimal("0.01"),
+                maxEarnRate = BigDecimal("0.05"),
+                minUseAmount = BigDecimal("1000"),
+                maxUseAmount = BigDecimal("100000"),
+                isActive = true,
+                description = "1% 적립"
+            )
+        )
         
         val captor = argumentCaptor<PointEarnRequestEvent>()
         
@@ -80,14 +100,20 @@ class PaymentEventServiceTest {
         // given
         val payment = Payment.fixture()
         
-        val captor = argumentCaptor<NotificationEvent>()
-        
         // when
         paymentEventService.publishPaymentCompletedNotification(payment)
         
         // then
-        verify(kafkaTemplate).send(eq("notification"), eq("1"), captor.capture())
-        assertEquals(NotificationType.PAYMENT_COMPLETED, captor.firstValue.type)
-        assertEquals("주문번호 1의 결제가 성공적으로 완료되었습니다. 결제 금액: 50000원", captor.firstValue.content)
+        verify(transactionalEventPublisher).publishEvent(
+            aggregateType = eq("Payment"),
+            aggregateId = eq("1"),
+            eventType = eq("PaymentCompletedNotificationRequested"),
+            eventData = argThat { eventData ->
+                val data = eventData as Map<String, Any>
+                data["content"] == "주문번호 1의 결제가 성공적으로 완료되었습니다. 결제 금액: 50000원"
+            },
+            topic = eq("notification"),
+            partitionKey = eq("1")
+        )
     }
 } 

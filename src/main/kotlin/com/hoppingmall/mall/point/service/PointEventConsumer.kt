@@ -11,10 +11,10 @@ import com.hoppingmall.mall.point.enum.PointType
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.retry.annotation.Retryable
 import org.springframework.retry.annotation.Backoff
+import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 
@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 class PointEventConsumer(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
-    private val kafkaTemplate: KafkaTemplate<String, Any>
+    private val transactionalEventPublisher: TransactionalEventPublisher
 ) {
 
     @KafkaListener(topics = ["point-earn-request"], groupId = "point-service")
@@ -49,25 +49,27 @@ class PointEventConsumer(
                 )
             )
 
-            val metadata = """
-                {
-                    "orderId": ${event.orderId},
-                    "paymentId": ${event.paymentId},
-                    "earnAmount": "${event.earnAmount}",
-                    "reason": "${event.reason}",
-                    "currentBalance": "${savedPoint.balance}"
-                }
-            """.trimIndent()
+            val metadata = mapOf(
+                "orderId" to event.orderId,
+                "paymentId" to event.paymentId,
+                "earnAmount" to event.earnAmount.toString(),
+                "reason" to (event.reason ?: "포인트 적립"),
+                "currentBalance" to savedPoint.balance.toString()
+            )
 
-            kafkaTemplate.send(
-                "notification", event.userId.toString(),
-                NotificationEvent(
-                    userId = event.userId,
-                    type = NotificationType.POINT_EARNED,
-                    title = "포인트가 적립되었습니다",
-                    content = "주문번호 ${event.orderId}의 포인트 ${event.earnAmount}점이 적립되었습니다. 현재 잔액: ${savedPoint.balance}점",
-                    metadata = metadata
-                )
+            transactionalEventPublisher.publishEvent(
+                aggregateType = "Point",
+                aggregateId = savedPoint.id!!.toString(),
+                eventType = "PointEarnedNotificationRequested",
+                eventData = mapOf(
+                    "userId" to event.userId,
+                    "type" to NotificationType.POINT_EARNED.toString(),
+                    "title" to "포인트가 적립되었습니다",
+                    "content" to "주문번호 ${event.orderId}의 포인트 ${event.earnAmount}점이 적립되었습니다. 현재 잔액: ${savedPoint.balance}점",
+                    "metadata" to metadata
+                ),
+                topic = "notification",
+                partitionKey = event.userId.toString()
             )
         } catch (e: Exception) {
             println("포인트 적립 처리 중 오류 발생: ${e.message}")
