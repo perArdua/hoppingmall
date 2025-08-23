@@ -6,7 +6,7 @@ import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.mall.notification.dto.event.NotificationEvent
 import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.point.service.PointPolicyService
-import org.springframework.kafka.core.KafkaTemplate
+import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -14,7 +14,7 @@ import java.time.LocalDateTime
 @Service
 class PaymentEventService(
     private val paymentEventPublisher: PaymentEventPublisher,
-    private val kafkaTemplate: KafkaTemplate<String, Any>,
+    private val transactionalEventPublisher: TransactionalEventPublisher,
     private val pointPolicyService: PointPolicyService
 ) {
     
@@ -45,24 +45,28 @@ class PaymentEventService(
     }
     
     fun publishPaymentCompletedNotification(payment: Payment) {
-        val metadata = """
-            {
-                "orderId": ${payment.orderId},
-                "paymentId": ${payment.id},
-                "amount": "${payment.amount}",
-                "method": "${payment.method}",
-                "transactionId": "${payment.transactionId}"
-            }
-        """.trimIndent()
-        
-        val event = NotificationEvent(
-            userId = payment.userId,
-            type = NotificationType.PAYMENT_COMPLETED,
-            title = "결제가 완료되었습니다",
-            content = "주문번호 ${payment.orderId}의 결제가 성공적으로 완료되었습니다. 결제 금액: ${payment.amount}원",
-            metadata = metadata
+        val metadata = mapOf(
+            "orderId" to payment.orderId,
+            "paymentId" to payment.id!!,
+            "amount" to payment.amount.toString(),
+            "method" to payment.method.toString(),
+            "transactionId" to payment.transactionId
         )
-        kafkaTemplate.send("notification", payment.userId.toString(), event)
+        
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Payment",
+            aggregateId = payment.id!!.toString(),
+            eventType = "PaymentCompletedNotificationRequested",
+            eventData = mapOf(
+                "userId" to payment.userId,
+                "type" to NotificationType.PAYMENT_COMPLETED.toString(),
+                "title" to "결제가 완료되었습니다",
+                "content" to "주문번호 ${payment.orderId}의 결제가 성공적으로 완료되었습니다. 결제 금액: ${payment.amount}원",
+                "metadata" to metadata
+            ),
+            topic = "notification",
+            partitionKey = payment.userId.toString()
+        )
     }
     
     private fun getCurrentEarnRate(): BigDecimal {

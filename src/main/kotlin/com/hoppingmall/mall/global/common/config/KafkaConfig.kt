@@ -14,7 +14,8 @@ import org.springframework.kafka.support.serializer.JsonDeserializer
 import org.springframework.kafka.support.serializer.JsonSerializer
 import org.springframework.util.backoff.FixedBackOff
 import com.hoppingmall.mall.global.common.service.DLQService
-
+import org.apache.kafka.clients.consumer.ConsumerConfig.ISOLATION_LEVEL_CONFIG
+import org.apache.kafka.clients.consumer.ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG
 @Configuration
 class KafkaConfig {
 
@@ -36,13 +37,34 @@ class KafkaConfig {
         configProps[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
         configProps[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
         configProps[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = JsonSerializer::class.java
+        
+        // EOS 설정 - 완전한 트랜잭션 지원
+        configProps[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
+        configProps[ProducerConfig.ACKS_CONFIG] = "all"
+        configProps[ProducerConfig.RETRIES_CONFIG] = Int.MAX_VALUE
+        configProps[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = 5
+        configProps[ProducerConfig.TRANSACTIONAL_ID_CONFIG] = "hoppingmall-tx-"
+        
+        // 성능 최적화
+        configProps[ProducerConfig.BATCH_SIZE_CONFIG] = 16384
+        configProps[ProducerConfig.LINGER_MS_CONFIG] = 10
+        configProps[ProducerConfig.COMPRESSION_TYPE_CONFIG] = "lz4"
+        
         return DefaultKafkaProducerFactory(configProps)
     }
 
     @Bean
     fun kafkaTemplate(): KafkaTemplate<String, Any> {
-        return KafkaTemplate(producerFactory())
+        val template = KafkaTemplate(producerFactory())
+        template.setTransactionIdPrefix("hoppingmall-tx-")
+        return template
     }
+
+    @Bean("kafkaTransactionManager")
+    fun kafkaTransactionManager(): org.springframework.kafka.transaction.KafkaTransactionManager<String, Any> {
+        return org.springframework.kafka.transaction.KafkaTransactionManager(producerFactory())
+    }
+
 
     @Bean
     fun consumerFactory(): ConsumerFactory<String, Any> {
@@ -53,6 +75,11 @@ class KafkaConfig {
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
         configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = JsonDeserializer::class.java
         configProps[JsonDeserializer.TRUSTED_PACKAGES] = "*"
+        
+        // Consumer 설정 - EOS를 위한 read_committed 유지
+        configProps[ENABLE_AUTO_COMMIT_CONFIG] = false
+        configProps[ISOLATION_LEVEL_CONFIG] = "read_committed"
+        
         return DefaultKafkaConsumerFactory(configProps)
     }
 

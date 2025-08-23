@@ -11,6 +11,9 @@ import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.failedFixture
 import com.hoppingmall.mall.support.fixture.successFixture
 import com.hoppingmall.mall.support.withId
+import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
+import com.hoppingmall.mall.point.service.PointPolicyService
+import com.hoppingmall.mall.point.dto.response.PointPolicyResponse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -26,9 +29,10 @@ class PaymentCommandServiceImplTest {
 
     private val paymentRepository: PaymentRepository = mock()
     private val paymentService: PaymentService = mock()
-    private val paymentEventService: PaymentEventService = mock()
+    private val transactionalEventPublisher: TransactionalEventPublisher = mock()
+    private val pointPolicyService: PointPolicyService = mock()
     private val paymentCommandService = PaymentCommandServiceImpl(
-        paymentRepository, paymentService, paymentEventService
+        paymentRepository, paymentService, transactionalEventPublisher, pointPolicyService
     )
 
     @Nested
@@ -55,6 +59,18 @@ class PaymentCommandServiceImplTest {
             }
             whenever(paymentService.processPayment(any())).thenReturn(paymentResult)
             whenever(paymentRepository.save(updatedPayment)).thenReturn(updatedPayment)
+            whenever(pointPolicyService.getCurrentPolicy()).thenReturn(
+                PointPolicyResponse(
+                    id = 1L,
+                    policyName = "기본 적립 정책",
+                    earnRate = BigDecimal("0.01"),
+                    maxEarnRate = BigDecimal("0.05"),
+                    minUseAmount = BigDecimal("1000"),
+                    maxUseAmount = BigDecimal("100000"),
+                    isActive = true,
+                    description = "기본 1% 적립"
+                )
+            )
 
             // when
             val response = paymentCommandService.processPayment(request, userId)
@@ -67,9 +83,7 @@ class PaymentCommandServiceImplTest {
             assertEquals(request.method.name, response.method)
             assertEquals(PaymentStatus.SUCCESS, response.status)
             assertEquals("TXN_123456", response.transactionId)
-            verify(paymentEventService).publishPaymentCompletedEvent(updatedPayment)
-            verify(paymentEventService).publishPointEarnRequestEvent(updatedPayment)
-            verify(paymentEventService).publishPaymentCompletedNotification(updatedPayment)
+            verify(transactionalEventPublisher, times(3)).publishEvent(any(), any(), any(), any(), any(), any())
         }
 
         @Test
@@ -99,9 +113,7 @@ class PaymentCommandServiceImplTest {
             // then
             assertEquals(PaymentStatus.FAILED, response.status)
             assertEquals("잔액 부족", response.errorMessage)
-            verify(paymentEventService, never()).publishPaymentCompletedEvent(any())
-            verify(paymentEventService, never()).publishPointEarnRequestEvent(any())
-            verify(paymentEventService, never()).publishPaymentCompletedNotification(any())
+            verify(transactionalEventPublisher, never()).publishEvent(any(), any(), any(), any(), any(), any())
         }
     }
 } 
