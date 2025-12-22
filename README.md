@@ -1,7 +1,7 @@
 # HoppingMall
 
 **쇼핑몰 프로젝트**  
-Kotlin + Spring Boot + DDD + TDD 기반으로 개발된 쇼핑몰 플랫폼입니다.
+Kotlin + Spring Boot 기반으로 개발된 쇼핑몰 플랫폼입니다.
 
 [![codecov](https://codecov.io/gh/perArdua/hoppingmall/branch/develop/graph/badge.svg)](https://codecov.io/gh/perArdua/hoppingmall)
 
