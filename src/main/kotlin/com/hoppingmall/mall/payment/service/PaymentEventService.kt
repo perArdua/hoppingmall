@@ -25,6 +25,8 @@ class PaymentEventService(
             userId = payment.userId,
             amount = payment.amount,
             pointAmount = payment.pointAmount,
+            method = payment.method,
+            status = payment.status,
             transactionId = payment.transactionId!!,
             completedAt = payment.completedAt ?: LocalDateTime.now()
         )

@@ -21,10 +21,12 @@ class KafkaPaymentEventPublisher(
                 "userId" to event.userId,
                 "amount" to event.amount,
                 "pointAmount" to event.pointAmount,
+                "method" to event.method,
+                "status" to event.status,
                 "transactionId" to event.transactionId,
                 "completedAt" to event.completedAt
             ),
-            topic = "payment-completed",
+            topic = "payment",
             partitionKey = event.paymentId.toString()
         )
     }
