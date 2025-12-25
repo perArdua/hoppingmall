@@ -4,16 +4,12 @@ import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
 import com.hoppingmall.mall.payment.dto.PaymentResult
 import com.hoppingmall.mall.payment.dto.request.PaymentRequest
-import com.hoppingmall.mall.payment.dto.response.PaymentResponse
 import com.hoppingmall.mall.payment.enum.PaymentMethod
 import com.hoppingmall.mall.payment.enum.PaymentStatus
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.failedFixture
 import com.hoppingmall.mall.support.fixture.successFixture
 import com.hoppingmall.mall.support.withId
-import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
-import com.hoppingmall.mall.point.service.PointPolicyService
-import com.hoppingmall.mall.point.dto.response.PointPolicyResponse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -29,10 +25,9 @@ class PaymentCommandServiceImplTest {
 
     private val paymentRepository: PaymentRepository = mock()
     private val paymentService: PaymentService = mock()
-    private val transactionalEventPublisher: TransactionalEventPublisher = mock()
-    private val pointPolicyService: PointPolicyService = mock()
+    private val paymentEventService: PaymentEventService = mock()
     private val paymentCommandService = PaymentCommandServiceImpl(
-        paymentRepository, paymentService, transactionalEventPublisher, pointPolicyService
+        paymentRepository, paymentService, paymentEventService
     )
 
     @Nested
@@ -59,19 +54,6 @@ class PaymentCommandServiceImplTest {
             }
             whenever(paymentService.processPayment(any())).thenReturn(paymentResult)
             whenever(paymentRepository.save(updatedPayment)).thenReturn(updatedPayment)
-            whenever(pointPolicyService.getCurrentPolicy()).thenReturn(
-                PointPolicyResponse(
-                    id = 1L,
-                    policyName = "기본 적립 정책",
-                    earnRate = BigDecimal("0.01"),
-                    maxEarnRate = BigDecimal("0.05"),
-                    minUseAmount = BigDecimal("1000"),
-                    maxUseAmount = BigDecimal("100000"),
-                    isActive = true,
-                    description = "기본 1% 적립"
-                )
-            )
-
             // when
             val response = paymentCommandService.processPayment(request, userId)
 
@@ -83,7 +65,9 @@ class PaymentCommandServiceImplTest {
             assertEquals(request.method.name, response.method)
             assertEquals(PaymentStatus.SUCCESS, response.status)
             assertEquals("TXN_123456", response.transactionId)
-            verify(transactionalEventPublisher, times(3)).publishEvent(any(), any(), any(), any(), any(), any())
+            verify(paymentEventService).publishPaymentCompletedEvent(any())
+            verify(paymentEventService).publishPointEarnRequestEvent(any())
+            verify(paymentEventService).publishPaymentCompletedNotification(any())
         }
 
         @Test
@@ -113,7 +97,9 @@ class PaymentCommandServiceImplTest {
             // then
             assertEquals(PaymentStatus.FAILED, response.status)
             assertEquals("잔액 부족", response.errorMessage)
-            verify(transactionalEventPublisher, never()).publishEvent(any(), any(), any(), any(), any(), any())
+            verify(paymentEventService, never()).publishPaymentCompletedEvent(any())
+            verify(paymentEventService, never()).publishPointEarnRequestEvent(any())
+            verify(paymentEventService, never()).publishPaymentCompletedNotification(any())
         }
     }
 } 
