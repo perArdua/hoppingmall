@@ -1,12 +1,7 @@
 package com.hoppingmall.mall.payment.service
 
 import com.hoppingmall.mall.payment.domain.Payment
-import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.mall.payment.enum.PaymentMethod
-import com.hoppingmall.mall.payment.enum.PaymentStatus
-import com.hoppingmall.mall.notification.dto.event.NotificationEvent
-import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.point.service.PointPolicyService
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.successFixture
@@ -15,7 +10,6 @@ import com.hoppingmall.mall.point.dto.response.PointPolicyResponse
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import java.math.BigDecimal
-import java.time.LocalDateTime
 import kotlin.test.assertEquals
 
 class PaymentEventServiceTest {
