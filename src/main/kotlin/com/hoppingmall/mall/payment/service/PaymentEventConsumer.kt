@@ -1,6 +1,8 @@
 package com.hoppingmall.mall.payment.service
 
-import com.hoppingmall.mall.global.common.config.DeadLetterMessage
+import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
+import com.hoppingmall.mall.payment.enum.PaymentMethod
+import java.math.BigDecimal
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -11,7 +13,7 @@ class PaymentEventConsumer {
     private val logger = LoggerFactory.getLogger(PaymentEventConsumer::class.java)
     
     @KafkaListener(topics = ["\${kafka.topics.payment:payment}"], groupId = "payment-consumer-group")
-    fun handlePaymentEvent(paymentEvent: PaymentEvent) {
+    fun handlePaymentEvent(paymentEvent: PaymentCompletedEvent) {
         try {
             logger.info("결제 이벤트 처리 시작: ${paymentEvent.orderId}")
             
@@ -25,40 +27,21 @@ class PaymentEventConsumer {
         }
     }
     
-    private fun processPayment(paymentEvent: PaymentEvent) {
-        when (paymentEvent.paymentType) {
-            PaymentType.CREDIT_CARD -> processCreditCardPayment(paymentEvent)
-            PaymentType.BANK_TRANSFER -> processBankTransferPayment(paymentEvent)
-            PaymentType.VIRTUAL_ACCOUNT -> processVirtualAccountPayment(paymentEvent)
+    private fun processPayment(paymentEvent: PaymentCompletedEvent) {
+        when (paymentEvent.method) {
+            PaymentMethod.CREDIT_CARD -> processCreditCardPayment(paymentEvent)
+            PaymentMethod.BANK_TRANSFER -> processBankTransferPayment(paymentEvent)
         }
     }
     
-    private fun processCreditCardPayment(paymentEvent: PaymentEvent) {
-        if (paymentEvent.amount > 1000000) {
+    private fun processCreditCardPayment(paymentEvent: PaymentCompletedEvent) {
+        if (paymentEvent.amount > BigDecimal("1000000")) {
             throw RuntimeException("대금액 결제는 별도 승인이 필요합니다")
         }
         logger.info("신용카드 결제 처리: ${paymentEvent.orderId}")
     }
     
-    private fun processBankTransferPayment(paymentEvent: PaymentEvent) {
+    private fun processBankTransferPayment(paymentEvent: PaymentCompletedEvent) {
         logger.info("계좌이체 결제 처리: ${paymentEvent.orderId}")
     }
-    
-    private fun processVirtualAccountPayment(paymentEvent: PaymentEvent) {
-        logger.info("가상계좌 결제 처리: ${paymentEvent.orderId}")
-    }
-}
-
-data class PaymentEvent(
-    val orderId: Long,
-    val userId: Long,
-    val amount: Long,
-    val paymentType: PaymentType,
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-enum class PaymentType {
-    CREDIT_CARD,
-    BANK_TRANSFER,
-    VIRTUAL_ACCOUNT
 }
