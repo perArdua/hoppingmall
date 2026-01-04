@@ -10,6 +10,8 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -24,8 +26,6 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.CompletableFuture
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @ExtendWith(MockitoExtension::class)
 @DisplayName("OutboxEventService 통합 테스트")
@@ -55,6 +55,7 @@ class OutboxEventServiceIntegrationTest {
             callback(kafkaTemplate)
         }
         lenient().`when`(objectMapper.writeValueAsString(any())).thenReturn("\"{\"test\": \"data\"}\"")
+        lenient().`when`(objectMapper.readValue(any<String>(), eq(Map::class.java))).thenReturn(mapOf("test" to "data"))
     }
 
     private fun mockSendResult(): SendResult<String, Any> {
@@ -78,6 +79,13 @@ class OutboxEventServiceIntegrationTest {
             eventData = "\"{\"test\": \"data\"}\"",
             topic = "payment"
         )
+        doReturn(false).whenever(outboxEventRepository).existsDuplicateEvent(
+            aggregateType = "Payment",
+            aggregateId = "123",
+            eventType = "PaymentCompleted",
+            eventData = "\"{\"test\": \"data\"}\"",
+            statuses = listOf(OutboxStatus.PENDING, OutboxStatus.RETRYING, OutboxStatus.PUBLISHED)
+        )
         whenever(outboxEventRepository.save(any<OutboxEvent>())).thenReturn(savedEvent)
         
         outboxEventService.saveEvent(
@@ -90,6 +98,84 @@ class OutboxEventServiceIntegrationTest {
         
         verify(outboxEventRepository).save(any<OutboxEvent>())
         verify(objectMapper).writeValueAsString(eventData)
+    }
+
+    @Test
+    fun saveEvent_중복_이벤트는_저장하지_않는다() {
+        val eventData = mapOf("orderId" to 123, "amount" to 50000)
+        doReturn(true).whenever(outboxEventRepository).existsDuplicateEvent(
+            aggregateType = "Payment",
+            aggregateId = "123",
+            eventType = "PaymentCompleted",
+            eventData = "\"{\"test\": \"data\"}\"",
+            statuses = listOf(OutboxStatus.PENDING, OutboxStatus.RETRYING, OutboxStatus.PUBLISHED)
+        )
+
+        outboxEventService.saveEvent(
+            aggregateType = "Payment",
+            aggregateId = "123",
+            eventType = "PaymentCompleted",
+            eventData = eventData,
+            topic = "payment"
+        )
+
+        verify(outboxEventRepository, never()).save(any<OutboxEvent>())
+    }
+
+    @Test
+    fun publishPendingEvents_클레임_성공시_발행한다() {
+        val event = OutboxEvent(
+            aggregateType = "Payment",
+            aggregateId = "123",
+            eventType = "PaymentCompleted",
+            eventData = "\"{\"test\": \"data\"}\"",
+            topic = "payment",
+            partitionKey = "order-123"
+        ).apply { id = 1L }
+
+        whenever(outboxEventRepository.findUnprocessedEvents(any(), any(), any(), any()))
+            .thenReturn(listOf(event))
+        doReturn(1).whenever(outboxEventRepository).claimEventForPublish(
+            eq(1L),
+            eq(OutboxStatus.RETRYING),
+            any(),
+            eq(OutboxStatus.PENDING),
+            eq(OutboxStatus.FAILED),
+            eq(3)
+        )
+        event.status = OutboxStatus.RETRYING
+        whenever(outboxEventRepository.findById(1L)).thenReturn(java.util.Optional.of(event))
+
+        outboxEventService.publishPendingEvents()
+
+        verify(kafkaTemplate).executeInTransaction<Any>(any())
+    }
+
+    @Test
+    fun publishPendingEvents_클레임_실패시_발행하지_않는다() {
+        val event = OutboxEvent(
+            aggregateType = "Payment",
+            aggregateId = "123",
+            eventType = "PaymentCompleted",
+            eventData = "\"{\"test\": \"data\"}\"",
+            topic = "payment",
+            partitionKey = "order-123"
+        ).apply { id = 1L }
+
+        whenever(outboxEventRepository.findUnprocessedEvents(any(), any(), any(), any()))
+            .thenReturn(listOf(event))
+        doReturn(0).whenever(outboxEventRepository).claimEventForPublish(
+            eq(1L),
+            eq(OutboxStatus.RETRYING),
+            any(),
+            eq(OutboxStatus.PENDING),
+            eq(OutboxStatus.FAILED),
+            eq(3)
+        )
+
+        outboxEventService.publishPendingEvents()
+
+        verify(kafkaTemplate, never()).send(any<String>(), any<String>(), any<Any>())
     }
 
     @Test
