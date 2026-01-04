@@ -35,6 +35,18 @@ class OutboxEventService(
         partitionKey: String? = null
     ) {
         val serializedData = objectMapper.writeValueAsString(eventData)
+        val duplicated = outboxEventRepository.existsDuplicateEvent(
+            aggregateType = aggregateType,
+            aggregateId = aggregateId,
+            eventType = eventType,
+            eventData = serializedData,
+            statuses = listOf(OutboxStatus.PENDING, OutboxStatus.RETRYING, OutboxStatus.PUBLISHED)
+        )
+        
+        if (duplicated) {
+            logger.warn("Duplicate outbox event skipped: aggregateId=$aggregateId, eventType=$eventType")
+            return
+        }
         
         val outboxEvent = OutboxEvent(
             aggregateType = aggregateType,
@@ -63,17 +75,31 @@ class OutboxEventService(
             logger.info("Processing ${pendingEvents.size} pending outbox events")
             
             pendingEvents.forEach { event ->
-                publishEvent(event)
+                val eventId = event.id ?: return@forEach
+                val claimed = outboxEventRepository.claimEventForPublish(
+                    id = eventId,
+                    nextStatus = OutboxStatus.RETRYING,
+                    updatedAt = LocalDateTime.now(),
+                    pendingStatus = OutboxStatus.PENDING,
+                    failedStatus = OutboxStatus.FAILED,
+                    maxRetries = maxRetries
+                )
+                if (claimed > 0) {
+                    publishEvent(eventId)
+                }
             }
         }
     }
     
     @Async
     @Transactional
-    fun publishEvent(event: OutboxEvent) {
+    fun publishEvent(eventId: Long) {
+        var event: OutboxEvent? = null
         try {
-            event.markAsRetrying()
-            outboxEventRepository.save(event)
+            event = outboxEventRepository.findById(eventId).orElse(null) ?: return
+            if (event.processed || event.status != OutboxStatus.RETRYING) {
+                return
+            }
             
             val eventData = objectMapper.readValue(event.eventData, Map::class.java)
             
@@ -97,8 +123,13 @@ class OutboxEventService(
             }
             
         } catch (e: Exception) {
-            logger.error("Failed to publish outbox event: ${event.id}", e)
-            handlePublishFailure(event, e)
+            val failedEvent = event
+            if (failedEvent != null) {
+                logger.error("Failed to publish outbox event: ${failedEvent.id}", e)
+                handlePublishFailure(failedEvent, e)
+            } else {
+                logger.error("Failed to publish outbox event: $eventId", e)
+            }
         }
     }
     
@@ -113,9 +144,10 @@ class OutboxEventService(
     
     private fun handlePublishFailure(event: OutboxEvent, throwable: Throwable) {
         val errorMessage = throwable.message ?: "Unknown error"
-        
-        if (event.retryCount >= maxRetries) {
-            event.markAsFailed("Max retries exceeded: $errorMessage")
+        val willExceedMaxRetry = event.retryCount + 1 >= maxRetries
+
+        if (willExceedMaxRetry) {
+            event.markAsFailedPermanently("Max retries exceeded: $errorMessage")
             logger.error("Outbox event failed after max retries: eventId=${event.id}, error=$errorMessage")
         } else {
             event.markAsFailed(errorMessage)
@@ -147,11 +179,22 @@ class OutboxEventService(
             logger.warn("Found ${staleEvents.size} stale outbox events, retrying...")
             
             staleEvents.forEach { event ->
-                if (event.retryCount < maxRetries) {
-                    publishEvent(event)
-                } else {
-                    event.markAsFailed("Stale event - max retries exceeded")
+                val eventId = event.id ?: return@forEach
+                if (event.retryCount >= maxRetries) {
+                    event.markAsFailedPermanently("Stale event - max retries exceeded")
                     outboxEventRepository.save(event)
+                    return@forEach
+                }
+                val claimed = outboxEventRepository.claimStaleEvent(
+                    id = eventId,
+                    nextStatus = OutboxStatus.RETRYING,
+                    updatedAt = LocalDateTime.now(),
+                    cutoffDate = cutoffDate,
+                    maxRetries = maxRetries,
+                    statuses = listOf(OutboxStatus.PENDING, OutboxStatus.FAILED, OutboxStatus.RETRYING)
+                )
+                if (claimed > 0) {
+                    publishEvent(eventId)
                 }
             }
         }

@@ -69,6 +69,12 @@ class OutboxEvent(
         this.retryCount++
         this.updatedAt = LocalDateTime.now()
     }
+
+    fun markAsFailedPermanently(errorMessage: String) {
+        markAsFailed(errorMessage)
+        this.processed = true
+        this.processedAt = LocalDateTime.now()
+    }
     
     fun markAsRetrying() {
         this.status = OutboxStatus.RETRYING
