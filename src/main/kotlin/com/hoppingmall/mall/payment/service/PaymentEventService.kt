@@ -1,9 +1,9 @@
 package com.hoppingmall.mall.payment.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.mall.notification.dto.event.NotificationEvent
 import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.point.service.PointPolicyService
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
@@ -15,7 +15,8 @@ import java.time.LocalDateTime
 class PaymentEventService(
     private val paymentEventPublisher: PaymentEventPublisher,
     private val transactionalEventPublisher: TransactionalEventPublisher,
-    private val pointPolicyService: PointPolicyService
+    private val pointPolicyService: PointPolicyService,
+    private val objectMapper: ObjectMapper
 ) {
     
     fun publishPaymentCompletedEvent(payment: Payment) {
@@ -47,12 +48,14 @@ class PaymentEventService(
     }
     
     fun publishPaymentCompletedNotification(payment: Payment) {
-        val metadata = mapOf(
+        val metadata = objectMapper.writeValueAsString(
+            mapOf(
             "orderId" to payment.orderId,
             "paymentId" to payment.id!!,
             "amount" to payment.amount.toString(),
             "method" to payment.method.toString(),
             "transactionId" to payment.transactionId
+            )
         )
         
         transactionalEventPublisher.publishEvent(
