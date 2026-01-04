@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.point.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.mall.point.domain.Point
@@ -17,10 +18,9 @@ import org.mockito.kotlin.*
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Spy
 import org.mockito.junit.jupiter.MockitoExtension
 import java.math.BigDecimal
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 @ExtendWith(MockitoExtension::class)
 @DisplayName("PointEventConsumer 단위 테스트")
@@ -35,6 +35,9 @@ class PointEventConsumerIntegrationTest {
     
     @Mock
     private lateinit var transactionalEventPublisher: TransactionalEventPublisher
+    
+    @Spy
+    private val objectMapper = ObjectMapper()
     
     @InjectMocks
     private lateinit var pointEventConsumer: PointEventConsumer
@@ -78,7 +81,13 @@ class PointEventConsumerIntegrationTest {
             eq("Point"),
             eq("1"),
             eq("PointEarnedNotificationRequested"),
-            any(),
+            argThat { eventData ->
+                val data = eventData as Map<String, Any>
+                val metadata = data["metadata"] as String
+                val metadataMap = objectMapper.readValue(metadata, Map::class.java)
+                metadataMap["orderId"].toString() == "123" &&
+                    metadataMap["paymentId"].toString() == "456"
+            },
             eq("notification"),
             eq(userId.toString())
         )
