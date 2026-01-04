@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.payment.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.mall.point.service.PointPolicyService
@@ -17,7 +18,13 @@ class PaymentEventServiceTest {
     private val paymentEventPublisher: PaymentEventPublisher = mock()
     private val transactionalEventPublisher: TransactionalEventPublisher = mock()
     private val pointPolicyService: PointPolicyService = mock()
-    private val paymentEventService = PaymentEventService(paymentEventPublisher, transactionalEventPublisher, pointPolicyService)
+    private val objectMapper = ObjectMapper()
+    private val paymentEventService = PaymentEventService(
+        paymentEventPublisher,
+        transactionalEventPublisher,
+        pointPolicyService,
+        objectMapper
+    )
     
     @Test
     fun `결제 완료 이벤트를 발행한다`() {
@@ -104,7 +111,11 @@ class PaymentEventServiceTest {
             eventType = eq("PaymentCompletedNotificationRequested"),
             eventData = argThat { eventData ->
                 val data = eventData as Map<String, Any>
-                data["content"] == "주문번호 1의 결제가 성공적으로 완료되었습니다. 결제 금액: 50000원"
+                val metadata = data["metadata"] as String
+                val metadataMap = objectMapper.readValue(metadata, Map::class.java)
+                data["content"] == "주문번호 1의 결제가 성공적으로 완료되었습니다. 결제 금액: 50000원" &&
+                    metadataMap["orderId"].toString() == "1" &&
+                    metadataMap["paymentId"].toString() == "1"
             },
             topic = eq("notification"),
             partitionKey = eq("1")

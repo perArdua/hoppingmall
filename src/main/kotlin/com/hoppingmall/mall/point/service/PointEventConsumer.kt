@@ -1,7 +1,7 @@
 package com.hoppingmall.mall.point.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.mall.notification.dto.event.NotificationEvent
 import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.point.domain.Point
 import com.hoppingmall.mall.point.domain.PointHistory
@@ -23,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap
 class PointEventConsumer(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
-    private val transactionalEventPublisher: TransactionalEventPublisher
+    private val transactionalEventPublisher: TransactionalEventPublisher,
+    private val objectMapper: ObjectMapper
 ) {
 
     @KafkaListener(topics = ["point-earn-request"], groupId = "point-service")
@@ -49,12 +50,14 @@ class PointEventConsumer(
                 )
             )
 
-            val metadata = mapOf(
-                "orderId" to event.orderId,
-                "paymentId" to event.paymentId,
-                "earnAmount" to event.earnAmount.toString(),
-                "reason" to (event.reason ?: "포인트 적립"),
-                "currentBalance" to savedPoint.balance.toString()
+            val metadata = objectMapper.writeValueAsString(
+                mapOf(
+                    "orderId" to event.orderId,
+                    "paymentId" to event.paymentId,
+                    "earnAmount" to event.earnAmount.toString(),
+                    "reason" to (event.reason ?: "포인트 적립"),
+                    "currentBalance" to savedPoint.balance.toString()
+                )
             )
 
             transactionalEventPublisher.publishEvent(
