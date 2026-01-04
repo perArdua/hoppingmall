@@ -23,6 +23,22 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         @Param("maxRetries") maxRetries: Int = 3,
         @Param("limit") limit: Int = 100
     ): List<OutboxEvent>
+
+    @Query("""
+        SELECT COUNT(o) > 0 FROM OutboxEvent o
+        WHERE o.aggregateType = :aggregateType
+        AND o.aggregateId = :aggregateId
+        AND o.eventType = :eventType
+        AND o.eventData = :eventData
+        AND o.status IN :statuses
+    """)
+    fun existsDuplicateEvent(
+        @Param("aggregateType") aggregateType: String,
+        @Param("aggregateId") aggregateId: String,
+        @Param("eventType") eventType: String,
+        @Param("eventData") eventData: String,
+        @Param("statuses") statuses: List<OutboxStatus>
+    ): Boolean
     
     @Query("""
         SELECT o FROM OutboxEvent o 
@@ -43,6 +59,27 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         AND o.processedAt < :cutoffDate
     """)
     fun deleteProcessedEventsBefore(@Param("cutoffDate") cutoffDate: LocalDateTime): Int
+
+    @Modifying
+    @Query("""
+        UPDATE OutboxEvent o
+        SET o.status = :nextStatus,
+            o.updatedAt = :updatedAt
+        WHERE o.id = :id
+        AND o.processed = false
+        AND (
+            o.status = :pendingStatus
+            OR (o.status = :failedStatus AND o.retryCount < :maxRetries)
+        )
+    """)
+    fun claimEventForPublish(
+        @Param("id") id: Long,
+        @Param("nextStatus") nextStatus: OutboxStatus,
+        @Param("updatedAt") updatedAt: LocalDateTime,
+        @Param("pendingStatus") pendingStatus: OutboxStatus,
+        @Param("failedStatus") failedStatus: OutboxStatus,
+        @Param("maxRetries") maxRetries: Int
+    ): Int
     
     @Query("""
         SELECT COUNT(o) FROM OutboxEvent o 
@@ -53,7 +90,7 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
     @Query("""
         SELECT o FROM OutboxEvent o 
         WHERE o.processed = false 
-        AND o.createdAt < :cutoffDate
+        AND o.updatedAt < :cutoffDate
         ORDER BY o.createdAt ASC
         LIMIT :limit
     """)
@@ -61,4 +98,24 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         @Param("cutoffDate") cutoffDate: LocalDateTime,
         @Param("limit") limit: Int = 100
     ): List<OutboxEvent>
-}
+
+    @Modifying
+    @Query("""
+        UPDATE OutboxEvent o
+        SET o.status = :nextStatus,
+            o.updatedAt = :updatedAt
+        WHERE o.id = :id
+        AND o.processed = false
+        AND o.updatedAt < :cutoffDate
+        AND o.retryCount < :maxRetries
+        AND o.status IN :statuses
+    """)
+    fun claimStaleEvent(
+        @Param("id") id: Long,
+        @Param("nextStatus") nextStatus: OutboxStatus,
+        @Param("updatedAt") updatedAt: LocalDateTime,
+        @Param("cutoffDate") cutoffDate: LocalDateTime,
+        @Param("maxRetries") maxRetries: Int,
+        @Param("statuses") statuses: List<OutboxStatus>
+    ): Int
+} 
