@@ -91,7 +91,12 @@ class KafkaConfig {
         // Consumer 설정 - EOS를 위한 read_committed 유지
         configProps[ENABLE_AUTO_COMMIT_CONFIG] = false
         configProps[ISOLATION_LEVEL_CONFIG] = "read_committed"
-        
+
+        configProps[ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG] = 300_000
+        configProps[ConsumerConfig.MAX_POLL_RECORDS_CONFIG] = 100
+        configProps[ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG] = 30_000
+        configProps[ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG] = 10_000
+
         return DefaultKafkaConsumerFactory(configProps)
     }
 
