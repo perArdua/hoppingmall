@@ -16,6 +16,10 @@ import org.springframework.util.backoff.FixedBackOff
 import com.hoppingmall.mall.global.common.service.DLQService
 import org.apache.kafka.clients.consumer.ConsumerConfig.ISOLATION_LEVEL_CONFIG
 import org.apache.kafka.clients.consumer.ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG
+import org.springframework.messaging.converter.MessageConversionException
+import org.apache.kafka.common.errors.SerializationException
+import org.springframework.kafka.support.serializer.DeserializationException
+import java.util.UUID
 @Configuration
 class KafkaConfig {
 
@@ -30,6 +34,12 @@ class KafkaConfig {
 
     @Value("\${spring.kafka.listener.concurrency:1}")
     private var concurrency: Int = 4
+    
+    private val instanceId: String = UUID.randomUUID().toString()
+    private val trustedPackages: String = listOf(
+        "com.hoppingmall.mall.payment.dto.event",
+        "com.hoppingmall.mall.notification.dto.event"
+    ).joinToString(",")
 
     @Bean
     fun producerFactory(): ProducerFactory<String, Any> {
@@ -43,20 +53,22 @@ class KafkaConfig {
         configProps[ProducerConfig.ACKS_CONFIG] = "all"
         configProps[ProducerConfig.RETRIES_CONFIG] = Int.MAX_VALUE
         configProps[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = 5
-        configProps[ProducerConfig.TRANSACTIONAL_ID_CONFIG] = "hoppingmall-tx-"
+        configProps[ProducerConfig.TRANSACTIONAL_ID_CONFIG] = "hoppingmall-tx-$instanceId"
         
         // 성능 최적화
         configProps[ProducerConfig.BATCH_SIZE_CONFIG] = 16384
         configProps[ProducerConfig.LINGER_MS_CONFIG] = 10
         configProps[ProducerConfig.COMPRESSION_TYPE_CONFIG] = "lz4"
         
-        return DefaultKafkaProducerFactory(configProps)
+        val producerFactory = DefaultKafkaProducerFactory<String, Any>(configProps)
+        producerFactory.setTransactionIdPrefix("hoppingmall-tx-$instanceId-")
+        return producerFactory
     }
 
     @Bean
     fun kafkaTemplate(): KafkaTemplate<String, Any> {
         val template = KafkaTemplate(producerFactory())
-        template.setTransactionIdPrefix("hoppingmall-tx-")
+        template.setTransactionIdPrefix("hoppingmall-tx-$instanceId-")
         return template
     }
 
@@ -74,12 +86,17 @@ class KafkaConfig {
         configProps[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = autoOffsetReset
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
         configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = JsonDeserializer::class.java
-        configProps[JsonDeserializer.TRUSTED_PACKAGES] = "*"
+        configProps[JsonDeserializer.TRUSTED_PACKAGES] = trustedPackages
         
         // Consumer 설정 - EOS를 위한 read_committed 유지
         configProps[ENABLE_AUTO_COMMIT_CONFIG] = false
         configProps[ISOLATION_LEVEL_CONFIG] = "read_committed"
-        
+
+        configProps[ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG] = 300_000
+        configProps[ConsumerConfig.MAX_POLL_RECORDS_CONFIG] = 100
+        configProps[ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG] = 30_000
+        configProps[ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG] = 10_000
+
         return DefaultKafkaConsumerFactory(configProps)
     }
 
@@ -96,6 +113,11 @@ class KafkaConfig {
                 sendToDLQ(record, exception, dlqService)
             },
             FixedBackOff(1000L, 3) // 1초 간격으로 3번 재시도
+        )
+        errorHandler.addNotRetryableExceptions(
+            DeserializationException::class.java,
+            SerializationException::class.java,
+            MessageConversionException::class.java
         )
         factory.setCommonErrorHandler(errorHandler)
         
