@@ -16,7 +16,6 @@ import org.springframework.retry.annotation.Retryable
 import org.springframework.retry.annotation.Backoff
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import java.math.BigDecimal
-import java.util.concurrent.ConcurrentHashMap
 
 @Service
 @Transactional
@@ -35,6 +34,10 @@ class PointEventConsumer(
     )
     fun handlePointEarnRequest(event: PointEarnRequestEvent) {
         try {
+            if (pointHistoryRepository.existsByEventId(event.eventId)) {
+                return
+            }
+
             val point = findOrCreatePoint(event.userId)
             point.balance += event.earnAmount
             val savedPoint = pointRepository.save(point)
@@ -46,7 +49,8 @@ class PointEventConsumer(
                     type = PointType.EARN,
                     reason = event.reason,
                     orderId = event.orderId,
-                    paymentId = event.paymentId
+                    paymentId = event.paymentId,
+                    eventId = event.eventId
                 )
             )
 
@@ -65,6 +69,7 @@ class PointEventConsumer(
                 aggregateId = savedPoint.id!!.toString(),
                 eventType = "PointEarnedNotificationRequested",
                 eventData = mapOf(
+                    "eventId" to event.eventId,
                     "userId" to event.userId,
                     "type" to NotificationType.POINT_EARNED.toString(),
                     "title" to "포인트가 적립되었습니다",

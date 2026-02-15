@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
+import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.springframework.kafka.support.serializer.JsonDeserializer
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -50,6 +51,19 @@ class KafkaConfigTest {
             trusted
         )
         assertNotEquals("*", trusted)
+    }
+
+    @Test
+    fun 컨슈머_타임아웃_설정이_적용된다() {
+        val config = createConfig()
+        val consumerFactory = config.consumerFactory() as DefaultKafkaConsumerFactory<String, Any>
+
+        val configs = readConfigs(consumerFactory)
+
+        assertEquals(300_000, configs[ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG])
+        assertEquals(100, configs[ConsumerConfig.MAX_POLL_RECORDS_CONFIG])
+        assertEquals(30_000, configs[ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG])
+        assertEquals(10_000, configs[ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG])
     }
 
     private fun createConfig(): KafkaConfig {

@@ -25,7 +25,10 @@ class PointHistory(
     val orderId: Long? = null,
     
     @Column
-    val paymentId: Long? = null
+    val paymentId: Long? = null,
+
+    @Column(unique = true)
+    val eventId: String? = null
 ) : BaseEntity() {
 
     companion object {

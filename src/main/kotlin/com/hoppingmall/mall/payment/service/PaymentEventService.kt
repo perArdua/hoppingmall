@@ -37,8 +37,10 @@ class PaymentEventService(
     fun publishPointEarnRequestEvent(payment: Payment) {
         val earnRate = getCurrentEarnRate()
         val earnAmount = payment.amount.multiply(earnRate)
+        val eventId = payment.transactionId ?: "payment-${payment.id}"
         
         val event = PointEarnRequestEvent(
+            eventId = eventId,
             userId = payment.userId,
             orderId = payment.orderId,
             paymentId = payment.id!!,
@@ -48,6 +50,7 @@ class PaymentEventService(
     }
     
     fun publishPaymentCompletedNotification(payment: Payment) {
+        val eventId = payment.transactionId ?: "payment-${payment.id}"
         val metadata = objectMapper.writeValueAsString(
             mapOf(
             "orderId" to payment.orderId,
@@ -63,6 +66,7 @@ class PaymentEventService(
             aggregateId = payment.id!!.toString(),
             eventType = "PaymentCompletedNotificationRequested",
             eventData = mapOf(
+                "eventId" to eventId,
                 "userId" to payment.userId,
                 "type" to NotificationType.PAYMENT_COMPLETED.toString(),
                 "title" to "결제가 완료되었습니다",

@@ -9,12 +9,17 @@ import com.hoppingmall.mall.point.domain.PointHistoryRepository
 import com.hoppingmall.mall.point.domain.PointRepository
 import com.hoppingmall.mall.point.enum.PointType
 import com.hoppingmall.mall.support.withId
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.*
+import org.mockito.kotlin.any
+import org.mockito.kotlin.argThat
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.never
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
@@ -35,22 +40,19 @@ class PointEventConsumerIntegrationTest {
     
     @Mock
     private lateinit var transactionalEventPublisher: TransactionalEventPublisher
-    
+
     @Spy
     private val objectMapper = ObjectMapper()
     
     @InjectMocks
     private lateinit var pointEventConsumer: PointEventConsumer
 
-    @BeforeEach
-    fun setUp() {
-    }
-
     @Test
     fun 신규_사용자_포인트_적립() {
         val userId = 1L
         val earnAmount = BigDecimal("1000")
         val event = PointEarnRequestEvent(
+            eventId = "EVENT-1",
             userId = userId,
             orderId = 123L,
             paymentId = 456L,
@@ -68,7 +70,8 @@ class PointEventConsumerIntegrationTest {
             type = PointType.EARN,
             reason = event.reason,
             orderId = event.orderId,
-            paymentId = event.paymentId
+            paymentId = event.paymentId,
+            eventId = event.eventId
         ).withId(1L)
         whenever(pointHistoryRepository.save(any<PointHistory>())).thenReturn(savedHistory)
         
@@ -104,6 +107,7 @@ class PointEventConsumerIntegrationTest {
         whenever(pointRepository.save(any<Point>())).thenReturn(existingPoint)
         
         val event = PointEarnRequestEvent(
+            eventId = "EVENT-2",
             userId = userId,
             orderId = 789L,
             paymentId = 321L,
@@ -117,7 +121,8 @@ class PointEventConsumerIntegrationTest {
             type = PointType.EARN,
             reason = event.reason,
             orderId = event.orderId,
-            paymentId = event.paymentId
+            paymentId = event.paymentId,
+            eventId = event.eventId
         ).withId(2L)
         whenever(pointHistoryRepository.save(any<PointHistory>())).thenReturn(savedHistory2)
         
@@ -130,9 +135,32 @@ class PointEventConsumerIntegrationTest {
             eq("Point"),
             eq("2"),
             eq("PointEarnedNotificationRequested"),
-            any(),
+            argThat { eventData ->
+                val data = eventData as Map<String, Any>
+                data["eventId"] == "EVENT-2"
+            },
             eq("notification"),
             eq(userId.toString())
         )
+    }
+
+    @Test
+    fun 중복_이벤트는_포인트_적립을_건너뛴다() {
+        val event = PointEarnRequestEvent(
+            eventId = "EVENT-3",
+            userId = 3L,
+            orderId = 111L,
+            paymentId = 222L,
+            earnAmount = BigDecimal("500"),
+            reason = "중복 테스트"
+        )
+
+        whenever(pointHistoryRepository.existsByEventId(event.eventId)).thenReturn(true)
+
+        pointEventConsumer.handlePointEarnRequest(event)
+
+        verify(pointRepository, never()).save(any<Point>())
+        verify(pointHistoryRepository, never()).save(any<PointHistory>())
+        verify(transactionalEventPublisher, never()).publishEvent(any(), any(), any(), any(), any(), any())
     }
 }

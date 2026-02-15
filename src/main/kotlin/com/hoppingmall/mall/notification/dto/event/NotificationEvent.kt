@@ -3,6 +3,7 @@ package com.hoppingmall.mall.notification.dto.event
 import com.hoppingmall.mall.notification.enum.NotificationType
 
 data class NotificationEvent(
+    val eventId: String,
     val userId: Long,
     val type: NotificationType,
     val title: String,

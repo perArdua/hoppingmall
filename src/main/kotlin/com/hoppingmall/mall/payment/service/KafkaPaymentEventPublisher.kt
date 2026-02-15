@@ -37,6 +37,7 @@ class KafkaPaymentEventPublisher(
             aggregateId = event.paymentId.toString(),
             eventType = "PointEarnRequested",
             eventData = mapOf(
+                "eventId" to event.eventId,
                 "userId" to event.userId,
                 "orderId" to event.orderId,
                 "paymentId" to event.paymentId,
