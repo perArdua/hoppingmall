@@ -11,7 +11,8 @@ fun PointHistory.Companion.fixture(
     type: PointType = PointType.EARN,
     reason: String? = "결제 완료",
     orderId: Long? = 1L,
-    paymentId: Long? = 1L
+    paymentId: Long? = 1L,
+    eventId: String? = null
 ): PointHistory {
     return PointHistory(
         userId = userId,
@@ -19,7 +20,8 @@ fun PointHistory.Companion.fixture(
         type = type,
         reason = reason,
         orderId = orderId,
-        paymentId = paymentId
+        paymentId = paymentId,
+        eventId = eventId
     ).withId(1L)
 }
 
