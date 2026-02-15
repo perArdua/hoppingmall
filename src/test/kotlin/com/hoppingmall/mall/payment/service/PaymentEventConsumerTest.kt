@@ -3,12 +3,21 @@ package com.hoppingmall.mall.payment.service
 import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.mall.payment.enum.PaymentMethod
 import com.hoppingmall.mall.payment.enum.PaymentStatus
+import com.hoppingmall.mall.payment.domain.repository.PaymentEventLogRepository
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import com.hoppingmall.mall.payment.domain.PaymentEventLog
+import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+import kotlin.test.assertEquals
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -16,7 +25,8 @@ import java.time.LocalDateTime
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class PaymentEventConsumerTest {
 
-    private val paymentEventConsumer = PaymentEventConsumer()
+    private val paymentEventLogRepository: PaymentEventLogRepository = mock()
+    private val paymentEventConsumer = PaymentEventConsumer(paymentEventLogRepository)
 
     @Nested
     @DisplayName("handlePaymentEvent")
@@ -37,8 +47,15 @@ class PaymentEventConsumerTest {
                 completedAt = LocalDateTime.now()
             )
 
-            // when & then
+            // when
             paymentEventConsumer.handlePaymentEvent(paymentEvent)
+
+            // then
+            val captor = argumentCaptor<PaymentEventLog>()
+            verify(paymentEventLogRepository).save(captor.capture())
+            assertEquals("TXN_1", captor.firstValue.transactionId)
+            assertEquals(1L, captor.firstValue.paymentId)
+            assertEquals(1L, captor.firstValue.orderId)
         }
 
         @Test
@@ -56,8 +73,15 @@ class PaymentEventConsumerTest {
                 completedAt = LocalDateTime.now()
             )
 
-            // when & then
+            // when
             paymentEventConsumer.handlePaymentEvent(paymentEvent)
+
+            // then
+            val captor = argumentCaptor<PaymentEventLog>()
+            verify(paymentEventLogRepository).save(captor.capture())
+            assertEquals("TXN_2", captor.firstValue.transactionId)
+            assertEquals(2L, captor.firstValue.paymentId)
+            assertEquals(2L, captor.firstValue.orderId)
         }
 
         @Test
@@ -79,6 +103,27 @@ class PaymentEventConsumerTest {
             assertThrows<RuntimeException> {
                 paymentEventConsumer.handlePaymentEvent(paymentEvent)
             }
+        }
+
+        @Test
+        fun 중복_결제_이벤트는_처리하지_않는다() {
+            val paymentEvent = PaymentCompletedEvent(
+                paymentId = 5L,
+                orderId = 5L,
+                userId = 5L,
+                amount = BigDecimal("30000"),
+                pointAmount = BigDecimal.ZERO,
+                method = PaymentMethod.BANK_TRANSFER,
+                status = PaymentStatus.SUCCESS,
+                transactionId = "TXN_DUP",
+                completedAt = LocalDateTime.now()
+            )
+
+            whenever(paymentEventLogRepository.existsByTransactionId(paymentEvent.transactionId)).thenReturn(true)
+
+            paymentEventConsumer.handlePaymentEvent(paymentEvent)
+
+            verify(paymentEventLogRepository, never()).save(any())
         }
     }
 }
