@@ -94,6 +94,7 @@ class PaymentEventServiceTest {
         // then
         verify(paymentEventPublisher).publishPointEarnRequestEvent(captor.capture())
         assertEquals(BigDecimal("100.00"), captor.firstValue.earnAmount)
+        assertEquals("payment-1", captor.firstValue.eventId)
     }
     
     @Test
@@ -113,7 +114,8 @@ class PaymentEventServiceTest {
                 val data = eventData as Map<String, Any>
                 val metadata = data["metadata"] as String
                 val metadataMap = objectMapper.readValue(metadata, Map::class.java)
-                data["content"] == "주문번호 1의 결제가 성공적으로 완료되었습니다. 결제 금액: 50000원" &&
+                data["eventId"] == "payment-1" &&
+                    data["content"] == "주문번호 1의 결제가 성공적으로 완료되었습니다. 결제 금액: 50000원" &&
                     metadataMap["orderId"].toString() == "1" &&
                     metadataMap["paymentId"].toString() == "1"
             },
