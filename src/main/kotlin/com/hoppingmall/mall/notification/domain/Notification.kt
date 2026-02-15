@@ -7,6 +7,9 @@ import jakarta.persistence.*
 @Entity
 @Table(name = "notifications")
 class Notification(
+    @Column(nullable = false, unique = true)
+    val eventId: String,
+
     @Column(nullable = false)
     val userId: Long,
 

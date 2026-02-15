@@ -5,7 +5,12 @@ import com.hoppingmall.mall.notification.domain.NotificationRepository
 import com.hoppingmall.mall.notification.dto.event.NotificationEvent
 import com.hoppingmall.mall.notification.enum.NotificationType
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.*
+import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import kotlin.test.assertEquals
 
 class NotificationEventConsumerTest {
@@ -27,6 +32,7 @@ class NotificationEventConsumerTest {
         """.trimIndent()
         
         val event = NotificationEvent(
+            eventId = "EVENT-1",
             userId = 1L,
             type = NotificationType.PAYMENT_COMPLETED,
             title = "결제가 완료되었습니다",
@@ -42,6 +48,7 @@ class NotificationEventConsumerTest {
         // then
         verify(notificationRepository).save(captor.capture())
         val savedNotification = captor.firstValue
+        assertEquals("EVENT-1", savedNotification.eventId)
         assertEquals(1L, savedNotification.userId)
         assertEquals(NotificationType.PAYMENT_COMPLETED, savedNotification.type)
         assertEquals("결제가 완료되었습니다", savedNotification.title)
@@ -64,6 +71,7 @@ class NotificationEventConsumerTest {
         """.trimIndent()
         
         val event = NotificationEvent(
+            eventId = "EVENT-2",
             userId = 2L,
             type = NotificationType.POINT_EARNED,
             title = "포인트가 적립되었습니다",
@@ -79,6 +87,7 @@ class NotificationEventConsumerTest {
         // then
         verify(notificationRepository).save(captor.capture())
         val savedNotification = captor.firstValue
+        assertEquals("EVENT-2", savedNotification.eventId)
         assertEquals(2L, savedNotification.userId)
         assertEquals(NotificationType.POINT_EARNED, savedNotification.type)
         assertEquals("포인트가 적립되었습니다", savedNotification.title)
@@ -86,4 +95,22 @@ class NotificationEventConsumerTest {
         assertEquals(metadata, savedNotification.metadata)
         assertEquals(false, savedNotification.isRead)
     }
-} 
+
+    @Test
+    fun `중복 알림 이벤트는 저장하지 않는다`() {
+        val event = NotificationEvent(
+            eventId = "EVENT-3",
+            userId = 3L,
+            type = NotificationType.PAYMENT_COMPLETED,
+            title = "중복 테스트",
+            content = "중복 처리 방지",
+            metadata = null
+        )
+
+        whenever(notificationRepository.existsByEventId(event.eventId)).thenReturn(true)
+
+        notificationEventConsumer.handleNotificationEvent(event)
+
+        verify(notificationRepository, never()).save(any())
+    }
+}
