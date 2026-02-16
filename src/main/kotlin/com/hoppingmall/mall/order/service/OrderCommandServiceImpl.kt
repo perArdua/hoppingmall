@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.order.service
 
 import com.hoppingmall.mall.cartItem.domain.repository.CartItemRepository
+import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.order.domain.Order
 import com.hoppingmall.mall.order.domain.OrderItem
 import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
@@ -21,7 +22,8 @@ import java.math.BigDecimal
 class OrderCommandServiceImpl(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
-    private val cartItemRepository: CartItemRepository
+    private val cartItemRepository: CartItemRepository,
+    private val inventoryCommandService: InventoryCommandService
 ) : OrderCommandService {
 
     override fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse {
@@ -34,6 +36,10 @@ class OrderCommandServiceImpl(
         val hasOtherBuyerItem = cartItems.any { it.buyerId != buyerId }
         if (hasOtherBuyerItem) {
             throw OrderAccessDeniedException()
+        }
+
+        cartItems.sortedBy { it.productId }.forEach { cartItem ->
+            inventoryCommandService.decreaseStock(cartItem.productId, cartItem.quantity)
         }
 
         val totalAmount = cartItems.sumOf { BigDecimal(it.productPrice) * BigDecimal(it.quantity) }
@@ -67,6 +73,10 @@ class OrderCommandServiceImpl(
         order.updateStatus(OrderStatus.CANCELLED)
 
         val orderItems = orderItemRepository.findByOrderId(orderId)
+        orderItems.forEach { orderItem ->
+            inventoryCommandService.increaseStock(orderItem.productId, orderItem.quantity)
+        }
+
         return OrderResponse.from(order, orderItems)
     }
 

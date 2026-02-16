@@ -1,0 +1,13 @@
+package com.hoppingmall.mall.inventory.dto.request
+
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotNull
+
+data class InventoryInitRequest(
+    @field:NotNull(message = "상품 ID는 필수입니다")
+    val productId: Long,
+
+    @field:NotNull(message = "재고 수량은 필수입니다")
+    @field:Min(value = 0, message = "재고 수량은 0 이상이어야 합니다")
+    val stockQuantity: Int
+)
