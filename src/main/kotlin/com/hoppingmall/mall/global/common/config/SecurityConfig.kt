@@ -39,6 +39,7 @@ class SecurityConfig(
                     "/api/v1/point-policies/current",
                     "/api/v1/point-policies/{policyId}"
                 ).permitAll()
+                it.requestMatchers(HttpMethod.GET, "/api/v1/inventories/{productId}").permitAll()
 
                 it.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/point-policies/**").hasRole("ADMIN")
@@ -50,6 +51,8 @@ class SecurityConfig(
                 ).hasRole("SELLER")
                 it.requestMatchers(HttpMethod.PUT, "/api/v1/products/{productId}").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.DELETE, "/api/v1/products/{productId}").hasRole("SELLER")
+                it.requestMatchers(HttpMethod.POST, "/api/v1/inventories").hasRole("SELLER")
+                it.requestMatchers(HttpMethod.PATCH, "/api/v1/inventories/{productId}").hasRole("SELLER")
 
                 it.requestMatchers("/api/v1/**").authenticated()
                 it.anyRequest().denyAll()
