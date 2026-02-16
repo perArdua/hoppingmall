@@ -2,6 +2,7 @@ package com.hoppingmall.mall.order.service
 
 import com.hoppingmall.mall.cartItem.domain.CartItem
 import com.hoppingmall.mall.cartItem.domain.repository.CartItemRepository
+import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.order.domain.Order
 import com.hoppingmall.mall.order.domain.OrderItem
 import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
@@ -34,8 +35,9 @@ class OrderCommandServiceImplTest {
     private val orderRepository: OrderRepository = mock()
     private val orderItemRepository: OrderItemRepository = mock()
     private val cartItemRepository: CartItemRepository = mock()
+    private val inventoryCommandService: InventoryCommandService = mock()
     private val orderCommandService = OrderCommandServiceImpl(
-        orderRepository, orderItemRepository, cartItemRepository
+        orderRepository, orderItemRepository, cartItemRepository, inventoryCommandService
     )
 
     @Nested
@@ -70,6 +72,8 @@ class OrderCommandServiceImplTest {
             assertEquals(OrderStatus.CREATED, response.status)
             assertEquals(BigDecimal("50000"), response.totalAmount)
             assertEquals(2, response.items.size)
+            verify(inventoryCommandService).decreaseStock(100L, 2)
+            verify(inventoryCommandService).decreaseStock(200L, 1)
             verify(cartItemRepository).deleteAllById(request.cartItemIds)
         }
 
@@ -122,6 +126,7 @@ class OrderCommandServiceImplTest {
 
             // then
             assertEquals(OrderStatus.CANCELLED, response.status)
+            verify(inventoryCommandService).increaseStock(100L, 2)
         }
 
         @Test
