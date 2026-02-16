@@ -65,7 +65,7 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: trace
 
 jwt:
-  secret: my-secret-secret-secret-secret-secret-key-123456789
+  secret: ${JWT_SECRET}
   access-expiration-ms: 3600000 # 1 hour
   refresh-expiration-ms: 86400000 # 24 hour
 
