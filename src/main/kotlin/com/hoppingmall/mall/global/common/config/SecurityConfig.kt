@@ -33,7 +33,8 @@ class SecurityConfig(
                     "/api/v1/products",
                     "/api/v1/products/{productId}",
                     "/api/v1/products/seller/{sellerId}",
-                    "/api/v1/products/category/{categoryId}"
+                    "/api/v1/products/category/{categoryId}",
+                    "/api/v1/products/search"
                 ).permitAll()
                 it.requestMatchers(
                     HttpMethod.GET,
