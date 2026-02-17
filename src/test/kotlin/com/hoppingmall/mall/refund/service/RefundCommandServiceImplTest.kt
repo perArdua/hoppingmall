@@ -13,6 +13,7 @@ import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
 import com.hoppingmall.mall.point.service.PointCommandService
 import com.hoppingmall.mall.product.domain.Product
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
+import com.hoppingmall.mall.product.service.ProductStatisticsCommandService
 import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
@@ -53,6 +54,7 @@ class RefundCommandServiceImplTest {
     private val shippingRepository: ShippingRepository = mock()
     private val inventoryCommandService: InventoryCommandService = mock()
     private val pointCommandService: PointCommandService = mock()
+    private val productStatisticsCommandService: ProductStatisticsCommandService = mock()
 
     private val refundCommandService = RefundCommandServiceImpl(
         refundRepository,
@@ -63,7 +65,8 @@ class RefundCommandServiceImplTest {
         productRepository,
         shippingRepository,
         inventoryCommandService,
-        pointCommandService
+        pointCommandService,
+        productStatisticsCommandService
     )
 
     @Nested
@@ -109,6 +112,7 @@ class RefundCommandServiceImplTest {
             assertTrue(response.isFullRefund)
             verify(inventoryCommandService).increaseStock(100L, 2)
             verify(pointCommandService).refundPoints(eq(buyerId), eq(BigDecimal("1000")), eq(1L), eq(orderId))
+            verify(productStatisticsCommandService).incrementRefundStats(eq(100L), eq(2L), any())
         }
 
         @Test
@@ -369,6 +373,7 @@ class RefundCommandServiceImplTest {
             assertEquals(RefundStatus.COMPLETED, response.status)
             verify(inventoryCommandService).increaseStock(100L, 2)
             verify(pointCommandService).refundPoints(eq(1L), any(), eq(1L), eq(1L))
+            verify(productStatisticsCommandService).incrementRefundStats(eq(100L), eq(2L), any())
         }
 
         @Test
