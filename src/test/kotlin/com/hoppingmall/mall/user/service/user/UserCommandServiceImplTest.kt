@@ -4,6 +4,7 @@ import com.hoppingmall.mall.global.enums.Role
 import com.hoppingmall.mall.global.vo.email.Email
 import com.hoppingmall.mall.global.vo.password.Password
 import com.hoppingmall.mall.global.vo.password.service.PasswordCreator
+import com.hoppingmall.mall.membership.service.MembershipCommandService
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.withId
 import com.hoppingmall.mall.user.domain.User
@@ -25,7 +26,8 @@ class UserCommandServiceImplTest {
     private val userRepository: UserRepository = mock()
     private val passwordCreator: PasswordCreator = mock()
     private val userDomainService: UserDomainService = mock()
-    private val userCommandService = UserCommandServiceImpl(userRepository, passwordCreator, userDomainService)
+    private val membershipCommandService: MembershipCommandService = mock()
+    private val userCommandService = UserCommandServiceImpl(userRepository, passwordCreator, userDomainService, membershipCommandService)
 
     @Nested
     @DisplayName("signUp")
@@ -53,6 +55,7 @@ class UserCommandServiceImplTest {
             assertEquals(Role.SELLER, savedUser.getRole())
             assertEquals(1L, response.id)
             verify(userDomainService).validateNewUser(Email(request.email), request.password)
+            verify(membershipCommandService).createMembership(1L)
         }
 
         @Test
