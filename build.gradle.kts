@@ -113,7 +113,9 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/payment/service/PaymentEventConsumer*",
 	"**/com/hoppingmall/mall/membership/service/MembershipEventConsumer*",
 	"**/com/hoppingmall/mall/membership/domain/MembershipEventLog*",
-	"**/com/hoppingmall/mall/product/service/ProductStatisticsScheduler*"
+	"**/com/hoppingmall/mall/product/service/ProductStatisticsScheduler*",
+	"**/com/hoppingmall/mall/product/service/StatisticsEventConsumer*",
+	"**/com/hoppingmall/mall/product/domain/StatisticsEventLog*"
 )
 
 tasks.jacocoTestReport {
