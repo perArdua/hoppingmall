@@ -6,6 +6,9 @@ import com.hoppingmall.mall.payment.dto.PaymentResult
 import com.hoppingmall.mall.payment.enum.PaymentStatus
 import com.hoppingmall.mall.payment.dto.request.PaymentRequest
 import com.hoppingmall.mall.payment.dto.response.PaymentResponse
+import com.hoppingmall.mall.payment.exception.PaymentAccessDeniedException
+import com.hoppingmall.mall.payment.exception.PaymentInvalidStateException
+import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -38,8 +41,34 @@ class PaymentCommandServiceImpl(
         if (finalPayment.status == PaymentStatus.SUCCESS) {
             publishPaymentEvents(finalPayment)
         }
-        
+
+        if (finalPayment.status == PaymentStatus.FAILED) {
+            paymentEventService.publishPaymentFailedEvent(finalPayment)
+            paymentEventService.publishPaymentFailedNotification(finalPayment)
+        }
+
         return PaymentResponse.from(finalPayment)
+    }
+
+    override fun cancelPayment(paymentId: Long, userId: Long): PaymentResponse {
+        val payment = paymentRepository.findById(paymentId)
+            .orElseThrow { PaymentNotFoundException() }
+
+        if (payment.userId != userId) {
+            throw PaymentAccessDeniedException()
+        }
+
+        if (payment.status != PaymentStatus.SUCCESS) {
+            throw PaymentInvalidStateException()
+        }
+
+        payment.status = PaymentStatus.CANCELLED
+        val cancelledPayment = paymentRepository.save(payment)
+
+        paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
+        paymentEventService.publishPaymentCancelledNotification(cancelledPayment)
+
+        return PaymentResponse.from(cancelledPayment)
     }
     
     private fun updatePaymentWithResult(payment: Payment, result: PaymentResult): Payment {

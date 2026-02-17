@@ -183,4 +183,41 @@ class PaymentControllerTest {
             verify(paymentQueryService).getPaymentsByOrderId(orderId)
         }
     }
+
+    @Nested
+    @DisplayName("cancelPayment")
+    inner class CancelPayment {
+        @Test
+        fun `결제 취소 성공`() {
+            // given
+            val paymentId = 1L
+            val userId = 1L
+            val response = PaymentResponse(
+                id = paymentId,
+                orderId = 1L,
+                userId = userId,
+                amount = BigDecimal("50000"),
+                pointAmount = BigDecimal("1000"),
+                method = PaymentMethod.CREDIT_CARD.name,
+                status = PaymentStatus.CANCELLED,
+                transactionId = "TXN_123456",
+                errorMessage = null,
+                completedAt = LocalDateTime.now(),
+                createdAt = LocalDateTime.now(),
+                updatedAt = LocalDateTime.now()
+            )
+            val userDetails: UserDetails = mock()
+
+            whenever(userDetails.username).thenReturn(userId.toString())
+            whenever(paymentCommandService.cancelPayment(paymentId, userId)).thenReturn(response)
+
+            // when
+            val result = paymentController.cancelPayment(paymentId, userDetails)
+
+            // then
+            assertEquals(HttpStatus.OK, result.statusCode)
+            assertEquals(response, result.body)
+            verify(paymentCommandService).cancelPayment(paymentId, userId)
+        }
+    }
 } 
