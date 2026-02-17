@@ -45,6 +45,28 @@ class PointCommandServiceImpl(
         )
     }
     
+    override fun refundPoints(userId: Long, amount: BigDecimal, paymentId: Long, orderId: Long) {
+        if (amount <= BigDecimal.ZERO) return
+
+        val eventId = "refund-point-$paymentId-$orderId"
+        if (pointHistoryRepository.existsByEventId(eventId)) return
+
+        val point = findOrCreatePoint(userId)
+        point.balance = point.balance.add(amount)
+        pointRepository.save(point)
+
+        val pointHistory = PointHistory(
+            userId = userId,
+            amount = amount,
+            type = PointType.REFUND,
+            reason = "환불 포인트 반환",
+            orderId = orderId,
+            paymentId = paymentId,
+            eventId = eventId
+        )
+        pointHistoryRepository.save(pointHistory)
+    }
+
     private fun validateSufficientBalance(point: Point, useAmount: BigDecimal) {
         if (point.balance < useAmount) {
             throw PointInsufficientBalanceException()

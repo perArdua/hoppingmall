@@ -137,6 +137,100 @@ class PointCommandServiceImplTest {
     }
 
     @Nested
+    @DisplayName("refundPoints")
+    inner class RefundPoints {
+        @Test
+        fun `포인트 환불 성공`() {
+            // given
+            val userId = 1L
+            val amount = BigDecimal("500")
+            val paymentId = 1L
+            val orderId = 1L
+            val point = Point.fixture()
+            val savedPoint = Point.fixture(balance = BigDecimal("1500"))
+
+            whenever(pointHistoryRepository.existsByEventId("refund-point-$paymentId-$orderId")).thenReturn(false)
+            whenever(pointRepository.findByUserId(userId)).thenReturn(point)
+            whenever(pointRepository.save(any<Point>())).thenReturn(savedPoint)
+            whenever(pointHistoryRepository.save(any<PointHistory>())).thenReturn(
+                PointHistory.fixture(type = PointType.REFUND, amount = amount)
+            )
+
+            // when
+            pointCommandService.refundPoints(userId, amount, paymentId, orderId)
+
+            // then
+            verify(pointRepository).save(any())
+            verify(pointHistoryRepository).save(any())
+        }
+
+        @Test
+        fun `환불 금액이 0 이하이면 처리하지 않는다`() {
+            // given
+            val userId = 1L
+            val amount = BigDecimal.ZERO
+            val paymentId = 1L
+            val orderId = 1L
+
+            // when
+            pointCommandService.refundPoints(userId, amount, paymentId, orderId)
+
+            // then
+            verify(pointRepository, never()).findByUserId(any())
+            verify(pointHistoryRepository, never()).save(any())
+        }
+
+        @Test
+        fun `이미 처리된 환불은 중복 처리하지 않는다`() {
+            // given
+            val userId = 1L
+            val amount = BigDecimal("500")
+            val paymentId = 1L
+            val orderId = 1L
+
+            whenever(pointHistoryRepository.existsByEventId("refund-point-$paymentId-$orderId")).thenReturn(true)
+
+            // when
+            pointCommandService.refundPoints(userId, amount, paymentId, orderId)
+
+            // then
+            verify(pointRepository, never()).save(any())
+        }
+
+        @Test
+        fun `포인트 환불 내역이 정확히 기록된다`() {
+            // given
+            val userId = 1L
+            val amount = BigDecimal("500")
+            val paymentId = 1L
+            val orderId = 1L
+            val point = Point.fixture()
+
+            whenever(pointHistoryRepository.existsByEventId("refund-point-$paymentId-$orderId")).thenReturn(false)
+            whenever(pointRepository.findByUserId(userId)).thenReturn(point)
+            whenever(pointRepository.save(any<Point>())).thenReturn(point)
+            whenever(pointHistoryRepository.save(any<PointHistory>())).thenReturn(
+                PointHistory.fixture(type = PointType.REFUND, amount = amount)
+            )
+
+            val captor = argumentCaptor<PointHistory>()
+
+            // when
+            pointCommandService.refundPoints(userId, amount, paymentId, orderId)
+
+            // then
+            verify(pointHistoryRepository).save(captor.capture())
+            val savedHistory = captor.firstValue
+            assertEquals(userId, savedHistory.userId)
+            assertEquals(amount, savedHistory.amount)
+            assertEquals(PointType.REFUND, savedHistory.type)
+            assertEquals(orderId, savedHistory.orderId)
+            assertEquals(paymentId, savedHistory.paymentId)
+            assertEquals("refund-point-$paymentId-$orderId", savedHistory.eventId)
+        }
+    }
+
+    @Nested
     @DisplayName("validatePointUseRequest")
     inner class ValidatePointUseRequest {
         @Test
