@@ -2,6 +2,7 @@ package com.hoppingmall.mall.product.domain
 
 import com.hoppingmall.mall.global.enums.ProductStatus
 import org.junit.jupiter.api.Assertions.assertEquals
+import java.math.BigDecimal
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
@@ -20,7 +21,7 @@ class ProductTest {
             val sellerId = 1L
             val name = "테스트 상품"
             val description = "테스트 상품 설명"
-            val price = 10000L
+            val price = BigDecimal("10000")
             val status = ProductStatus.AVAILABLE
 
             val product = Product.create(sellerId, name, description, price, status)
@@ -37,7 +38,7 @@ class ProductTest {
             val sellerId = 1L
             val name = "테스트 상품"
             val description = "테스트 상품 설명"
-            val price = 10000L
+            val price = BigDecimal("10000")
 
             val product = Product.create(sellerId, name, description, price, ProductStatus.AVAILABLE)
 
@@ -49,7 +50,7 @@ class ProductTest {
             val sellerId = 1L
             val name = "테스트 상품"
             val description = "테스트 상품 설명"
-            val price = 10000L
+            val price = BigDecimal("10000")
 
             val product = Product.create(sellerId, name, description, price, ProductStatus.SOLD_OUT)
 

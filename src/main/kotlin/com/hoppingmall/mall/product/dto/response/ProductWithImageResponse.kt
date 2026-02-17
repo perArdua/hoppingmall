@@ -3,6 +3,7 @@ package com.hoppingmall.mall.product.dto.response
 import com.hoppingmall.mall.global.enums.ProductStatus
 import com.hoppingmall.mall.product.domain.Product
 import com.hoppingmall.mall.product.domain.ProductImage
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 data class ProductResponse(
@@ -10,7 +11,7 @@ data class ProductResponse(
     val sellerId: Long,
     val name: String,
     val description: String,
-    val price: Long,
+    val price: BigDecimal,
     val status: ProductStatus,
     val imageUrl: String?,
     val createdAt: LocalDateTime,

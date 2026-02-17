@@ -4,6 +4,7 @@ import com.hoppingmall.mall.global.common.entity.BaseEntity
 import com.hoppingmall.mall.global.enums.ProductStatus
 import jakarta.persistence.*
 import org.hibernate.annotations.Filter
+import java.math.BigDecimal
 
 @Entity
 @Table(name = "products")
@@ -19,8 +20,8 @@ class Product private constructor(
     @Column(columnDefinition = "TEXT")
     var description: String,
 
-    @Column(nullable = false)
-    var price: Long,
+    @Column(nullable = false, precision = 10, scale = 2)
+    var price: BigDecimal,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -33,7 +34,7 @@ class Product private constructor(
             sellerId: Long,
             name: String,
             description: String,
-            price: Long,
+            price: BigDecimal,
             status: ProductStatus
         ): Product{
             return Product(sellerId, name, description, price, status)

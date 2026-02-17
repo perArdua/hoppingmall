@@ -2,6 +2,7 @@ package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.global.enums.ProductStatus
 import com.hoppingmall.mall.product.domain.Product
+import java.math.BigDecimal
 import com.hoppingmall.mall.product.domain.ProductImage
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
@@ -37,7 +38,7 @@ class ProductCommandServiceImplTest {
                 sellerId = 1L,
                 name = "테스트 상품",
                 description = "테스트 상품 설명",
-                price = 10000L,
+                price = BigDecimal("10000"),
                 imageUrl = "https://example.com/image.jpg",
                 status = ProductStatus.AVAILABLE
             )
@@ -84,7 +85,7 @@ class ProductCommandServiceImplTest {
                 sellerId = 1L,
                 name = "테스트 상품",
                 description = "테스트 상품 설명",
-                price = 10000L,
+                price = BigDecimal("10000"),
                 imageUrl = null,
                 status = ProductStatus.AVAILABLE
             )
@@ -132,7 +133,7 @@ class ProductCommandServiceImplTest {
             val request = ProductUpdateRequest(
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
-                price = 20000L,
+                price = BigDecimal("20000"),
                 imageUrl = "https://example.com/updated-image.jpg",
                 status = ProductStatus.SOLD_OUT
             )
@@ -177,7 +178,7 @@ class ProductCommandServiceImplTest {
             val request = ProductUpdateRequest(
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
-                price = 20000L,
+                price = BigDecimal("20000"),
                 imageUrl = "https://example.com/updated-image.jpg",
                 status = ProductStatus.AVAILABLE
             )
@@ -201,7 +202,7 @@ class ProductCommandServiceImplTest {
             val request = ProductUpdateRequest(
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
-                price = 20000L,
+                price = BigDecimal("20000"),
                 imageUrl = "https://example.com/new-image.jpg",
                 status = ProductStatus.AVAILABLE
             )
@@ -243,7 +244,7 @@ class ProductCommandServiceImplTest {
             val request = ProductUpdateRequest(
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
-                price = 20000L,
+                price = BigDecimal("20000"),
                 imageUrl = null,
                 status = ProductStatus.AVAILABLE
             )
