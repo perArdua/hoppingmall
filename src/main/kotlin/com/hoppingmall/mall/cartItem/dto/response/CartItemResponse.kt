@@ -1,15 +1,16 @@
 package com.hoppingmall.mall.cartItem.dto.response
 
 import com.hoppingmall.mall.cartItem.domain.CartItem
+import java.math.BigDecimal
 
 data class CartItemResponse(
     val id: Long,
     val productId: Long,
     val productName: String,
-    val productPrice: Long,
+    val productPrice: BigDecimal,
     val productImageUrl: String?,
     val quantity: Int,
-    val totalPrice: Long
+    val totalPrice: BigDecimal
 ) {
     companion object {
         fun from(cartItem: CartItem): CartItemResponse {

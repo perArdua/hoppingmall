@@ -2,6 +2,7 @@ package com.hoppingmall.mall.cartItem.service
 
 import com.hoppingmall.mall.cartItem.domain.CartItem
 import com.hoppingmall.mall.cartItem.domain.repository.CartItemRepository
+import java.math.BigDecimal
 import com.hoppingmall.mall.cartItem.dto.request.CartItemCreateRequest
 import com.hoppingmall.mall.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.mall.cartItem.dto.response.CartItemResponse
@@ -79,7 +80,7 @@ class CartItemCommandServiceImplTest {
             assertThat(result.productPrice).isEqualTo(product.price)
             assertThat(result.productImageUrl).isEqualTo(productImage.imageUrl)
             assertThat(result.quantity).isEqualTo(request.quantity)
-            assertThat(result.totalPrice).isEqualTo(product.price * request.quantity)
+            assertThat(result.totalPrice).isEqualByComparingTo(product.price.multiply(BigDecimal(request.quantity)))
 
             verify(cartItemRepository).save(any())
         }
@@ -107,7 +108,7 @@ class CartItemCommandServiceImplTest {
 
             // Assertions
             assertThat(result.quantity).isEqualTo(5) // 2 + 3
-            assertThat(result.totalPrice).isEqualTo(existingCartItem.productPrice * 5)
+            assertThat(result.totalPrice).isEqualByComparingTo(existingCartItem.productPrice.multiply(BigDecimal(5)))
 
             verify(cartItemRepository).save(any())
         }
@@ -133,7 +134,7 @@ class CartItemCommandServiceImplTest {
 
             // Assertions
             assertThat(result.productImageUrl).isNull()
-            assertThat(result.totalPrice).isEqualTo(product.price * request.quantity)
+            assertThat(result.totalPrice).isEqualByComparingTo(product.price.multiply(BigDecimal(request.quantity)))
 
             verify(cartItemRepository).save(any())
         }
@@ -177,7 +178,7 @@ class CartItemCommandServiceImplTest {
 
             // Assertions
             assertThat(result.quantity).isEqualTo(request.quantity)
-            assertThat(result.totalPrice).isEqualTo(existingCartItem.productPrice * request.quantity)
+            assertThat(result.totalPrice).isEqualByComparingTo(existingCartItem.productPrice.multiply(BigDecimal(request.quantity)))
 
             verify(cartItemRepository).save(any())
         }

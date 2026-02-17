@@ -11,6 +11,7 @@ import com.hoppingmall.mall.product.service.ProductImageService
 import com.hoppingmall.mall.product.service.ProductQueryService
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
+import java.math.BigDecimal
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.mockito.kotlin.*
 import org.springframework.data.domain.Page
@@ -40,7 +41,7 @@ class ProductControllerTest {
                     sellerId = 1L,
                     name = "상품1",
                     description = "설명1",
-                    price = 10000L,
+                    price = BigDecimal("10000"),
                     status = ProductStatus.AVAILABLE,
                     imageUrl = "https://example.com/image1.jpg",
                     createdAt = LocalDateTime.now(),
@@ -51,7 +52,7 @@ class ProductControllerTest {
                     sellerId = 2L,
                     name = "상품2",
                     description = "설명2",
-                    price = 20000L,
+                    price = BigDecimal("20000"),
                     status = ProductStatus.AVAILABLE,
                     imageUrl = "https://example.com/image2.jpg",
                     createdAt = LocalDateTime.now(),
@@ -82,7 +83,7 @@ class ProductControllerTest {
                 sellerId = 1L,
                 name = "상품1",
                 description = "설명1",
-                price = 10000L,
+                price = BigDecimal("10000"),
                 status = ProductStatus.AVAILABLE,
                 imageUrl = "https://example.com/image.jpg",
                 createdAt = LocalDateTime.now(),
@@ -128,7 +129,7 @@ class ProductControllerTest {
                     sellerId = sellerId,
                     name = "상품1",
                     description = "설명1",
-                    price = 10000L,
+                    price = BigDecimal("10000"),
                     status = ProductStatus.AVAILABLE,
                     imageUrl = "https://example.com/image1.jpg",
                     createdAt = LocalDateTime.now(),
@@ -139,7 +140,7 @@ class ProductControllerTest {
                     sellerId = sellerId,
                     name = "상품2",
                     description = "설명2",
-                    price = 20000L,
+                    price = BigDecimal("20000"),
                     status = ProductStatus.AVAILABLE,
                     imageUrl = "https://example.com/image2.jpg",
                     createdAt = LocalDateTime.now(),
@@ -168,7 +169,7 @@ class ProductControllerTest {
                 sellerId = 1L,
                 name = "새 상품",
                 description = "새 상품 설명",
-                price = 15000L,
+                price = BigDecimal("15000"),
                 imageUrl = "https://example.com/new-image.jpg",
                 status = ProductStatus.AVAILABLE
             )
@@ -178,7 +179,7 @@ class ProductControllerTest {
                 sellerId = 1L,
                 name = "새 상품",
                 description = "새 상품 설명",
-                price = 15000L,
+                price = BigDecimal("15000"),
                 status = ProductStatus.AVAILABLE,
                 imageUrl = "https://example.com/new-image.jpg",
                 createdAt = LocalDateTime.now(),
@@ -205,7 +206,7 @@ class ProductControllerTest {
             val request = ProductUpdateRequest(
                 name = "수정된 상품",
                 description = "수정된 상품 설명",
-                price = 20000L,
+                price = BigDecimal("20000"),
                 imageUrl = "https://example.com/updated-image.jpg",
                 status = ProductStatus.AVAILABLE
             )
@@ -215,7 +216,7 @@ class ProductControllerTest {
                 sellerId = 1L,
                 name = "수정된 상품",
                 description = "수정된 상품 설명",
-                price = 20000L,
+                price = BigDecimal("20000"),
                 status = ProductStatus.AVAILABLE,
                 imageUrl = "https://example.com/updated-image.jpg",
                 createdAt = LocalDateTime.now(),
