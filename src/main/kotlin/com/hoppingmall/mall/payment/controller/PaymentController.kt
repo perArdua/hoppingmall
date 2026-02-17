@@ -52,4 +52,14 @@ class PaymentController(
         val payments = paymentQueryService.getPaymentsByOrderId(orderId)
         return ResponseEntity.ok(payments)
     }
+
+    @PostMapping("/{paymentId}/cancel")
+    fun cancelPayment(
+        @PathVariable paymentId: Long,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<PaymentResponse> {
+        val userId = userDetails.username.toLong()
+        val paymentResponse = paymentCommandService.cancelPayment(paymentId, userId)
+        return ResponseEntity.ok(paymentResponse)
+    }
 } 
