@@ -126,6 +126,18 @@ class PaymentEventServiceTest {
     }
 
     @Test
+    fun `멤버십 업데이트 요청 이벤트를 발행한다`() {
+        // given
+        val payment = Payment.fixture()
+
+        // when
+        paymentEventService.publishMembershipUpdateEvent(payment)
+
+        // then
+        verify(paymentEventPublisher).publishMembershipUpdateEvent(any())
+    }
+
+    @Test
     fun `결제 실패 이벤트를 발행한다`() {
         // given
         val payment = Payment.failedFixture()

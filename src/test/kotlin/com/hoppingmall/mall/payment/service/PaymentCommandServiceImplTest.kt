@@ -72,6 +72,7 @@ class PaymentCommandServiceImplTest {
             assertEquals("TXN_123456", response.transactionId)
             verify(paymentEventService).publishPaymentCompletedEvent(any())
             verify(paymentEventService).publishPointEarnRequestEvent(any())
+            verify(paymentEventService).publishMembershipUpdateEvent(any())
             verify(paymentEventService).publishPaymentCompletedNotification(any())
         }
 
@@ -104,6 +105,7 @@ class PaymentCommandServiceImplTest {
             assertEquals("잔액 부족", response.errorMessage)
             verify(paymentEventService, never()).publishPaymentCompletedEvent(any())
             verify(paymentEventService, never()).publishPointEarnRequestEvent(any())
+            verify(paymentEventService, never()).publishMembershipUpdateEvent(any())
             verify(paymentEventService, never()).publishPaymentCompletedNotification(any())
             verify(paymentEventService).publishPaymentFailedEvent(any())
             verify(paymentEventService).publishPaymentFailedNotification(any())
