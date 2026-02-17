@@ -2,6 +2,7 @@ package com.hoppingmall.mall.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.payment.domain.Payment
+import com.hoppingmall.mall.payment.dto.event.MembershipUpdateRequestEvent
 import com.hoppingmall.mall.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.mall.payment.dto.event.PaymentFailedEvent
@@ -51,6 +52,19 @@ class PaymentEventService(
         paymentEventPublisher.publishPointEarnRequestEvent(event)
     }
     
+    fun publishMembershipUpdateEvent(payment: Payment) {
+        val eventId = "membership-${payment.transactionId ?: "payment-${payment.id}"}"
+
+        val event = MembershipUpdateRequestEvent(
+            eventId = eventId,
+            userId = payment.userId,
+            orderId = payment.orderId,
+            paymentId = payment.id!!,
+            amount = payment.amount
+        )
+        paymentEventPublisher.publishMembershipUpdateEvent(event)
+    }
+
     fun publishPaymentCompletedNotification(payment: Payment) {
         val eventId = payment.transactionId ?: "payment-${payment.id}"
         val metadata = objectMapper.writeValueAsString(
