@@ -22,11 +22,12 @@ spring:
         legacy_id_generator_strategy: true
 
   kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
     topics:
       payment: payment-test
       point: point-test
     consumer:
-      bootstrap-servers: localhost:9092
+      bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
       group-id: test-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -34,9 +35,11 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
     producer:
-      bootstrap-servers: localhost:9092
+      bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    listener:
+      concurrency: 1
 
 jwt:
   secret: test-secret-secret-secret-secret-secret-key-123456789
