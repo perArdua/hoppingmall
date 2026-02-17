@@ -53,6 +53,8 @@ class SecurityConfig(
                 it.requestMatchers(HttpMethod.DELETE, "/api/v1/products/{productId}").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.POST, "/api/v1/inventories").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.PATCH, "/api/v1/inventories/{productId}").hasRole("SELLER")
+                it.requestMatchers(HttpMethod.POST, "/api/v1/shipping").hasRole("SELLER")
+                it.requestMatchers(HttpMethod.PATCH, "/api/v1/shipping/{shippingId}/status").hasRole("SELLER")
 
                 it.requestMatchers("/api/v1/**").authenticated()
                 it.anyRequest().denyAll()
