@@ -42,7 +42,7 @@ class OrderCommandServiceImpl(
             inventoryCommandService.decreaseStock(cartItem.productId, cartItem.quantity)
         }
 
-        val totalAmount = cartItems.sumOf { BigDecimal(it.productPrice) * BigDecimal(it.quantity) }
+        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
 
         val order = orderRepository.save(Order.create(buyerId = buyerId, totalAmount = totalAmount))
 
@@ -51,7 +51,7 @@ class OrderCommandServiceImpl(
                 orderId = order.id!!,
                 productId = cartItem.productId,
                 productName = cartItem.productName,
-                productPrice = BigDecimal(cartItem.productPrice),
+                productPrice = cartItem.productPrice,
                 quantity = cartItem.quantity
             )
         }
