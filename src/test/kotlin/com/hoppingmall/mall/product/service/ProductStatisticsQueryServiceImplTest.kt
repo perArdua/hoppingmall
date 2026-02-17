@@ -1,7 +1,10 @@
 package com.hoppingmall.mall.product.service
 
+import com.hoppingmall.mall.product.domain.ProductDailyStatistics
 import com.hoppingmall.mall.product.domain.ProductStatistics
+import com.hoppingmall.mall.product.domain.repository.ProductDailyStatisticsRepository
 import com.hoppingmall.mall.product.domain.repository.ProductStatisticsRepository
+import com.hoppingmall.mall.product.dto.TopProductProjection
 import com.hoppingmall.mall.product.exception.ProductStatisticsNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.withId
@@ -12,19 +15,19 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.*
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import java.math.BigDecimal
+import java.time.LocalDate
 
 @DisplayName("ProductStatisticsQueryServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class ProductStatisticsQueryServiceImplTest {
 
     private val productStatisticsRepository: ProductStatisticsRepository = mock()
-    private val service = ProductStatisticsQueryServiceImpl(productStatisticsRepository)
+    private val productDailyStatisticsRepository: ProductDailyStatisticsRepository = mock()
+    private val service = ProductStatisticsQueryServiceImpl(productStatisticsRepository, productDailyStatisticsRepository)
 
     @Nested
     @DisplayName("getAll")
@@ -147,6 +150,92 @@ class ProductStatisticsQueryServiceImplTest {
             verify(productStatisticsRepository).sumTotalSalesAmount()
             verify(productStatisticsRepository).sumTotalRefundAmount()
             verify(productStatisticsRepository).avgRefundRate()
+        }
+    }
+
+    @Nested
+    @DisplayName("getTodaySummary")
+    inner class GetTodaySummary {
+        @Test
+        fun 오늘_실시간_요약_조회_성공() {
+            whenever(productStatisticsRepository.sumTodaySalesAmount()).thenReturn(BigDecimal("1000000"))
+            whenever(productStatisticsRepository.sumTodayOrderCount()).thenReturn(50L)
+            whenever(productStatisticsRepository.sumTodayRefundAmount()).thenReturn(BigDecimal("50000"))
+
+            val result = service.getTodaySummary()
+
+            assertEquals(BigDecimal("1000000"), result.todaySalesAmount)
+            assertEquals(50L, result.todayOrderCount)
+            assertEquals(BigDecimal("50000"), result.todayRefundAmount)
+        }
+    }
+
+    @Nested
+    @DisplayName("getDailyStatistics")
+    inner class GetDailyStatistics {
+        @Test
+        fun 상품별_일별_추이_조회_성공() {
+            val productId = 1L
+            val startDate = LocalDate.of(2026, 2, 10)
+            val endDate = LocalDate.of(2026, 2, 18)
+            val dailyList = listOf(
+                ProductDailyStatistics.fixture(productId = productId, statisticsDate = startDate).withId(1L),
+                ProductDailyStatistics.fixture(productId = productId, statisticsDate = endDate).withId(2L)
+            )
+
+            whenever(
+                productDailyStatisticsRepository
+                    .findByProductIdAndStatisticsDateBetweenOrderByStatisticsDateAsc(productId, startDate, endDate)
+            ).thenReturn(dailyList)
+
+            val result = service.getDailyStatistics(productId, startDate, endDate)
+
+            assertEquals(2, result.size)
+            assertEquals(startDate, result[0].statisticsDate)
+            assertEquals(endDate, result[1].statisticsDate)
+        }
+    }
+
+    @Nested
+    @DisplayName("getTopSellingProducts")
+    inner class GetTopSellingProducts {
+        @Test
+        fun 기간별_판매_TOP_N_조회_성공() {
+            val projection = mock<TopProductProjection>()
+            whenever(projection.getProductId()).thenReturn(1L)
+            whenever(projection.getTotalAmount()).thenReturn(BigDecimal("500000"))
+            whenever(projection.getTotalQuantity()).thenReturn(50L)
+
+            whenever(productDailyStatisticsRepository.findTopSellingProducts(any(), any(), eq(10)))
+                .thenReturn(listOf(projection))
+
+            val result = service.getTopSellingProducts(7, 10)
+
+            assertEquals(1, result.size)
+            assertEquals(1L, result[0].productId)
+            assertEquals(BigDecimal("500000"), result[0].totalAmount)
+            assertEquals(50L, result[0].totalQuantity)
+        }
+    }
+
+    @Nested
+    @DisplayName("getTopRefundProducts")
+    inner class GetTopRefundProducts {
+        @Test
+        fun 기간별_환불_TOP_N_조회_성공() {
+            val projection = mock<TopProductProjection>()
+            whenever(projection.getProductId()).thenReturn(2L)
+            whenever(projection.getTotalAmount()).thenReturn(BigDecimal("100000"))
+            whenever(projection.getTotalQuantity()).thenReturn(10L)
+
+            whenever(productDailyStatisticsRepository.findTopRefundProducts(any(), any(), eq(5)))
+                .thenReturn(listOf(projection))
+
+            val result = service.getTopRefundProducts(30, 5)
+
+            assertEquals(1, result.size)
+            assertEquals(2L, result[0].productId)
+            assertEquals(BigDecimal("100000"), result[0].totalAmount)
         }
     }
 }
