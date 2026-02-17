@@ -10,4 +10,6 @@ interface ProductQueryService {
     fun getProductById(productId: Long): ProductResponse
     
     fun getProductsBySellerId(sellerId: Long, pageable: Pageable): Page<ProductResponse>
+
+    fun getProductsByCategoryId(categoryId: Long, pageable: Pageable): Page<ProductResponse>
 }

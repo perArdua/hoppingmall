@@ -46,12 +46,30 @@ class ProductQueryServiceImpl(
         pageable: Pageable
     ): Page<ProductResponse> {
         val productPage = productRepository.findBySellerId(sellerId, pageable)
-        
+
         val productResponses = productPage.content.map { product ->
             val image = productImageRepository.findByProductId(product.id!!)
             ProductResponse.from(product, image)
         }
-        
+
+        return PageImpl(
+            productResponses,
+            pageable,
+            productPage.totalElements
+        )
+    }
+
+    override fun getProductsByCategoryId(
+        categoryId: Long,
+        pageable: Pageable
+    ): Page<ProductResponse> {
+        val productPage = productRepository.findByCategoryId(categoryId, pageable)
+
+        val productResponses = productPage.content.map { product ->
+            val image = productImageRepository.findByProductId(product.id!!)
+            ProductResponse.from(product, image)
+        }
+
         return PageImpl(
             productResponses,
             pageable,
