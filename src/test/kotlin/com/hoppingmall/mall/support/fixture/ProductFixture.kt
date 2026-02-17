@@ -6,10 +6,11 @@ import java.math.BigDecimal
 
 fun Product.Companion.fixture(
     sellerId: Long = 1L,
+    categoryId: Long = 1L,
     name: String = "테스트 상품",
     description: String = "테스트 상품 설명",
     price: BigDecimal = BigDecimal("10000"),
     status: ProductStatus = ProductStatus.AVAILABLE
 ): Product {
-    return Product.create(sellerId, name, description, price, status)
+    return Product.create(sellerId, categoryId, name, description, price, status)
 } 

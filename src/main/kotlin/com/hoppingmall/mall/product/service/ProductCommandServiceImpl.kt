@@ -1,5 +1,7 @@
 package com.hoppingmall.mall.product.service
 
+import com.hoppingmall.mall.category.domain.repository.CategoryRepository
+import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import com.hoppingmall.mall.product.domain.Product
 import com.hoppingmall.mall.product.domain.ProductImage
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
@@ -15,7 +17,8 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class ProductCommandServiceImpl(
     private val productRepository: ProductRepository,
-    private val productImageRepository: ProductImageRepository
+    private val productImageRepository: ProductImageRepository,
+    private val categoryRepository: CategoryRepository
 ) : ProductCommandService {
 
     companion object {
@@ -23,8 +26,13 @@ class ProductCommandServiceImpl(
     }
 
     override fun createProduct(request: ProductCreateRequest): ProductResponse {
+        if (!categoryRepository.existsById(request.categoryId)) {
+            throw CategoryNotFoundException()
+        }
+
         val product = Product.create(
             sellerId = request.sellerId,
+            categoryId = request.categoryId,
             name = request.name,
             description = request.description,
             price = request.price,
@@ -43,9 +51,14 @@ class ProductCommandServiceImpl(
     }
 
     override fun updateProduct(productId: Long, request: ProductUpdateRequest): ProductResponse {
+        if (!categoryRepository.existsById(request.categoryId)) {
+            throw CategoryNotFoundException()
+        }
+
         val product = productRepository.findById(productId)
             .orElseThrow { ProductNotFoundException() }
 
+        product.categoryId = request.categoryId
         product.name = request.name
         product.description = request.description
         product.price = request.price

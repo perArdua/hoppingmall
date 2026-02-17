@@ -32,7 +32,8 @@ class SecurityConfig(
                     HttpMethod.GET,
                     "/api/v1/products",
                     "/api/v1/products/{productId}",
-                    "/api/v1/products/seller/{sellerId}"
+                    "/api/v1/products/seller/{sellerId}",
+                    "/api/v1/products/category/{categoryId}"
                 ).permitAll()
                 it.requestMatchers(
                     HttpMethod.GET,

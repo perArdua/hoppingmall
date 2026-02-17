@@ -9,7 +9,10 @@ import java.math.BigDecimal
 data class ProductCreateRequest(
     @field:NotNull(message = "판매자 ID는 필수입니다.")
     val sellerId: Long,
-    
+
+    @field:NotNull(message = "카테고리 ID는 필수입니다.")
+    val categoryId: Long,
+
     @field:NotBlank(message = "상품명은 필수입니다.")
     val name: String,
     

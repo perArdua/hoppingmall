@@ -11,5 +11,7 @@ interface ProductRepository: JpaRepository<Product, Long> {
 
     fun findBySellerId(sellerId: Long, pageable: Pageable): Page<Product>
 
+    fun findByCategoryId(categoryId: Long, pageable: Pageable): Page<Product>
+
     fun findNullableById(id: Long): Product?
 }

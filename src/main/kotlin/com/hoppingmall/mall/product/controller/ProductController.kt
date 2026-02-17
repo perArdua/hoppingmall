@@ -43,6 +43,15 @@ class ProductController(
         return ApiResponse.success(products)
     }
 
+    @GetMapping("/category/{categoryId}")
+    fun getProductsByCategory(
+        @PathVariable categoryId: Long,
+        pageable: Pageable
+    ): ApiResponse<Page<ProductResponse>> {
+        val products = productQueryService.getProductsByCategoryId(categoryId, pageable)
+        return ApiResponse.success(products)
+    }
+
     @PostMapping
     fun createProduct(@Valid @RequestBody request: ProductCreateRequest): ApiResponse<ProductResponse> {
         val productResponse = productCommandService.createProduct(request)

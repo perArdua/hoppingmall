@@ -15,6 +15,9 @@ class Product private constructor(
     val sellerId: Long,
 
     @Column(nullable = false)
+    var categoryId: Long,
+
+    @Column(nullable = false)
     var name: String,
 
     @Column(columnDefinition = "TEXT")
@@ -32,12 +35,13 @@ class Product private constructor(
     companion object {
         fun create(
             sellerId: Long,
+            categoryId: Long,
             name: String,
             description: String,
             price: BigDecimal,
             status: ProductStatus
-        ): Product{
-            return Product(sellerId, name, description, price, status)
+        ): Product {
+            return Product(sellerId, categoryId, name, description, price, status)
         }
     }
 }
