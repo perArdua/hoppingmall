@@ -3,12 +3,11 @@ package com.hoppingmall.mall.payment.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.mall.point.service.PointPolicyService
+import com.hoppingmall.mall.point.service.strategy.PointEarnRateStrategy
 import com.hoppingmall.mall.support.fixture.failedFixture
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.successFixture
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
-import com.hoppingmall.mall.point.dto.response.PointPolicyResponse
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import java.math.BigDecimal
@@ -18,12 +17,12 @@ class PaymentEventServiceTest {
     
     private val paymentEventPublisher: PaymentEventPublisher = mock()
     private val transactionalEventPublisher: TransactionalEventPublisher = mock()
-    private val pointPolicyService: PointPolicyService = mock()
+    private val pointEarnRateStrategy: PointEarnRateStrategy = mock()
     private val objectMapper = ObjectMapper()
     private val paymentEventService = PaymentEventService(
         paymentEventPublisher,
         transactionalEventPublisher,
-        pointPolicyService,
+        pointEarnRateStrategy,
         objectMapper
     )
     
@@ -43,10 +42,11 @@ class PaymentEventServiceTest {
     fun `포인트 적립 요청 이벤트를 발행한다`() {
         // given
         val payment = Payment.fixture()
-        
+        whenever(pointEarnRateStrategy.getEarnRate(payment.userId)).thenReturn(BigDecimal("0.01"))
+
         // when
         paymentEventService.publishPointEarnRequestEvent(payment)
-        
+
         // then
         verify(paymentEventPublisher).publishPointEarnRequestEvent(any())
     }
@@ -74,24 +74,13 @@ class PaymentEventServiceTest {
     fun `포인트 적립 요청 이벤트의 금액이 정확히 계산된다`() {
         // given
         val payment = Payment.fixture(amount = BigDecimal("10000"))
-        whenever(pointPolicyService.getCurrentPolicy()).thenReturn(
-            PointPolicyResponse(
-                id = 1L,
-                policyName = "기본 정책",
-                earnRate = BigDecimal("0.01"),
-                maxEarnRate = BigDecimal("0.05"),
-                minUseAmount = BigDecimal("1000"),
-                maxUseAmount = BigDecimal("100000"),
-                isActive = true,
-                description = "1% 적립"
-            )
-        )
-        
+        whenever(pointEarnRateStrategy.getEarnRate(payment.userId)).thenReturn(BigDecimal("0.01"))
+
         val captor = argumentCaptor<PointEarnRequestEvent>()
-        
+
         // when
         paymentEventService.publishPointEarnRequestEvent(payment)
-        
+
         // then
         verify(paymentEventPublisher).publishPointEarnRequestEvent(captor.capture())
         assertEquals(BigDecimal("100.00"), captor.firstValue.earnAmount)
