@@ -86,9 +86,10 @@ class PaymentCommandServiceImpl(
     
     private fun publishPaymentEvents(payment: Payment) {
         paymentEventService.publishPaymentCompletedEvent(payment)
-        
+
         if (payment.amount > BigDecimal.ZERO) {
             paymentEventService.publishPointEarnRequestEvent(payment)
+            paymentEventService.publishMembershipUpdateEvent(payment)
         }
         paymentEventService.publishPaymentCompletedNotification(payment)
     }
