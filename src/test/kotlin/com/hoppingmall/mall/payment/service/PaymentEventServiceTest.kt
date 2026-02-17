@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.mall.point.service.PointPolicyService
+import com.hoppingmall.mall.support.fixture.failedFixture
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.successFixture
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
@@ -101,10 +102,10 @@ class PaymentEventServiceTest {
     fun `알림 이벤트의 내용이 정확히 설정된다`() {
         // given
         val payment = Payment.fixture()
-        
+
         // when
         paymentEventService.publishPaymentCompletedNotification(payment)
-        
+
         // then
         verify(transactionalEventPublisher).publishEvent(
             aggregateType = eq("Payment"),
@@ -119,6 +120,68 @@ class PaymentEventServiceTest {
                     metadataMap["orderId"].toString() == "1" &&
                     metadataMap["paymentId"].toString() == "1"
             },
+            topic = eq("notification"),
+            partitionKey = eq("1")
+        )
+    }
+
+    @Test
+    fun `결제 실패 이벤트를 발행한다`() {
+        // given
+        val payment = Payment.failedFixture()
+
+        // when
+        paymentEventService.publishPaymentFailedEvent(payment)
+
+        // then
+        verify(paymentEventPublisher).publishPaymentFailedEvent(any())
+    }
+
+    @Test
+    fun `결제 취소 이벤트를 발행한다`() {
+        // given
+        val payment = Payment.successFixture()
+
+        // when
+        paymentEventService.publishPaymentCancelledEvent(payment)
+
+        // then
+        verify(paymentEventPublisher).publishPaymentCancelledEvent(any())
+    }
+
+    @Test
+    fun `결제 실패 알림 이벤트를 발행한다`() {
+        // given
+        val payment = Payment.failedFixture()
+
+        // when
+        paymentEventService.publishPaymentFailedNotification(payment)
+
+        // then
+        verify(transactionalEventPublisher).publishEvent(
+            aggregateType = eq("Payment"),
+            aggregateId = eq("1"),
+            eventType = eq("PaymentFailedNotificationRequested"),
+            eventData = any(),
+            topic = eq("notification"),
+            partitionKey = eq("1")
+        )
+    }
+
+    @Test
+    fun `결제 취소 알림 이벤트를 발행한다`() {
+        // given
+        val payment = Payment.successFixture()
+
+        // when
+        paymentEventService.publishPaymentCancelledNotification(payment)
+
+        // then
+        verify(transactionalEventPublisher).publishEvent(
+            aggregateType = eq("Payment"),
+            aggregateId = eq("1"),
+            eventType = eq("PaymentCancelledNotificationRequested"),
+            eventData = any(),
             topic = eq("notification"),
             partitionKey = eq("1")
         )
