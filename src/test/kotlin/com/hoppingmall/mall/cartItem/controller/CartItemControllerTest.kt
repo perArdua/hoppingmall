@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.cartItem.controller
 
 import com.hoppingmall.mall.cartItem.dto.request.CartItemCreateRequest
+import java.math.BigDecimal
 import com.hoppingmall.mall.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.mall.cartItem.dto.response.CartItemResponse
 import com.hoppingmall.mall.cartItem.service.CartItemCommandService
@@ -33,10 +34,10 @@ class CartItemControllerTest {
                 id = 1L,
                 productId = 100L,
                 productName = "테스트 상품",
-                productPrice = 15000L,
+                productPrice = BigDecimal("15000"),
                 productImageUrl = "https://example.com/image.jpg",
                 quantity = 2,
-                totalPrice = 30000L
+                totalPrice = BigDecimal("30000")
             )
 
             // Context
@@ -65,19 +66,19 @@ class CartItemControllerTest {
                     id = 1L,
                     productId = 100L,
                     productName = "테스트 상품 1",
-                    productPrice = 15000L,
+                    productPrice = BigDecimal("15000"),
                     productImageUrl = "https://example.com/image1.jpg",
                     quantity = 2,
-                    totalPrice = 30000L
+                    totalPrice = BigDecimal("30000")
                 ),
                 CartItemResponse(
                     id = 2L,
                     productId = 200L,
                     productName = "테스트 상품 2",
-                    productPrice = 20000L,
+                    productPrice = BigDecimal("20000"),
                     productImageUrl = "https://example.com/image2.jpg",
                     quantity = 1,
-                    totalPrice = 20000L
+                    totalPrice = BigDecimal("20000")
                 )
             )
 
@@ -108,10 +109,10 @@ class CartItemControllerTest {
                 id = 1L,
                 productId = 100L,
                 productName = "테스트 상품",
-                productPrice = 15000L,
+                productPrice = BigDecimal("15000"),
                 productImageUrl = "https://example.com/image.jpg",
                 quantity = 5,
-                totalPrice = 75000L
+                totalPrice = BigDecimal("75000")
             )
 
             // Context
