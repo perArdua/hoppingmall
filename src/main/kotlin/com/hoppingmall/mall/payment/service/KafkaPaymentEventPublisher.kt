@@ -1,6 +1,8 @@
 package com.hoppingmall.mall.payment.service
 
+import com.hoppingmall.mall.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
+import com.hoppingmall.mall.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
@@ -46,6 +48,42 @@ class KafkaPaymentEventPublisher(
             ),
             topic = "point-earn-request",
             partitionKey = event.userId.toString()
+        )
+    }
+
+    override fun publishPaymentFailedEvent(event: PaymentFailedEvent) {
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Payment",
+            aggregateId = event.paymentId.toString(),
+            eventType = "PaymentFailed",
+            eventData = mapOf(
+                "eventId" to event.eventId,
+                "paymentId" to event.paymentId,
+                "orderId" to event.orderId,
+                "userId" to event.userId,
+                "amount" to event.amount,
+                "reason" to event.reason
+            ),
+            topic = "payment-compensation",
+            partitionKey = event.orderId.toString()
+        )
+    }
+
+    override fun publishPaymentCancelledEvent(event: PaymentCancelledEvent) {
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Payment",
+            aggregateId = event.paymentId.toString(),
+            eventType = "PaymentCancelled",
+            eventData = mapOf(
+                "eventId" to event.eventId,
+                "paymentId" to event.paymentId,
+                "orderId" to event.orderId,
+                "userId" to event.userId,
+                "amount" to event.amount,
+                "transactionId" to event.transactionId
+            ),
+            topic = "payment-compensation",
+            partitionKey = event.orderId.toString()
         )
     }
 }

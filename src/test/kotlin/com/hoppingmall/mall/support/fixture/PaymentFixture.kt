@@ -70,4 +70,25 @@ fun Payment.Companion.failedFixture(
         status = PaymentStatus.FAILED,
         errorMessage = errorMessage
     )
+}
+
+fun Payment.Companion.cancelledFixture(
+    orderId: Long = 1L,
+    userId: Long = 1L,
+    amount: BigDecimal = BigDecimal("50000"),
+    method: PaymentMethod = PaymentMethod.CREDIT_CARD,
+    pointAmount: BigDecimal = BigDecimal("1000"),
+    transactionId: String = "TXN_123456",
+    completedAt: LocalDateTime = LocalDateTime.now()
+): Payment {
+    return Payment.fixture(
+        orderId = orderId,
+        userId = userId,
+        amount = amount,
+        method = method,
+        pointAmount = pointAmount,
+        status = PaymentStatus.CANCELLED,
+        transactionId = transactionId,
+        completedAt = completedAt
+    )
 } 
