@@ -1,0 +1,64 @@
+package com.hoppingmall.mall.category.service
+
+import com.hoppingmall.mall.category.domain.Category
+import com.hoppingmall.mall.category.domain.repository.CategoryRepository
+import com.hoppingmall.mall.category.dto.request.CategoryCreateRequest
+import com.hoppingmall.mall.category.dto.request.CategoryUpdateRequest
+import com.hoppingmall.mall.category.dto.response.CategoryResponse
+import com.hoppingmall.mall.category.exception.CategoryAlreadyExistsException
+import com.hoppingmall.mall.category.exception.CategoryHasChildrenException
+import com.hoppingmall.mall.category.exception.CategoryNotFoundException
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
+@Service
+@Transactional
+class CategoryCommandServiceImpl(
+    private val categoryRepository: CategoryRepository
+) : CategoryCommandService {
+
+    override fun createCategory(request: CategoryCreateRequest): CategoryResponse {
+        if (categoryRepository.existsByName(request.name)) {
+            throw CategoryAlreadyExistsException()
+        }
+
+        val depth = if (request.parentCategoryId != null) {
+            val parent = categoryRepository.findNullableById(request.parentCategoryId)
+                ?: throw CategoryNotFoundException()
+            parent.depth + 1
+        } else {
+            0
+        }
+
+        val category = Category.create(
+            name = request.name,
+            parentCategoryId = request.parentCategoryId,
+            depth = depth
+        )
+        val savedCategory = categoryRepository.save(category)
+        return CategoryResponse.from(savedCategory)
+    }
+
+    override fun updateCategory(categoryId: Long, request: CategoryUpdateRequest): CategoryResponse {
+        val category = categoryRepository.findNullableById(categoryId)
+            ?: throw CategoryNotFoundException()
+
+        if (categoryRepository.existsByNameAndIdNot(request.name, categoryId)) {
+            throw CategoryAlreadyExistsException()
+        }
+
+        category.update(request.name)
+        return CategoryResponse.from(category)
+    }
+
+    override fun deleteCategory(categoryId: Long) {
+        val category = categoryRepository.findNullableById(categoryId)
+            ?: throw CategoryNotFoundException()
+
+        if (categoryRepository.existsByParentCategoryId(category.id!!)) {
+            throw CategoryHasChildrenException()
+        }
+
+        categoryRepository.deleteById(category.id!!)
+    }
+}

@@ -40,9 +40,16 @@ class SecurityConfig(
                     "/api/v1/point-policies/{policyId}"
                 ).permitAll()
                 it.requestMatchers(HttpMethod.GET, "/api/v1/inventories/{productId}").permitAll()
+                it.requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/categories/root",
+                    "/api/v1/categories/{categoryId}",
+                    "/api/v1/categories/{categoryId}/sub"
+                ).permitAll()
 
                 it.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/point-policies/**").hasRole("ADMIN")
+                it.requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
 
                 it.requestMatchers(
                     HttpMethod.POST,
