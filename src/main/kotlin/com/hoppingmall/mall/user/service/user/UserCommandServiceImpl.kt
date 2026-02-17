@@ -3,6 +3,7 @@ package com.hoppingmall.mall.user.service.user
 import com.hoppingmall.mall.global.vo.email.Email
 import com.hoppingmall.mall.global.vo.password.Password
 import com.hoppingmall.mall.global.vo.password.service.PasswordCreator
+import com.hoppingmall.mall.membership.service.MembershipCommandService
 import com.hoppingmall.mall.user.domain.User
 import com.hoppingmall.mall.user.domain.repository.UserRepository
 import com.hoppingmall.mall.user.dto.request.user.SignUpRequest
@@ -17,7 +18,8 @@ import org.springframework.transaction.annotation.Transactional
 class UserCommandServiceImpl(
     private val userRepository: UserRepository,
     private val passwordCreator: PasswordCreator,
-    private val userDomainService: UserDomainService
+    private val userDomainService: UserDomainService,
+    private val membershipCommandService: MembershipCommandService
 ) : UserCommandService {
 
     override fun signUp(request: SignUpRequest): SignUpResponse {
@@ -34,6 +36,7 @@ class UserCommandServiceImpl(
         )
 
         val saved = userRepository.save(user)
+        membershipCommandService.createMembership(saved.id!!)
 
         return SignUpResponse(
             id = saved.id!!,
