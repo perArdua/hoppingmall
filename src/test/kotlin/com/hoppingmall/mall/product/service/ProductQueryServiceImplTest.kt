@@ -36,8 +36,8 @@ class ProductQueryServiceImplTest {
         fun 상품_목록_조회_성공() {
             val pageable = PageRequest.of(0, 10)
             val products = listOf(
-                Product.create(1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
-                Product.create(2L, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
+                Product.create(1L, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
+                Product.create(2L, 1L, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
             )
             val productPage = PageImpl(products, pageable, products.size.toLong())
 
@@ -62,7 +62,7 @@ class ProductQueryServiceImplTest {
         @Test
         fun 상품_상세_조회_성공() {
             val productId = 1L
-            val product = Product.create(1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(productId)
+            val product = Product.create(1L, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(productId)
             val image = ProductImage.create(productId, "https://example.com/image.jpg")
 
             whenever(productRepository.findNullableById(productId)).thenReturn(product)
@@ -93,7 +93,7 @@ class ProductQueryServiceImplTest {
         @Test
         fun 이미지가_없는_상품_조회_성공() {
             val productId = 1L
-            val product = Product.create(1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(productId)
+            val product = Product.create(1L, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(productId)
 
             whenever(productRepository.findNullableById(productId)).thenReturn(product)
             whenever(productImageRepository.findByProductId(productId)).thenReturn(null)
@@ -116,8 +116,8 @@ class ProductQueryServiceImplTest {
             val sellerId = 1L
             val pageable = PageRequest.of(0, 10)
             val products = listOf(
-                Product.create(sellerId, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
-                Product.create(sellerId, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
+                Product.create(sellerId, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
+                Product.create(sellerId, 1L, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
             )
             val productPage = PageImpl(products, pageable, products.size.toLong())
 
@@ -135,6 +135,36 @@ class ProductQueryServiceImplTest {
             assertEquals("상품2", result.content[1].name)
             assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
             verify(productRepository).findBySellerId(sellerId, pageable)
+        }
+    }
+
+    @Nested
+    @DisplayName("getProductsByCategoryId")
+    inner class GetProductsByCategoryId {
+        @Test
+        fun 카테고리별_상품_목록_조회_성공() {
+            val categoryId = 1L
+            val pageable = PageRequest.of(0, 10)
+            val products = listOf(
+                Product.create(1L, categoryId, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
+                Product.create(2L, categoryId, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
+            )
+            val productPage = PageImpl(products, pageable, products.size.toLong())
+
+            whenever(productRepository.findByCategoryId(categoryId, pageable)).thenReturn(productPage)
+            whenever(productImageRepository.findByProductId(1L)).thenReturn(ProductImage.create(1L, "https://example.com/image1.jpg"))
+            whenever(productImageRepository.findByProductId(2L)).thenReturn(ProductImage.create(2L, "https://example.com/image2.jpg"))
+
+            val result = productQueryService.getProductsByCategoryId(categoryId, pageable)
+
+            assertEquals(2, result.content.size)
+            assertEquals(categoryId, result.content[0].categoryId)
+            assertEquals("상품1", result.content[0].name)
+            assertEquals("https://example.com/image1.jpg", result.content[0].imageUrl)
+            assertEquals(categoryId, result.content[1].categoryId)
+            assertEquals("상품2", result.content[1].name)
+            assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
+            verify(productRepository).findByCategoryId(categoryId, pageable)
         }
     }
 } 

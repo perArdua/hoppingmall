@@ -39,6 +39,7 @@ class ProductControllerTest {
                 ProductResponse(
                     id = 1L,
                     sellerId = 1L,
+                    categoryId = 1L,
                     name = "상품1",
                     description = "설명1",
                     price = BigDecimal("10000"),
@@ -50,6 +51,7 @@ class ProductControllerTest {
                 ProductResponse(
                     id = 2L,
                     sellerId = 2L,
+                    categoryId = 1L,
                     name = "상품2",
                     description = "설명2",
                     price = BigDecimal("20000"),
@@ -81,6 +83,7 @@ class ProductControllerTest {
             val productResponse = ProductResponse(
                 id = productId,
                 sellerId = 1L,
+                categoryId = 1L,
                 name = "상품1",
                 description = "설명1",
                 price = BigDecimal("10000"),
@@ -127,6 +130,7 @@ class ProductControllerTest {
                 ProductResponse(
                     id = 1L,
                     sellerId = sellerId,
+                    categoryId = 1L,
                     name = "상품1",
                     description = "설명1",
                     price = BigDecimal("10000"),
@@ -138,6 +142,7 @@ class ProductControllerTest {
                 ProductResponse(
                     id = 2L,
                     sellerId = sellerId,
+                    categoryId = 1L,
                     name = "상품2",
                     description = "설명2",
                     price = BigDecimal("20000"),
@@ -161,12 +166,59 @@ class ProductControllerTest {
     }
 
     @Nested
+    @DisplayName("getProductsByCategory")
+    inner class GetProductsByCategory {
+        @Test
+        fun 카테고리별_상품_목록_조회_성공() {
+            val categoryId = 1L
+            val pageable = PageRequest.of(0, 10)
+            val productResponses = listOf(
+                ProductResponse(
+                    id = 1L,
+                    sellerId = 1L,
+                    categoryId = categoryId,
+                    name = "상품1",
+                    description = "설명1",
+                    price = BigDecimal("10000"),
+                    status = ProductStatus.AVAILABLE,
+                    imageUrl = "https://example.com/image1.jpg",
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = null
+                ),
+                ProductResponse(
+                    id = 2L,
+                    sellerId = 2L,
+                    categoryId = categoryId,
+                    name = "상품2",
+                    description = "설명2",
+                    price = BigDecimal("20000"),
+                    status = ProductStatus.AVAILABLE,
+                    imageUrl = "https://example.com/image2.jpg",
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = null
+                )
+            )
+            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+
+            whenever(productQueryService.getProductsByCategoryId(eq(categoryId), any())).thenReturn(productResponsePage)
+
+            val response: ApiResponse<Page<ProductResponse>> = controller.getProductsByCategory(categoryId, pageable)
+
+            assertEquals("SUCCESS", response.code)
+            assertEquals("성공", response.message)
+            assertEquals(productResponsePage, response.data)
+            verify(productQueryService).getProductsByCategoryId(categoryId, pageable)
+        }
+    }
+
+    @Nested
     @DisplayName("createProduct")
     inner class CreateProduct {
         @Test
         fun 상품_생성_성공() {
             val request = ProductCreateRequest(
                 sellerId = 1L,
+                categoryId = 1L,
                 name = "새 상품",
                 description = "새 상품 설명",
                 price = BigDecimal("15000"),
@@ -177,6 +229,7 @@ class ProductControllerTest {
             val expectedResponse = ProductResponse(
                 id = 1L,
                 sellerId = 1L,
+                categoryId = 1L,
                 name = "새 상품",
                 description = "새 상품 설명",
                 price = BigDecimal("15000"),
@@ -204,6 +257,7 @@ class ProductControllerTest {
         fun 상품_수정_성공() {
             val productId = 1L
             val request = ProductUpdateRequest(
+                categoryId = 1L,
                 name = "수정된 상품",
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
@@ -214,6 +268,7 @@ class ProductControllerTest {
             val expectedResponse = ProductResponse(
                 id = productId,
                 sellerId = 1L,
+                categoryId = 1L,
                 name = "수정된 상품",
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
@@ -281,4 +336,4 @@ class ProductControllerTest {
             verify(productImageService).uploadProductImage(imageFile)
         }
     }
-} 
+}

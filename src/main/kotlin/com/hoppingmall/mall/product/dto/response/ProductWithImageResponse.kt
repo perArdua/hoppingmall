@@ -9,6 +9,7 @@ import java.time.LocalDateTime
 data class ProductResponse(
     val id: Long,
     val sellerId: Long,
+    val categoryId: Long,
     val name: String,
     val description: String,
     val price: BigDecimal,
@@ -22,6 +23,7 @@ data class ProductResponse(
             return ProductResponse(
                 id = product.id!!,
                 sellerId = product.sellerId,
+                categoryId = product.categoryId,
                 name = product.name,
                 description = product.description,
                 price = product.price,
