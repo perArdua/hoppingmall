@@ -8,17 +8,16 @@ import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.mall.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.mall.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.mall.notification.enum.NotificationType
-import com.hoppingmall.mall.point.service.PointPolicyService
+import com.hoppingmall.mall.point.service.strategy.PointEarnRateStrategy
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
-import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Service
 class PaymentEventService(
     private val paymentEventPublisher: PaymentEventPublisher,
     private val transactionalEventPublisher: TransactionalEventPublisher,
-    private val pointPolicyService: PointPolicyService,
+    private val pointEarnRateStrategy: PointEarnRateStrategy,
     private val objectMapper: ObjectMapper
 ) {
     
@@ -38,7 +37,7 @@ class PaymentEventService(
     }
     
     fun publishPointEarnRequestEvent(payment: Payment) {
-        val earnRate = getCurrentEarnRate()
+        val earnRate = pointEarnRateStrategy.getEarnRate(payment.userId)
         val earnAmount = payment.amount.multiply(earnRate)
         val eventId = payment.transactionId ?: "payment-${payment.id}"
         
@@ -174,10 +173,5 @@ class PaymentEventService(
             topic = "notification",
             partitionKey = payment.userId.toString()
         )
-    }
-
-    private fun getCurrentEarnRate(): BigDecimal {
-        val currentPolicy = pointPolicyService.getCurrentPolicy()
-        return currentPolicy?.earnRate ?: BigDecimal("0.01")
     }
 } 
