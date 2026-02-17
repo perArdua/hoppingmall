@@ -6,6 +6,7 @@ import java.math.BigDecimal
 import com.hoppingmall.mall.product.domain.ProductImage
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
+import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import com.hoppingmall.mall.support.withId
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -15,6 +16,9 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.isNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -165,6 +169,99 @@ class ProductQueryServiceImplTest {
             assertEquals("상품2", result.content[1].name)
             assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
             verify(productRepository).findByCategoryId(categoryId, pageable)
+        }
+    }
+
+    @Nested
+    @DisplayName("searchProducts")
+    inner class SearchProducts {
+        @Test
+        fun 키워드로_상품_검색_성공() {
+            val pageable = PageRequest.of(0, 10)
+            val condition = ProductSearchCondition(keyword = "노트북")
+            val products = listOf(
+                Product.create(1L, 1L, "게이밍 노트북", "설명1", BigDecimal("1500000"), ProductStatus.AVAILABLE).withId(1L)
+            )
+            val productPage = PageImpl(products, pageable, products.size.toLong())
+
+            whenever(productRepository.searchProducts(
+                eq("노트북"), isNull(), isNull(), isNull(), isNull(), eq(pageable)
+            )).thenReturn(productPage)
+            whenever(productImageRepository.findByProductId(1L)).thenReturn(null)
+
+            val result = productQueryService.searchProducts(condition, pageable)
+
+            assertEquals(1, result.content.size)
+            assertEquals("게이밍 노트북", result.content[0].name)
+        }
+
+        @Test
+        fun 가격_범위로_상품_검색_성공() {
+            val pageable = PageRequest.of(0, 10)
+            val condition = ProductSearchCondition(
+                minPrice = BigDecimal("10000"),
+                maxPrice = BigDecimal("30000")
+            )
+            val products = listOf(
+                Product.create(1L, 1L, "상품1", "설명1", BigDecimal("15000"), ProductStatus.AVAILABLE).withId(1L),
+                Product.create(2L, 1L, "상품2", "설명2", BigDecimal("25000"), ProductStatus.AVAILABLE).withId(2L)
+            )
+            val productPage = PageImpl(products, pageable, products.size.toLong())
+
+            whenever(productRepository.searchProducts(
+                isNull(), isNull(), isNull(), eq(BigDecimal("10000")), eq(BigDecimal("30000")), eq(pageable)
+            )).thenReturn(productPage)
+            whenever(productImageRepository.findByProductId(1L)).thenReturn(null)
+            whenever(productImageRepository.findByProductId(2L)).thenReturn(null)
+
+            val result = productQueryService.searchProducts(condition, pageable)
+
+            assertEquals(2, result.content.size)
+        }
+
+        @Test
+        fun 복합_조건으로_상품_검색_성공() {
+            val pageable = PageRequest.of(0, 10)
+            val condition = ProductSearchCondition(
+                keyword = "상품",
+                categoryId = 1L,
+                status = ProductStatus.AVAILABLE,
+                minPrice = BigDecimal("5000"),
+                maxPrice = BigDecimal("50000")
+            )
+            val products = listOf(
+                Product.create(1L, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L)
+            )
+            val productPage = PageImpl(products, pageable, products.size.toLong())
+
+            whenever(productRepository.searchProducts(
+                eq("상품"), eq(1L), eq(ProductStatus.AVAILABLE),
+                eq(BigDecimal("5000")), eq(BigDecimal("50000")), eq(pageable)
+            )).thenReturn(productPage)
+            whenever(productImageRepository.findByProductId(1L))
+                .thenReturn(ProductImage.create(1L, "https://example.com/image1.jpg"))
+
+            val result = productQueryService.searchProducts(condition, pageable)
+
+            assertEquals(1, result.content.size)
+            assertEquals("상품1", result.content[0].name)
+            assertEquals("https://example.com/image1.jpg", result.content[0].imageUrl)
+        }
+
+        @Test
+        fun 검색_결과가_없으면_빈_페이지_반환() {
+            val pageable = PageRequest.of(0, 10)
+            val condition = ProductSearchCondition(keyword = "존재하지않는상품")
+            val productPage = PageImpl<Product>(emptyList(), pageable, 0)
+
+            whenever(productRepository.searchProducts(
+                eq("존재하지않는상품"), isNull(), isNull(), isNull(), isNull(), eq(pageable)
+            )).thenReturn(productPage)
+
+            val result = productQueryService.searchProducts(condition, pageable)
+
+            assertEquals(0, result.content.size)
+            assertEquals(0, result.totalElements)
         }
     }
 } 

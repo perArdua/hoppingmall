@@ -3,6 +3,7 @@ package com.hoppingmall.mall.product.controller
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.global.enums.ProductStatus
 import com.hoppingmall.mall.product.dto.request.ProductCreateRequest
+import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.dto.request.ProductUpdateRequest
 import com.hoppingmall.mall.product.dto.response.ProductImageResponse
 import com.hoppingmall.mall.product.dto.response.ProductResponse
@@ -208,6 +209,69 @@ class ProductControllerTest {
             assertEquals("성공", response.message)
             assertEquals(productResponsePage, response.data)
             verify(productQueryService).getProductsByCategoryId(categoryId, pageable)
+        }
+    }
+
+    @Nested
+    @DisplayName("searchProducts")
+    inner class SearchProducts {
+        @Test
+        fun 키워드로_상품_검색_성공() {
+            val pageable = PageRequest.of(0, 10)
+            val condition = ProductSearchCondition(keyword = "노트북")
+            val productResponses = listOf(
+                ProductResponse(
+                    id = 1L,
+                    sellerId = 1L,
+                    categoryId = 1L,
+                    name = "게이밍 노트북",
+                    description = "고성능 노트북",
+                    price = BigDecimal("1500000"),
+                    status = ProductStatus.AVAILABLE,
+                    imageUrl = null,
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = null
+                )
+            )
+            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+
+            whenever(productQueryService.searchProducts(eq(condition), any())).thenReturn(productResponsePage)
+
+            val response: ApiResponse<Page<ProductResponse>> = controller.searchProducts(condition, pageable)
+
+            assertEquals("SUCCESS", response.code)
+            assertEquals("성공", response.message)
+            assertEquals(productResponsePage, response.data)
+            verify(productQueryService).searchProducts(condition, pageable)
+        }
+
+        @Test
+        fun 조건_없이_전체_검색_성공() {
+            val pageable = PageRequest.of(0, 10)
+            val condition = ProductSearchCondition()
+            val productResponses = listOf(
+                ProductResponse(
+                    id = 1L,
+                    sellerId = 1L,
+                    categoryId = 1L,
+                    name = "상품1",
+                    description = "설명1",
+                    price = BigDecimal("10000"),
+                    status = ProductStatus.AVAILABLE,
+                    imageUrl = null,
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = null
+                )
+            )
+            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+
+            whenever(productQueryService.searchProducts(eq(condition), any())).thenReturn(productResponsePage)
+
+            val response: ApiResponse<Page<ProductResponse>> = controller.searchProducts(condition, pageable)
+
+            assertEquals("SUCCESS", response.code)
+            assertEquals(productResponsePage, response.data)
+            verify(productQueryService).searchProducts(condition, pageable)
         }
     }
 

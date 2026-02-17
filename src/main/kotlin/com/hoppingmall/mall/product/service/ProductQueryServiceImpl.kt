@@ -2,6 +2,7 @@ package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
+import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.dto.response.ProductResponse
 import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import org.springframework.data.domain.Page
@@ -64,6 +65,31 @@ class ProductQueryServiceImpl(
         pageable: Pageable
     ): Page<ProductResponse> {
         val productPage = productRepository.findByCategoryId(categoryId, pageable)
+
+        val productResponses = productPage.content.map { product ->
+            val image = productImageRepository.findByProductId(product.id!!)
+            ProductResponse.from(product, image)
+        }
+
+        return PageImpl(
+            productResponses,
+            pageable,
+            productPage.totalElements
+        )
+    }
+
+    override fun searchProducts(
+        condition: ProductSearchCondition,
+        pageable: Pageable
+    ): Page<ProductResponse> {
+        val productPage = productRepository.searchProducts(
+            keyword = condition.keyword,
+            categoryId = condition.categoryId,
+            status = condition.status,
+            minPrice = condition.minPrice,
+            maxPrice = condition.maxPrice,
+            pageable = pageable
+        )
 
         val productResponses = productPage.content.map { product ->
             val image = productImageRepository.findByProductId(product.id!!)
