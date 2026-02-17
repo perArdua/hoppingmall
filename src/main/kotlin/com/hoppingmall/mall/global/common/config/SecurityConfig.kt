@@ -51,6 +51,7 @@ class SecurityConfig(
                 it.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/point-policies/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
+                it.requestMatchers(HttpMethod.GET, "/api/v1/memberships/users/{userId}").hasRole("ADMIN")
 
                 it.requestMatchers(
                     HttpMethod.POST,
