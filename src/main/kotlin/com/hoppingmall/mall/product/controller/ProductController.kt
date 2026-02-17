@@ -2,6 +2,7 @@ package com.hoppingmall.mall.product.controller
 
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.product.dto.request.ProductCreateRequest
+import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.dto.request.ProductUpdateRequest
 import com.hoppingmall.mall.product.dto.response.ProductImageResponse
 import com.hoppingmall.mall.product.dto.response.ProductResponse
@@ -49,6 +50,15 @@ class ProductController(
         pageable: Pageable
     ): ApiResponse<Page<ProductResponse>> {
         val products = productQueryService.getProductsByCategoryId(categoryId, pageable)
+        return ApiResponse.success(products)
+    }
+
+    @GetMapping("/search")
+    fun searchProducts(
+        @ModelAttribute condition: ProductSearchCondition,
+        pageable: Pageable
+    ): ApiResponse<Page<ProductResponse>> {
+        val products = productQueryService.searchProducts(condition, pageable)
         return ApiResponse.success(products)
     }
 
