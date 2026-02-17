@@ -30,7 +30,7 @@ import java.math.BigDecimal
 @ExtendWith(MockitoExtension::class)
 @DisplayName("PointEventConsumer 단위 테스트")
 @DisplayNameGeneration(ReplaceUnderscores::class)
-class PointEventConsumerIntegrationTest {
+class PointEventConsumerTest {
 
     @Mock
     private lateinit var pointRepository: PointRepository

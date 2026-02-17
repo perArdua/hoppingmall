@@ -21,6 +21,7 @@ import org.apache.kafka.common.errors.SerializationException
 import org.springframework.kafka.support.serializer.DeserializationException
 import java.util.UUID
 @Configuration
+@org.springframework.context.annotation.Profile("!test")
 class KafkaConfig {
 
     @Value("\${spring.kafka.bootstrap-servers}")
