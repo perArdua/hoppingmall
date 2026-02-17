@@ -1,15 +1,13 @@
 package com.hoppingmall.mall.product.controller
 
 import com.hoppingmall.mall.global.common.response.ApiResponse
-import com.hoppingmall.mall.product.dto.response.ProductStatisticsResponse
-import com.hoppingmall.mall.product.dto.response.ProductStatisticsSummaryResponse
+import com.hoppingmall.mall.product.dto.response.*
 import com.hoppingmall.mall.product.service.ProductStatisticsQueryService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.format.annotation.DateTimeFormat
+import org.springframework.web.bind.annotation.*
+import java.time.LocalDate
 
 @RestController
 @RequestMapping("/api/v1/admin/product-statistics")
@@ -45,5 +43,35 @@ class ProductStatisticsController(
     @GetMapping("/summary")
     fun getSummary(): ApiResponse<ProductStatisticsSummaryResponse> {
         return ApiResponse.success(productStatisticsQueryService.getSummary())
+    }
+
+    @GetMapping("/realtime/today")
+    fun getTodaySummary(): ApiResponse<TodaySummaryResponse> {
+        return ApiResponse.success(productStatisticsQueryService.getTodaySummary())
+    }
+
+    @GetMapping("/daily")
+    fun getDailyStatistics(
+        @RequestParam productId: Long,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate
+    ): ApiResponse<List<ProductDailyStatisticsResponse>> {
+        return ApiResponse.success(productStatisticsQueryService.getDailyStatistics(productId, startDate, endDate))
+    }
+
+    @GetMapping("/top-selling")
+    fun getTopSellingProducts(
+        @RequestParam(defaultValue = "7") days: Int,
+        @RequestParam(defaultValue = "10") limit: Int
+    ): ApiResponse<List<TopProductResponse>> {
+        return ApiResponse.success(productStatisticsQueryService.getTopSellingProducts(days, limit))
+    }
+
+    @GetMapping("/top-refund")
+    fun getTopRefundProducts(
+        @RequestParam(defaultValue = "7") days: Int,
+        @RequestParam(defaultValue = "10") limit: Int
+    ): ApiResponse<List<TopProductResponse>> {
+        return ApiResponse.success(productStatisticsQueryService.getTopRefundProducts(days, limit))
     }
 }
