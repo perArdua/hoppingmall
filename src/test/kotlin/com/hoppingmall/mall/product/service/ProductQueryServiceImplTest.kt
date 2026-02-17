@@ -2,6 +2,7 @@ package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.global.enums.ProductStatus
 import com.hoppingmall.mall.product.domain.Product
+import java.math.BigDecimal
 import com.hoppingmall.mall.product.domain.ProductImage
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
@@ -35,8 +36,8 @@ class ProductQueryServiceImplTest {
         fun 상품_목록_조회_성공() {
             val pageable = PageRequest.of(0, 10)
             val products = listOf(
-                Product.create(1L, "상품1", "설명1", 10000L, ProductStatus.AVAILABLE).withId(1L),
-                Product.create(2L, "상품2", "설명2", 20000L, ProductStatus.AVAILABLE).withId(2L)
+                Product.create(1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
+                Product.create(2L, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
             )
             val productPage = PageImpl(products, pageable, products.size.toLong())
 
@@ -61,7 +62,7 @@ class ProductQueryServiceImplTest {
         @Test
         fun 상품_상세_조회_성공() {
             val productId = 1L
-            val product = Product.create(1L, "상품1", "설명1", 10000L, ProductStatus.AVAILABLE).withId(productId)
+            val product = Product.create(1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(productId)
             val image = ProductImage.create(productId, "https://example.com/image.jpg")
 
             whenever(productRepository.findNullableById(productId)).thenReturn(product)
@@ -92,7 +93,7 @@ class ProductQueryServiceImplTest {
         @Test
         fun 이미지가_없는_상품_조회_성공() {
             val productId = 1L
-            val product = Product.create(1L, "상품1", "설명1", 10000L, ProductStatus.AVAILABLE).withId(productId)
+            val product = Product.create(1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(productId)
 
             whenever(productRepository.findNullableById(productId)).thenReturn(product)
             whenever(productImageRepository.findByProductId(productId)).thenReturn(null)
@@ -115,8 +116,8 @@ class ProductQueryServiceImplTest {
             val sellerId = 1L
             val pageable = PageRequest.of(0, 10)
             val products = listOf(
-                Product.create(sellerId, "상품1", "설명1", 10000L, ProductStatus.AVAILABLE).withId(1L),
-                Product.create(sellerId, "상품2", "설명2", 20000L, ProductStatus.AVAILABLE).withId(2L)
+                Product.create(sellerId, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
+                Product.create(sellerId, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
             )
             val productPage = PageImpl(products, pageable, products.size.toLong())
 

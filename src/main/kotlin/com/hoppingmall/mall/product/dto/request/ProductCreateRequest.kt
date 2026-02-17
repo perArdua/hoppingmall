@@ -4,6 +4,7 @@ import com.hoppingmall.mall.global.enums.ProductStatus
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
+import java.math.BigDecimal
 
 data class ProductCreateRequest(
     @field:NotNull(message = "판매자 ID는 필수입니다.")
@@ -16,7 +17,7 @@ data class ProductCreateRequest(
     val description: String,
     
     @field:Positive(message = "가격은 0보다 커야 합니다.")
-    val price: Long,
+    val price: BigDecimal,
     
     val imageUrl: String? = null,
     

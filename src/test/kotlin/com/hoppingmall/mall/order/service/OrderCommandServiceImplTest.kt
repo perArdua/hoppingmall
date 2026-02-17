@@ -48,8 +48,8 @@ class OrderCommandServiceImplTest {
             // given
             val buyerId = 1L
             val request = OrderCreateRequest(cartItemIds = listOf(1L, 2L))
-            val cartItem1 = CartItem.fixture(buyerId = 1L, productId = 100L, productName = "상품1", productPrice = 15000L, quantity = 2).withId(1L)
-            val cartItem2 = CartItem.fixture(buyerId = 1L, productId = 200L, productName = "상품2", productPrice = 20000L, quantity = 1).withId(2L)
+            val cartItem1 = CartItem.fixture(buyerId = 1L, productId = 100L, productName = "상품1", productPrice = BigDecimal("15000"), quantity = 2).withId(1L)
+            val cartItem2 = CartItem.fixture(buyerId = 1L, productId = 200L, productName = "상품2", productPrice = BigDecimal("20000"), quantity = 1).withId(2L)
 
             val orderCaptor = argumentCaptor<Order>()
 
