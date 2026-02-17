@@ -10,6 +10,7 @@ import com.hoppingmall.mall.payment.enum.PaymentStatus
 import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
 import com.hoppingmall.mall.point.service.PointCommandService
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
+import com.hoppingmall.mall.product.service.ProductStatisticsCommandService
 import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
@@ -39,7 +40,8 @@ class RefundCommandServiceImpl(
     private val productRepository: ProductRepository,
     private val shippingRepository: ShippingRepository,
     private val inventoryCommandService: InventoryCommandService,
-    private val pointCommandService: PointCommandService
+    private val pointCommandService: PointCommandService,
+    private val productStatisticsCommandService: ProductStatisticsCommandService
 ) : RefundCommandService {
 
     private val refundableOrderStatuses = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
@@ -205,6 +207,14 @@ class RefundCommandServiceImpl(
             paymentId = payment.id!!,
             orderId = refund.orderId
         )
+
+        refundItems.forEach { item ->
+            productStatisticsCommandService.incrementRefundStats(
+                item.productId,
+                item.quantity.toLong(),
+                item.refundPrice
+            )
+        }
 
         if (refund.isFullRefund) {
             payment.updateStatus(PaymentStatus.REFUNDED)
