@@ -19,14 +19,16 @@ class ProductTest {
         @Test
         fun 상품_생성_성공() {
             val sellerId = 1L
+            val categoryId = 1L
             val name = "테스트 상품"
             val description = "테스트 상품 설명"
             val price = BigDecimal("10000")
             val status = ProductStatus.AVAILABLE
 
-            val product = Product.create(sellerId, name, description, price, status)
+            val product = Product.create(sellerId, categoryId, name, description, price, status)
 
             assertEquals(sellerId, product.sellerId)
+            assertEquals(categoryId, product.categoryId)
             assertEquals(name, product.name)
             assertEquals(description, product.description)
             assertEquals(price, product.price)
@@ -36,11 +38,12 @@ class ProductTest {
         @Test
         fun 기본_상태로_상품_생성_성공() {
             val sellerId = 1L
+            val categoryId = 1L
             val name = "테스트 상품"
             val description = "테스트 상품 설명"
             val price = BigDecimal("10000")
 
-            val product = Product.create(sellerId, name, description, price, ProductStatus.AVAILABLE)
+            val product = Product.create(sellerId, categoryId, name, description, price, ProductStatus.AVAILABLE)
 
             assertEquals(ProductStatus.AVAILABLE, product.status)
         }
@@ -48,11 +51,12 @@ class ProductTest {
         @Test
         fun 품절_상태로_상품_생성_성공() {
             val sellerId = 1L
+            val categoryId = 1L
             val name = "테스트 상품"
             val description = "테스트 상품 설명"
             val price = BigDecimal("10000")
 
-            val product = Product.create(sellerId, name, description, price, ProductStatus.SOLD_OUT)
+            val product = Product.create(sellerId, categoryId, name, description, price, ProductStatus.SOLD_OUT)
 
             assertEquals(ProductStatus.SOLD_OUT, product.status)
         }
