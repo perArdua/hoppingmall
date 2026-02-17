@@ -66,6 +66,10 @@ class SecurityConfig(
                 it.requestMatchers(HttpMethod.POST, "/api/v1/shipping").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.PATCH, "/api/v1/shipping/{shippingId}/status").hasRole("SELLER")
 
+                it.requestMatchers(HttpMethod.PATCH, "/api/v1/refunds/{refundId}/approve", "/api/v1/refunds/{refundId}/reject")
+                    .hasAnyRole("SELLER", "ADMIN")
+                it.requestMatchers(HttpMethod.GET, "/api/v1/refunds/seller").hasRole("SELLER")
+
                 it.requestMatchers("/api/v1/**").authenticated()
                 it.anyRequest().denyAll()
             }

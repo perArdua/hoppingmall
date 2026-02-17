@@ -1,0 +1,15 @@
+package com.hoppingmall.mall.refund.domain.repository
+
+import com.hoppingmall.mall.refund.domain.Refund
+import com.hoppingmall.mall.refund.enum.RefundStatus
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.stereotype.Repository
+
+@Repository
+interface RefundRepository : JpaRepository<Refund, Long> {
+    fun findByOrderIdAndStatusNot(orderId: Long, status: RefundStatus): List<Refund>
+    fun findByBuyerId(buyerId: Long, pageable: Pageable): Page<Refund>
+    fun findBySellerId(sellerId: Long, pageable: Pageable): Page<Refund>
+}
