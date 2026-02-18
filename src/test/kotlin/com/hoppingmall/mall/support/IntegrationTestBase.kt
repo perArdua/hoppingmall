@@ -18,7 +18,7 @@ import java.time.Duration
 @Import(TestKafkaConfig::class)
 @EmbeddedKafka(
     partitions = 1,
-    topics = ["notification", "point-earn-request", "payment", "payment-compensation"],
+    topics = ["notification", "point-earn-request", "payment", "payment-compensation", "refund-completion"],
     brokerProperties = ["listeners=PLAINTEXT://localhost:0", "port=0"]
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
