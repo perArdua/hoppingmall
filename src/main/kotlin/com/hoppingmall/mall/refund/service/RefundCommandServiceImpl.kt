@@ -1,20 +1,19 @@
 package com.hoppingmall.mall.refund.service
 
-import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
 import com.hoppingmall.mall.order.domain.repository.OrderRepository
 import com.hoppingmall.mall.order.enum.OrderStatus
 import com.hoppingmall.mall.order.exception.OrderNotFoundException
+import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
-import com.hoppingmall.mall.payment.enum.PaymentStatus
 import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
-import com.hoppingmall.mall.point.service.PointCommandService
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
-import com.hoppingmall.mall.product.service.ProductStatisticsCommandService
 import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.mall.refund.domain.repository.RefundRepository
+import com.hoppingmall.mall.refund.dto.event.RefundCompletedEvent
+import com.hoppingmall.mall.refund.dto.event.RefundItemEvent
 import com.hoppingmall.mall.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.mall.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.mall.refund.dto.response.RefundResponse
@@ -39,9 +38,7 @@ class RefundCommandServiceImpl(
     private val paymentRepository: PaymentRepository,
     private val productRepository: ProductRepository,
     private val shippingRepository: ShippingRepository,
-    private val inventoryCommandService: InventoryCommandService,
-    private val pointCommandService: PointCommandService,
-    private val productStatisticsCommandService: ProductStatisticsCommandService
+    private val refundEventPublisher: RefundEventPublisher
 ) : RefundCommandService {
 
     private val refundableOrderStatuses = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
@@ -134,7 +131,7 @@ class RefundCommandServiceImpl(
 
         if (isAutoApprove) {
             savedRefund.approve(buyerId)
-            processRefundCompletion(savedRefund, savedRefundItems, payment, order)
+            publishRefundCompletedEvent(savedRefund, savedRefundItems, payment)
             savedRefund.complete()
             refundRepository.save(savedRefund)
         }
@@ -155,10 +152,8 @@ class RefundCommandServiceImpl(
         val refundItems = refundItemRepository.findByRefundId(refundId)
         val payment = paymentRepository.findById(refund.paymentId)
             .orElseThrow { PaymentNotFoundException() }
-        val order = orderRepository.findById(refund.orderId)
-            .orElseThrow { OrderNotFoundException() }
 
-        processRefundCompletion(refund, refundItems, payment, order)
+        publishRefundCompletedEvent(refund, refundItems, payment)
         refund.complete()
         refundRepository.save(refund)
 
@@ -180,16 +175,11 @@ class RefundCommandServiceImpl(
         return RefundResponse.from(refund, refundItems)
     }
 
-    private fun processRefundCompletion(
+    private fun publishRefundCompletedEvent(
         refund: Refund,
         refundItems: List<RefundItem>,
-        payment: com.hoppingmall.mall.payment.domain.Payment,
-        order: com.hoppingmall.mall.order.domain.Order
+        payment: Payment
     ) {
-        refundItems.forEach { item ->
-            inventoryCommandService.increaseStock(item.productId, item.quantity)
-        }
-
         val pointRefundAmount = if (refund.isFullRefund) {
             payment.pointAmount
         } else {
@@ -201,29 +191,23 @@ class RefundCommandServiceImpl(
             }
         }
 
-        pointCommandService.refundPoints(
-            userId = refund.buyerId,
-            amount = pointRefundAmount,
-            paymentId = payment.id!!,
-            orderId = refund.orderId
-        )
-
-        refundItems.forEach { item ->
-            productStatisticsCommandService.incrementRefundStats(
-                item.productId,
-                item.quantity.toLong(),
-                item.refundPrice
+        refundEventPublisher.publishRefundCompletedEvent(
+            RefundCompletedEvent(
+                refundId = refund.id!!,
+                orderId = refund.orderId,
+                paymentId = payment.id!!,
+                buyerId = refund.buyerId,
+                refundAmount = refund.refundAmount,
+                pointRefundAmount = pointRefundAmount,
+                isFullRefund = refund.isFullRefund,
+                items = refundItems.map { item ->
+                    RefundItemEvent(
+                        productId = item.productId,
+                        quantity = item.quantity,
+                        refundPrice = item.refundPrice
+                    )
+                }
             )
-        }
-
-        if (refund.isFullRefund) {
-            payment.updateStatus(PaymentStatus.REFUNDED)
-            paymentRepository.save(payment)
-
-            if (order.isCancellable()) {
-                order.updateStatus(OrderStatus.CANCELLED)
-                orderRepository.save(order)
-            }
-        }
+        )
     }
 }

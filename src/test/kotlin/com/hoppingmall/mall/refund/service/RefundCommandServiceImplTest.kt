@@ -1,6 +1,5 @@
 package com.hoppingmall.mall.refund.service
 
-import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.order.domain.Order
 import com.hoppingmall.mall.order.domain.OrderItem
 import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
@@ -10,14 +9,13 @@ import com.hoppingmall.mall.order.exception.OrderNotFoundException
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
 import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
-import com.hoppingmall.mall.point.service.PointCommandService
 import com.hoppingmall.mall.product.domain.Product
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
-import com.hoppingmall.mall.product.service.ProductStatisticsCommandService
 import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.mall.refund.domain.repository.RefundRepository
+import com.hoppingmall.mall.refund.dto.event.RefundCompletedEvent
 import com.hoppingmall.mall.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.mall.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.mall.refund.dto.request.RefundItemRequest
@@ -52,9 +50,7 @@ class RefundCommandServiceImplTest {
     private val paymentRepository: PaymentRepository = mock()
     private val productRepository: ProductRepository = mock()
     private val shippingRepository: ShippingRepository = mock()
-    private val inventoryCommandService: InventoryCommandService = mock()
-    private val pointCommandService: PointCommandService = mock()
-    private val productStatisticsCommandService: ProductStatisticsCommandService = mock()
+    private val refundEventPublisher: RefundEventPublisher = mock()
 
     private val refundCommandService = RefundCommandServiceImpl(
         refundRepository,
@@ -64,9 +60,7 @@ class RefundCommandServiceImplTest {
         paymentRepository,
         productRepository,
         shippingRepository,
-        inventoryCommandService,
-        pointCommandService,
-        productStatisticsCommandService
+        refundEventPublisher
     )
 
     @Nested
@@ -110,9 +104,7 @@ class RefundCommandServiceImplTest {
             // then
             assertEquals(RefundStatus.COMPLETED, response.status)
             assertTrue(response.isFullRefund)
-            verify(inventoryCommandService).increaseStock(100L, 2)
-            verify(pointCommandService).refundPoints(eq(buyerId), eq(BigDecimal("1000")), eq(1L), eq(orderId))
-            verify(productStatisticsCommandService).incrementRefundStats(eq(100L), eq(2L), any())
+            verify(refundEventPublisher).publishRefundCompletedEvent(any())
         }
 
         @Test
@@ -152,8 +144,7 @@ class RefundCommandServiceImplTest {
 
             // then
             assertEquals(RefundStatus.REQUESTED, response.status)
-            verify(inventoryCommandService, never()).increaseStock(any(), any())
-            verify(pointCommandService, never()).refundPoints(any(), any(), any(), any())
+            verify(refundEventPublisher, never()).publishRefundCompletedEvent(any())
         }
 
         @Test
@@ -193,7 +184,7 @@ class RefundCommandServiceImplTest {
             // then
             assertFalse(response.isFullRefund)
             assertEquals(BigDecimal("15000"), response.refundAmount)
-            verify(inventoryCommandService).increaseStock(100L, 1)
+            verify(refundEventPublisher).publishRefundCompletedEvent(any())
         }
 
         @Test
@@ -358,12 +349,10 @@ class RefundCommandServiceImplTest {
             val refund = Refund.fixture(sellerId = sellerId, status = RefundStatus.REQUESTED)
             val refundItem = RefundItem.fixture(refundId = refundId, productId = 100L, quantity = 2)
             val payment = Payment.successFixture(pointAmount = BigDecimal("1000"))
-            val order = Order.paidFixture()
 
             whenever(refundRepository.findById(refundId)).thenReturn(Optional.of(refund))
             whenever(refundItemRepository.findByRefundId(refundId)).thenReturn(listOf(refundItem))
             whenever(paymentRepository.findById(refund.paymentId)).thenReturn(Optional.of(payment))
-            whenever(orderRepository.findById(refund.orderId)).thenReturn(Optional.of(order))
             whenever(refundRepository.save(any<Refund>())).thenAnswer { it.arguments[0] }
 
             // when
@@ -371,9 +360,7 @@ class RefundCommandServiceImplTest {
 
             // then
             assertEquals(RefundStatus.COMPLETED, response.status)
-            verify(inventoryCommandService).increaseStock(100L, 2)
-            verify(pointCommandService).refundPoints(eq(1L), any(), eq(1L), eq(1L))
-            verify(productStatisticsCommandService).incrementRefundStats(eq(100L), eq(2L), any())
+            verify(refundEventPublisher).publishRefundCompletedEvent(any())
         }
 
         @Test
@@ -425,7 +412,7 @@ class RefundCommandServiceImplTest {
             // then
             assertEquals(RefundStatus.REJECTED, response.status)
             assertEquals("반품 불가 상품", response.rejectionReason)
-            verify(inventoryCommandService, never()).increaseStock(any(), any())
+            verify(refundEventPublisher, never()).publishRefundCompletedEvent(any())
         }
 
         @Test
