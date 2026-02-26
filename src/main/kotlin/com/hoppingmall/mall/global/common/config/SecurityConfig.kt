@@ -48,6 +48,11 @@ class SecurityConfig(
                     "/api/v1/categories/{categoryId}",
                     "/api/v1/categories/{categoryId}/sub"
                 ).permitAll()
+                it.requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/reviews/{reviewId}",
+                    "/api/v1/products/{productId}/reviews"
+                ).permitAll()
 
                 it.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/point-policies/**").hasRole("ADMIN")
