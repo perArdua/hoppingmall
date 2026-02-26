@@ -12,6 +12,7 @@ data class RefundCompletedEvent(
     val refundAmount: BigDecimal,
     val pointRefundAmount: BigDecimal,
     val isFullRefund: Boolean,
+    val couponId: Long? = null,
     val items: List<RefundItemEvent>
 )
 
