@@ -19,5 +19,7 @@ data class PaymentRequest(
     val method: PaymentMethod,
     
     @field:DecimalMin(value = "0.00", message = "포인트 사용 금액은 0 이상이어야 합니다.")
-    val pointAmount: BigDecimal = BigDecimal.ZERO
+    val pointAmount: BigDecimal = BigDecimal.ZERO,
+
+    val couponId: Long? = null
 ) 
