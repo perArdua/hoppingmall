@@ -80,6 +80,12 @@ class ProductStatistics private constructor(
     @Column(nullable = false, precision = 15, scale = 2)
     var averageOrderAmount: BigDecimal = BigDecimal.ZERO,
 
+    @Column(nullable = false, precision = 3, scale = 2)
+    var averageRating: BigDecimal = BigDecimal.ZERO,
+
+    @Column(nullable = false)
+    var reviewCount: Long = 0,
+
     @Column(nullable = false)
     var lastAggregatedAt: LocalDateTime = LocalDateTime.now()
 ) : BaseEntity() {
@@ -165,6 +171,11 @@ class ProductStatistics private constructor(
         } else {
             BigDecimal.ZERO
         }
+    }
+
+    fun updateReviewStats(averageRating: BigDecimal, reviewCount: Long) {
+        this.averageRating = averageRating
+        this.reviewCount = reviewCount
     }
 
     fun updateCartAndInventory(cartCount: Long, stock: Int) {
