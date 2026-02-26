@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.payment.service
 
+import com.hoppingmall.mall.coupon.service.CouponCommandService
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
 import com.hoppingmall.mall.payment.dto.PaymentResult
@@ -18,31 +19,50 @@ import java.math.BigDecimal
 class PaymentCommandServiceImpl(
     private val paymentRepository: PaymentRepository,
     private val paymentService: PaymentService,
-    private val paymentEventService: PaymentEventService
+    private val paymentEventService: PaymentEventService,
+    private val couponCommandService: CouponCommandService
 ) : PaymentCommandService {
-    
+
     override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse {
+        var couponDiscountAmount = BigDecimal.ZERO
+        var couponId: Long? = null
+
+        if (paymentRequest.couponId != null) {
+            couponDiscountAmount = couponCommandService.useCoupon(
+                userId = userId,
+                couponId = paymentRequest.couponId,
+                orderAmount = paymentRequest.amount,
+                orderId = paymentRequest.orderId
+            )
+            couponId = paymentRequest.couponId
+        }
+
         val payment = Payment.create(
             orderId = paymentRequest.orderId,
             userId = userId,
-            amount = paymentRequest.amount,
+            amount = paymentRequest.amount.subtract(couponDiscountAmount),
             method = paymentRequest.method,
-            pointAmount = paymentRequest.pointAmount
+            pointAmount = paymentRequest.pointAmount,
+            couponId = couponId,
+            couponDiscountAmount = couponDiscountAmount
         )
-        
+
         val savedPayment = paymentRepository.save(payment)
-        
+
         val paymentResult = paymentService.processPayment(savedPayment)
-        
+
         val updatedPayment = updatePaymentWithResult(savedPayment, paymentResult)
-        
+
         val finalPayment = paymentRepository.save(updatedPayment)
-        
+
         if (finalPayment.status == PaymentStatus.SUCCESS) {
             publishPaymentEvents(finalPayment)
         }
 
         if (finalPayment.status == PaymentStatus.FAILED) {
+            if (couponId != null) {
+                couponCommandService.restoreCouponByPayment(couponId, userId)
+            }
             paymentEventService.publishPaymentFailedEvent(finalPayment)
             paymentEventService.publishPaymentFailedNotification(finalPayment)
         }

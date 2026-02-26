@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.payment.service
 
+import com.hoppingmall.mall.coupon.service.CouponCommandService
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
 import com.hoppingmall.mall.payment.dto.PaymentResult
@@ -31,8 +32,9 @@ class PaymentCommandServiceImplTest {
     private val paymentRepository: PaymentRepository = mock()
     private val paymentService: PaymentService = mock()
     private val paymentEventService: PaymentEventService = mock()
+    private val couponCommandService: CouponCommandService = mock()
     private val paymentCommandService = PaymentCommandServiceImpl(
-        paymentRepository, paymentService, paymentEventService
+        paymentRepository, paymentService, paymentEventService, couponCommandService
     )
 
     @Nested

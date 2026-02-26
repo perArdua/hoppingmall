@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.refund.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.mall.coupon.service.CouponCommandService
 import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.order.domain.repository.OrderRepository
 import com.hoppingmall.mall.order.enum.OrderStatus
@@ -25,6 +26,7 @@ class RefundCompletionConsumer(
     private val inventoryCommandService: InventoryCommandService,
     private val pointCommandService: PointCommandService,
     private val productStatisticsCommandService: ProductStatisticsCommandService,
+    private val couponCommandService: CouponCommandService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val objectMapper: ObjectMapper
@@ -65,6 +67,7 @@ class RefundCompletionConsumer(
             refundAmount = BigDecimal(node.get("refundAmount").asText()),
             pointRefundAmount = BigDecimal(node.get("pointRefundAmount").asText()),
             isFullRefund = node.get("isFullRefund").asBoolean(),
+            couponId = node.get("couponId")?.takeIf { !it.isNull }?.asLong(),
             items = items
         )
     }
@@ -107,6 +110,10 @@ class RefundCompletionConsumer(
                 if (order != null && order.isCancellable()) {
                     order.updateStatus(OrderStatus.CANCELLED)
                     orderRepository.save(order)
+                }
+
+                if (event.couponId != null) {
+                    couponCommandService.restoreCouponByOrder(event.orderId)
                 }
             }
 
