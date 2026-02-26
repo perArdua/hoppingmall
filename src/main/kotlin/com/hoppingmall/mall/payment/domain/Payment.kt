@@ -39,7 +39,13 @@ class Payment private constructor(
     var errorMessage: String? = null,
     
     @Column
-    var completedAt: LocalDateTime? = null
+    var completedAt: LocalDateTime? = null,
+
+    @Column
+    val couponId: Long? = null,
+
+    @Column(precision = 10, scale = 2)
+    val couponDiscountAmount: BigDecimal = BigDecimal.ZERO
 ) : BaseEntity() {
 
     companion object {
@@ -48,14 +54,18 @@ class Payment private constructor(
             userId: Long,
             amount: BigDecimal,
             method: PaymentMethod,
-            pointAmount: BigDecimal = BigDecimal.ZERO
+            pointAmount: BigDecimal = BigDecimal.ZERO,
+            couponId: Long? = null,
+            couponDiscountAmount: BigDecimal = BigDecimal.ZERO
         ): Payment {
             return Payment(
                 orderId = orderId,
                 userId = userId,
                 amount = amount,
                 method = method,
-                pointAmount = pointAmount
+                pointAmount = pointAmount,
+                couponId = couponId,
+                couponDiscountAmount = couponDiscountAmount
             )
         }
     }
@@ -66,7 +76,9 @@ class Payment private constructor(
             userId = this.userId,
             amount = this.amount,
             method = this.method,
-            pointAmount = this.pointAmount
+            pointAmount = this.pointAmount,
+            couponId = this.couponId,
+            couponDiscountAmount = this.couponDiscountAmount
         ).apply {
             this.status = this@Payment.status
             this.transactionId = this@Payment.transactionId

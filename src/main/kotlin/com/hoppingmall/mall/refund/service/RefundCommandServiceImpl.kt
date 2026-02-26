@@ -200,6 +200,7 @@ class RefundCommandServiceImpl(
                 refundAmount = refund.refundAmount,
                 pointRefundAmount = pointRefundAmount,
                 isFullRefund = refund.isFullRefund,
+                couponId = payment.couponId,
                 items = refundItems.map { item ->
                     RefundItemEvent(
                         productId = item.productId,

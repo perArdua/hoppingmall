@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.refund.service
 
+import com.hoppingmall.mall.coupon.service.CouponCommandService
 import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.order.domain.Order
 import com.hoppingmall.mall.order.domain.repository.OrderRepository
@@ -31,6 +32,7 @@ class RefundCompletionConsumerTest {
     private val inventoryCommandService: InventoryCommandService = mock()
     private val pointCommandService: PointCommandService = mock()
     private val productStatisticsCommandService: ProductStatisticsCommandService = mock()
+    private val couponCommandService: CouponCommandService = mock()
     private val paymentRepository: PaymentRepository = mock()
     private val orderRepository: OrderRepository = mock()
     private val objectMapper = com.fasterxml.jackson.databind.ObjectMapper()
@@ -40,6 +42,7 @@ class RefundCompletionConsumerTest {
         inventoryCommandService,
         pointCommandService,
         productStatisticsCommandService,
+        couponCommandService,
         paymentRepository,
         orderRepository,
         objectMapper
