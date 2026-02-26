@@ -39,3 +39,14 @@ fun Order.Companion.cancelledFixture(
         status = OrderStatus.CANCELLED
     )
 }
+
+fun Order.Companion.deliveredFixture(
+    buyerId: Long = 1L,
+    totalAmount: BigDecimal = BigDecimal("50000")
+): Order {
+    return Order.fixture(
+        buyerId = buyerId,
+        totalAmount = totalAmount,
+        status = OrderStatus.DELIVERED
+    )
+}
