@@ -2,16 +2,15 @@ package com.hoppingmall.mall.category.service
 
 import com.hoppingmall.mall.category.domain.Category
 import com.hoppingmall.mall.category.domain.repository.CategoryRepository
-import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.withId
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
@@ -36,19 +35,20 @@ class CategoryQueryServiceImplTest {
             val response = categoryQueryService.getCategory(1L)
 
             // then
-            assertEquals(1L, response.id)
+            assertEquals(1L, response!!.id)
             assertEquals("전자제품", response.name)
         }
 
         @Test
-        fun 카테고리가_존재하지_않으면_예외가_발생한다() {
+        fun 카테고리가_존재하지_않으면_null을_반환한다() {
             // given
             whenever(categoryRepository.findNullableById(999L)).thenReturn(null)
 
-            // when & then
-            assertThrows<CategoryNotFoundException> {
-                categoryQueryService.getCategory(999L)
-            }
+            // when
+            val response = categoryQueryService.getCategory(999L)
+
+            // then
+            assertNull(response)
         }
     }
 

@@ -3,6 +3,7 @@ package com.hoppingmall.mall.category.controller
 import com.hoppingmall.mall.category.dto.request.CategoryCreateRequest
 import com.hoppingmall.mall.category.dto.request.CategoryUpdateRequest
 import com.hoppingmall.mall.category.dto.response.CategoryResponse
+import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import com.hoppingmall.mall.category.service.CategoryCommandService
 import com.hoppingmall.mall.category.service.CategoryQueryService
 import com.hoppingmall.mall.global.common.response.ApiResponse
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -75,6 +77,18 @@ class CategoryControllerTest {
             assertEquals("SUCCESS", response.body?.code)
             assertEquals(expectedResponse, response.body?.data)
             verify(categoryQueryService).getCategory(1L)
+        }
+
+        @Test
+        fun 존재하지_않는_카테고리_조회_시_예외_발생() {
+            // given
+            whenever(categoryQueryService.getCategory(999L)).thenReturn(null)
+
+            // when & then
+            assertThrows<CategoryNotFoundException> {
+                controller.getCategory(999L)
+            }
+            verify(categoryQueryService).getCategory(999L)
         }
     }
 

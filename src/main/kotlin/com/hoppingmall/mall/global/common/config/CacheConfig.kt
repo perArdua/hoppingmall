@@ -30,21 +30,29 @@ class CacheConfig(
         val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
             .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer()))
             .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer))
-            .disableCachingNullValues()
             .entryTtl(Duration.ofHours(1))
 
         val cacheConfigurations = mapOf(
-            "category" to defaultConfig.entryTtl(Duration.ofHours(2)),
-            "categories:root" to defaultConfig.entryTtl(Duration.ofHours(2)),
-            "categories:sub" to defaultConfig.entryTtl(Duration.ofHours(2)),
-            "product" to defaultConfig.entryTtl(Duration.ofHours(1))
+            "category" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
+            "categories:root" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
+            "categories:sub" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
+            "product" to defaultConfig.entryTtl(Duration.ofMinutes(10))
         )
 
-        return RedisCacheManager.builder(connectionFactory)
+        val redisCacheManager = RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(defaultConfig)
             .withInitialCacheConfigurations(cacheConfigurations)
             .transactionAware()
             .build()
+
+        val l1Specs = mapOf(
+            "category" to L1CacheSpec(maxSize = 500, ttl = Duration.ofSeconds(30)),
+            "categories:root" to L1CacheSpec(maxSize = 10, ttl = Duration.ofSeconds(60)),
+            "categories:sub" to L1CacheSpec(maxSize = 200, ttl = Duration.ofSeconds(60)),
+            "product" to L1CacheSpec(maxSize = 1000, ttl = Duration.ofSeconds(10))
+        )
+
+        return TwoLevelCacheManager(redisCacheManager, l1Specs)
     }
 
     override fun errorHandler(): CacheErrorHandler {

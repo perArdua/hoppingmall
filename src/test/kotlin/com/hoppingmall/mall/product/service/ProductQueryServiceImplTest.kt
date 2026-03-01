@@ -7,10 +7,9 @@ import com.hoppingmall.mall.product.domain.ProductImage
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
-import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import com.hoppingmall.mall.support.withId
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
@@ -74,7 +73,7 @@ class ProductQueryServiceImplTest {
 
             val result = productQueryService.getProductById(productId)
 
-            assertEquals(productId, result.id)
+            assertEquals(productId, result!!.id)
             assertEquals(product.name, result.name)
             assertEquals(image.imageUrl, result.imageUrl)
             verify(productRepository).findNullableById(productId)
@@ -82,15 +81,14 @@ class ProductQueryServiceImplTest {
         }
 
         @Test
-        fun 존재하지_않는_상품_ID로_조회_시_예외_발생() {
+        fun 존재하지_않는_상품_ID로_조회_시_null을_반환한다() {
             val productId = 999L
 
             whenever(productRepository.findNullableById(productId)).thenReturn(null)
 
-            assertThrows(ProductNotFoundException::class.java) {
-                productQueryService.getProductById(productId)
-            }
+            val result = productQueryService.getProductById(productId)
 
+            assertNull(result)
             verify(productRepository).findNullableById(productId)
         }
 
@@ -104,7 +102,7 @@ class ProductQueryServiceImplTest {
 
             val result = productQueryService.getProductById(productId)
 
-            assertEquals(productId, result.id)
+            assertEquals(productId, result!!.id)
             assertEquals(product.name, result.name)
             assertEquals(null, result.imageUrl)
             verify(productRepository).findNullableById(productId)

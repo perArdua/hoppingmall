@@ -4,7 +4,6 @@ import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.dto.response.ProductResponse
-import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
@@ -21,12 +20,12 @@ class ProductQueryServiceImpl(
 
     override fun getProducts(pageable: Pageable): Page<ProductResponse> {
         val productPage = productRepository.findAll(pageable)
-        
+
         val productResponses = productPage.content.map { product ->
             val image = productImageRepository.findByProductId(product.id!!)
             ProductResponse.from(product, image)
         }
-        
+
         return PageImpl(
             productResponses,
             pageable,
@@ -34,13 +33,13 @@ class ProductQueryServiceImpl(
         )
     }
 
-    @Cacheable(cacheNames = ["product"], key = "#productId")
-    override fun getProductById(productId: Long): ProductResponse {
+    @Cacheable(cacheNames = ["product"], key = "#productId", sync = true)
+    override fun getProductById(productId: Long): ProductResponse? {
         val product = productRepository.findNullableById(productId)
-            ?: throw ProductNotFoundException()
-        
+            ?: return null
+
         val image = productImageRepository.findByProductId(productId)
-        
+
         return ProductResponse.from(product, image)
     }
 
