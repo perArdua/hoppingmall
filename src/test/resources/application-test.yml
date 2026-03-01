@@ -1,6 +1,8 @@
 spring:
   main:
     allow-bean-definition-overriding: true
+  cache:
+    type: none
   jackson:
     property-naming-strategy: SNAKE_CASE
 

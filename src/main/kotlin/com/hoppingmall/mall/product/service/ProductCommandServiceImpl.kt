@@ -10,6 +10,7 @@ import com.hoppingmall.mall.product.dto.request.ProductCreateRequest
 import com.hoppingmall.mall.product.dto.request.ProductUpdateRequest
 import com.hoppingmall.mall.product.dto.response.ProductResponse
 import com.hoppingmall.mall.product.exception.ProductNotFoundException
+import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -50,6 +51,7 @@ class ProductCommandServiceImpl(
         return ProductResponse.from(savedProduct, savedProductImage)
     }
 
+    @CacheEvict(cacheNames = ["product"], key = "#productId")
     override fun updateProduct(productId: Long, request: ProductUpdateRequest): ProductResponse {
         if (!categoryRepository.existsById(request.categoryId)) {
             throw CategoryNotFoundException()
@@ -83,6 +85,7 @@ class ProductCommandServiceImpl(
         return ProductResponse.from(updatedProduct, updatedProductImage)
     }
 
+    @CacheEvict(cacheNames = ["product"], key = "#productId")
     override fun deleteProduct(productId: Long) {
         if (!productRepository.existsById(productId)) {
             throw ProductNotFoundException()
