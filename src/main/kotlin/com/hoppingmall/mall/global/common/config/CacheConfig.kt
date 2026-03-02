@@ -1,6 +1,10 @@
 package com.hoppingmall.mall.global.common.config
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.mall.global.common.config.cache.CachePolicy
+import com.hoppingmall.mall.global.common.config.cache.LockProvider
+import com.hoppingmall.mall.global.common.config.cache.RedisLockProvider
+import com.hoppingmall.mall.global.common.config.cache.TtlJitter
 import org.slf4j.LoggerFactory
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
@@ -12,6 +16,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
@@ -23,8 +28,24 @@ class CacheConfig(
     private val objectMapper: ObjectMapper
 ) : CachingConfigurer {
 
+    companion object {
+        val CACHE_POLICIES = listOf(
+            CachePolicy("category", l1MaxSize = 500, l1Ttl = Duration.ofSeconds(30), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
+            CachePolicy("category:notfound", l1MaxSize = 200, l1Ttl = Duration.ofSeconds(5), l2Ttl = Duration.ofSeconds(15), jitterPercent = 10),
+            CachePolicy("categories:root", l1MaxSize = 10, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
+            CachePolicy("categories:sub", l1MaxSize = 200, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
+            CachePolicy("product", l1MaxSize = 1000, l1Ttl = Duration.ofSeconds(10), l2Ttl = Duration.ofMinutes(10), jitterPercent = 10, hotKey = true),
+            CachePolicy("product:notfound", l1MaxSize = 500, l1Ttl = Duration.ofSeconds(5), l2Ttl = Duration.ofSeconds(20), jitterPercent = 10)
+        )
+    }
+
     @Bean
-    fun cacheManager(connectionFactory: RedisConnectionFactory): CacheManager {
+    fun cacheLockProvider(connectionFactory: RedisConnectionFactory): LockProvider {
+        return RedisLockProvider(StringRedisTemplate(connectionFactory))
+    }
+
+    @Bean
+    fun cacheManager(connectionFactory: RedisConnectionFactory, cacheLockProvider: LockProvider): CacheManager {
         val jsonSerializer = GenericJackson2JsonRedisSerializer(objectMapper)
 
         val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
@@ -32,12 +53,9 @@ class CacheConfig(
             .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer))
             .entryTtl(Duration.ofHours(1))
 
-        val cacheConfigurations = mapOf(
-            "category" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
-            "categories:root" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
-            "categories:sub" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
-            "product" to defaultConfig.entryTtl(Duration.ofMinutes(10))
-        )
+        val cacheConfigurations = CACHE_POLICIES.associate { policy ->
+            policy.cacheName to defaultConfig.entryTtl(TtlJitter.apply(policy.l2Ttl, policy.jitterPercent))
+        }
 
         val redisCacheManager = RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(defaultConfig)
@@ -45,14 +63,9 @@ class CacheConfig(
             .transactionAware()
             .build()
 
-        val l1Specs = mapOf(
-            "category" to L1CacheSpec(maxSize = 500, ttl = Duration.ofSeconds(30)),
-            "categories:root" to L1CacheSpec(maxSize = 10, ttl = Duration.ofSeconds(60)),
-            "categories:sub" to L1CacheSpec(maxSize = 200, ttl = Duration.ofSeconds(60)),
-            "product" to L1CacheSpec(maxSize = 1000, ttl = Duration.ofSeconds(10))
-        )
+        val policyMap = CACHE_POLICIES.associateBy { it.cacheName }
 
-        return TwoLevelCacheManager(redisCacheManager, l1Specs)
+        return TwoLevelCacheManager(redisCacheManager, policyMap, cacheLockProvider)
     }
 
     override fun errorHandler(): CacheErrorHandler {

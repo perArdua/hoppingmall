@@ -1,35 +1,35 @@
 package com.hoppingmall.mall.global.common.config
 
 import com.github.benmanes.caffeine.cache.Caffeine
+import com.hoppingmall.mall.global.common.config.cache.CachePolicy
+import com.hoppingmall.mall.global.common.config.cache.LockProvider
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
-import java.time.Duration
-
-data class L1CacheSpec(
-    val maxSize: Long,
-    val ttl: Duration
-)
+import java.util.concurrent.ConcurrentHashMap
 
 class TwoLevelCacheManager(
     private val redisCacheManager: CacheManager,
-    private val l1Specs: Map<String, L1CacheSpec>
+    private val policies: Map<String, CachePolicy>,
+    private val lockProvider: LockProvider
 ) : CacheManager {
 
-    private val cacheMap = mutableMapOf<String, Cache>()
+    private val cacheMap = ConcurrentHashMap<String, Cache>()
 
     override fun getCache(name: String): Cache? {
-        return cacheMap.getOrPut(name) {
-            val redisCache = redisCacheManager.getCache(name) ?: return null
+        val existing = cacheMap[name]
+        if (existing != null) return existing
 
-            val spec = l1Specs[name] ?: return redisCache
+        val redisCache = redisCacheManager.getCache(name) ?: return null
+        val policy = policies[name] ?: return redisCache
 
-            val caffeineCache = Caffeine.newBuilder()
-                .maximumSize(spec.maxSize)
-                .expireAfterWrite(spec.ttl)
-                .build<Any, Any>()
+        val caffeineCache = Caffeine.newBuilder()
+            .maximumSize(policy.l1MaxSize)
+            .expireAfterWrite(policy.l1Ttl)
+            .build<Any, Any>()
 
-            TwoLevelCache(name, caffeineCache, redisCache)
-        }
+        val twoLevelCache = TwoLevelCache(name, caffeineCache, redisCache, policy, lockProvider)
+        cacheMap[name] = twoLevelCache
+        return twoLevelCache
     }
 
     override fun getCacheNames(): Collection<String> {

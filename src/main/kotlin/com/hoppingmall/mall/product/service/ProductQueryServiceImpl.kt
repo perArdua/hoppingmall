@@ -1,9 +1,11 @@
 package com.hoppingmall.mall.product.service
 
+import com.hoppingmall.mall.global.common.config.cache.NotFoundMarker
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.dto.response.ProductResponse
+import org.springframework.cache.CacheManager
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
@@ -15,8 +17,9 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class ProductQueryServiceImpl(
     private val productRepository: ProductRepository,
-    private val productImageRepository: ProductImageRepository
-): ProductQueryService {
+    private val productImageRepository: ProductImageRepository,
+    private val cacheManager: CacheManager
+) : ProductQueryService {
 
     override fun getProducts(pageable: Pageable): Page<ProductResponse> {
         val productPage = productRepository.findAll(pageable)
@@ -35,8 +38,17 @@ class ProductQueryServiceImpl(
 
     @Cacheable(cacheNames = ["product"], key = "#productId", sync = true)
     override fun getProductById(productId: Long): ProductResponse? {
+        val notFoundCache = cacheManager.getCache("product:notfound")
+        val cached = notFoundCache?.get(productId)
+        if (cached != null && NotFoundMarker.isNotFound(cached.get())) {
+            return null
+        }
+
         val product = productRepository.findNullableById(productId)
-            ?: return null
+        if (product == null) {
+            notFoundCache?.put(productId, NotFoundMarker.INSTANCE)
+            return null
+        }
 
         val image = productImageRepository.findByProductId(productId)
 

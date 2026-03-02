@@ -2,6 +2,7 @@ package com.hoppingmall.mall.category.service
 
 import com.hoppingmall.mall.category.domain.Category
 import com.hoppingmall.mall.category.domain.repository.CategoryRepository
+import com.hoppingmall.mall.global.common.config.cache.NotFoundMarker
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.withId
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -11,15 +12,22 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.cache.Cache
+import org.springframework.cache.CacheManager
 
 @DisplayName("CategoryQueryServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class CategoryQueryServiceImplTest {
 
     private val categoryRepository: CategoryRepository = mock()
-    private val categoryQueryService = CategoryQueryServiceImpl(categoryRepository)
+    private val cacheManager: CacheManager = mock()
+    private val notFoundCache: Cache = mock()
+    private val categoryQueryService = CategoryQueryServiceImpl(categoryRepository, cacheManager)
 
     @Nested
     @DisplayName("getCategory")
@@ -29,6 +37,8 @@ class CategoryQueryServiceImplTest {
             // given
             val category = Category.fixture(name = "전자제품").withId(1L)
 
+            whenever(cacheManager.getCache("category:notfound")).thenReturn(notFoundCache)
+            whenever(notFoundCache.get(1L)).thenReturn(null)
             whenever(categoryRepository.findNullableById(1L)).thenReturn(category)
 
             // when
@@ -40,8 +50,10 @@ class CategoryQueryServiceImplTest {
         }
 
         @Test
-        fun 카테고리가_존재하지_않으면_null을_반환한다() {
+        fun 카테고리가_존재하지_않으면_null을_반환하고_notfound_캐시에_마커를_저장한다() {
             // given
+            whenever(cacheManager.getCache("category:notfound")).thenReturn(notFoundCache)
+            whenever(notFoundCache.get(999L)).thenReturn(null)
             whenever(categoryRepository.findNullableById(999L)).thenReturn(null)
 
             // when
@@ -49,6 +61,23 @@ class CategoryQueryServiceImplTest {
 
             // then
             assertNull(response)
+            verify(notFoundCache).put(999L, NotFoundMarker.INSTANCE)
+        }
+
+        @Test
+        fun notfound_캐시에_마커가_있으면_DB를_조회하지_않고_null을_반환한다() {
+            // given
+            val markerWrapper: Cache.ValueWrapper = mock()
+            whenever(cacheManager.getCache("category:notfound")).thenReturn(notFoundCache)
+            whenever(notFoundCache.get(999L)).thenReturn(markerWrapper)
+            whenever(markerWrapper.get()).thenReturn(NotFoundMarker.INSTANCE)
+
+            // when
+            val response = categoryQueryService.getCategory(999L)
+
+            // then
+            assertNull(response)
+            verify(categoryRepository, never()).findNullableById(any())
         }
     }
 
