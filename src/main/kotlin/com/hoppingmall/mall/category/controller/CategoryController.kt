@@ -3,6 +3,7 @@ package com.hoppingmall.mall.category.controller
 import com.hoppingmall.mall.category.dto.request.CategoryCreateRequest
 import com.hoppingmall.mall.category.dto.request.CategoryUpdateRequest
 import com.hoppingmall.mall.category.dto.response.CategoryResponse
+import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import com.hoppingmall.mall.category.service.CategoryCommandService
 import com.hoppingmall.mall.category.service.CategoryQueryService
 import com.hoppingmall.mall.global.common.response.ApiResponse
@@ -32,6 +33,7 @@ class CategoryController(
         @PathVariable categoryId: Long
     ): ResponseEntity<ApiResponse<CategoryResponse>> {
         val response = categoryQueryService.getCategory(categoryId)
+            ?: throw CategoryNotFoundException()
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
