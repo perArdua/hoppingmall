@@ -2,6 +2,7 @@ package com.hoppingmall.mall.product.controller
 
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.product.dto.request.ProductCreateRequest
+import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.dto.request.ProductUpdateRequest
 import com.hoppingmall.mall.product.dto.response.ProductImageResponse
@@ -32,6 +33,7 @@ class ProductController(
     @GetMapping("/{productId}")
     fun getProduct(@PathVariable productId: Long): ApiResponse<ProductResponse> {
         val productResponse = productQueryService.getProductById(productId)
+            ?: throw ProductNotFoundException()
         return ApiResponse.success(productResponse)
     }
 

@@ -8,6 +8,8 @@ import com.hoppingmall.mall.category.dto.response.CategoryResponse
 import com.hoppingmall.mall.category.exception.CategoryAlreadyExistsException
 import com.hoppingmall.mall.category.exception.CategoryHasChildrenException
 import com.hoppingmall.mall.category.exception.CategoryNotFoundException
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,6 +19,10 @@ class CategoryCommandServiceImpl(
     private val categoryRepository: CategoryRepository
 ) : CategoryCommandService {
 
+    @Caching(evict = [
+        CacheEvict(cacheNames = ["categories:root"], allEntries = true),
+        CacheEvict(cacheNames = ["categories:sub"], allEntries = true)
+    ])
     override fun createCategory(request: CategoryCreateRequest): CategoryResponse {
         if (categoryRepository.existsByName(request.name)) {
             throw CategoryAlreadyExistsException()
@@ -39,6 +45,11 @@ class CategoryCommandServiceImpl(
         return CategoryResponse.from(savedCategory)
     }
 
+    @Caching(evict = [
+        CacheEvict(cacheNames = ["category"], key = "#categoryId"),
+        CacheEvict(cacheNames = ["categories:root"], allEntries = true),
+        CacheEvict(cacheNames = ["categories:sub"], allEntries = true)
+    ])
     override fun updateCategory(categoryId: Long, request: CategoryUpdateRequest): CategoryResponse {
         val category = categoryRepository.findNullableById(categoryId)
             ?: throw CategoryNotFoundException()
@@ -51,6 +62,11 @@ class CategoryCommandServiceImpl(
         return CategoryResponse.from(category)
     }
 
+    @Caching(evict = [
+        CacheEvict(cacheNames = ["category"], key = "#categoryId"),
+        CacheEvict(cacheNames = ["categories:root"], allEntries = true),
+        CacheEvict(cacheNames = ["categories:sub"], allEntries = true)
+    ])
     override fun deleteCategory(categoryId: Long) {
         val category = categoryRepository.findNullableById(categoryId)
             ?: throw CategoryNotFoundException()

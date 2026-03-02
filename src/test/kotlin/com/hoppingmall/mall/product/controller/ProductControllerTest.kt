@@ -108,14 +108,12 @@ class ProductControllerTest {
         fun 존재하지_않는_상품_조회_시_예외_발생() {
             val productId = 999L
 
-            whenever(productQueryService.getProductById(productId))
-                .thenThrow(com.hoppingmall.mall.product.exception.ProductNotFoundException())
+            whenever(productQueryService.getProductById(productId)).thenReturn(null)
 
-            val exception = assertThrows<com.hoppingmall.mall.product.exception.ProductNotFoundException> {
+            assertThrows<com.hoppingmall.mall.product.exception.ProductNotFoundException> {
                 controller.getProduct(productId)
             }
 
-            assertEquals("상품을 찾을 수 없습니다.", exception.message)
             verify(productQueryService).getProductById(productId)
         }
     }

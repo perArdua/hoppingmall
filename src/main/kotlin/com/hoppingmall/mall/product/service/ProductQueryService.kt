@@ -8,7 +8,7 @@ import org.springframework.data.domain.Pageable
 interface ProductQueryService {
     fun getProducts(pageable: Pageable): Page<ProductResponse>
 
-    fun getProductById(productId: Long): ProductResponse
+    fun getProductById(productId: Long): ProductResponse?
 
     fun getProductsBySellerId(sellerId: Long, pageable: Pageable): Page<ProductResponse>
 
