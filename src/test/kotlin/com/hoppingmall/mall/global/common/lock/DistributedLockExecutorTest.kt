@@ -91,6 +91,25 @@ class DistributedLockExecutorTest {
     }
 
     @Test
+    fun withLockVoid는_반환값_없이_실행한다() {
+        // Context
+        stubTransaction()
+        whenever(redissonClient.getLock("void-key")).thenReturn(rLock)
+        whenever(rLock.tryLock(3000L, 5000L, TimeUnit.MILLISECONDS)).thenReturn(true)
+        whenever(rLock.isHeldByCurrentThread).thenReturn(true)
+
+        var executed = false
+
+        // Interaction
+        lockExecutor.withLockVoid("void-key") { executed = true }
+
+        // Assertions
+        assertThat(executed).isTrue()
+        verify(transactionManager).commit(any())
+        verify(rLock).unlock()
+    }
+
+    @Test
     fun 커스텀_대기_시간과_임대_시간을_사용한다() {
         // Context
         stubTransaction()
