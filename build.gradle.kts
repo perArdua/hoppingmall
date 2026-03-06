@@ -69,7 +69,10 @@ dependencies {
 	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
 
 	// Redis & Cache
-	implementation("org.springframework.boot:spring-boot-starter-data-redis")
+	implementation("org.springframework.boot:spring-boot-starter-data-redis") {
+		exclude(group = "io.lettuce", module = "lettuce-core")
+	}
+	implementation("org.redisson:redisson-spring-boot-starter:4.3.0")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("com.github.ben-manes.caffeine:caffeine")
 }
