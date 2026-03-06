@@ -2,7 +2,9 @@ package com.hoppingmall.mall.global.common.config
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.hoppingmall.mall.global.common.config.cache.CachePolicy
+import com.hoppingmall.mall.global.common.config.cache.HotKeyDetectorRegistry
 import com.hoppingmall.mall.global.common.config.cache.LockProvider
+import com.hoppingmall.mall.global.common.config.cache.ShardedRedisCache
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import java.util.concurrent.ConcurrentHashMap
@@ -10,7 +12,8 @@ import java.util.concurrent.ConcurrentHashMap
 class TwoLevelCacheManager(
     private val redisCacheManager: CacheManager,
     private val policies: Map<String, CachePolicy>,
-    private val lockProvider: LockProvider
+    private val lockProvider: LockProvider,
+    private val hotKeyDetectorRegistry: HotKeyDetectorRegistry
 ) : CacheManager {
 
     private val cacheMap = ConcurrentHashMap<String, Cache>()
@@ -27,7 +30,15 @@ class TwoLevelCacheManager(
             .expireAfterWrite(policy.l1Ttl)
             .build<Any, Any>()
 
-        val twoLevelCache = TwoLevelCache(name, caffeineCache, redisCache, policy, lockProvider)
+        val detector = hotKeyDetectorRegistry.getDetector(name)
+        val shardedRedisCache = if (policy.dynamicHotKeyEnabled) {
+            ShardedRedisCache(redisCache, policy.hotKeyShardCount)
+        } else null
+
+        val twoLevelCache = TwoLevelCache(
+            name, caffeineCache, redisCache, policy, lockProvider,
+            shardedRedisCache, detector
+        )
         cacheMap[name] = twoLevelCache
         return twoLevelCache
     }

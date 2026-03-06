@@ -2,6 +2,7 @@ package com.hoppingmall.mall.global.common.config
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.global.common.config.cache.CachePolicy
+import com.hoppingmall.mall.global.common.config.cache.HotKeyDetectorRegistry
 import com.hoppingmall.mall.global.common.config.cache.LockProvider
 import com.hoppingmall.mall.global.common.config.cache.RedissonLockProvider
 import com.hoppingmall.mall.global.common.config.cache.TtlJitter
@@ -34,7 +35,7 @@ class CacheConfig(
             CachePolicy("category:notfound", l1MaxSize = 200, l1Ttl = Duration.ofSeconds(5), l2Ttl = Duration.ofSeconds(15), jitterPercent = 10),
             CachePolicy("categories:root", l1MaxSize = 10, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
             CachePolicy("categories:sub", l1MaxSize = 200, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
-            CachePolicy("product", l1MaxSize = 1000, l1Ttl = Duration.ofSeconds(10), l2Ttl = Duration.ofMinutes(10), jitterPercent = 10, hotKey = true),
+            CachePolicy("product", l1MaxSize = 1000, l1Ttl = Duration.ofSeconds(10), l2Ttl = Duration.ofMinutes(10), jitterPercent = 10, hotKeyThreshold = 50L, hotKeyShardCount = 4),
             CachePolicy("product:notfound", l1MaxSize = 500, l1Ttl = Duration.ofSeconds(5), l2Ttl = Duration.ofSeconds(20), jitterPercent = 10)
         )
     }
@@ -44,8 +45,13 @@ class CacheConfig(
         return RedissonLockProvider(redissonClient)
     }
 
+    @Bean(destroyMethod = "close")
+    fun hotKeyDetectorRegistry(): HotKeyDetectorRegistry {
+        return HotKeyDetectorRegistry(CACHE_POLICIES)
+    }
+
     @Bean
-    fun cacheManager(connectionFactory: RedisConnectionFactory, cacheLockProvider: LockProvider): CacheManager {
+    fun cacheManager(connectionFactory: RedisConnectionFactory, cacheLockProvider: LockProvider, hotKeyDetectorRegistry: HotKeyDetectorRegistry): CacheManager {
         val jsonSerializer = GenericJackson2JsonRedisSerializer(objectMapper)
 
         val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
@@ -65,7 +71,7 @@ class CacheConfig(
 
         val policyMap = CACHE_POLICIES.associateBy { it.cacheName }
 
-        return TwoLevelCacheManager(redisCacheManager, policyMap, cacheLockProvider)
+        return TwoLevelCacheManager(redisCacheManager, policyMap, cacheLockProvider, hotKeyDetectorRegistry)
     }
 
     override fun errorHandler(): CacheErrorHandler {
