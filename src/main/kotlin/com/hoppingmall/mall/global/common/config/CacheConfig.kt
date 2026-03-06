@@ -36,7 +36,12 @@ class CacheConfig(
             CachePolicy("categories:root", l1MaxSize = 10, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
             CachePolicy("categories:sub", l1MaxSize = 200, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
             CachePolicy("product", l1MaxSize = 1000, l1Ttl = Duration.ofSeconds(10), l2Ttl = Duration.ofMinutes(10), jitterPercent = 10, hotKeyThreshold = 50L, hotKeyShardCount = 4),
-            CachePolicy("product:notfound", l1MaxSize = 500, l1Ttl = Duration.ofSeconds(5), l2Ttl = Duration.ofSeconds(20), jitterPercent = 10)
+            CachePolicy("product:notfound", l1MaxSize = 500, l1Ttl = Duration.ofSeconds(5), l2Ttl = Duration.ofSeconds(20), jitterPercent = 10),
+            CachePolicy("point-policy", l1MaxSize = 10, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(30), jitterPercent = 10),
+            CachePolicy("membership", l1MaxSize = 500, l1Ttl = Duration.ofSeconds(30), l2Ttl = Duration.ofMinutes(15), jitterPercent = 10),
+            CachePolicy("coupon:available", l1MaxSize = 10, l1Ttl = Duration.ofSeconds(30), l2Ttl = Duration.ofMinutes(5), jitterPercent = 10),
+            CachePolicy("coupon:all", l1MaxSize = 10, l1Ttl = Duration.ofSeconds(60), l2Ttl = Duration.ofMinutes(10), jitterPercent = 10),
+            CachePolicy("inventory", l1MaxSize = 2000, l1Ttl = Duration.ofSeconds(5), l2Ttl = Duration.ofMinutes(3), jitterPercent = 10)
         )
     }
 
