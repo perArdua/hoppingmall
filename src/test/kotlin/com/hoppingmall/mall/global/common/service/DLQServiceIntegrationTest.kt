@@ -2,6 +2,7 @@ package com.hoppingmall.mall.global.common.service
 
 import com.hoppingmall.mall.global.common.config.DeadLetterMessage
 import com.hoppingmall.mall.global.common.config.TestKafkaConfig
+import com.hoppingmall.mall.global.common.config.TestRedisConfig
 import com.hoppingmall.mall.global.common.domain.DLQStatus
 import com.hoppingmall.mall.global.common.domain.repository.DLQMessageRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -19,7 +20,7 @@ import org.springframework.test.context.ActiveProfiles
 
 @SpringBootTest(properties = ["spring.main.allow-bean-definition-overriding=true"])
 @ActiveProfiles("test")
-@Import(TestKafkaConfig::class)
+@Import(TestKafkaConfig::class, TestRedisConfig::class)
 @EmbeddedKafka(
     partitions = 1,
     topics = ["notification", "point-earn-request", "payment", "payment-compensation"],

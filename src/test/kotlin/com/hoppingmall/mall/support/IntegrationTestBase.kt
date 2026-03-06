@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.support
 
 import com.hoppingmall.mall.global.common.config.TestKafkaConfig
+import com.hoppingmall.mall.global.common.config.TestRedisConfig
 import com.hoppingmall.mall.global.common.service.OutboxEventService
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
@@ -15,7 +16,7 @@ import java.time.Duration
 
 @SpringBootTest(properties = ["spring.main.allow-bean-definition-overriding=true"])
 @ActiveProfiles("test")
-@Import(TestKafkaConfig::class)
+@Import(TestKafkaConfig::class, TestRedisConfig::class)
 @EmbeddedKafka(
     partitions = 1,
     topics = ["notification", "point-earn-request", "payment", "payment-compensation", "refund-completion"],
