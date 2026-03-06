@@ -8,5 +8,9 @@ data class CachePolicy(
     val l1Ttl: Duration,
     val l2Ttl: Duration,
     val jitterPercent: Int = 10,
-    val hotKey: Boolean = false
-)
+    val hotKeyThreshold: Long = 0L,
+    val hotKeyWindow: Duration = Duration.ofSeconds(60),
+    val hotKeyShardCount: Int = 4
+) {
+    val dynamicHotKeyEnabled: Boolean get() = hotKeyThreshold > 0L
+}

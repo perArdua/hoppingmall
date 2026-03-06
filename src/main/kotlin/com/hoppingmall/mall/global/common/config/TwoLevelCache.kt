@@ -2,6 +2,7 @@ package com.hoppingmall.mall.global.common.config
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.hoppingmall.mall.global.common.config.cache.CachePolicy
+import com.hoppingmall.mall.global.common.config.cache.HotKeyDetector
 import com.hoppingmall.mall.global.common.config.cache.LockProvider
 import org.slf4j.LoggerFactory
 import org.springframework.cache.support.AbstractValueAdaptingCache
@@ -13,7 +14,9 @@ class TwoLevelCache(
     private val caffeineCache: Cache<Any, Any>,
     private val redisCache: org.springframework.cache.Cache,
     private val policy: CachePolicy,
-    private val lockProvider: LockProvider
+    private val lockProvider: LockProvider,
+    private val shardedRedisCache: org.springframework.cache.Cache? = null,
+    private val hotKeyDetector: HotKeyDetector? = null
 ) : AbstractValueAdaptingCache(true) {
 
     private val log = LoggerFactory.getLogger(TwoLevelCache::class.java)
@@ -33,7 +36,11 @@ class TwoLevelCache(
         val l1Value = caffeineCache.getIfPresent(key)
         if (l1Value != null) return l1Value
 
-        val l2Value = redisCache.get(key)?.get()
+        hotKeyDetector?.recordAccess(key.toString())
+        val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
+
+        val l2Cache = if (isHot && shardedRedisCache != null) shardedRedisCache else redisCache
+        val l2Value = l2Cache.get(key)?.get()
         if (l2Value != null) {
             caffeineCache.put(key, l2Value)
         }
@@ -45,17 +52,25 @@ class TwoLevelCache(
         val l1Value = caffeineCache.getIfPresent(key)
         if (l1Value != null) return fromStoreValue(l1Value) as T?
 
+        hotKeyDetector?.recordAccess(key.toString())
+        val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
+
+        if (isHot && shardedRedisCache != null) {
+            val shardValue = shardedRedisCache.get(key)?.get()
+            if (shardValue != null) {
+                caffeineCache.put(key, shardValue)
+                return fromStoreValue(shardValue) as T?
+            }
+            return loadWithLock(key, valueLoader)
+        }
+
         val l2Value = redisCache.get(key)?.get()
         if (l2Value != null) {
             caffeineCache.put(key, l2Value)
             return fromStoreValue(l2Value) as T?
         }
 
-        if (!policy.hotKey) {
-            return loadAndCache(key, valueLoader)
-        }
-
-        return loadWithLock(key, valueLoader)
+        return loadAndCache(key, valueLoader)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -104,17 +119,33 @@ class TwoLevelCache(
     }
 
     override fun put(key: Any, value: Any?) {
+        val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
+
         if (value != null) {
-            redisCache.put(key, value)
+            if (isHot && shardedRedisCache != null) {
+                shardedRedisCache.put(key, value)
+            } else {
+                redisCache.put(key, value)
+            }
             caffeineCache.put(key, toStoreValue(value))
         } else {
-            redisCache.put(key, value)
+            if (isHot && shardedRedisCache != null) {
+                shardedRedisCache.put(key, value)
+            } else {
+                redisCache.put(key, value)
+            }
             caffeineCache.invalidate(key)
         }
     }
 
     override fun evict(key: Any) {
-        redisCache.evict(key)
+        val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
+
+        if (isHot && shardedRedisCache != null) {
+            shardedRedisCache.evict(key)
+        } else {
+            redisCache.evict(key)
+        }
         caffeineCache.invalidate(key)
     }
 
