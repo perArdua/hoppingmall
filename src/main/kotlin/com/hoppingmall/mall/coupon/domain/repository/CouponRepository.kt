@@ -2,9 +2,7 @@ package com.hoppingmall.mall.coupon.domain.repository
 
 import com.hoppingmall.mall.coupon.domain.Coupon
 import com.hoppingmall.mall.coupon.enum.CouponStatus
-import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -13,9 +11,8 @@ import java.time.LocalDateTime
 @Repository
 interface CouponRepository : JpaRepository<Coupon, Long> {
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Coupon c WHERE c.id = :id AND c.deletedAt IS NULL")
-    fun findByIdForUpdate(@Param("id") id: Long): Coupon?
+    fun findActiveById(@Param("id") id: Long): Coupon?
 
     @Query(
         "SELECT c FROM Coupon c WHERE c.status = :status AND c.validFrom <= :now AND c.validTo > :now " +
