@@ -3,8 +3,9 @@ package com.hoppingmall.mall.global.common.config
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.global.common.config.cache.CachePolicy
 import com.hoppingmall.mall.global.common.config.cache.LockProvider
-import com.hoppingmall.mall.global.common.config.cache.RedisLockProvider
+import com.hoppingmall.mall.global.common.config.cache.RedissonLockProvider
 import com.hoppingmall.mall.global.common.config.cache.TtlJitter
+import org.redisson.api.RedissonClient
 import org.slf4j.LoggerFactory
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
@@ -16,7 +17,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
-import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
@@ -40,8 +40,8 @@ class CacheConfig(
     }
 
     @Bean
-    fun cacheLockProvider(connectionFactory: RedisConnectionFactory): LockProvider {
-        return RedisLockProvider(StringRedisTemplate(connectionFactory))
+    fun cacheLockProvider(redissonClient: RedissonClient): LockProvider {
+        return RedissonLockProvider(redissonClient)
     }
 
     @Bean
