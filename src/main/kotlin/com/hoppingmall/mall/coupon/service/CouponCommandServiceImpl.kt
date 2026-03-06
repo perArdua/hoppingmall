@@ -10,6 +10,8 @@ import com.hoppingmall.mall.coupon.dto.response.UserCouponResponse
 import com.hoppingmall.mall.coupon.enum.CouponStatus
 import com.hoppingmall.mall.coupon.enum.UserCouponStatus
 import com.hoppingmall.mall.coupon.exception.*
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -21,6 +23,10 @@ class CouponCommandServiceImpl(
     private val userCouponRepository: UserCouponRepository
 ) : CouponCommandService {
 
+    @Caching(evict = [
+        CacheEvict(cacheNames = ["coupon:available"], allEntries = true),
+        CacheEvict(cacheNames = ["coupon:all"], allEntries = true)
+    ])
     override fun createCoupon(request: CouponCreateRequest): CouponResponse {
         val coupon = Coupon.create(
             name = request.name,
@@ -37,6 +43,10 @@ class CouponCommandServiceImpl(
         return CouponResponse.from(savedCoupon)
     }
 
+    @Caching(evict = [
+        CacheEvict(cacheNames = ["coupon:available"], allEntries = true),
+        CacheEvict(cacheNames = ["coupon:all"], allEntries = true)
+    ])
     override fun changeCouponStatus(couponId: Long, status: CouponStatus): CouponResponse {
         val coupon = couponRepository.findById(couponId)
             .orElseThrow { CouponNotFoundException() }
@@ -44,6 +54,7 @@ class CouponCommandServiceImpl(
         return CouponResponse.from(couponRepository.save(coupon))
     }
 
+    @CacheEvict(cacheNames = ["coupon:available"], allEntries = true)
     override fun issueCoupon(userId: Long, couponId: Long): UserCouponResponse {
         val coupon = couponRepository.findByIdForUpdate(couponId)
             ?: throw CouponNotFoundException()

@@ -9,6 +9,7 @@ import com.hoppingmall.mall.inventory.exception.InventoryAlreadyExistsException
 import com.hoppingmall.mall.inventory.exception.InventoryNotFoundException
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.exception.ProductNotFoundException
+import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -36,6 +37,7 @@ class InventoryCommandServiceImpl(
         return InventoryResponse.from(savedInventory)
     }
 
+    @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun updateStock(productId: Long, request: InventoryUpdateRequest): InventoryResponse {
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
             ?: throw InventoryNotFoundException()
@@ -44,6 +46,7 @@ class InventoryCommandServiceImpl(
         return InventoryResponse.from(inventory)
     }
 
+    @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun decreaseStock(productId: Long, quantity: Int) {
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
             ?: throw InventoryNotFoundException()
@@ -51,6 +54,7 @@ class InventoryCommandServiceImpl(
         inventory.decreaseStock(quantity)
     }
 
+    @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun increaseStock(productId: Long, quantity: Int) {
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
             ?: throw InventoryNotFoundException()

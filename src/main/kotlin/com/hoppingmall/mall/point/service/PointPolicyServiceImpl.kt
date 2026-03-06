@@ -5,6 +5,8 @@ import com.hoppingmall.mall.point.domain.PointPolicyRepository
 import com.hoppingmall.mall.point.dto.request.PointPolicyRequest
 import com.hoppingmall.mall.point.dto.response.PointPolicyResponse
 import com.hoppingmall.mall.point.exception.PointPolicyNotFoundException
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -14,6 +16,7 @@ class PointPolicyServiceImpl(
     private val pointPolicyRepository: PointPolicyRepository
 ) : PointPolicyService {
     
+    @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun createPolicy(request: PointPolicyRequest): PointPolicyResponse {
         validatePolicyRequest(request)
         validatePolicyNameNotExists(request.policyName)
@@ -34,6 +37,7 @@ class PointPolicyServiceImpl(
         return PointPolicyResponse.from(savedPolicy)
     }
     
+    @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun updatePolicy(policyId: Long, request: PointPolicyRequest): PointPolicyResponse {
         validatePolicyRequest(request)
         
@@ -53,6 +57,7 @@ class PointPolicyServiceImpl(
         return PointPolicyResponse.from(savedPolicy)
     }
     
+    @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun activatePolicy(policyId: Long): PointPolicyResponse {
         val policy = pointPolicyRepository.findById(policyId)
             .orElseThrow { PointPolicyNotFoundException() }
@@ -66,6 +71,7 @@ class PointPolicyServiceImpl(
         return PointPolicyResponse.from(savedPolicy)
     }
     
+    @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun deactivatePolicy(policyId: Long): PointPolicyResponse {
         val policy = pointPolicyRepository.findById(policyId)
             .orElseThrow { PointPolicyNotFoundException() }
@@ -75,6 +81,7 @@ class PointPolicyServiceImpl(
         return PointPolicyResponse.from(savedPolicy)
     }
     
+    @Cacheable(cacheNames = ["point-policy"], key = "'current'", sync = true)
     override fun getCurrentPolicy(): PointPolicyResponse? {
         val policy = pointPolicyRepository.findByIsActiveTrue()
         return policy?.let { PointPolicyResponse.from(it) }
