@@ -2,20 +2,21 @@ package com.hoppingmall.mall.global.common.lock
 
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.redisson.api.RLock
 import org.redisson.api.RedissonClient
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.SimpleTransactionStatus
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
@@ -28,14 +29,26 @@ class DistributedLockExecutorTest {
     private lateinit var redissonClient: RedissonClient
 
     @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
+
+    @Mock
     private lateinit var rLock: RLock
 
-    @InjectMocks
     private lateinit var lockExecutor: DistributedLockExecutor
 
+    @BeforeEach
+    fun setUp() {
+        lockExecutor = DistributedLockExecutor(redissonClient, transactionManager)
+    }
+
+    private fun stubTransaction() {
+        whenever(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
+    }
+
     @Test
-    fun 락_획득_성공_시_액션을_실행한다() {
+    fun 락_획득_성공_시_트랜잭션_내에서_액션을_실행한다() {
         // Context
+        stubTransaction()
         whenever(redissonClient.getLock("test-key")).thenReturn(rLock)
         whenever(rLock.tryLock(3000L, 5000L, TimeUnit.MILLISECONDS)).thenReturn(true)
         whenever(rLock.isHeldByCurrentThread).thenReturn(true)
@@ -45,6 +58,7 @@ class DistributedLockExecutorTest {
 
         // Assertions
         assertThat(result).isEqualTo("success")
+        verify(transactionManager).commit(any())
         verify(rLock).unlock()
     }
 
@@ -60,8 +74,9 @@ class DistributedLockExecutorTest {
     }
 
     @Test
-    fun 액션_예외_발생_시에도_락을_해제한다() {
+    fun 액션_예외_발생_시_롤백_후_락을_해제한다() {
         // Context
+        stubTransaction()
         whenever(redissonClient.getLock("test-key")).thenReturn(rLock)
         whenever(rLock.tryLock(3000L, 5000L, TimeUnit.MILLISECONDS)).thenReturn(true)
         whenever(rLock.isHeldByCurrentThread).thenReturn(true)
@@ -71,12 +86,14 @@ class DistributedLockExecutorTest {
             lockExecutor.withLock("test-key") { throw RuntimeException("action failed") }
         }.isInstanceOf(RuntimeException::class.java)
 
+        verify(transactionManager).rollback(any())
         verify(rLock).unlock()
     }
 
     @Test
     fun 커스텀_대기_시간과_임대_시간을_사용한다() {
         // Context
+        stubTransaction()
         val waitTime = Duration.ofSeconds(5)
         val leaseTime = Duration.ofSeconds(10)
         whenever(redissonClient.getLock("custom-key")).thenReturn(rLock)

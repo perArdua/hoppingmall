@@ -2,12 +2,15 @@ package com.hoppingmall.mall.global.common.lock
 
 import org.redisson.api.RedissonClient
 import org.springframework.stereotype.Component
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 @Component
 class DistributedLockExecutor(
-    private val redissonClient: RedissonClient
+    private val redissonClient: RedissonClient,
+    private val transactionManager: PlatformTransactionManager
 ) {
 
     fun <T> withLock(
@@ -22,7 +25,7 @@ class DistributedLockExecutor(
             throw DistributedLockException()
         }
         try {
-            return action()
+            return TransactionTemplate(transactionManager).execute { action() }!!
         } finally {
             if (lock.isHeldByCurrentThread) {
                 lock.unlock()
