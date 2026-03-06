@@ -9,6 +9,7 @@ import com.hoppingmall.mall.coupon.enum.CouponStatus
 import com.hoppingmall.mall.coupon.enum.DiscountType
 import com.hoppingmall.mall.coupon.enum.UserCouponStatus
 import com.hoppingmall.mall.coupon.exception.*
+import com.hoppingmall.mall.global.common.lock.DistributedLockExecutor
 import com.hoppingmall.mall.support.fixture.*
 import com.hoppingmall.mall.support.withId
 import org.assertj.core.api.Assertions.assertThat
@@ -38,11 +39,21 @@ class CouponCommandServiceImplTest {
     @Mock
     private lateinit var userCouponRepository: UserCouponRepository
 
+    @Mock
+    private lateinit var distributedLockExecutor: DistributedLockExecutor
+
     private lateinit var couponCommandService: CouponCommandServiceImpl
 
     @BeforeEach
     fun setUp() {
-        couponCommandService = CouponCommandServiceImpl(couponRepository, userCouponRepository)
+        couponCommandService = CouponCommandServiceImpl(couponRepository, userCouponRepository, distributedLockExecutor)
+    }
+
+    private fun stubLockExecutor() {
+        whenever(distributedLockExecutor.withLock<Any>(any(), any(), any(), any())).thenAnswer { invocation ->
+            val action = invocation.getArgument<() -> Any>(3)
+            action()
+        }
     }
 
     @Nested
@@ -117,6 +128,11 @@ class CouponCommandServiceImplTest {
     @DisplayName("issueCoupon")
     inner class IssueCoupon {
 
+        @BeforeEach
+        fun setUpLock() {
+            stubLockExecutor()
+        }
+
         @Test
         fun 쿠폰_발급_성공() {
             // Data
@@ -125,7 +141,7 @@ class CouponCommandServiceImplTest {
             val coupon = Coupon.fixture()
 
             // Context
-            whenever(couponRepository.findByIdForUpdate(couponId)).thenReturn(coupon)
+            whenever(couponRepository.findActiveById(couponId)).thenReturn(coupon)
             whenever(userCouponRepository.existsByUserIdAndCouponId(userId, couponId)).thenReturn(false)
             whenever(couponRepository.save(any<Coupon>())).thenReturn(coupon)
             whenever(userCouponRepository.save(any<UserCoupon>())).thenAnswer { invocation ->
@@ -140,12 +156,13 @@ class CouponCommandServiceImplTest {
             assertThat(result.status).isEqualTo(UserCouponStatus.ISSUED)
             verify(couponRepository).save(any())
             verify(userCouponRepository).save(any())
+            verify(distributedLockExecutor).withLock<Any>(eq("coupon:issue:$couponId"), any(), any(), any())
         }
 
         @Test
         fun 존재하지_않는_쿠폰_발급_시_예외_발생() {
             // Context
-            whenever(couponRepository.findByIdForUpdate(999L)).thenReturn(null)
+            whenever(couponRepository.findActiveById(999L)).thenReturn(null)
 
             // Interaction & Assertions
             assertThatThrownBy { couponCommandService.issueCoupon(1L, 999L) }
@@ -158,7 +175,7 @@ class CouponCommandServiceImplTest {
             val coupon = Coupon.expiredFixture()
 
             // Context
-            whenever(couponRepository.findByIdForUpdate(1L)).thenReturn(coupon)
+            whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
 
             // Interaction & Assertions
             assertThatThrownBy { couponCommandService.issueCoupon(1L, 1L) }
@@ -171,7 +188,7 @@ class CouponCommandServiceImplTest {
             val coupon = Coupon.exhaustedFixture()
 
             // Context
-            whenever(couponRepository.findByIdForUpdate(1L)).thenReturn(coupon)
+            whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
 
             // Interaction & Assertions
             assertThatThrownBy { couponCommandService.issueCoupon(1L, 1L) }
@@ -184,7 +201,7 @@ class CouponCommandServiceImplTest {
             val coupon = Coupon.fixture()
 
             // Context
-            whenever(couponRepository.findByIdForUpdate(1L)).thenReturn(coupon)
+            whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
             whenever(userCouponRepository.existsByUserIdAndCouponId(1L, 1L)).thenReturn(true)
 
             // Interaction & Assertions

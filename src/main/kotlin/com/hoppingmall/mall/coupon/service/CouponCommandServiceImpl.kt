@@ -10,9 +10,11 @@ import com.hoppingmall.mall.coupon.dto.response.UserCouponResponse
 import com.hoppingmall.mall.coupon.enum.CouponStatus
 import com.hoppingmall.mall.coupon.enum.UserCouponStatus
 import com.hoppingmall.mall.coupon.exception.*
+import com.hoppingmall.mall.global.common.lock.DistributedLockExecutor
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
@@ -20,7 +22,8 @@ import java.math.BigDecimal
 @Transactional
 class CouponCommandServiceImpl(
     private val couponRepository: CouponRepository,
-    private val userCouponRepository: UserCouponRepository
+    private val userCouponRepository: UserCouponRepository,
+    private val distributedLockExecutor: DistributedLockExecutor
 ) : CouponCommandService {
 
     @Caching(evict = [
@@ -55,33 +58,36 @@ class CouponCommandServiceImpl(
     }
 
     @CacheEvict(cacheNames = ["coupon:available"], allEntries = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun issueCoupon(userId: Long, couponId: Long): UserCouponResponse {
-        val coupon = couponRepository.findByIdForUpdate(couponId)
-            ?: throw CouponNotFoundException()
+        return distributedLockExecutor.withLock("coupon:issue:$couponId") {
+            val coupon = couponRepository.findActiveById(couponId)
+                ?: throw CouponNotFoundException()
 
-        if (coupon.isExpired()) {
-            throw CouponExpiredException()
+            if (coupon.isExpired()) {
+                throw CouponExpiredException()
+            }
+
+            if (coupon.isExhausted()) {
+                throw CouponExhaustedException()
+            }
+
+            if (!coupon.isValid()) {
+                throw CouponNotAvailableException()
+            }
+
+            if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
+                throw CouponAlreadyIssuedException()
+            }
+
+            coupon.issue()
+            couponRepository.save(coupon)
+
+            val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
+            val savedUserCoupon = userCouponRepository.save(userCoupon)
+
+            UserCouponResponse.from(savedUserCoupon, coupon)
         }
-
-        if (coupon.isExhausted()) {
-            throw CouponExhaustedException()
-        }
-
-        if (!coupon.isValid()) {
-            throw CouponNotAvailableException()
-        }
-
-        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
-            throw CouponAlreadyIssuedException()
-        }
-
-        coupon.issue()
-        couponRepository.save(coupon)
-
-        val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
-        val savedUserCoupon = userCouponRepository.save(userCoupon)
-
-        return UserCouponResponse.from(savedUserCoupon, coupon)
     }
 
     override fun useCoupon(userId: Long, couponId: Long, orderAmount: BigDecimal, orderId: Long): BigDecimal {
