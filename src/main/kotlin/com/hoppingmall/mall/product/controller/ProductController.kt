@@ -11,8 +11,8 @@ import com.hoppingmall.mall.product.service.ProductCommandService
 import com.hoppingmall.mall.product.service.ProductImageService
 import com.hoppingmall.mall.product.service.ProductQueryService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
@@ -25,7 +25,7 @@ class ProductController(
 ) {
 
     @GetMapping
-    fun getProducts(pageable: Pageable): ApiResponse<Page<ProductResponse>> {
+    fun getProducts(pageable: Pageable): ApiResponse<Slice<ProductResponse>> {
         val products = productQueryService.getProducts(pageable)
         return ApiResponse.success(products)
     }
@@ -41,7 +41,7 @@ class ProductController(
     fun getProductsBySeller(
         @PathVariable sellerId: Long,
         pageable: Pageable
-    ): ApiResponse<Page<ProductResponse>> {
+    ): ApiResponse<Slice<ProductResponse>> {
         val products = productQueryService.getProductsBySellerId(sellerId, pageable)
         return ApiResponse.success(products)
     }
@@ -50,7 +50,7 @@ class ProductController(
     fun getProductsByCategory(
         @PathVariable categoryId: Long,
         pageable: Pageable
-    ): ApiResponse<Page<ProductResponse>> {
+    ): ApiResponse<Slice<ProductResponse>> {
         val products = productQueryService.getProductsByCategoryId(categoryId, pageable)
         return ApiResponse.success(products)
     }
@@ -59,7 +59,7 @@ class ProductController(
     fun searchProducts(
         @ModelAttribute condition: ProductSearchCondition,
         pageable: Pageable
-    ): ApiResponse<Page<ProductResponse>> {
+    ): ApiResponse<Slice<ProductResponse>> {
         val products = productQueryService.searchProducts(condition, pageable)
         return ApiResponse.success(products)
     }

@@ -8,8 +8,8 @@ import com.hoppingmall.mall.order.dto.response.OrderResponse
 import com.hoppingmall.mall.order.service.OrderCommandService
 import com.hoppingmall.mall.order.service.OrderQueryService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -46,7 +46,7 @@ class OrderController(
     fun getMyOrders(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<Page<OrderResponse>>> {
+    ): ResponseEntity<ApiResponse<Slice<OrderResponse>>> {
         val orders = orderQueryService.getMyOrders(userPrincipal.getUserId(), pageable)
         return ResponseEntity.ok(ApiResponse.success(orders))
     }
