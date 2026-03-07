@@ -4,6 +4,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -19,10 +20,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig.ENABLE_AUTO_COMMIT_CONFI
 import org.springframework.messaging.converter.MessageConversionException
 import org.apache.kafka.common.errors.SerializationException
 import org.springframework.kafka.support.serializer.DeserializationException
+import com.hoppingmall.mall.global.common.config.kafka.TracingProducerInterceptor
+import com.hoppingmall.mall.global.common.config.kafka.TracingConsumerInterceptor
 import java.util.UUID
 @Configuration
 @org.springframework.context.annotation.Profile("!test")
 class KafkaConfig {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @Value("\${spring.kafka.bootstrap-servers}")
     private lateinit var bootstrapServers: String
@@ -60,7 +65,8 @@ class KafkaConfig {
         configProps[ProducerConfig.BATCH_SIZE_CONFIG] = 16384
         configProps[ProducerConfig.LINGER_MS_CONFIG] = 10
         configProps[ProducerConfig.COMPRESSION_TYPE_CONFIG] = "lz4"
-        
+        configProps[ProducerConfig.INTERCEPTOR_CLASSES_CONFIG] = listOf(TracingProducerInterceptor::class.java.name)
+
         val producerFactory = DefaultKafkaProducerFactory<String, Any>(configProps)
         producerFactory.setTransactionIdPrefix("hoppingmall-tx-$instanceId-")
         return producerFactory
@@ -121,7 +127,8 @@ class KafkaConfig {
             MessageConversionException::class.java
         )
         factory.setCommonErrorHandler(errorHandler)
-        
+        factory.setRecordInterceptor(TracingConsumerInterceptor())
+
         return factory
     }
 
@@ -145,7 +152,7 @@ class KafkaConfig {
             dlqService.saveDLQMessage(dlqMessage)
         } catch (e: Exception) {
             // DLQ 저장 실패 시에도 메시지 손실 방지를 위해 로깅만 수행
-            println("DLQ 저장 실패: ${e.message}")
+            log.error("DLQ 저장 실패: topic={}, offset={}, error={}", record.topic(), record.offset(), e.message)
         }
     }
 }

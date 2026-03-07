@@ -64,6 +64,15 @@ kafka:
     restart:
       enabled: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    tags:
+      application: hoppingmall
+
 logging:
   level:
     org.hibernate.SQL: debug
