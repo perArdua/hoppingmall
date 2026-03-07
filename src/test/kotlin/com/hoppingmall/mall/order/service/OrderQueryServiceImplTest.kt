@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.SliceImpl
 import java.util.*
 
 @DisplayName("OrderQueryServiceImpl")
@@ -94,9 +94,9 @@ class OrderQueryServiceImplTest {
             val pageable = PageRequest.of(0, 20)
             val order1 = Order.fixture(buyerId = buyerId).withId(1L)
             val order2 = Order.fixture(buyerId = buyerId).withId(2L)
-            val page = PageImpl(listOf(order1, order2), pageable, 2)
+            val slice = SliceImpl(listOf(order1, order2), pageable, false)
 
-            whenever(orderRepository.findByBuyerId(buyerId, pageable)).thenReturn(page)
+            whenever(orderRepository.findByBuyerId(buyerId, pageable)).thenReturn(slice)
             whenever(orderItemRepository.findByOrderIdIn(listOf(1L, 2L))).thenReturn(listOf(
                 OrderItem.fixture(orderId = 1L),
                 OrderItem.fixture(orderId = 2L)
@@ -106,8 +106,8 @@ class OrderQueryServiceImplTest {
             val response = orderQueryService.getMyOrders(buyerId, pageable)
 
             // then
-            assertEquals(2, response.totalElements)
             assertEquals(2, response.content.size)
+            assertEquals(false, response.hasNext())
         }
     }
 }
