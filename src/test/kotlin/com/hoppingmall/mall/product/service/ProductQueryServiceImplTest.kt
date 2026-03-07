@@ -26,8 +26,8 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.SliceImpl
 
 @DisplayName("ProductQueryServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -49,9 +49,9 @@ class ProductQueryServiceImplTest {
                 Product.create(1L, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
                 Product.create(2L, 1L, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
             )
-            val productPage = PageImpl(products, pageable, products.size.toLong())
+            val productSlice = SliceImpl(products, pageable, false)
 
-            whenever(productRepository.findAll(pageable)).thenReturn(productPage)
+            whenever(productRepository.findBy(pageable)).thenReturn(productSlice)
             whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(listOf(
                 ProductImage.create(1L, "https://example.com/image1.jpg"),
                 ProductImage.create(2L, "https://example.com/image2.jpg")
@@ -64,7 +64,7 @@ class ProductQueryServiceImplTest {
             assertEquals("https://example.com/image1.jpg", result.content[0].imageUrl)
             assertEquals("상품2", result.content[1].name)
             assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
-            verify(productRepository).findAll(pageable)
+            verify(productRepository).findBy(pageable)
             verify(productImageRepository).findByProductIdIn(listOf(1L, 2L))
         }
     }
@@ -153,9 +153,9 @@ class ProductQueryServiceImplTest {
                 Product.create(sellerId, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
                 Product.create(sellerId, 1L, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
             )
-            val productPage = PageImpl(products, pageable, products.size.toLong())
+            val productSlice = SliceImpl(products, pageable, false)
 
-            whenever(productRepository.findBySellerId(sellerId, pageable)).thenReturn(productPage)
+            whenever(productRepository.findBySellerId(sellerId, pageable)).thenReturn(productSlice)
             whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(listOf(
                 ProductImage.create(1L, "https://example.com/image1.jpg"),
                 ProductImage.create(2L, "https://example.com/image2.jpg")
@@ -186,9 +186,9 @@ class ProductQueryServiceImplTest {
                 Product.create(1L, categoryId, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L),
                 Product.create(2L, categoryId, "상품2", "설명2", BigDecimal("20000"), ProductStatus.AVAILABLE).withId(2L)
             )
-            val productPage = PageImpl(products, pageable, products.size.toLong())
+            val productSlice = SliceImpl(products, pageable, false)
 
-            whenever(productRepository.findByCategoryId(categoryId, pageable)).thenReturn(productPage)
+            whenever(productRepository.findByCategoryId(categoryId, pageable)).thenReturn(productSlice)
             whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(listOf(
                 ProductImage.create(1L, "https://example.com/image1.jpg"),
                 ProductImage.create(2L, "https://example.com/image2.jpg")
@@ -218,11 +218,11 @@ class ProductQueryServiceImplTest {
             val products = listOf(
                 Product.create(1L, 1L, "게이밍 노트북", "설명1", BigDecimal("1500000"), ProductStatus.AVAILABLE).withId(1L)
             )
-            val productPage = PageImpl(products, pageable, products.size.toLong())
+            val productSlice = SliceImpl(products, pageable, false)
 
             whenever(productRepository.searchProducts(
                 eq("노트북"), isNull(), isNull(), isNull(), isNull(), eq(pageable)
-            )).thenReturn(productPage)
+            )).thenReturn(productSlice)
             whenever(productImageRepository.findByProductIdIn(listOf(1L))).thenReturn(emptyList())
 
             val result = productQueryService.searchProducts(condition, pageable)
@@ -242,11 +242,11 @@ class ProductQueryServiceImplTest {
                 Product.create(1L, 1L, "상품1", "설명1", BigDecimal("15000"), ProductStatus.AVAILABLE).withId(1L),
                 Product.create(2L, 1L, "상품2", "설명2", BigDecimal("25000"), ProductStatus.AVAILABLE).withId(2L)
             )
-            val productPage = PageImpl(products, pageable, products.size.toLong())
+            val productSlice = SliceImpl(products, pageable, false)
 
             whenever(productRepository.searchProducts(
                 isNull(), isNull(), isNull(), eq(BigDecimal("10000")), eq(BigDecimal("30000")), eq(pageable)
-            )).thenReturn(productPage)
+            )).thenReturn(productSlice)
             whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(emptyList())
 
             val result = productQueryService.searchProducts(condition, pageable)
@@ -267,12 +267,12 @@ class ProductQueryServiceImplTest {
             val products = listOf(
                 Product.create(1L, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(1L)
             )
-            val productPage = PageImpl(products, pageable, products.size.toLong())
+            val productSlice = SliceImpl(products, pageable, false)
 
             whenever(productRepository.searchProducts(
                 eq("상품"), eq(1L), eq(ProductStatus.AVAILABLE),
                 eq(BigDecimal("5000")), eq(BigDecimal("50000")), eq(pageable)
-            )).thenReturn(productPage)
+            )).thenReturn(productSlice)
             whenever(productImageRepository.findByProductIdIn(listOf(1L))).thenReturn(listOf(
                 ProductImage.create(1L, "https://example.com/image1.jpg")
             ))
@@ -285,19 +285,19 @@ class ProductQueryServiceImplTest {
         }
 
         @Test
-        fun 검색_결과가_없으면_빈_페이지_반환() {
+        fun 검색_결과가_없으면_빈_슬라이스_반환() {
             val pageable = PageRequest.of(0, 10)
             val condition = ProductSearchCondition(keyword = "존재하지않는상품")
-            val productPage = PageImpl<Product>(emptyList(), pageable, 0)
+            val productSlice = SliceImpl<Product>(emptyList(), pageable, false)
 
             whenever(productRepository.searchProducts(
                 eq("존재하지않는상품"), isNull(), isNull(), isNull(), isNull(), eq(pageable)
-            )).thenReturn(productPage)
+            )).thenReturn(productSlice)
 
             val result = productQueryService.searchProducts(condition, pageable)
 
             assertEquals(0, result.content.size)
-            assertEquals(0, result.totalElements)
+            assertEquals(false, result.hasNext())
         }
     }
 }

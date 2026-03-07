@@ -7,9 +7,9 @@ import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
 import com.hoppingmall.mall.product.dto.response.ProductResponse
 import org.springframework.cache.CacheManager
-import org.springframework.data.domain.Page
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
+import org.springframework.data.domain.SliceImpl
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,9 +22,9 @@ class ProductQueryServiceImpl(
     private val cacheManager: CacheManager
 ) : ProductQueryService {
 
-    override fun getProducts(pageable: Pageable): Page<ProductResponse> {
-        val productPage = productRepository.findAll(pageable)
-        return toProductResponsePage(productPage, pageable)
+    override fun getProducts(pageable: Pageable): Slice<ProductResponse> {
+        val productSlice = productRepository.findBy(pageable)
+        return toProductResponseSlice(productSlice, pageable)
     }
 
     @Cacheable(cacheNames = ["product"], key = "#productId", sync = true)
@@ -49,24 +49,24 @@ class ProductQueryServiceImpl(
     override fun getProductsBySellerId(
         sellerId: Long,
         pageable: Pageable
-    ): Page<ProductResponse> {
-        val productPage = productRepository.findBySellerId(sellerId, pageable)
-        return toProductResponsePage(productPage, pageable)
+    ): Slice<ProductResponse> {
+        val productSlice = productRepository.findBySellerId(sellerId, pageable)
+        return toProductResponseSlice(productSlice, pageable)
     }
 
     override fun getProductsByCategoryId(
         categoryId: Long,
         pageable: Pageable
-    ): Page<ProductResponse> {
-        val productPage = productRepository.findByCategoryId(categoryId, pageable)
-        return toProductResponsePage(productPage, pageable)
+    ): Slice<ProductResponse> {
+        val productSlice = productRepository.findByCategoryId(categoryId, pageable)
+        return toProductResponseSlice(productSlice, pageable)
     }
 
     override fun searchProducts(
         condition: ProductSearchCondition,
         pageable: Pageable
-    ): Page<ProductResponse> {
-        val productPage = productRepository.searchProducts(
+    ): Slice<ProductResponse> {
+        val productSlice = productRepository.searchProducts(
             keyword = condition.keyword,
             categoryId = condition.categoryId,
             status = condition.status,
@@ -74,21 +74,21 @@ class ProductQueryServiceImpl(
             maxPrice = condition.maxPrice,
             pageable = pageable
         )
-        return toProductResponsePage(productPage, pageable)
+        return toProductResponseSlice(productSlice, pageable)
     }
 
-    private fun toProductResponsePage(
-        productPage: Page<Product>,
+    private fun toProductResponseSlice(
+        productSlice: Slice<Product>,
         pageable: Pageable
-    ): Page<ProductResponse> {
-        val productIds = productPage.content.mapNotNull { it.id }
+    ): Slice<ProductResponse> {
+        val productIds = productSlice.content.mapNotNull { it.id }
         val imageMap = productImageRepository.findByProductIdIn(productIds)
             .associateBy { it.productId }
 
-        val productResponses = productPage.content.map { product ->
+        val productResponses = productSlice.content.map { product ->
             ProductResponse.from(product, imageMap[product.id])
         }
 
-        return PageImpl(productResponses, pageable, productPage.totalElements)
+        return SliceImpl(productResponses, pageable, productSlice.hasNext())
     }
 }

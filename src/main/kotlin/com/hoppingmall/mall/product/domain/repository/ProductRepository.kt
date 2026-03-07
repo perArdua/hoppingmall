@@ -2,8 +2,8 @@ package com.hoppingmall.mall.product.domain.repository
 
 import com.hoppingmall.mall.global.enums.ProductStatus
 import com.hoppingmall.mall.product.domain.Product
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
@@ -12,9 +12,11 @@ import java.math.BigDecimal
 @Repository
 interface ProductRepository: JpaRepository<Product, Long> {
 
-    fun findBySellerId(sellerId: Long, pageable: Pageable): Page<Product>
+    fun findBy(pageable: Pageable): Slice<Product>
 
-    fun findByCategoryId(categoryId: Long, pageable: Pageable): Page<Product>
+    fun findBySellerId(sellerId: Long, pageable: Pageable): Slice<Product>
+
+    fun findByCategoryId(categoryId: Long, pageable: Pageable): Slice<Product>
 
     fun findNullableById(id: Long): Product?
 
@@ -34,5 +36,5 @@ interface ProductRepository: JpaRepository<Product, Long> {
         minPrice: BigDecimal?,
         maxPrice: BigDecimal?,
         pageable: Pageable
-    ): Page<Product>
+    ): Slice<Product>
 }
