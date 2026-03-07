@@ -2,13 +2,15 @@ package com.hoppingmall.mall.cartItem.domain.repository
 
 import com.hoppingmall.mall.cartItem.domain.CartItem
 import com.hoppingmall.mall.product.dto.CartAggregation
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
 
 @Repository
 interface CartItemRepository: JpaRepository<CartItem, Long> {
-    fun findByBuyerId(buyerId: Long): List<CartItem>
+    fun findByBuyerId(buyerId: Long, pageable: Pageable): Slice<CartItem>
     fun findByBuyerIdAndProductId(buyerId: Long, productId: Long): CartItem?
 
     @Query(

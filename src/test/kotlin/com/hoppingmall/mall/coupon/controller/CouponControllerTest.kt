@@ -13,6 +13,8 @@ import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.mockito.kotlin.*
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.SliceImpl
 import org.springframework.http.HttpStatus
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -197,20 +199,23 @@ class CouponControllerTest {
         fun 내_쿠폰_목록_조회_성공() {
             // Data
             val userPrincipal = UserPrincipal(1L, "test@example.com", "BUYER")
-            val expectedResponse = listOf(createUserCouponResponse())
+            val pageable = PageRequest.of(0, 20)
+            val expectedResponses = listOf(createUserCouponResponse())
+            val slice = SliceImpl(expectedResponses, pageable, false)
 
             // Context
-            whenever(couponQueryService.getMyCoupons(userPrincipal.getUserId()))
-                .thenReturn(expectedResponse)
+            whenever(couponQueryService.getMyCoupons(userPrincipal.getUserId(), pageable))
+                .thenReturn(slice)
 
             // Interaction
-            val response = controller.getMyCoupons(userPrincipal)
+            val response = controller.getMyCoupons(userPrincipal, pageable)
 
             // Assertions
             assertEquals(HttpStatus.OK, response.statusCode)
             assertEquals("SUCCESS", response.body?.code)
-            assertEquals(expectedResponse, response.body?.data)
-            verify(couponQueryService).getMyCoupons(userPrincipal.getUserId())
+            assertEquals(1, response.body?.data?.content?.size)
+            assertEquals(false, response.body?.data?.hasNext())
+            verify(couponQueryService).getMyCoupons(userPrincipal.getUserId(), pageable)
         }
     }
 }
