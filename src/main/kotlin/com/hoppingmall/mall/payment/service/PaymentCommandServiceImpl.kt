@@ -10,6 +10,7 @@ import com.hoppingmall.mall.payment.dto.response.PaymentResponse
 import com.hoppingmall.mall.payment.exception.PaymentAccessDeniedException
 import com.hoppingmall.mall.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -22,6 +23,8 @@ class PaymentCommandServiceImpl(
     private val paymentEventService: PaymentEventService,
     private val couponCommandService: CouponCommandService
 ) : PaymentCommandService {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse {
         var couponDiscountAmount = BigDecimal.ZERO
@@ -56,10 +59,12 @@ class PaymentCommandServiceImpl(
         val finalPayment = paymentRepository.save(updatedPayment)
 
         if (finalPayment.status == PaymentStatus.SUCCESS) {
+            log.info("결제 성공: paymentId={}, orderId={}, userId={}, amount={}", finalPayment.id, finalPayment.orderId, userId, finalPayment.amount)
             publishPaymentEvents(finalPayment)
         }
 
         if (finalPayment.status == PaymentStatus.FAILED) {
+            log.warn("결제 실패: paymentId={}, orderId={}, userId={}, error={}", finalPayment.id, finalPayment.orderId, userId, finalPayment.errorMessage)
             if (couponId != null) {
                 couponCommandService.restoreCouponByPayment(couponId, userId)
             }
@@ -88,6 +93,7 @@ class PaymentCommandServiceImpl(
         paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
         paymentEventService.publishPaymentCancelledNotification(cancelledPayment)
 
+        log.info("결제 취소: paymentId={}, orderId={}, userId={}", paymentId, payment.orderId, userId)
         return PaymentResponse.from(cancelledPayment)
     }
     
