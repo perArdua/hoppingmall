@@ -6,6 +6,9 @@ import com.hoppingmall.mall.coupon.dto.response.CouponResponse
 import com.hoppingmall.mall.coupon.dto.response.UserCouponResponse
 import com.hoppingmall.mall.coupon.exception.CouponNotFoundException
 import org.springframework.cache.annotation.Cacheable
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
+import org.springframework.data.domain.SliceImpl
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -28,15 +31,17 @@ class CouponQueryServiceImpl(
             .map { CouponResponse.from(it) }
     }
 
-    override fun getMyCoupons(userId: Long): List<UserCouponResponse> {
-        val userCoupons = userCouponRepository.findByUserId(userId)
-        val couponIds = userCoupons.map { it.couponId }
+    override fun getMyCoupons(userId: Long, pageable: Pageable): Slice<UserCouponResponse> {
+        val userCouponSlice = userCouponRepository.findByUserId(userId, pageable)
+        val couponIds = userCouponSlice.content.map { it.couponId }
         val couponMap = couponRepository.findAllById(couponIds).associateBy { it.id }
 
-        return userCoupons.map { userCoupon ->
+        val responses = userCouponSlice.content.map { userCoupon ->
             val coupon = couponMap[userCoupon.couponId]
                 ?: throw CouponNotFoundException()
             UserCouponResponse.from(userCoupon, coupon)
         }
+
+        return SliceImpl(responses, pageable, userCouponSlice.hasNext())
     }
 }

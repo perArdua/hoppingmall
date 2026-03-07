@@ -2,6 +2,8 @@ package com.hoppingmall.mall.coupon.domain.repository
 
 import com.hoppingmall.mall.coupon.domain.UserCoupon
 import com.hoppingmall.mall.coupon.enum.UserCouponStatus
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 
@@ -14,7 +16,7 @@ interface UserCouponRepository : JpaRepository<UserCoupon, Long> {
 
     fun findByUserIdAndStatus(userId: Long, status: UserCouponStatus): List<UserCoupon>
 
-    fun findByUserId(userId: Long): List<UserCoupon>
+    fun findByUserId(userId: Long, pageable: Pageable): Slice<UserCoupon>
 
     fun findByOrderId(orderId: Long): UserCoupon?
 }

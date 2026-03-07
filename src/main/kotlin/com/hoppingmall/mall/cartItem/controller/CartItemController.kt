@@ -8,6 +8,9 @@ import com.hoppingmall.mall.cartItem.service.CartItemQueryService
 import com.hoppingmall.mall.global.auth.UserPrincipal
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import jakarta.validation.Valid
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
+import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -32,9 +35,10 @@ class CartItemController(
 
     @GetMapping
     fun getCartItems(
-        @AuthenticationPrincipal userPrincipal: UserPrincipal
-    ): ResponseEntity<ApiResponse<List<CartItemResponse>>> {
-        val cartItems = cartItemQueryService.getCartItems(userPrincipal.getUserId())
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PageableDefault(size = 20) pageable: Pageable
+    ): ResponseEntity<ApiResponse<Slice<CartItemResponse>>> {
+        val cartItems = cartItemQueryService.getCartItems(userPrincipal.getUserId(), pageable)
         return ResponseEntity.ok(ApiResponse.success(cartItems))
     }
 
