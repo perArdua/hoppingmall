@@ -13,6 +13,7 @@ import com.hoppingmall.mall.order.enum.OrderStatus
 import com.hoppingmall.mall.order.exception.OrderAccessDeniedException
 import com.hoppingmall.mall.order.exception.OrderEmptyItemsException
 import com.hoppingmall.mall.order.exception.OrderNotFoundException
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -25,6 +26,8 @@ class OrderCommandServiceImpl(
     private val cartItemRepository: CartItemRepository,
     private val inventoryCommandService: InventoryCommandService
 ) : OrderCommandService {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     override fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse {
         val cartItems = cartItemRepository.findAllById(request.cartItemIds)
@@ -59,6 +62,7 @@ class OrderCommandServiceImpl(
 
         cartItemRepository.deleteAllById(request.cartItemIds)
 
+        log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
         return OrderResponse.from(order, savedOrderItems)
     }
 
@@ -77,6 +81,7 @@ class OrderCommandServiceImpl(
             inventoryCommandService.increaseStock(orderItem.productId, orderItem.quantity)
         }
 
+        log.info("주문 취소: orderId={}, buyerId={}", orderId, buyerId)
         return OrderResponse.from(order, orderItems)
     }
 
