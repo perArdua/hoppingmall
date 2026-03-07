@@ -30,9 +30,13 @@ class OrderQueryServiceImpl(
     }
 
     override fun getMyOrders(buyerId: Long, pageable: Pageable): Page<OrderResponse> {
-        return orderRepository.findByBuyerId(buyerId, pageable).map { order ->
-            val orderItems = orderItemRepository.findByOrderId(order.id!!)
-            OrderResponse.from(order, orderItems)
+        val orderPage = orderRepository.findByBuyerId(buyerId, pageable)
+        val orderIds = orderPage.content.mapNotNull { it.id }
+        val orderItemMap = orderItemRepository.findByOrderIdIn(orderIds)
+            .groupBy { it.orderId }
+
+        return orderPage.map { order ->
+            OrderResponse.from(order, orderItemMap[order.id] ?: emptyList())
         }
     }
 }
