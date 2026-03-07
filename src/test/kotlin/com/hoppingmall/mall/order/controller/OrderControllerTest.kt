@@ -13,8 +13,8 @@ import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.mockito.kotlin.*
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.SliceImpl
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import java.math.BigDecimal
@@ -104,16 +104,16 @@ class OrderControllerTest {
         fun 내_주문_목록_조회_성공() {
             // given
             val pageable = PageRequest.of(0, 20)
-            val expectedPage = PageImpl(listOf(createOrderResponse()), pageable, 1)
+            val expectedSlice = SliceImpl(listOf(createOrderResponse()), pageable, false)
 
-            whenever(orderQueryService.getMyOrders(userPrincipal.getUserId(), pageable)).thenReturn(expectedPage)
+            whenever(orderQueryService.getMyOrders(userPrincipal.getUserId(), pageable)).thenReturn(expectedSlice)
 
             // when
             val response = controller.getMyOrders(userPrincipal, pageable)
 
             // then
             assertEquals("SUCCESS", response.body?.code)
-            assertEquals(1, response.body?.data?.totalElements)
+            assertEquals(1, response.body?.data?.content?.size)
             verify(orderQueryService).getMyOrders(userPrincipal.getUserId(), pageable)
         }
     }

@@ -15,9 +15,9 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import java.math.BigDecimal
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.mockito.kotlin.*
-import org.springframework.data.domain.Page
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Slice
+import org.springframework.data.domain.SliceImpl
 import org.springframework.mock.web.MockMultipartFile
 import java.time.LocalDateTime
 
@@ -62,15 +62,15 @@ class ProductControllerTest {
                     updatedAt = null
                 )
             )
-            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+            val productResponseSlice = SliceImpl(productResponses, pageable, false)
 
-            whenever(productQueryService.getProducts(any())).thenReturn(productResponsePage)
+            whenever(productQueryService.getProducts(any())).thenReturn(productResponseSlice)
 
-            val response: ApiResponse<Page<ProductResponse>> = controller.getProducts(pageable)
+            val response: ApiResponse<Slice<ProductResponse>> = controller.getProducts(pageable)
 
             assertEquals("SUCCESS", response.code)
             assertEquals("성공", response.message)
-            assertEquals(productResponsePage, response.data)
+            assertEquals(productResponseSlice, response.data)
             verify(productQueryService).getProducts(pageable)
         }
     }
@@ -151,15 +151,15 @@ class ProductControllerTest {
                     updatedAt = null
                 )
             )
-            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+            val productResponseSlice = SliceImpl(productResponses, pageable, false)
 
-            whenever(productQueryService.getProductsBySellerId(eq(sellerId), any())).thenReturn(productResponsePage)
+            whenever(productQueryService.getProductsBySellerId(eq(sellerId), any())).thenReturn(productResponseSlice)
 
-            val response: ApiResponse<Page<ProductResponse>> = controller.getProductsBySeller(sellerId, pageable)
+            val response: ApiResponse<Slice<ProductResponse>> = controller.getProductsBySeller(sellerId, pageable)
 
             assertEquals("SUCCESS", response.code)
             assertEquals("성공", response.message)
-            assertEquals(productResponsePage, response.data)
+            assertEquals(productResponseSlice, response.data)
             verify(productQueryService).getProductsBySellerId(sellerId, pageable)
         }
     }
@@ -197,15 +197,15 @@ class ProductControllerTest {
                     updatedAt = null
                 )
             )
-            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+            val productResponseSlice = SliceImpl(productResponses, pageable, false)
 
-            whenever(productQueryService.getProductsByCategoryId(eq(categoryId), any())).thenReturn(productResponsePage)
+            whenever(productQueryService.getProductsByCategoryId(eq(categoryId), any())).thenReturn(productResponseSlice)
 
-            val response: ApiResponse<Page<ProductResponse>> = controller.getProductsByCategory(categoryId, pageable)
+            val response: ApiResponse<Slice<ProductResponse>> = controller.getProductsByCategory(categoryId, pageable)
 
             assertEquals("SUCCESS", response.code)
             assertEquals("성공", response.message)
-            assertEquals(productResponsePage, response.data)
+            assertEquals(productResponseSlice, response.data)
             verify(productQueryService).getProductsByCategoryId(categoryId, pageable)
         }
     }
@@ -231,15 +231,15 @@ class ProductControllerTest {
                     updatedAt = null
                 )
             )
-            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+            val productResponseSlice = SliceImpl(productResponses, pageable, false)
 
-            whenever(productQueryService.searchProducts(eq(condition), any())).thenReturn(productResponsePage)
+            whenever(productQueryService.searchProducts(eq(condition), any())).thenReturn(productResponseSlice)
 
-            val response: ApiResponse<Page<ProductResponse>> = controller.searchProducts(condition, pageable)
+            val response: ApiResponse<Slice<ProductResponse>> = controller.searchProducts(condition, pageable)
 
             assertEquals("SUCCESS", response.code)
             assertEquals("성공", response.message)
-            assertEquals(productResponsePage, response.data)
+            assertEquals(productResponseSlice, response.data)
             verify(productQueryService).searchProducts(condition, pageable)
         }
 
@@ -261,14 +261,14 @@ class ProductControllerTest {
                     updatedAt = null
                 )
             )
-            val productResponsePage = PageImpl(productResponses, pageable, productResponses.size.toLong())
+            val productResponseSlice = SliceImpl(productResponses, pageable, false)
 
-            whenever(productQueryService.searchProducts(eq(condition), any())).thenReturn(productResponsePage)
+            whenever(productQueryService.searchProducts(eq(condition), any())).thenReturn(productResponseSlice)
 
-            val response: ApiResponse<Page<ProductResponse>> = controller.searchProducts(condition, pageable)
+            val response: ApiResponse<Slice<ProductResponse>> = controller.searchProducts(condition, pageable)
 
             assertEquals("SUCCESS", response.code)
-            assertEquals(productResponsePage, response.data)
+            assertEquals(productResponseSlice, response.data)
             verify(productQueryService).searchProducts(condition, pageable)
         }
     }
