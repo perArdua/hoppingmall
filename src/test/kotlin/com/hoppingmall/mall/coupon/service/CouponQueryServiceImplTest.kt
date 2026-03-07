@@ -115,7 +115,7 @@ class CouponQueryServiceImplTest {
 
             // Context
             whenever(userCouponRepository.findByUserId(userId)).thenReturn(userCoupons)
-            whenever(couponRepository.findById(1L)).thenReturn(Optional.of(coupon))
+            whenever(couponRepository.findAllById(listOf(1L))).thenReturn(listOf(coupon))
 
             // Interaction
             val result = couponQueryService.getMyCoupons(userId)
@@ -124,6 +124,7 @@ class CouponQueryServiceImplTest {
             assertThat(result).hasSize(1)
             assertThat(result[0].couponName).isEqualTo(coupon.name)
             verify(userCouponRepository).findByUserId(userId)
+            verify(couponRepository).findAllById(listOf(1L))
         }
 
         @Test
@@ -145,7 +146,7 @@ class CouponQueryServiceImplTest {
 
             // Context
             whenever(userCouponRepository.findByUserId(1L)).thenReturn(userCoupons)
-            whenever(couponRepository.findById(999L)).thenReturn(Optional.empty())
+            whenever(couponRepository.findAllById(listOf(999L))).thenReturn(emptyList())
 
             // Interaction & Assertions
             assertThatThrownBy { couponQueryService.getMyCoupons(1L) }

@@ -30,9 +30,12 @@ class CouponQueryServiceImpl(
 
     override fun getMyCoupons(userId: Long): List<UserCouponResponse> {
         val userCoupons = userCouponRepository.findByUserId(userId)
+        val couponIds = userCoupons.map { it.couponId }
+        val couponMap = couponRepository.findAllById(couponIds).associateBy { it.id }
+
         return userCoupons.map { userCoupon ->
-            val coupon = couponRepository.findById(userCoupon.couponId)
-                .orElseThrow { CouponNotFoundException() }
+            val coupon = couponMap[userCoupon.couponId]
+                ?: throw CouponNotFoundException()
             UserCouponResponse.from(userCoupon, coupon)
         }
     }

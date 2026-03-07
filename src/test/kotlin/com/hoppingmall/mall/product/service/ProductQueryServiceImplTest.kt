@@ -52,8 +52,10 @@ class ProductQueryServiceImplTest {
             val productPage = PageImpl(products, pageable, products.size.toLong())
 
             whenever(productRepository.findAll(pageable)).thenReturn(productPage)
-            whenever(productImageRepository.findByProductId(1L)).thenReturn(ProductImage.create(1L, "https://example.com/image1.jpg"))
-            whenever(productImageRepository.findByProductId(2L)).thenReturn(ProductImage.create(2L, "https://example.com/image2.jpg"))
+            whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(listOf(
+                ProductImage.create(1L, "https://example.com/image1.jpg"),
+                ProductImage.create(2L, "https://example.com/image2.jpg")
+            ))
 
             val result = productQueryService.getProducts(pageable)
 
@@ -63,6 +65,7 @@ class ProductQueryServiceImplTest {
             assertEquals("상품2", result.content[1].name)
             assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
             verify(productRepository).findAll(pageable)
+            verify(productImageRepository).findByProductIdIn(listOf(1L, 2L))
         }
     }
 
@@ -153,8 +156,10 @@ class ProductQueryServiceImplTest {
             val productPage = PageImpl(products, pageable, products.size.toLong())
 
             whenever(productRepository.findBySellerId(sellerId, pageable)).thenReturn(productPage)
-            whenever(productImageRepository.findByProductId(1L)).thenReturn(ProductImage.create(1L, "https://example.com/image1.jpg"))
-            whenever(productImageRepository.findByProductId(2L)).thenReturn(ProductImage.create(2L, "https://example.com/image2.jpg"))
+            whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(listOf(
+                ProductImage.create(1L, "https://example.com/image1.jpg"),
+                ProductImage.create(2L, "https://example.com/image2.jpg")
+            ))
 
             val result = productQueryService.getProductsBySellerId(sellerId, pageable)
 
@@ -166,6 +171,7 @@ class ProductQueryServiceImplTest {
             assertEquals("상품2", result.content[1].name)
             assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
             verify(productRepository).findBySellerId(sellerId, pageable)
+            verify(productImageRepository).findByProductIdIn(listOf(1L, 2L))
         }
     }
 
@@ -183,8 +189,10 @@ class ProductQueryServiceImplTest {
             val productPage = PageImpl(products, pageable, products.size.toLong())
 
             whenever(productRepository.findByCategoryId(categoryId, pageable)).thenReturn(productPage)
-            whenever(productImageRepository.findByProductId(1L)).thenReturn(ProductImage.create(1L, "https://example.com/image1.jpg"))
-            whenever(productImageRepository.findByProductId(2L)).thenReturn(ProductImage.create(2L, "https://example.com/image2.jpg"))
+            whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(listOf(
+                ProductImage.create(1L, "https://example.com/image1.jpg"),
+                ProductImage.create(2L, "https://example.com/image2.jpg")
+            ))
 
             val result = productQueryService.getProductsByCategoryId(categoryId, pageable)
 
@@ -196,6 +204,7 @@ class ProductQueryServiceImplTest {
             assertEquals("상품2", result.content[1].name)
             assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
             verify(productRepository).findByCategoryId(categoryId, pageable)
+            verify(productImageRepository).findByProductIdIn(listOf(1L, 2L))
         }
     }
 
@@ -214,7 +223,7 @@ class ProductQueryServiceImplTest {
             whenever(productRepository.searchProducts(
                 eq("노트북"), isNull(), isNull(), isNull(), isNull(), eq(pageable)
             )).thenReturn(productPage)
-            whenever(productImageRepository.findByProductId(1L)).thenReturn(null)
+            whenever(productImageRepository.findByProductIdIn(listOf(1L))).thenReturn(emptyList())
 
             val result = productQueryService.searchProducts(condition, pageable)
 
@@ -238,8 +247,7 @@ class ProductQueryServiceImplTest {
             whenever(productRepository.searchProducts(
                 isNull(), isNull(), isNull(), eq(BigDecimal("10000")), eq(BigDecimal("30000")), eq(pageable)
             )).thenReturn(productPage)
-            whenever(productImageRepository.findByProductId(1L)).thenReturn(null)
-            whenever(productImageRepository.findByProductId(2L)).thenReturn(null)
+            whenever(productImageRepository.findByProductIdIn(listOf(1L, 2L))).thenReturn(emptyList())
 
             val result = productQueryService.searchProducts(condition, pageable)
 
@@ -265,8 +273,9 @@ class ProductQueryServiceImplTest {
                 eq("상품"), eq(1L), eq(ProductStatus.AVAILABLE),
                 eq(BigDecimal("5000")), eq(BigDecimal("50000")), eq(pageable)
             )).thenReturn(productPage)
-            whenever(productImageRepository.findByProductId(1L))
-                .thenReturn(ProductImage.create(1L, "https://example.com/image1.jpg"))
+            whenever(productImageRepository.findByProductIdIn(listOf(1L))).thenReturn(listOf(
+                ProductImage.create(1L, "https://example.com/image1.jpg")
+            ))
 
             val result = productQueryService.searchProducts(condition, pageable)
 

@@ -97,8 +97,10 @@ class OrderQueryServiceImplTest {
             val page = PageImpl(listOf(order1, order2), pageable, 2)
 
             whenever(orderRepository.findByBuyerId(buyerId, pageable)).thenReturn(page)
-            whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(OrderItem.fixture(orderId = 1L)))
-            whenever(orderItemRepository.findByOrderId(2L)).thenReturn(listOf(OrderItem.fixture(orderId = 2L)))
+            whenever(orderItemRepository.findByOrderIdIn(listOf(1L, 2L))).thenReturn(listOf(
+                OrderItem.fixture(orderId = 1L),
+                OrderItem.fixture(orderId = 2L)
+            ))
 
             // when
             val response = orderQueryService.getMyOrders(buyerId, pageable)

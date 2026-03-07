@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.global.common.config.cache.NotFoundMarker
+import com.hoppingmall.mall.product.domain.Product
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.dto.request.ProductSearchCondition
@@ -23,17 +24,7 @@ class ProductQueryServiceImpl(
 
     override fun getProducts(pageable: Pageable): Page<ProductResponse> {
         val productPage = productRepository.findAll(pageable)
-
-        val productResponses = productPage.content.map { product ->
-            val image = productImageRepository.findByProductId(product.id!!)
-            ProductResponse.from(product, image)
-        }
-
-        return PageImpl(
-            productResponses,
-            pageable,
-            productPage.totalElements
-        )
+        return toProductResponsePage(productPage, pageable)
     }
 
     @Cacheable(cacheNames = ["product"], key = "#productId", sync = true)
@@ -60,17 +51,7 @@ class ProductQueryServiceImpl(
         pageable: Pageable
     ): Page<ProductResponse> {
         val productPage = productRepository.findBySellerId(sellerId, pageable)
-
-        val productResponses = productPage.content.map { product ->
-            val image = productImageRepository.findByProductId(product.id!!)
-            ProductResponse.from(product, image)
-        }
-
-        return PageImpl(
-            productResponses,
-            pageable,
-            productPage.totalElements
-        )
+        return toProductResponsePage(productPage, pageable)
     }
 
     override fun getProductsByCategoryId(
@@ -78,17 +59,7 @@ class ProductQueryServiceImpl(
         pageable: Pageable
     ): Page<ProductResponse> {
         val productPage = productRepository.findByCategoryId(categoryId, pageable)
-
-        val productResponses = productPage.content.map { product ->
-            val image = productImageRepository.findByProductId(product.id!!)
-            ProductResponse.from(product, image)
-        }
-
-        return PageImpl(
-            productResponses,
-            pageable,
-            productPage.totalElements
-        )
+        return toProductResponsePage(productPage, pageable)
     }
 
     override fun searchProducts(
@@ -103,16 +74,21 @@ class ProductQueryServiceImpl(
             maxPrice = condition.maxPrice,
             pageable = pageable
         )
+        return toProductResponsePage(productPage, pageable)
+    }
+
+    private fun toProductResponsePage(
+        productPage: Page<Product>,
+        pageable: Pageable
+    ): Page<ProductResponse> {
+        val productIds = productPage.content.mapNotNull { it.id }
+        val imageMap = productImageRepository.findByProductIdIn(productIds)
+            .associateBy { it.productId }
 
         val productResponses = productPage.content.map { product ->
-            val image = productImageRepository.findByProductId(product.id!!)
-            ProductResponse.from(product, image)
+            ProductResponse.from(product, imageMap[product.id])
         }
 
-        return PageImpl(
-            productResponses,
-            pageable,
-            productPage.totalElements
-        )
+        return PageImpl(productResponses, pageable, productPage.totalElements)
     }
 }

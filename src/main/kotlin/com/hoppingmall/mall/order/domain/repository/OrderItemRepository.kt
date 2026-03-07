@@ -11,6 +11,8 @@ import org.springframework.stereotype.Repository
 interface OrderItemRepository : JpaRepository<OrderItem, Long> {
     fun findByOrderId(orderId: Long): List<OrderItem>
 
+    fun findByOrderIdIn(orderIds: List<Long>): List<OrderItem>
+
     @Query(
         value = """
             SELECT oi.product_id AS productId,
