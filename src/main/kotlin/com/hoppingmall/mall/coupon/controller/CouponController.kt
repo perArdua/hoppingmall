@@ -9,6 +9,9 @@ import com.hoppingmall.mall.coupon.service.CouponQueryService
 import com.hoppingmall.mall.global.auth.UserPrincipal
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import jakarta.validation.Valid
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
+import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -63,9 +66,10 @@ class CouponController(
 
     @GetMapping("/coupons/my")
     fun getMyCoupons(
-        @AuthenticationPrincipal userPrincipal: UserPrincipal
-    ): ResponseEntity<ApiResponse<List<UserCouponResponse>>> {
-        val response = couponQueryService.getMyCoupons(userPrincipal.getUserId())
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PageableDefault(size = 20) pageable: Pageable
+    ): ResponseEntity<ApiResponse<Slice<UserCouponResponse>>> {
+        val response = couponQueryService.getMyCoupons(userPrincipal.getUserId(), pageable)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 }

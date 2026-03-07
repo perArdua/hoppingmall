@@ -19,6 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.SliceImpl
 import java.util.*
 
 @DisplayName("CouponQueryServiceImpl")
@@ -108,48 +110,58 @@ class CouponQueryServiceImplTest {
         fun 내_쿠폰_목록_조회_성공() {
             // Data
             val userId = 1L
+            val pageable = PageRequest.of(0, 20)
             val coupon = Coupon.fixture().withId(1L)
             val userCoupons = listOf(
                 UserCoupon.fixture(userId = userId, couponId = 1L).withId(1L)
             )
+            val slice = SliceImpl(userCoupons, pageable, false)
 
             // Context
-            whenever(userCouponRepository.findByUserId(userId)).thenReturn(userCoupons)
+            whenever(userCouponRepository.findByUserId(userId, pageable)).thenReturn(slice)
             whenever(couponRepository.findAllById(listOf(1L))).thenReturn(listOf(coupon))
 
             // Interaction
-            val result = couponQueryService.getMyCoupons(userId)
+            val result = couponQueryService.getMyCoupons(userId, pageable)
 
             // Assertions
-            assertThat(result).hasSize(1)
-            assertThat(result[0].couponName).isEqualTo(coupon.name)
-            verify(userCouponRepository).findByUserId(userId)
+            assertThat(result.content).hasSize(1)
+            assertThat(result.content[0].couponName).isEqualTo(coupon.name)
+            assertThat(result.hasNext()).isFalse()
+            verify(userCouponRepository).findByUserId(userId, pageable)
             verify(couponRepository).findAllById(listOf(1L))
         }
 
         @Test
-        fun 쿠폰이_없으면_빈_목록_반환() {
+        fun 쿠폰이_없으면_빈_슬라이스_반환() {
+            // Data
+            val pageable = PageRequest.of(0, 20)
+
             // Context
-            whenever(userCouponRepository.findByUserId(1L)).thenReturn(emptyList())
+            whenever(userCouponRepository.findByUserId(1L, pageable))
+                .thenReturn(SliceImpl(emptyList(), pageable, false))
 
             // Interaction
-            val result = couponQueryService.getMyCoupons(1L)
+            val result = couponQueryService.getMyCoupons(1L, pageable)
 
             // Assertions
-            assertThat(result).isEmpty()
+            assertThat(result.content).isEmpty()
+            assertThat(result.hasNext()).isFalse()
         }
 
         @Test
         fun 쿠폰_원본이_삭제된_경우_예외_발생() {
             // Data
+            val pageable = PageRequest.of(0, 20)
             val userCoupons = listOf(UserCoupon.fixture(couponId = 999L).withId(1L))
+            val slice = SliceImpl(userCoupons, pageable, false)
 
             // Context
-            whenever(userCouponRepository.findByUserId(1L)).thenReturn(userCoupons)
+            whenever(userCouponRepository.findByUserId(1L, pageable)).thenReturn(slice)
             whenever(couponRepository.findAllById(listOf(999L))).thenReturn(emptyList())
 
             // Interaction & Assertions
-            assertThatThrownBy { couponQueryService.getMyCoupons(1L) }
+            assertThatThrownBy { couponQueryService.getMyCoupons(1L, pageable) }
                 .isInstanceOf(CouponNotFoundException::class.java)
         }
     }

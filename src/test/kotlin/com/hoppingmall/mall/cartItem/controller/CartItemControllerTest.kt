@@ -12,6 +12,9 @@ import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.mockito.kotlin.*
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Slice
+import org.springframework.data.domain.SliceImpl
 import org.springframework.http.ResponseEntity
 
 @DisplayName("CartItemController")
@@ -61,6 +64,7 @@ class CartItemControllerTest {
         fun 장바구니_아이템_목록_조회_성공() {
             // Data
             val userPrincipal = UserPrincipal(1L, "test@example.com", "ROLE_USER")
+            val pageable = PageRequest.of(0, 20)
             val expectedResponses = listOf(
                 CartItemResponse(
                     id = 1L,
@@ -81,18 +85,20 @@ class CartItemControllerTest {
                     totalPrice = BigDecimal("20000")
                 )
             )
+            val slice = SliceImpl(expectedResponses, pageable, false)
 
             // Context
-            whenever(cartItemQueryService.getCartItems(userPrincipal.getUserId())).thenReturn(expectedResponses)
+            whenever(cartItemQueryService.getCartItems(userPrincipal.getUserId(), pageable)).thenReturn(slice)
 
             // Interaction
-            val response: ResponseEntity<ApiResponse<List<CartItemResponse>>> = controller.getCartItems(userPrincipal)
+            val response: ResponseEntity<ApiResponse<Slice<CartItemResponse>>> = controller.getCartItems(userPrincipal, pageable)
 
             // Assertions
             assertEquals("SUCCESS", response.body?.code)
             assertEquals("성공", response.body?.message)
-            assertEquals(expectedResponses, response.body?.data)
-            verify(cartItemQueryService).getCartItems(userPrincipal.getUserId())
+            assertEquals(2, response.body?.data?.content?.size)
+            assertEquals(false, response.body?.data?.hasNext())
+            verify(cartItemQueryService).getCartItems(userPrincipal.getUserId(), pageable)
         }
     }
 
@@ -151,4 +157,4 @@ class CartItemControllerTest {
             verify(cartItemCommandService).removeCartItem(userPrincipal.getUserId(), cartItemId)
         }
     }
-} 
+}
