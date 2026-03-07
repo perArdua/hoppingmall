@@ -11,6 +11,7 @@ import com.hoppingmall.mall.coupon.enum.CouponStatus
 import com.hoppingmall.mall.coupon.enum.UserCouponStatus
 import com.hoppingmall.mall.coupon.exception.*
 import com.hoppingmall.mall.global.common.lock.DistributedLockExecutor
+import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Service
@@ -25,6 +26,8 @@ class CouponCommandServiceImpl(
     private val userCouponRepository: UserCouponRepository,
     private val distributedLockExecutor: DistributedLockExecutor
 ) : CouponCommandService {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @Caching(evict = [
         CacheEvict(cacheNames = ["coupon:available"], allEntries = true),
@@ -86,6 +89,7 @@ class CouponCommandServiceImpl(
             val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
             val savedUserCoupon = userCouponRepository.save(userCoupon)
 
+            log.info("쿠폰 발급: userId={}, couponId={}, remaining={}", userId, couponId, coupon.totalQuantity - coupon.issuedQuantity)
             UserCouponResponse.from(savedUserCoupon, coupon)
         }
     }
