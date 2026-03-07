@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.global.auth.service
 
+import com.hoppingmall.mall.global.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.mall.global.auth.dto.response.TokenRefreshResponse
 import com.hoppingmall.mall.global.enums.Role
 import com.hoppingmall.mall.global.jwt.JwtProperties
@@ -30,6 +31,7 @@ class AuthServiceImplTest {
         refreshExpirationMs = 86400000L
     }
     private val userRepository: UserRepository = mock()
+    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository = mock()
     private lateinit var authService: AuthServiceImpl
 
     @BeforeEach
@@ -39,7 +41,8 @@ class AuthServiceImplTest {
             tokenProvider,
             refreshTokenService,
             jwtProperties,
-            userRepository
+            userRepository,
+            accessTokenBlacklistRepository
         )
     }
 
@@ -98,12 +101,14 @@ class AuthServiceImplTest {
     @DisplayName("로그아웃")
     inner class Logout {
         @Test
-        fun accessToken으로_userId를_파싱하고_refreshToken을_삭제한다() {
+        fun accessToken으로_userId를_파싱하고_블랙리스트_등록_후_refreshToken을_삭제한다() {
             val accessToken = "valid-access-token"
             whenever(tokenProvider.parseAccessToken(accessToken)).thenReturn(7L)
+            whenever(tokenProvider.getRemainingExpirationMs(accessToken)).thenReturn(1800000L)
 
             authService.logout(accessToken)
 
+            verify(accessTokenBlacklistRepository).add(accessToken, 1800000L)
             verify(refreshTokenService).delete(7L)
         }
     }

@@ -70,6 +70,11 @@ class TokenProviderImpl(
         return UserPrincipal.of(userId, role.name)
     }
 
+    override fun getRemainingExpirationMs(token: String): Long {
+        val expiration = parseClaims(token).expiration
+        return expiration.time - System.currentTimeMillis()
+    }
+
     fun parseClaims(token: String): Claims {
         return try {
             Jwts.parserBuilder()

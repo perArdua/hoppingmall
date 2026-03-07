@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.global.auth.service
 
+import com.hoppingmall.mall.global.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.mall.global.auth.dto.response.TokenRefreshResponse
 import com.hoppingmall.mall.global.jwt.JwtProperties
 import com.hoppingmall.mall.global.jwt.TokenProvider
@@ -18,7 +19,8 @@ class AuthServiceImpl(
     private val tokenProvider: TokenProvider,
     private val refreshTokenService: RefreshTokenService,
     private val jwtProperties: JwtProperties,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository
 ) : AuthService {
 
     override fun login(request: SignInRequest): SignInResponse {
@@ -61,6 +63,8 @@ class AuthServiceImpl(
 
     override fun logout(accessToken: String) {
         val userId = tokenProvider.parseAccessToken(accessToken)
+        val remainingMs = tokenProvider.getRemainingExpirationMs(accessToken)
+        accessTokenBlacklistRepository.add(accessToken, remainingMs)
         refreshTokenService.delete(userId)
     }
 }
