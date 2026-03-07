@@ -16,4 +16,6 @@ interface TokenProvider {
     fun getUserIdFromToken(token: String): Long
     fun getUserRoleFromToken(token: String): Role
     fun getUserPrincipal(token: String): UserPrincipal
+
+    fun getRemainingExpirationMs(token: String): Long
 }
