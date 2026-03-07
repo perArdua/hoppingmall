@@ -75,6 +75,10 @@ dependencies {
 	implementation("org.redisson:redisson-spring-boot-starter:4.3.0")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("com.github.ben-manes.caffeine:caffeine")
+
+	// Rate Limiting
+	implementation("com.bucket4j:bucket4j-core:8.10.1")
+	implementation("com.bucket4j:bucket4j-redis:8.10.1")
 }
 
 kotlin {
