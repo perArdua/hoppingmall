@@ -8,6 +8,7 @@ import com.hoppingmall.mall.point.domain.PointHistory
 import com.hoppingmall.mall.point.domain.PointRepository
 import com.hoppingmall.mall.point.domain.PointHistoryRepository
 import com.hoppingmall.mall.point.enum.PointType
+import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -25,6 +26,8 @@ class PointEventConsumer(
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(topics = ["point-earn-request"], groupId = "point-service")
     @Retryable(
@@ -80,7 +83,7 @@ class PointEventConsumer(
                 partitionKey = event.userId.toString()
             )
         } catch (e: Exception) {
-            println("포인트 적립 처리 중 오류 발생: ${e.message}")
+            log.error("포인트 적립 처리 실패: userId={}, orderId={}, 오류={}", event.userId, event.orderId, e.message)
             throw e
         }
     }
