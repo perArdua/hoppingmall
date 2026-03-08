@@ -68,6 +68,21 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
     """)
     fun getDLQStatsByTopic(): List<DLQStatsProjection>
     
+    @Query("""
+        SELECT d FROM DLQMessage d
+        WHERE d.status = :status
+        AND d.retryCount < :maxRetryCount
+        AND d.nextRetryAt IS NOT NULL
+        AND d.nextRetryAt <= :now
+        ORDER BY d.nextRetryAt ASC
+    """)
+    fun findAutoRetryableMessages(
+        @Param("status") status: DLQStatus,
+        @Param("maxRetryCount") maxRetryCount: Int,
+        @Param("now") now: Long,
+        pageable: Pageable
+    ): Page<DLQMessage>
+
     fun existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
         originalTopic: String,
         originalPartition: Int,

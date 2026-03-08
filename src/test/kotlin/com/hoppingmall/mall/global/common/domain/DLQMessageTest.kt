@@ -132,6 +132,114 @@ class DLQMessageTest {
         }
     }
     
+    @Nested
+    @DisplayName("scheduleNextRetry")
+    inner class ScheduleNextRetry {
+
+        @Test
+        fun 다음_재시도를_스케줄링하고_상태를_PENDING으로_변경한다() {
+            // given
+            val dlqMessage = createDLQMessage()
+            dlqMessage.incrementRetry()
+            assertEquals(DLQStatus.RETRYING, dlqMessage.status)
+
+            // when
+            dlqMessage.scheduleNextRetry()
+
+            // then
+            assertEquals(DLQStatus.PENDING, dlqMessage.status)
+            assertNotNull(dlqMessage.nextRetryAt)
+        }
+    }
+
+    @Nested
+    @DisplayName("isNonRetryableException")
+    inner class IsNonRetryableException {
+
+        @Test
+        fun DeserializationException이_포함된_에러는_비재시도로_판별한다() {
+            // given
+            val dlqMessage = createDLQMessage(exception = "org.apache.kafka.common.errors.DeserializationException: Error")
+
+            // when & then
+            assertTrue(dlqMessage.isNonRetryableException())
+        }
+
+        @Test
+        fun IllegalArgumentException이_포함된_에러는_비재시도로_판별한다() {
+            // given
+            val dlqMessage = createDLQMessage(exception = "java.lang.IllegalArgumentException: Invalid value")
+
+            // when & then
+            assertTrue(dlqMessage.isNonRetryableException())
+        }
+
+        @Test
+        fun 일반_런타임_에러는_재시도_가능으로_판별한다() {
+            // given
+            val dlqMessage = createDLQMessage(exception = "java.net.SocketTimeoutException: Connection timed out")
+
+            // when & then
+            assertFalse(dlqMessage.isNonRetryableException())
+        }
+
+        @Test
+        fun 예외_메시지가_null이면_재시도_가능으로_판별한다() {
+            // given
+            val dlqMessage = createDLQMessage(exception = null)
+
+            // when & then
+            assertFalse(dlqMessage.isNonRetryableException())
+        }
+    }
+
+    @Nested
+    @DisplayName("calculateNextRetryAt")
+    inner class CalculateNextRetryAt {
+
+        @Test
+        fun 재시도_횟수에_따라_백오프_간격이_증가한다() {
+            // given & when
+            val before = System.currentTimeMillis()
+            val firstRetry = DLQMessage.calculateNextRetryAt(0)
+            val secondRetry = DLQMessage.calculateNextRetryAt(1)
+            val thirdRetry = DLQMessage.calculateNextRetryAt(2)
+
+            // then
+            assertTrue(firstRetry >= before + 60_000L)
+            assertTrue(secondRetry >= before + 300_000L)
+            assertTrue(thirdRetry >= before + 1_800_000L)
+        }
+
+        @Test
+        fun 최대_인덱스를_초과해도_마지막_간격을_사용한다() {
+            // given & when
+            val before = System.currentTimeMillis()
+            val retryAt = DLQMessage.calculateNextRetryAt(10)
+
+            // then
+            assertTrue(retryAt >= before + 1_800_000L)
+        }
+    }
+
+    @Nested
+    @DisplayName("incrementRetry with nextRetryAt")
+    inner class IncrementRetryWithNextRetryAt {
+
+        @Test
+        fun 재시도_증가_시_nextRetryAt도_설정된다() {
+            // given
+            val dlqMessage = createDLQMessage()
+
+            // when
+            dlqMessage.incrementRetry()
+
+            // then
+            assertNotNull(dlqMessage.nextRetryAt)
+            assertTrue(dlqMessage.nextRetryAt!! > System.currentTimeMillis())
+        }
+    }
+
     private fun createDLQMessage(
         topic: String = "test-topic",
         partition: Int = 0,
