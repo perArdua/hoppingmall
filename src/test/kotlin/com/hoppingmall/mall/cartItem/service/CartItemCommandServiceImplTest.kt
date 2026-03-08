@@ -228,13 +228,12 @@ class CartItemCommandServiceImplTest {
 
             // Context
             whenever(cartItemRepository.findById(cartItemId)).thenReturn(java.util.Optional.of(existingCartItem))
-            doNothing().`when`(cartItemRepository).deleteById(cartItemId)
 
             // Interaction
             cartItemCommandService.removeCartItem(buyerId, cartItemId)
 
             // Assertions
-            verify(cartItemRepository).deleteById(cartItemId)
+            assertThat(existingCartItem.deletedAt).isNotNull()
         }
 
         @Test

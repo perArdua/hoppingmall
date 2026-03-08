@@ -87,13 +87,12 @@ class ProductCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")
     override fun deleteProduct(productId: Long) {
-        if (!productRepository.existsById(productId)) {
-            throw ProductNotFoundException()
-        }
+        val product = productRepository.findById(productId)
+            .orElseThrow { ProductNotFoundException() }
 
         val productImage = productImageRepository.findByProductId(productId)
-        productImage?.let { productImageRepository.delete(it) }
+        productImage?.softDelete()
 
-        productRepository.deleteById(productId)
+        product.softDelete()
     }
 } 

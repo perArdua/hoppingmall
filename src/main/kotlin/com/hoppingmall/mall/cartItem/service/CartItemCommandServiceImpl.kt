@@ -98,6 +98,6 @@ class CartItemCommandServiceImpl(
             throw CartItemAccessDeniedException()
         }
 
-        cartItemRepository.deleteById(cartItemId)
+        cartItem.softDelete()
     }
 } 
