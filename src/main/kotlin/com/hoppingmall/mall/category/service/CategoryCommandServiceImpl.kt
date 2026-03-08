@@ -6,6 +6,7 @@ import com.hoppingmall.mall.category.dto.request.CategoryCreateRequest
 import com.hoppingmall.mall.category.dto.request.CategoryUpdateRequest
 import com.hoppingmall.mall.category.dto.response.CategoryResponse
 import com.hoppingmall.mall.category.exception.CategoryAlreadyExistsException
+import com.hoppingmall.mall.category.exception.CategoryCircularReferenceException
 import com.hoppingmall.mall.category.exception.CategoryHasChildrenException
 import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import org.springframework.cache.annotation.CacheEvict
@@ -19,6 +20,10 @@ class CategoryCommandServiceImpl(
     private val categoryRepository: CategoryRepository
 ) : CategoryCommandService {
 
+    companion object {
+        private const val MAX_DEPTH = 10
+    }
+
     @Caching(evict = [
         CacheEvict(cacheNames = ["categories:root"], allEntries = true),
         CacheEvict(cacheNames = ["categories:sub"], allEntries = true)
@@ -31,6 +36,7 @@ class CategoryCommandServiceImpl(
         val depth = if (request.parentCategoryId != null) {
             val parent = categoryRepository.findNullableById(request.parentCategoryId)
                 ?: throw CategoryNotFoundException()
+            validateNoCircularReference(request.parentCategoryId)
             parent.depth + 1
         } else {
             0
@@ -76,5 +82,21 @@ class CategoryCommandServiceImpl(
         }
 
         category.softDelete()
+    }
+
+    private fun validateNoCircularReference(parentCategoryId: Long) {
+        val visited = mutableSetOf<Long>()
+        var currentId: Long? = parentCategoryId
+
+        while (currentId != null) {
+            if (!visited.add(currentId)) {
+                throw CategoryCircularReferenceException()
+            }
+            if (visited.size > MAX_DEPTH) {
+                throw CategoryCircularReferenceException()
+            }
+            val current = categoryRepository.findNullableById(currentId)
+            currentId = current?.parentCategoryId
+        }
     }
 }
