@@ -7,7 +7,13 @@ import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
 @Entity
-@Table(name = "products")
+@Table(
+    name = "products",
+    indexes = [
+        Index(name = "idx_products_seller_id", columnList = "sellerId"),
+        Index(name = "idx_products_category_id", columnList = "categoryId")
+    ]
+)
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Product private constructor(
 

@@ -8,7 +8,10 @@ import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
 @Entity
-@Table(name = "orders")
+@Table(
+    name = "orders",
+    indexes = [Index(name = "idx_orders_buyer_id", columnList = "buyerId")]
+)
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Order private constructor(
     @Column(nullable = false)
