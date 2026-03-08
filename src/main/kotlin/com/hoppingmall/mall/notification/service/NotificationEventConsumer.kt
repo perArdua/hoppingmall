@@ -22,27 +22,32 @@ class NotificationEventConsumer(
     fun handleNotificationEvent(
         @Payload event: NotificationEvent
     ) {
-        log.info("알림 처리: userId={}, type={}", event.userId, event.type)
-
-        if (notificationRepository.existsByEventId(event.eventId)) {
-            return
-        }
-
-        val notification = Notification(
-            eventId = event.eventId,
-            userId = event.userId,
-            type = event.type,
-            title = event.title,
-            content = event.content,
-            metadata = event.metadata
-        )
-
         try {
-            notificationRepository.save(notification)
-        } catch (e: DataIntegrityViolationException) {
-            return
-        }
+            if (notificationRepository.existsByEventId(event.eventId)) {
+                log.info("이미 처리된 알림 이벤트: eventId={}", event.eventId)
+                return
+            }
 
-        log.info("알림 저장 완료: userId={}, type={}, title={}", event.userId, event.type, event.title)
+            val notification = Notification(
+                eventId = event.eventId,
+                userId = event.userId,
+                type = event.type,
+                title = event.title,
+                content = event.content,
+                metadata = event.metadata
+            )
+
+            try {
+                notificationRepository.save(notification)
+            } catch (e: DataIntegrityViolationException) {
+                log.info("이미 처리된 알림 이벤트: eventId={}", event.eventId)
+                return
+            }
+
+            log.info("알림 처리 완료: userId={}, type={}, title={}", event.userId, event.type, event.title)
+        } catch (e: Exception) {
+            log.error("알림 처리 실패: eventId={}, userId={}, 오류={}", event.eventId, event.userId, e.message)
+            throw e
+        }
     }
-} 
+}

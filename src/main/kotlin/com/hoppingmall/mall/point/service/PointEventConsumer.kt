@@ -13,8 +13,6 @@ import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.retry.annotation.Retryable
-import org.springframework.retry.annotation.Backoff
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import java.math.BigDecimal
 
@@ -30,14 +28,10 @@ class PointEventConsumer(
     private val log = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(topics = ["point-earn-request"], groupId = "point-service")
-    @Retryable(
-        value = [DataIntegrityViolationException::class],
-        maxAttempts = 5,
-        backoff = Backoff(delay = 50, multiplier = 2.0)
-    )
     fun handlePointEarnRequest(event: PointEarnRequestEvent) {
         try {
             if (pointHistoryRepository.existsByEventId(event.eventId)) {
+                log.info("이미 처리된 포인트 이벤트: eventId={}", event.eventId)
                 return
             }
 
