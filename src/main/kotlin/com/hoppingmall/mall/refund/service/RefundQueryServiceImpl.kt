@@ -3,6 +3,7 @@ package com.hoppingmall.mall.refund.service
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.mall.refund.domain.repository.RefundRepository
 import com.hoppingmall.mall.refund.dto.response.RefundResponse
+import com.hoppingmall.mall.refund.exception.RefundAccessDeniedException
 import com.hoppingmall.mall.refund.exception.RefundNotFoundException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -16,9 +17,12 @@ class RefundQueryServiceImpl(
     private val refundItemRepository: RefundItemRepository
 ) : RefundQueryService {
 
-    override fun getRefund(refundId: Long): RefundResponse {
+    override fun getRefund(refundId: Long, userId: Long): RefundResponse {
         val refund = refundRepository.findById(refundId)
             .orElseThrow { RefundNotFoundException() }
+        if (refund.buyerId != userId && refund.sellerId != userId) {
+            throw RefundAccessDeniedException()
+        }
         val items = refundItemRepository.findByRefundId(refundId)
         return RefundResponse.from(refund, items)
     }
