@@ -114,13 +114,12 @@ class WishlistCommandServiceImplTest {
 
             // Context
             whenever(wishlistRepository.findById(wishlistId)).thenReturn(java.util.Optional.of(wishlist))
-            doNothing().`when`(wishlistRepository).deleteById(wishlistId)
 
             // Interaction
             wishlistCommandService.removeWishlist(buyerId, wishlistId)
 
             // Assertions
-            verify(wishlistRepository).deleteById(wishlistId)
+            assertThat(wishlist.deletedAt).isNotNull()
         }
 
         @Test
