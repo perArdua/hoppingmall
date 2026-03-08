@@ -180,16 +180,17 @@ class OrderCommandServiceImplTest {
         @Test
         fun 주문_상태를_변경한다() {
             // given
+            val buyerId = 1L
             val orderId = 1L
             val request = OrderStatusUpdateRequest(status = OrderStatus.PAID)
-            val order = Order.fixture()
+            val order = Order.fixture(buyerId = buyerId)
             val orderItems = listOf(OrderItem.fixture(orderId = orderId))
 
             whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(orderItems)
 
             // when
-            val response = orderCommandService.updateOrderStatus(orderId, request)
+            val response = orderCommandService.updateOrderStatus(orderId, request, buyerId, false)
 
             // then
             assertEquals(OrderStatus.PAID, response.status)
@@ -205,8 +206,42 @@ class OrderCommandServiceImplTest {
 
             // when & then
             assertThrows<OrderNotFoundException> {
-                orderCommandService.updateOrderStatus(orderId, request)
+                orderCommandService.updateOrderStatus(orderId, request, 1L, false)
             }
+        }
+
+        @Test
+        fun 다른_사용자의_주문이면_예외가_발생한다() {
+            // given
+            val orderId = 1L
+            val request = OrderStatusUpdateRequest(status = OrderStatus.PAID)
+            val order = Order.fixture(buyerId = 999L)
+
+            whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
+
+            // when & then
+            assertThrows<OrderAccessDeniedException> {
+                orderCommandService.updateOrderStatus(orderId, request, 1L, false)
+            }
+        }
+
+        @Test
+        fun 관리자는_다른_사용자의_주문_상태를_변경할_수_있다() {
+            // given
+            val adminId = 99L
+            val orderId = 1L
+            val request = OrderStatusUpdateRequest(status = OrderStatus.PAID)
+            val order = Order.fixture(buyerId = 1L)
+            val orderItems = listOf(OrderItem.fixture(orderId = orderId))
+
+            whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
+            whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(orderItems)
+
+            // when
+            val response = orderCommandService.updateOrderStatus(orderId, request, adminId, true)
+
+            // then
+            assertEquals(OrderStatus.PAID, response.status)
         }
     }
 }
