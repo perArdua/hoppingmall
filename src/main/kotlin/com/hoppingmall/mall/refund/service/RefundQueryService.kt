@@ -5,7 +5,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 
 interface RefundQueryService {
-    fun getRefund(refundId: Long): RefundResponse
+    fun getRefund(refundId: Long, userId: Long): RefundResponse
     fun getMyRefunds(buyerId: Long, pageable: Pageable): Page<RefundResponse>
     fun getSellerRefunds(sellerId: Long, pageable: Pageable): Page<RefundResponse>
 }
