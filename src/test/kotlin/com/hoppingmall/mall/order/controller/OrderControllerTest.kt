@@ -149,15 +149,15 @@ class OrderControllerTest {
             val request = OrderStatusUpdateRequest(status = OrderStatus.PAID)
             val expectedResponse = createOrderResponse(status = OrderStatus.PAID)
 
-            whenever(orderCommandService.updateOrderStatus(orderId, request)).thenReturn(expectedResponse)
+            whenever(orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), false)).thenReturn(expectedResponse)
 
             // when
-            val response: ResponseEntity<ApiResponse<OrderResponse>> = controller.updateOrderStatus(orderId, request)
+            val response: ResponseEntity<ApiResponse<OrderResponse>> = controller.updateOrderStatus(userPrincipal, orderId, request)
 
             // then
             assertEquals("SUCCESS", response.body?.code)
             assertEquals(OrderStatus.PAID, response.body?.data?.status)
-            verify(orderCommandService).updateOrderStatus(orderId, request)
+            verify(orderCommandService).updateOrderStatus(orderId, request, userPrincipal.getUserId(), false)
         }
     }
 }

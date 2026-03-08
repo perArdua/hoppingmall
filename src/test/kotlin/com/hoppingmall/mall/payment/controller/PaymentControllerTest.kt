@@ -79,10 +79,11 @@ class PaymentControllerTest {
         fun `결제 조회 성공`() {
             // given
             val paymentId = 1L
+            val userId = 1L
             val response = PaymentResponse(
                 id = paymentId,
                 orderId = 1L,
-                userId = 1L,
+                userId = userId,
                 amount = BigDecimal("50000"),
                 pointAmount = BigDecimal.ZERO,
                 couponId = null,
@@ -95,16 +96,18 @@ class PaymentControllerTest {
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now()
             )
+            val userDetails: UserDetails = mock()
 
-            whenever(paymentQueryService.getPaymentById(paymentId)).thenReturn(response)
+            whenever(userDetails.username).thenReturn(userId.toString())
+            whenever(paymentQueryService.getPaymentById(paymentId, userId)).thenReturn(response)
 
             // when
-            val result = paymentController.getPaymentById(paymentId)
+            val result = paymentController.getPaymentById(paymentId, userDetails)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
             assertEquals(response, result.body)
-            verify(paymentQueryService).getPaymentById(paymentId)
+            verify(paymentQueryService).getPaymentById(paymentId, userId)
         }
     }
 
@@ -160,11 +163,12 @@ class PaymentControllerTest {
         fun `주문별 결제 목록 조회 성공`() {
             // given
             val orderId = 1L
+            val userId = 1L
 
             val paymentResponse = PaymentResponse(
                 id = 1L,
                 orderId = orderId,
-                userId = 1L,
+                userId = userId,
                 amount = BigDecimal("50000"),
                 pointAmount = BigDecimal.ZERO,
                 couponId = null,
@@ -179,16 +183,18 @@ class PaymentControllerTest {
             )
 
             val payments = listOf(paymentResponse)
+            val userDetails: UserDetails = mock()
 
-            whenever(paymentQueryService.getPaymentsByOrderId(orderId)).thenReturn(payments)
+            whenever(userDetails.username).thenReturn(userId.toString())
+            whenever(paymentQueryService.getPaymentsByOrderId(orderId, userId)).thenReturn(payments)
 
             // when
-            val result = paymentController.getPaymentsByOrderId(orderId)
+            val result = paymentController.getPaymentsByOrderId(orderId, userDetails)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
             assertEquals(payments, result.body)
-            verify(paymentQueryService).getPaymentsByOrderId(orderId)
+            verify(paymentQueryService).getPaymentsByOrderId(orderId, userId)
         }
     }
 

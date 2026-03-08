@@ -5,6 +5,7 @@ import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
 import com.hoppingmall.mall.payment.dto.response.PaymentResponse
 import com.hoppingmall.mall.payment.enum.PaymentMethod
 import com.hoppingmall.mall.payment.enum.PaymentStatus
+import com.hoppingmall.mall.payment.exception.PaymentAccessDeniedException
 import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.successFixture
@@ -36,16 +37,17 @@ class PaymentQueryServiceImplTest {
         fun `결제 조회 성공`() {
             // given
             val paymentId = 1L
+            val userId = 1L
             val payment = Payment.successFixture()
 
             whenever(paymentRepository.findById(paymentId)).thenReturn(java.util.Optional.of(payment))
 
             // when
-            val result = paymentQueryService.getPaymentById(paymentId)
+            val result = paymentQueryService.getPaymentById(paymentId, userId)
 
             // then
             assertEquals(paymentId, result.id)
-            assertEquals(1L, result.userId)
+            assertEquals(userId, result.userId)
             assertEquals(BigDecimal("50000"), result.amount)
             assertEquals(PaymentStatus.SUCCESS, result.status)
         }
@@ -59,7 +61,21 @@ class PaymentQueryServiceImplTest {
 
             // when & then
             assertThrows(PaymentNotFoundException::class.java) {
-                paymentQueryService.getPaymentById(paymentId)
+                paymentQueryService.getPaymentById(paymentId, 1L)
+            }
+        }
+
+        @Test
+        fun `다른 사용자의 결제 조회 시 접근 거부`() {
+            // given
+            val paymentId = 1L
+            val payment = Payment.successFixture(userId = 1L)
+
+            whenever(paymentRepository.findById(paymentId)).thenReturn(java.util.Optional.of(payment))
+
+            // when & then
+            assertThrows(PaymentAccessDeniedException::class.java) {
+                paymentQueryService.getPaymentById(paymentId, 999L)
             }
         }
     }
@@ -116,12 +132,13 @@ class PaymentQueryServiceImplTest {
         fun `주문별 결제 조회 성공`() {
             // given
             val orderId = 1L
-            val payment = Payment.successFixture(orderId = orderId)
+            val userId = 1L
+            val payment = Payment.successFixture(orderId = orderId, userId = userId)
 
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
 
             // when
-            val result = paymentQueryService.getPaymentsByOrderId(orderId)
+            val result = paymentQueryService.getPaymentsByOrderId(orderId, userId)
 
             // then
             assertEquals(1, result.size)
@@ -137,10 +154,24 @@ class PaymentQueryServiceImplTest {
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(null)
 
             // when
-            val result = paymentQueryService.getPaymentsByOrderId(orderId)
+            val result = paymentQueryService.getPaymentsByOrderId(orderId, 1L)
 
             // then
             assertEquals(0, result.size)
+        }
+
+        @Test
+        fun `다른 사용자의 주문 결제 조회 시 접근 거부`() {
+            // given
+            val orderId = 1L
+            val payment = Payment.successFixture(orderId = orderId, userId = 1L)
+
+            whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
+
+            // when & then
+            assertThrows(PaymentAccessDeniedException::class.java) {
+                paymentQueryService.getPaymentsByOrderId(orderId, 999L)
+            }
         }
     }
 

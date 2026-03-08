@@ -100,17 +100,20 @@ class RefundControllerTest {
         fun `환불_상세_조회_성공`() {
             // given
             val refundId = 1L
+            val userId = 1L
             val response = createRefundResponse()
+            val userDetails: UserDetails = mock()
 
-            whenever(refundQueryService.getRefund(refundId)).thenReturn(response)
+            whenever(userDetails.username).thenReturn(userId.toString())
+            whenever(refundQueryService.getRefund(refundId, userId)).thenReturn(response)
 
             // when
-            val result = refundController.getRefund(refundId)
+            val result = refundController.getRefund(refundId, userDetails)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
             assertEquals(response, result.body)
-            verify(refundQueryService).getRefund(refundId)
+            verify(refundQueryService).getRefund(refundId, userId)
         }
     }
 

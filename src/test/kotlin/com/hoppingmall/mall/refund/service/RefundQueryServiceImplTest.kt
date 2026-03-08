@@ -4,6 +4,7 @@ import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.mall.refund.domain.repository.RefundRepository
+import com.hoppingmall.mall.refund.exception.RefundAccessDeniedException
 import com.hoppingmall.mall.refund.exception.RefundNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
 import org.junit.jupiter.api.Assertions.*
@@ -30,17 +31,37 @@ class RefundQueryServiceImplTest {
     inner class GetRefund {
 
         @Test
-        fun `환불_상세_조회_성공`() {
+        fun `구매자가_환불_상세_조회_성공`() {
             // given
             val refundId = 1L
-            val refund = Refund.fixture()
+            val buyerId = 1L
+            val refund = Refund.fixture(buyerId = buyerId, sellerId = 2L)
             val refundItem = RefundItem.fixture(refundId = refundId)
 
             whenever(refundRepository.findById(refundId)).thenReturn(Optional.of(refund))
             whenever(refundItemRepository.findByRefundId(refundId)).thenReturn(listOf(refundItem))
 
             // when
-            val response = refundQueryService.getRefund(refundId)
+            val response = refundQueryService.getRefund(refundId, buyerId)
+
+            // then
+            assertEquals(refundId, response.id)
+            assertEquals(1, response.items.size)
+        }
+
+        @Test
+        fun `판매자가_환불_상세_조회_성공`() {
+            // given
+            val refundId = 1L
+            val sellerId = 2L
+            val refund = Refund.fixture(buyerId = 1L, sellerId = sellerId)
+            val refundItem = RefundItem.fixture(refundId = refundId)
+
+            whenever(refundRepository.findById(refundId)).thenReturn(Optional.of(refund))
+            whenever(refundItemRepository.findByRefundId(refundId)).thenReturn(listOf(refundItem))
+
+            // when
+            val response = refundQueryService.getRefund(refundId, sellerId)
 
             // then
             assertEquals(refundId, response.id)
@@ -54,7 +75,21 @@ class RefundQueryServiceImplTest {
 
             // when & then
             assertThrows(RefundNotFoundException::class.java) {
-                refundQueryService.getRefund(999L)
+                refundQueryService.getRefund(999L, 1L)
+            }
+        }
+
+        @Test
+        fun `다른_사용자의_환불_조회_시_접근_거부`() {
+            // given
+            val refundId = 1L
+            val refund = Refund.fixture(buyerId = 1L, sellerId = 2L)
+
+            whenever(refundRepository.findById(refundId)).thenReturn(Optional.of(refund))
+
+            // when & then
+            assertThrows(RefundAccessDeniedException::class.java) {
+                refundQueryService.getRefund(refundId, 999L)
             }
         }
     }
