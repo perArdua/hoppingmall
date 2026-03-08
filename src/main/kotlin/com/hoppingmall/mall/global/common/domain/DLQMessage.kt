@@ -9,7 +9,8 @@ import jakarta.persistence.*
     indexes = [
         Index(name = "idx_dlq_topic", columnList = "original_topic"),
         Index(name = "idx_dlq_status", columnList = "status"),
-        Index(name = "idx_dlq_created_at", columnList = "created_at")
+        Index(name = "idx_dlq_created_at", columnList = "created_at"),
+        Index(name = "idx_dlq_next_retry_at", columnList = "status, next_retry_at")
     ]
 )
 class DLQMessage(
@@ -48,14 +49,18 @@ class DLQMessage(
     var processedAt: Long? = null,
     
     @Column(name = "notes", columnDefinition = "TEXT")
-    var notes: String? = null
-    
+    var notes: String? = null,
+
+    @Column(name = "next_retry_at")
+    var nextRetryAt: Long? = null
+
 ) : BaseEntity() {
-    
+
     fun incrementRetry() {
         this.retryCount++
         this.lastRetryAt = System.currentTimeMillis()
         this.status = DLQStatus.RETRYING
+        this.nextRetryAt = calculateNextRetryAt(this.retryCount)
     }
     
     fun markAsProcessed(notes: String? = null) {
@@ -71,6 +76,40 @@ class DLQMessage(
     
     fun getMessageKey(): String {
         return "${originalTopic}:${originalPartition}:${originalOffset}"
+    }
+
+    fun scheduleNextRetry() {
+        this.status = DLQStatus.PENDING
+        this.nextRetryAt = calculateNextRetryAt(this.retryCount)
+    }
+
+    fun isNonRetryableException(): Boolean {
+        val message = exceptionMessage ?: return false
+        return NON_RETRYABLE_PATTERNS.any { message.contains(it, ignoreCase = true) }
+    }
+
+    companion object {
+        private val BACKOFF_INTERVALS = longArrayOf(
+            60_000L,
+            300_000L,
+            1_800_000L
+        )
+
+        private val NON_RETRYABLE_PATTERNS = listOf(
+            "DeserializationException",
+            "SerializationException",
+            "MessageConversionException",
+            "IllegalArgumentException",
+            "JsonParseException",
+            "JsonMappingException",
+            "InvalidFormatException",
+            "MethodArgumentNotValidException"
+        )
+
+        fun calculateNextRetryAt(retryCount: Int): Long {
+            val index = (retryCount).coerceAtMost(BACKOFF_INTERVALS.size - 1)
+            return System.currentTimeMillis() + BACKOFF_INTERVALS[index]
+        }
     }
 }
 
