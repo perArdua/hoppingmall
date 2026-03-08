@@ -10,7 +10,15 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "refunds")
+@Table(
+    name = "refunds",
+    indexes = [
+        Index(name = "idx_refunds_order_id", columnList = "orderId"),
+        Index(name = "idx_refunds_payment_id", columnList = "paymentId"),
+        Index(name = "idx_refunds_buyer_id", columnList = "buyerId"),
+        Index(name = "idx_refunds_seller_id", columnList = "sellerId")
+    ]
+)
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Refund private constructor(
     @Column(nullable = false)

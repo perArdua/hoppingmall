@@ -5,7 +5,10 @@ import com.hoppingmall.mall.notification.enum.NotificationType
 import jakarta.persistence.*
 
 @Entity
-@Table(name = "notifications")
+@Table(
+    name = "notifications",
+    indexes = [Index(name = "idx_notifications_user_id", columnList = "userId")]
+)
 class Notification(
     @Column(nullable = false, unique = true)
     val eventId: String,

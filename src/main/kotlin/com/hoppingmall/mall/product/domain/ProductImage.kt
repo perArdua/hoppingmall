@@ -3,11 +3,15 @@ package com.hoppingmall.mall.product.domain
 import com.hoppingmall.mall.global.common.entity.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import org.hibernate.annotations.Filter
 
 @Entity
-@Table(name = "product_images")
+@Table(
+    name = "product_images",
+    indexes = [Index(name = "idx_product_images_product_id", columnList = "productId")]
+)
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class ProductImage private constructor(
 
