@@ -2,6 +2,7 @@ package com.hoppingmall.mall.order.controller
 
 import com.hoppingmall.mall.global.auth.UserPrincipal
 import com.hoppingmall.mall.global.common.response.ApiResponse
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.order.dto.request.OrderCreateRequest
 import com.hoppingmall.mall.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.mall.order.dto.response.OrderResponse
@@ -23,6 +24,7 @@ class OrderController(
     private val orderQueryService: OrderQueryService
 ) {
 
+    @Idempotent(ttlHours = 24)
     @PostMapping
     fun createOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
