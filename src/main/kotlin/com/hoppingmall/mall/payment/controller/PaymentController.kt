@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.payment.controller
 
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.payment.dto.request.PaymentRequest
 import com.hoppingmall.mall.payment.dto.response.PaymentResponse
 import com.hoppingmall.mall.payment.service.PaymentCommandService
@@ -19,6 +20,7 @@ class PaymentController(
     private val paymentQueryService: PaymentQueryService
 ) {
     
+    @Idempotent(ttlHours = 24)
     @PostMapping
     fun processPayment(
         @Valid @RequestBody paymentRequest: PaymentRequest,

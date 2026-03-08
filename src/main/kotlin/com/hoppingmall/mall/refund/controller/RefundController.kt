@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.refund.controller
 
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.mall.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.mall.refund.dto.response.RefundResponse
@@ -20,6 +21,7 @@ class RefundController(
     private val refundQueryService: RefundQueryService
 ) {
 
+    @Idempotent(ttlHours = 24)
     @PostMapping
     fun requestRefund(
         @Valid @RequestBody request: RefundCreateRequest,
