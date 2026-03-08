@@ -3,13 +3,20 @@ package com.hoppingmall.mall.cartItem.domain
 import com.hoppingmall.mall.global.common.entity.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 @Entity
-@Table(name = "cart_items")
+@Table(
+    name = "cart_items",
+    indexes = [
+        Index(name = "idx_cart_items_buyer_id", columnList = "buyerId"),
+        Index(name = "idx_cart_items_product_id", columnList = "productId")
+    ]
+)
 class CartItem private constructor(
     @Column
     val buyerId: Long,

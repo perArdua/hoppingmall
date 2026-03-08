@@ -3,12 +3,16 @@ package com.hoppingmall.mall.category.domain
 import com.hoppingmall.mall.global.common.entity.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import org.hibernate.annotations.Filter
 
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 @Entity
-@Table(name = "categories")
+@Table(
+    name = "categories",
+    indexes = [Index(name = "idx_categories_parent_id", columnList = "parentCategoryId")]
+)
 class Category private constructor(
     @Column(nullable = false, unique = true)
     var name: String,

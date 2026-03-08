@@ -3,12 +3,16 @@ package com.hoppingmall.mall.refund.domain
 import com.hoppingmall.mall.global.common.entity.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
 @Entity
-@Table(name = "refund_items")
+@Table(
+    name = "refund_items",
+    indexes = [Index(name = "idx_refund_items_refund_id", columnList = "refundId")]
+)
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class RefundItem private constructor(
     @Column(nullable = false)

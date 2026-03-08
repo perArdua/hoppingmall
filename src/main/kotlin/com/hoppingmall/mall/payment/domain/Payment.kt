@@ -9,7 +9,13 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "payments")
+@Table(
+    name = "payments",
+    indexes = [
+        Index(name = "idx_payments_order_id", columnList = "orderId"),
+        Index(name = "idx_payments_user_id", columnList = "userId")
+    ]
+)
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Payment private constructor(
     @Column(nullable = false)

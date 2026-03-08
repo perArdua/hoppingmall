@@ -7,7 +7,11 @@ import org.hibernate.annotations.Filter
 @Entity
 @Table(
     name = "reviews",
-    uniqueConstraints = [UniqueConstraint(columnNames = ["order_item_id"])]
+    uniqueConstraints = [UniqueConstraint(columnNames = ["order_item_id"])],
+    indexes = [
+        Index(name = "idx_reviews_product_id", columnList = "productId"),
+        Index(name = "idx_reviews_buyer_id", columnList = "buyerId")
+    ]
 )
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Review private constructor(

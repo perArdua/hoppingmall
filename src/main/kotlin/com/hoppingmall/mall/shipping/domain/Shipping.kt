@@ -7,7 +7,13 @@ import jakarta.persistence.*
 import org.hibernate.annotations.Filter
 
 @Entity
-@Table(name = "shippings")
+@Table(
+    name = "shippings",
+    indexes = [
+        Index(name = "idx_shippings_order_id", columnList = "orderId"),
+        Index(name = "idx_shippings_buyer_id", columnList = "buyerId")
+    ]
+)
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Shipping private constructor(
     @Column(nullable = false)
