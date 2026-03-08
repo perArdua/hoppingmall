@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
+import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.kafka.core.KafkaTemplate
@@ -45,6 +46,48 @@ class DLQServiceTest {
             verify(dlqMessageRepository).save(any<DLQMessage>())
         }
         
+        @Test
+        fun 비재시도_에러는_즉시_FAILED로_저장한다() {
+            // given
+            val deadLetterMessage = createDeadLetterMessage(
+                exception = "org.apache.kafka.common.errors.DeserializationException: Error"
+            )
+            whenever(dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
+                deadLetterMessage.originalTopic,
+                deadLetterMessage.originalPartition,
+                deadLetterMessage.originalOffset
+            )).thenReturn(false)
+
+            // when
+            dlqService.saveDLQMessage(deadLetterMessage)
+
+            // then
+            verify(dlqMessageRepository).save(argThat<DLQMessage> {
+                this.status == DLQStatus.FAILED && this.nextRetryAt == null
+            })
+        }
+
+        @Test
+        fun 재시도_가능한_에러는_nextRetryAt을_설정하여_저장한다() {
+            // given
+            val deadLetterMessage = createDeadLetterMessage(
+                exception = "java.net.SocketTimeoutException: Connection timed out"
+            )
+            whenever(dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
+                deadLetterMessage.originalTopic,
+                deadLetterMessage.originalPartition,
+                deadLetterMessage.originalOffset
+            )).thenReturn(false)
+
+            // when
+            dlqService.saveDLQMessage(deadLetterMessage)
+
+            // then
+            verify(dlqMessageRepository).save(argThat<DLQMessage> {
+                this.status == DLQStatus.PENDING && this.nextRetryAt != null
+            })
+        }
+
         @Test
         fun 중복된_DLQ_메시지는_저장하지_않는다() {
             // given
@@ -209,7 +252,7 @@ class DLQServiceTest {
         }
         
         @Test
-        fun Kafka_전송_실패_시_FAILED로_처리한다() {
+        fun Kafka_전송_실패_시_재시도_가능하면_다음_재시도를_스케줄링한다() {
             // given
             val dlqMessageId = 1L
             val dlqMessage = createDLQMessage(
@@ -217,18 +260,44 @@ class DLQServiceTest {
                 status = DLQStatus.PENDING,
                 retryCount = 1
             )
-            
+
             whenever(dlqMessageRepository.findById(dlqMessageId))
                 .thenReturn(Optional.of(dlqMessage))
             whenever(kafkaTemplate.send(any<String>(), any(), any()))
                 .thenThrow(RuntimeException("Kafka 전송 실패"))
-            
+
             // when
             val result = dlqService.retryDLQMessage(dlqMessageId)
-            
+
             // then
             assertFalse(result)
-            verify(dlqMessageRepository, atLeast(2)).save(dlqMessage) // incrementRetry + markAsFailed
+            assertEquals(DLQStatus.PENDING, dlqMessage.status)
+            assertNotNull(dlqMessage.nextRetryAt)
+            verify(dlqMessageRepository, atLeast(2)).save(dlqMessage)
+        }
+
+        @Test
+        fun Kafka_전송_실패_시_최대_재시도_초과하면_FAILED로_처리한다() {
+            // given
+            val dlqMessageId = 1L
+            val dlqMessage = createDLQMessage(
+                id = dlqMessageId,
+                status = DLQStatus.PENDING,
+                retryCount = 2
+            )
+
+            whenever(dlqMessageRepository.findById(dlqMessageId))
+                .thenReturn(Optional.of(dlqMessage))
+            whenever(kafkaTemplate.send(any<String>(), any(), any()))
+                .thenThrow(RuntimeException("Kafka 전송 실패"))
+
+            // when
+            val result = dlqService.retryDLQMessage(dlqMessageId)
+
+            // then
+            assertFalse(result)
+            assertEquals(DLQStatus.FAILED, dlqMessage.status)
+            verify(dlqMessageRepository, atLeast(2)).save(dlqMessage)
         }
     }
     
@@ -314,6 +383,51 @@ class DLQServiceTest {
         }
     }
     
+    @Nested
+    @DisplayName("autoRetryPendingMessages")
+    inner class AutoRetryPendingMessages {
+
+        @Test
+        fun 재시도_대상_메시지를_자동으로_재처리한다() {
+            // given
+            val dlqMessage = createDLQMessage(
+                id = 1L,
+                status = DLQStatus.PENDING,
+                retryCount = 0
+            ).apply { nextRetryAt = System.currentTimeMillis() - 1000 }
+
+            val page = PageImpl(listOf(dlqMessage))
+            whenever(dlqMessageRepository.findAutoRetryableMessages(
+                eq(DLQStatus.PENDING), eq(3), any(), any()
+            )).thenReturn(page)
+            whenever(dlqMessageRepository.findById(1L)).thenReturn(Optional.of(dlqMessage))
+
+            // when
+            dlqService.autoRetryPendingMessages()
+
+            // then
+            verify(kafkaTemplate).send(
+                eq(dlqMessage.originalTopic),
+                eq(dlqMessage.originalKey ?: ""),
+                any()
+            )
+        }
+
+        @Test
+        fun 재시도_대상이_없으면_아무_작업도_하지_않는다() {
+            // given
+            whenever(dlqMessageRepository.findAutoRetryableMessages(
+                eq(DLQStatus.PENDING), eq(3), any(), any()
+            )).thenReturn(Page.empty())
+
+            // when
+            dlqService.autoRetryPendingMessages()
+
+            // then
+            verify(kafkaTemplate, never()).send(any<String>(), any(), any())
+        }
+    }
+
     private fun createDeadLetterMessage(
         topic: String = "test-topic",
         partition: Int = 0,

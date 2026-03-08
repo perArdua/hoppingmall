@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.ConcurrentHashMap
@@ -23,6 +24,11 @@ class DLQService(
     private val logger = LoggerFactory.getLogger(DLQService::class.java)
     
     private val processingMessages = ConcurrentHashMap<String, Boolean>()
+
+    companion object {
+        private const val MAX_RETRY_COUNT = 3
+        private const val AUTO_RETRY_BATCH_SIZE = 20
+    }
     
     fun saveDLQMessage(deadLetterMessage: DeadLetterMessage) {
         try {
@@ -47,7 +53,16 @@ class DLQService(
                 exceptionMessage = deadLetterMessage.exception,
                 errorTimestamp = deadLetterMessage.timestamp
             )
-            
+
+            if (dlqMessage.isNonRetryableException()) {
+                dlqMessage.markAsFailed("비재시도 에러: ${deadLetterMessage.exception}")
+                dlqMessageRepository.save(dlqMessage)
+                logger.info("비재시도 에러로 즉시 FAILED 처리: topic={}, error={}",
+                    deadLetterMessage.originalTopic, deadLetterMessage.exception)
+                return
+            }
+
+            dlqMessage.nextRetryAt = DLQMessage.calculateNextRetryAt(0)
             dlqMessageRepository.save(dlqMessage)
             logger.info("DLQ 메시지 저장 완료: topic={}, partition={}, offset={}", 
                 deadLetterMessage.originalTopic, deadLetterMessage.originalPartition, deadLetterMessage.originalOffset)
@@ -117,7 +132,7 @@ class DLQService(
                 return false
             }
             
-            if (dlqMessage.retryCount >= 3) {
+            if (dlqMessage.retryCount >= MAX_RETRY_COUNT) {
                 dlqMessage.markAsFailed("최대 재시도 횟수 초과")
                 dlqMessageRepository.save(dlqMessage)
                 logger.warn("최대 재시도 횟수 초과: id={}, retryCount={}", dlqMessageId, dlqMessage.retryCount)
@@ -140,17 +155,21 @@ class DLQService(
             
         } catch (e: Exception) {
             logger.error("DLQ 메시지 재처리 실패: id={}, error={}", dlqMessageId, e.message, e)
-            
+
             try {
                 val dlqMessage = dlqMessageRepository.findById(dlqMessageId).orElse(null)
                 dlqMessage?.let {
-                    it.markAsFailed("재처리 실패: ${e.message}")
+                    if (it.retryCount >= MAX_RETRY_COUNT) {
+                        it.markAsFailed("최대 재시도 후 실패: ${e.message}")
+                    } else {
+                        it.scheduleNextRetry()
+                    }
                     dlqMessageRepository.save(it)
                 }
             } catch (updateException: Exception) {
                 logger.error("DLQ 메시지 상태 업데이트 실패: id={}", dlqMessageId, updateException)
             }
-            
+
             false
         } finally {
             processingMessages.remove(messageKey)
@@ -199,6 +218,32 @@ class DLQService(
         return deleteCount
     }
     
+    @Scheduled(fixedDelay = 30_000)
+    fun autoRetryPendingMessages() {
+        val now = System.currentTimeMillis()
+        val pageable = PageRequest.of(0, AUTO_RETRY_BATCH_SIZE)
+        val retryableMessages = dlqMessageRepository.findAutoRetryableMessages(
+            DLQStatus.PENDING, MAX_RETRY_COUNT, now, pageable
+        )
+
+        if (retryableMessages.isEmpty) return
+
+        logger.info("DLQ 자동 재처리 시작: {} 건", retryableMessages.content.size)
+
+        var successCount = 0
+        var failureCount = 0
+
+        retryableMessages.content.forEach { message ->
+            if (retryDLQMessage(message.id!!)) {
+                successCount++
+            } else {
+                failureCount++
+            }
+        }
+
+        logger.info("DLQ 자동 재처리 완료: 성공={}, 실패={}", successCount, failureCount)
+    }
+
     private fun reconstructOriginalMessage(dlqMessage: DLQMessage): Any? {
         return try {
             dlqMessage.originalValue?.let { value ->
