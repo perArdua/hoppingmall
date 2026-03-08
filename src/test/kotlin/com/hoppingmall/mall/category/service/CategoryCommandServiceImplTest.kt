@@ -5,6 +5,7 @@ import com.hoppingmall.mall.category.domain.repository.CategoryRepository
 import com.hoppingmall.mall.category.dto.request.CategoryCreateRequest
 import com.hoppingmall.mall.category.dto.request.CategoryUpdateRequest
 import com.hoppingmall.mall.category.exception.CategoryAlreadyExistsException
+import com.hoppingmall.mall.category.exception.CategoryCircularReferenceException
 import com.hoppingmall.mall.category.exception.CategoryHasChildrenException
 import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
@@ -81,6 +82,47 @@ class CategoryCommandServiceImplTest {
 
             // when & then
             assertThrows<CategoryAlreadyExistsException> {
+                categoryCommandService.createCategory(request)
+            }
+        }
+
+        @Test
+        fun 조상_체인에_순환_참조가_있으면_예외가_발생한다() {
+            // given
+            val request = CategoryCreateRequest(name = "새카테고리", parentCategoryId = 3L)
+
+            val catA = Category.fixture(name = "A", parentCategoryId = 3L).withId(1L)
+            val catB = Category.fixture(name = "B", parentCategoryId = 1L, depth = 1).withId(2L)
+            val catC = Category.fixture(name = "C", parentCategoryId = 2L, depth = 2).withId(3L)
+
+            whenever(categoryRepository.existsByName("새카테고리")).thenReturn(false)
+            whenever(categoryRepository.findNullableById(3L)).thenReturn(catC)
+            whenever(categoryRepository.findNullableById(2L)).thenReturn(catB)
+            whenever(categoryRepository.findNullableById(1L)).thenReturn(catA)
+
+            // when & then
+            assertThrows<CategoryCircularReferenceException> {
+                categoryCommandService.createCategory(request)
+            }
+        }
+
+        @Test
+        fun 조상_체인_깊이가_상한을_초과하면_예외가_발생한다() {
+            // given
+            val request = CategoryCreateRequest(name = "깊은카테고리", parentCategoryId = 1L)
+
+            val categories = (1L..12L).map { id ->
+                val parentId = if (id < 12L) id + 1 else null
+                Category.fixture(name = "Cat$id", parentCategoryId = parentId, depth = id.toInt()).withId(id)
+            }
+
+            whenever(categoryRepository.existsByName("깊은카테고리")).thenReturn(false)
+            categories.forEach { cat ->
+                whenever(categoryRepository.findNullableById(cat.id!!)).thenReturn(cat)
+            }
+
+            // when & then
+            assertThrows<CategoryCircularReferenceException> {
                 categoryCommandService.createCategory(request)
             }
         }
