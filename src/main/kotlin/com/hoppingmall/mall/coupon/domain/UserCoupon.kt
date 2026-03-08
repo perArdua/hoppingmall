@@ -9,7 +9,8 @@ import java.time.LocalDateTime
 @Entity
 @Table(
     name = "user_coupons",
-    uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "coupon_id"])]
+    uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "coupon_id"])],
+    indexes = [Index(name = "idx_user_coupons_user_id", columnList = "userId")]
 )
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class UserCoupon private constructor(

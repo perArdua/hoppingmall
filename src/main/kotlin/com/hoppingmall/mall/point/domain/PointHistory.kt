@@ -6,7 +6,10 @@ import jakarta.persistence.*
 import java.math.BigDecimal
 
 @Entity
-@Table(name = "point_histories")
+@Table(
+    name = "point_histories",
+    indexes = [Index(name = "idx_point_histories_user_id", columnList = "userId")]
+)
 class PointHistory(
     @Column(nullable = false)
     val userId: Long,
