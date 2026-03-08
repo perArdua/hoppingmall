@@ -352,20 +352,19 @@ class ProductCommandServiceImplTest {
         fun 상품_삭제_성공() {
             // Data
             val productId = 1L
-            val productImage = ProductImage.fixture(productId = productId)
+            val product = Product.fixture().withId(productId)
+            val productImage = ProductImage.fixture(productId = productId).withId(1L)
 
             // Context
-            whenever(productRepository.existsById(productId)).thenReturn(true)
+            whenever(productRepository.findById(productId)).thenReturn(java.util.Optional.of(product))
             whenever(productImageRepository.findByProductId(productId)).thenReturn(productImage)
 
             // Interaction
             productCommandService.deleteProduct(productId)
 
             // Assertions
-            verify(productRepository).existsById(productId)
-            verify(productImageRepository).findByProductId(productId)
-            verify(productImageRepository).delete(productImage)
-            verify(productRepository).deleteById(productId)
+            assertThat(product.deletedAt).isNotNull()
+            assertThat(productImage.deletedAt).isNotNull()
         }
 
         @Test
@@ -374,35 +373,30 @@ class ProductCommandServiceImplTest {
             val productId = 999L
 
             // Context
-            whenever(productRepository.existsById(productId)).thenReturn(false)
+            whenever(productRepository.findById(productId)).thenReturn(java.util.Optional.empty())
 
             // Interaction & Assertions
             assertThatThrownBy { productCommandService.deleteProduct(productId) }
                 .isInstanceOf(ProductNotFoundException::class.java)
-            
-            verify(productRepository).existsById(productId)
+
             verify(productImageRepository, never()).findByProductId(any())
-            verify(productImageRepository, never()).delete(any())
-            verify(productRepository, never()).deleteById(any())
         }
 
         @Test
         fun 이미지가_없는_상품_삭제_성공() {
             // Data
             val productId = 1L
+            val product = Product.fixture().withId(productId)
 
             // Context
-            whenever(productRepository.existsById(productId)).thenReturn(true)
+            whenever(productRepository.findById(productId)).thenReturn(java.util.Optional.of(product))
             whenever(productImageRepository.findByProductId(productId)).thenReturn(null)
 
             // Interaction
             productCommandService.deleteProduct(productId)
 
             // Assertions
-            verify(productRepository).existsById(productId)
-            verify(productImageRepository).findByProductId(productId)
-            verify(productImageRepository, never()).delete(any())
-            verify(productRepository).deleteById(productId)
+            assertThat(product.deletedAt).isNotNull()
         }
     }
 }

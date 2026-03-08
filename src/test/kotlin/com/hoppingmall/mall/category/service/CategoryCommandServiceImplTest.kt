@@ -9,6 +9,7 @@ import com.hoppingmall.mall.category.exception.CategoryHasChildrenException
 import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.withId
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName
@@ -158,7 +159,7 @@ class CategoryCommandServiceImplTest {
             categoryCommandService.deleteCategory(1L)
 
             // then
-            verify(categoryRepository).deleteById(1L)
+            assertThat(category.deletedAt).isNotNull()
         }
 
         @Test

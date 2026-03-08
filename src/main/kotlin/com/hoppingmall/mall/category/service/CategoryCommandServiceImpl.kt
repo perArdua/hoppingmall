@@ -75,6 +75,6 @@ class CategoryCommandServiceImpl(
             throw CategoryHasChildrenException()
         }
 
-        categoryRepository.deleteById(category.id!!)
+        category.softDelete()
     }
 }

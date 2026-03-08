@@ -40,6 +40,6 @@ class WishlistCommandServiceImpl(
             throw WishlistNotFoundException()
         }
 
-        wishlistRepository.deleteById(wishlistId)
+        wishlist.softDelete()
     }
 }
