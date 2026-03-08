@@ -7,5 +7,5 @@ import com.hoppingmall.mall.order.dto.response.OrderResponse
 interface OrderCommandService {
     fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse
     fun cancelOrder(buyerId: Long, orderId: Long): OrderResponse
-    fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest): OrderResponse
+    fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse
 }

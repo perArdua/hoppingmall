@@ -31,8 +31,12 @@ class RefundController(
     }
 
     @GetMapping("/{refundId}")
-    fun getRefund(@PathVariable refundId: Long): ResponseEntity<RefundResponse> {
-        val response = refundQueryService.getRefund(refundId)
+    fun getRefund(
+        @PathVariable refundId: Long,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<RefundResponse> {
+        val userId = userDetails.username.toLong()
+        val response = refundQueryService.getRefund(refundId, userId)
         return ResponseEntity.ok(response)
     }
 

@@ -62,10 +62,12 @@ class OrderController(
 
     @PatchMapping("/{orderId}/status")
     fun updateOrderStatus(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable orderId: Long,
         @Valid @RequestBody request: OrderStatusUpdateRequest
     ): ResponseEntity<ApiResponse<OrderResponse>> {
-        val order = orderCommandService.updateOrderStatus(orderId, request)
+        val isAdmin = userPrincipal.getRole() == "ADMIN"
+        val order = orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), isAdmin)
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 }

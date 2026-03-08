@@ -30,8 +30,12 @@ class PaymentController(
     }
     
     @GetMapping("/{paymentId}")
-    fun getPaymentById(@PathVariable paymentId: Long): ResponseEntity<PaymentResponse> {
-        val paymentResponse = paymentQueryService.getPaymentById(paymentId)
+    fun getPaymentById(
+        @PathVariable paymentId: Long,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<PaymentResponse> {
+        val userId = userDetails.username.toLong()
+        val paymentResponse = paymentQueryService.getPaymentById(paymentId, userId)
         return ResponseEntity.ok(paymentResponse)
     }
     
@@ -48,8 +52,12 @@ class PaymentController(
     }
     
     @GetMapping("/order/{orderId}")
-    fun getPaymentsByOrderId(@PathVariable orderId: Long): ResponseEntity<List<PaymentResponse>> {
-        val payments = paymentQueryService.getPaymentsByOrderId(orderId)
+    fun getPaymentsByOrderId(
+        @PathVariable orderId: Long,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<List<PaymentResponse>> {
+        val userId = userDetails.username.toLong()
+        val payments = paymentQueryService.getPaymentsByOrderId(orderId, userId)
         return ResponseEntity.ok(payments)
     }
 
