@@ -41,14 +41,17 @@ class ProductCommandServiceImpl(
         )
         val savedProduct = productRepository.save(product)
 
-        val imageUrl = request.imageUrl ?: DEFAULT_IMAGE_PATH
-        val productImage = ProductImage.create(
-            productId = savedProduct.id!!,
-            imageUrl = imageUrl
-        )
-        val savedProductImage = productImageRepository.save(productImage)
+        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(DEFAULT_IMAGE_PATH)
+        val productImages = imageUrls.mapIndexed { index, url ->
+            ProductImage.create(
+                productId = savedProduct.id!!,
+                imageUrl = url,
+                sortOrder = index
+            )
+        }
+        val savedImages = productImageRepository.saveAll(productImages)
 
-        return ProductResponse.from(savedProduct, savedProductImage)
+        return ProductResponse.from(savedProduct, savedImages)
     }
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")
@@ -68,21 +71,20 @@ class ProductCommandServiceImpl(
 
         val updatedProduct = productRepository.save(product)
 
-        val imageUrl = request.imageUrl ?: DEFAULT_IMAGE_PATH
-        val existingImage = productImageRepository.findByProductId(productId)
-        
-        val updatedProductImage = if (existingImage != null) {
-            existingImage.imageUrl = imageUrl
-            productImageRepository.save(existingImage)
-        } else {
-            val newProductImage = ProductImage.create(
-                productId = productId,
-                imageUrl = imageUrl
-            )
-            productImageRepository.save(newProductImage)
-        }
+        val existingImages = productImageRepository.findByProductIdOrderBySortOrder(productId)
+        existingImages.forEach { it.softDelete() }
 
-        return ProductResponse.from(updatedProduct, updatedProductImage)
+        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(DEFAULT_IMAGE_PATH)
+        val newImages = imageUrls.mapIndexed { index, url ->
+            ProductImage.create(
+                productId = productId,
+                imageUrl = url,
+                sortOrder = index
+            )
+        }
+        val savedImages = productImageRepository.saveAll(newImages)
+
+        return ProductResponse.from(updatedProduct, savedImages)
     }
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")
@@ -90,9 +92,9 @@ class ProductCommandServiceImpl(
         val product = productRepository.findById(productId)
             .orElseThrow { ProductNotFoundException() }
 
-        val productImage = productImageRepository.findByProductId(productId)
-        productImage?.softDelete()
+        val productImages = productImageRepository.findByProductIdOrderBySortOrder(productId)
+        productImages.forEach { it.softDelete() }
 
         product.softDelete()
     }
-} 
+}
