@@ -21,8 +21,8 @@ import com.hoppingmall.mall.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.mall.refund.dto.request.RefundItemRequest
 import com.hoppingmall.mall.refund.enum.RefundReason
 import com.hoppingmall.mall.refund.enum.RefundStatus
+import com.hoppingmall.mall.refund.domain.repository.RefundedQuantityProjection
 import com.hoppingmall.mall.refund.exception.RefundAccessDeniedException
-import com.hoppingmall.mall.refund.exception.RefundAlreadyExistsException
 import com.hoppingmall.mall.refund.exception.RefundException
 import com.hoppingmall.mall.refund.exception.RefundNotFoundException
 import com.hoppingmall.mall.shipping.domain.Shipping
@@ -86,7 +86,7 @@ class RefundCommandServiceImplTest {
 
             whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
-            whenever(refundRepository.findByOrderIdAndStatusNot(orderId, RefundStatus.REJECTED)).thenReturn(emptyList())
+            whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(emptyList())
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
             whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
@@ -127,7 +127,7 @@ class RefundCommandServiceImplTest {
 
             whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
-            whenever(refundRepository.findByOrderIdAndStatusNot(orderId, RefundStatus.REJECTED)).thenReturn(emptyList())
+            whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(emptyList())
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
             whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(shipping)
@@ -166,7 +166,7 @@ class RefundCommandServiceImplTest {
 
             whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
-            whenever(refundRepository.findByOrderIdAndStatusNot(orderId, RefundStatus.REJECTED)).thenReturn(emptyList())
+            whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(emptyList())
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem1, orderItem2))
             whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
@@ -267,30 +267,6 @@ class RefundCommandServiceImplTest {
         }
 
         @Test
-        fun `이미_진행_중인_환불이_있으면_예외_발생`() {
-            // given
-            val buyerId = 1L
-            val order = Order.paidFixture(buyerId = buyerId)
-            val payment = Payment.successFixture(orderId = 1L)
-            val existingRefund = Refund.fixture(status = RefundStatus.REQUESTED)
-
-            val request = RefundCreateRequest(
-                orderId = 1L,
-                reason = RefundReason.CHANGE_OF_MIND,
-                items = listOf(RefundItemRequest(orderItemId = 1L, quantity = 1))
-            )
-
-            whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
-            whenever(paymentRepository.findByOrderId(1L)).thenReturn(payment)
-            whenever(refundRepository.findByOrderIdAndStatusNot(1L, RefundStatus.REJECTED)).thenReturn(listOf(existingRefund))
-
-            // when & then
-            assertThrows(RefundAlreadyExistsException::class.java) {
-                refundCommandService.requestRefund(buyerId, request)
-            }
-        }
-
-        @Test
         fun `환불_수량이_주문_수량을_초과하면_예외_발생`() {
             // given
             val buyerId = 1L
@@ -306,13 +282,120 @@ class RefundCommandServiceImplTest {
 
             whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
             whenever(paymentRepository.findByOrderId(1L)).thenReturn(payment)
-            whenever(refundRepository.findByOrderIdAndStatusNot(1L, RefundStatus.REJECTED)).thenReturn(emptyList())
             whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+            whenever(refundItemRepository.findRefundedQuantitiesByOrderId(1L)).thenReturn(emptyList())
 
             // when & then
             assertThrows(RefundException::class.java) {
                 refundCommandService.requestRefund(buyerId, request)
             }
+        }
+
+        @Test
+        fun `이전_환불과_합산하여_수량_초과_시_예외_발생`() {
+            // given
+            val buyerId = 1L
+            val order = Order.paidFixture(buyerId = buyerId)
+            val payment = Payment.successFixture(orderId = 1L)
+            val orderItem = OrderItem.fixture(orderId = 1L, quantity = 3)
+
+            val request = RefundCreateRequest(
+                orderId = 1L,
+                reason = RefundReason.CHANGE_OF_MIND,
+                items = listOf(RefundItemRequest(orderItemId = 1L, quantity = 2))
+            )
+
+            val alreadyRefunded = mockRefundedQuantity(orderItemId = 1L, totalRefundedQuantity = 2L)
+
+            whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+            whenever(paymentRepository.findByOrderId(1L)).thenReturn(payment)
+            whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+            whenever(refundItemRepository.findRefundedQuantitiesByOrderId(1L)).thenReturn(listOf(alreadyRefunded))
+
+            // when & then
+            assertThrows(RefundException::class.java) {
+                refundCommandService.requestRefund(buyerId, request)
+            }
+        }
+
+        @Test
+        fun `이전_부분_환불_후_남은_수량_내에서_추가_환불_성공`() {
+            // given
+            val buyerId = 1L
+            val orderId = 1L
+            val order = Order.paidFixture(buyerId = buyerId)
+            val payment = Payment.successFixture(orderId = orderId, amount = BigDecimal("30000"), pointAmount = BigDecimal("1000"))
+            val orderItem = OrderItem.fixture(orderId = orderId, productId = 100L, productPrice = BigDecimal("10000"), quantity = 3)
+            val product = Product.fixture(sellerId = 2L).withId(100L)
+
+            val request = RefundCreateRequest(
+                orderId = orderId,
+                reason = RefundReason.CHANGE_OF_MIND,
+                items = listOf(RefundItemRequest(orderItemId = 1L, quantity = 1))
+            )
+
+            val alreadyRefunded = mockRefundedQuantity(orderItemId = 1L, totalRefundedQuantity = 1L)
+
+            whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
+            whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
+            whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
+            whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(listOf(alreadyRefunded))
+            whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
+            whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
+            whenever(refundRepository.save(any<Refund>())).thenAnswer { invocation ->
+                (invocation.arguments[0] as Refund).withId(2L)
+            }
+            whenever(refundItemRepository.saveAll(any<List<RefundItem>>())).thenAnswer { invocation ->
+                @Suppress("UNCHECKED_CAST")
+                (invocation.arguments[0] as List<RefundItem>).mapIndexed { index, item -> item.withId(index.toLong() + 1) }
+            }
+
+            // when
+            val response = refundCommandService.requestRefund(buyerId, request)
+
+            // then
+            assertFalse(response.isFullRefund)
+            assertEquals(BigDecimal("10000"), response.refundAmount)
+        }
+
+        @Test
+        fun `이전_부분_환불과_합산하여_전체_환불이_되면_isFullRefund_true`() {
+            // given
+            val buyerId = 1L
+            val orderId = 1L
+            val order = Order.paidFixture(buyerId = buyerId)
+            val payment = Payment.successFixture(orderId = orderId, amount = BigDecimal("30000"), pointAmount = BigDecimal("1000"))
+            val orderItem = OrderItem.fixture(orderId = orderId, productId = 100L, productPrice = BigDecimal("10000"), quantity = 3)
+            val product = Product.fixture(sellerId = 2L).withId(100L)
+
+            val request = RefundCreateRequest(
+                orderId = orderId,
+                reason = RefundReason.CHANGE_OF_MIND,
+                items = listOf(RefundItemRequest(orderItemId = 1L, quantity = 2))
+            )
+
+            val alreadyRefunded = mockRefundedQuantity(orderItemId = 1L, totalRefundedQuantity = 1L)
+
+            whenever(orderRepository.findById(orderId)).thenReturn(Optional.of(order))
+            whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
+            whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
+            whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(listOf(alreadyRefunded))
+            whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
+            whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
+            whenever(refundRepository.save(any<Refund>())).thenAnswer { invocation ->
+                (invocation.arguments[0] as Refund).withId(2L)
+            }
+            whenever(refundItemRepository.saveAll(any<List<RefundItem>>())).thenAnswer { invocation ->
+                @Suppress("UNCHECKED_CAST")
+                (invocation.arguments[0] as List<RefundItem>).mapIndexed { index, item -> item.withId(index.toLong() + 1) }
+            }
+
+            // when
+            val response = refundCommandService.requestRefund(buyerId, request)
+
+            // then
+            assertTrue(response.isFullRefund)
+            verify(refundEventPublisher).publishRefundCompletedEvent(any())
         }
 
         @Test
@@ -428,6 +511,13 @@ class RefundCommandServiceImplTest {
             assertThrows(RefundAccessDeniedException::class.java) {
                 refundCommandService.rejectRefund(refundId, 999L, rejectionRequest)
             }
+        }
+    }
+
+    private fun mockRefundedQuantity(orderItemId: Long, totalRefundedQuantity: Long): RefundedQuantityProjection {
+        return object : RefundedQuantityProjection {
+            override val orderItemId: Long = orderItemId
+            override val totalRefundedQuantity: Long = totalRefundedQuantity
         }
     }
 }
