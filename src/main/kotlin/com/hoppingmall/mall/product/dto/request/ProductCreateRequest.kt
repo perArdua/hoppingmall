@@ -22,7 +22,7 @@ data class ProductCreateRequest(
     @field:Positive(message = "가격은 0보다 커야 합니다.")
     val price: BigDecimal,
     
-    val imageUrl: String? = null,
+    val imageUrls: List<String>? = null,
     
     @field:NotNull(message = "상품 상태는 필수입니다.")
     val status: ProductStatus = ProductStatus.AVAILABLE
