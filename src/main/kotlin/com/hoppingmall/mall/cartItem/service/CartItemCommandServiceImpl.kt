@@ -27,7 +27,7 @@ class CartItemCommandServiceImpl(
         val product = productRepository.findById(request.productId)
             .orElseThrow { ProductNotFoundException() }
         
-        val productImage = productImageRepository.findByProductId(request.productId)
+        val productImage = productImageRepository.findByProductIdOrderBySortOrder(request.productId).firstOrNull()
         val existingCartItem = cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)
 
         val cartItem = if (existingCartItem != null) {

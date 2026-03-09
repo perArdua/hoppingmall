@@ -41,9 +41,9 @@ class ProductQueryServiceImpl(
             return null
         }
 
-        val image = productImageRepository.findByProductId(productId)
+        val images = productImageRepository.findByProductIdOrderBySortOrder(productId)
 
-        return ProductResponse.from(product, image)
+        return ProductResponse.from(product, images)
     }
 
     override fun getProductsBySellerId(
@@ -83,10 +83,10 @@ class ProductQueryServiceImpl(
     ): Slice<ProductResponse> {
         val productIds = productSlice.content.mapNotNull { it.id }
         val imageMap = productImageRepository.findByProductIdIn(productIds)
-            .associateBy { it.productId }
+            .groupBy { it.productId }
 
         val productResponses = productSlice.content.map { product ->
-            ProductResponse.from(product, imageMap[product.id])
+            ProductResponse.from(product, imageMap[product.id!!] ?: emptyList())
         }
 
         return SliceImpl(productResponses, pageable, productSlice.hasNext())
