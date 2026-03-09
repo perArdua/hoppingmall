@@ -15,4 +15,5 @@ enum class RefundErrorCode(
     REFUND_INVALID_ORDER_STATUS("RFD005", "현재 주문 상태에서는 환불을 요청할 수 없습니다.", HttpStatus.BAD_REQUEST),
     REFUND_INVALID_PAYMENT_STATUS("RFD006", "결제 상태가 유효하지 않아 환불을 요청할 수 없습니다.", HttpStatus.BAD_REQUEST),
     REFUND_INVALID_ITEM("RFD007", "환불 요청 아이템이 유효하지 않습니다.", HttpStatus.BAD_REQUEST),
+    REFUND_QUANTITY_EXCEEDED("RFD008", "환불 가능한 수량을 초과했습니다.", HttpStatus.BAD_REQUEST),
 }
