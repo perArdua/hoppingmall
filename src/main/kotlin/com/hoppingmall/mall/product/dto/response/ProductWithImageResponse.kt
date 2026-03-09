@@ -14,12 +14,12 @@ data class ProductResponse(
     val description: String,
     val price: BigDecimal,
     val status: ProductStatus,
-    val imageUrl: String?,
+    val imageUrls: List<String>,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime?
 ) {
     companion object {
-        fun from(product: Product, image: ProductImage?): ProductResponse {
+        fun from(product: Product, images: List<ProductImage>): ProductResponse {
             return ProductResponse(
                 id = product.id!!,
                 sellerId = product.sellerId,
@@ -28,10 +28,10 @@ data class ProductResponse(
                 description = product.description,
                 price = product.price,
                 status = product.status,
-                imageUrl = image?.imageUrl,
+                imageUrls = images.sortedBy { it.sortOrder }.map { it.imageUrl },
                 createdAt = product.createdAt,
                 updatedAt = product.updatedAt
             )
         }
     }
-}  
+}

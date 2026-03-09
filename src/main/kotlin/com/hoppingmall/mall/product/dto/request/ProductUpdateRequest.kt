@@ -19,7 +19,7 @@ data class ProductUpdateRequest(
     @field:Positive(message = "가격은 0보다 커야 합니다.")
     val price: BigDecimal,
     
-    val imageUrl: String? = null,
+    val imageUrls: List<String>? = null,
     
     val status: ProductStatus = ProductStatus.AVAILABLE
 ) 
