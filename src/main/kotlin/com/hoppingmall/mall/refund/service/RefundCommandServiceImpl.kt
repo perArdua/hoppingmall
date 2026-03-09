@@ -19,7 +19,6 @@ import com.hoppingmall.mall.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.mall.refund.dto.response.RefundResponse
 import com.hoppingmall.mall.refund.enum.RefundStatus
 import com.hoppingmall.mall.refund.exception.RefundAccessDeniedException
-import com.hoppingmall.mall.refund.exception.RefundAlreadyExistsException
 import com.hoppingmall.mall.refund.exception.RefundNotFoundException
 import com.hoppingmall.mall.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.mall.shipping.enum.ShippingStatus
@@ -66,22 +65,22 @@ class RefundCommandServiceImpl(
             )
         }
 
-        val existingRefunds = refundRepository.findByOrderIdAndStatusNot(request.orderId, RefundStatus.REJECTED)
-        if (existingRefunds.isNotEmpty()) {
-            throw RefundAlreadyExistsException()
-        }
-
         val orderItems = orderItemRepository.findByOrderId(request.orderId)
         val orderItemMap = orderItems.associateBy { it.id!! }
+
+        val refundedQuantities = refundItemRepository.findRefundedQuantitiesByOrderId(request.orderId)
+        val refundedMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedQuantity.toInt() }
 
         request.items.forEach { item ->
             val orderItem = orderItemMap[item.orderItemId]
                 ?: throw com.hoppingmall.mall.refund.exception.RefundException(
                     com.hoppingmall.mall.refund.exception.code.RefundErrorCode.REFUND_INVALID_ITEM
                 )
-            if (item.quantity > orderItem.quantity) {
+            val alreadyRefunded = refundedMap[item.orderItemId] ?: 0
+            val availableQuantity = orderItem.quantity - alreadyRefunded
+            if (item.quantity > availableQuantity) {
                 throw com.hoppingmall.mall.refund.exception.RefundException(
-                    com.hoppingmall.mall.refund.exception.code.RefundErrorCode.REFUND_INVALID_ITEM
+                    com.hoppingmall.mall.refund.exception.code.RefundErrorCode.REFUND_QUANTITY_EXCEEDED
                 )
             }
         }
@@ -91,11 +90,12 @@ class RefundCommandServiceImpl(
             orderItem.productPrice.multiply(BigDecimal(item.quantity))
         }
 
-        val isFullRefund = request.items.size == orderItems.size &&
-            request.items.all { item ->
-                val orderItem = orderItemMap[item.orderItemId]!!
-                item.quantity == orderItem.quantity
-            }
+        val requestItemMap = request.items.associate { it.orderItemId to it.quantity }
+        val isFullRefund = orderItems.all { orderItem ->
+            val alreadyRefunded = refundedMap[orderItem.id!!] ?: 0
+            val currentRefund = requestItemMap[orderItem.id!!] ?: 0
+            alreadyRefunded + currentRefund == orderItem.quantity
+        }
 
         val firstOrderItem = orderItemMap[request.items.first().orderItemId]!!
         val product = productRepository.findById(firstOrderItem.productId).orElse(null)
