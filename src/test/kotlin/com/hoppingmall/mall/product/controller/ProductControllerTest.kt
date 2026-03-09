@@ -45,7 +45,7 @@ class ProductControllerTest {
                     description = "설명1",
                     price = BigDecimal("10000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = "https://example.com/image1.jpg",
+                    imageUrls = listOf("https://example.com/image1.jpg"),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 ),
@@ -57,7 +57,7 @@ class ProductControllerTest {
                     description = "설명2",
                     price = BigDecimal("20000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = "https://example.com/image2.jpg",
+                    imageUrls = listOf("https://example.com/image2.jpg"),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 )
@@ -89,7 +89,7 @@ class ProductControllerTest {
                 description = "설명1",
                 price = BigDecimal("10000"),
                 status = ProductStatus.AVAILABLE,
-                imageUrl = "https://example.com/image.jpg",
+                imageUrls = listOf("https://example.com/image.jpg"),
                 createdAt = LocalDateTime.now(),
                 updatedAt = null
             )
@@ -134,7 +134,7 @@ class ProductControllerTest {
                     description = "설명1",
                     price = BigDecimal("10000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = "https://example.com/image1.jpg",
+                    imageUrls = listOf("https://example.com/image1.jpg"),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 ),
@@ -146,7 +146,7 @@ class ProductControllerTest {
                     description = "설명2",
                     price = BigDecimal("20000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = "https://example.com/image2.jpg",
+                    imageUrls = listOf("https://example.com/image2.jpg"),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 )
@@ -180,7 +180,7 @@ class ProductControllerTest {
                     description = "설명1",
                     price = BigDecimal("10000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = "https://example.com/image1.jpg",
+                    imageUrls = listOf("https://example.com/image1.jpg"),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 ),
@@ -192,7 +192,7 @@ class ProductControllerTest {
                     description = "설명2",
                     price = BigDecimal("20000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = "https://example.com/image2.jpg",
+                    imageUrls = listOf("https://example.com/image2.jpg"),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 )
@@ -226,7 +226,7 @@ class ProductControllerTest {
                     description = "고성능 노트북",
                     price = BigDecimal("1500000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = null,
+                    imageUrls = emptyList(),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 )
@@ -256,7 +256,7 @@ class ProductControllerTest {
                     description = "설명1",
                     price = BigDecimal("10000"),
                     status = ProductStatus.AVAILABLE,
-                    imageUrl = null,
+                    imageUrls = emptyList(),
                     createdAt = LocalDateTime.now(),
                     updatedAt = null
                 )
@@ -284,7 +284,7 @@ class ProductControllerTest {
                 name = "새 상품",
                 description = "새 상품 설명",
                 price = BigDecimal("15000"),
-                imageUrl = "https://example.com/new-image.jpg",
+                imageUrls = listOf("https://example.com/new-image.jpg"),
                 status = ProductStatus.AVAILABLE
             )
 
@@ -296,7 +296,7 @@ class ProductControllerTest {
                 description = "새 상품 설명",
                 price = BigDecimal("15000"),
                 status = ProductStatus.AVAILABLE,
-                imageUrl = "https://example.com/new-image.jpg",
+                imageUrls = listOf("https://example.com/new-image.jpg"),
                 createdAt = LocalDateTime.now(),
                 updatedAt = null
             )
@@ -323,7 +323,7 @@ class ProductControllerTest {
                 name = "수정된 상품",
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
-                imageUrl = "https://example.com/updated-image.jpg",
+                imageUrls = listOf("https://example.com/updated-image.jpg"),
                 status = ProductStatus.AVAILABLE
             )
 
@@ -335,7 +335,7 @@ class ProductControllerTest {
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
                 status = ProductStatus.AVAILABLE,
-                imageUrl = "https://example.com/updated-image.jpg",
+                imageUrls = listOf("https://example.com/updated-image.jpg"),
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now()
             )
