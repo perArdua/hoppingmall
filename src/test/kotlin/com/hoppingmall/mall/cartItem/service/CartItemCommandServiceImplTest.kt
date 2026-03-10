@@ -63,7 +63,7 @@ class CartItemCommandServiceImplTest {
 
             // Context
             whenever(productRepository.findById(request.productId)).thenReturn(java.util.Optional.of(product))
-            whenever(productImageRepository.findByProductId(request.productId)).thenReturn(productImage)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(request.productId)).thenReturn(listOf(productImage))
             whenever(cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)).thenReturn(null)
             whenever(cartItemRepository.save(any<CartItem>())).thenAnswer { invocation ->
                 val cartItem = invocation.getArgument<CartItem>(0)
@@ -96,7 +96,7 @@ class CartItemCommandServiceImplTest {
 
             // Context
             whenever(productRepository.findById(request.productId)).thenReturn(java.util.Optional.of(product))
-            whenever(productImageRepository.findByProductId(request.productId)).thenReturn(productImage)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(request.productId)).thenReturn(listOf(productImage))
             whenever(cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)).thenReturn(existingCartItem)
             whenever(cartItemRepository.save(any<CartItem>())).thenAnswer { invocation ->
                 val cartItem = invocation.getArgument<CartItem>(0)
@@ -122,7 +122,7 @@ class CartItemCommandServiceImplTest {
 
             // Context
             whenever(productRepository.findById(request.productId)).thenReturn(java.util.Optional.of(product))
-            whenever(productImageRepository.findByProductId(request.productId)).thenReturn(null)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(request.productId)).thenReturn(emptyList())
             whenever(cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)).thenReturn(null)
             whenever(cartItemRepository.save(any<CartItem>())).thenAnswer { invocation ->
                 val cartItem = invocation.getArgument<CartItem>(0)

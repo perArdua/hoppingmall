@@ -21,14 +21,18 @@ class ProductImage private constructor(
     @Column(nullable = false)
     var imageUrl: String,
 
-): BaseEntity() {
+    @Column(nullable = false)
+    val sortOrder: Int = 0
+
+) : BaseEntity() {
 
     companion object {
         fun create(
             productId: Long,
             imageUrl: String,
+            sortOrder: Int = 0
         ): ProductImage {
-            return ProductImage(productId, imageUrl)
+            return ProductImage(productId, imageUrl, sortOrder)
         }
     }
-}  
+}

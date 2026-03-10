@@ -43,20 +43,20 @@ class ProductCommandServiceImplTest {
                 name = "테스트 상품",
                 description = "테스트 상품 설명",
                 price = BigDecimal("10000"),
-                imageUrl = "https://example.com/image.jpg",
+                imageUrls = listOf("https://example.com/image.jpg"),
                 status = ProductStatus.AVAILABLE
             )
 
             val productCaptor = argumentCaptor<Product>()
-            val imageCaptor = argumentCaptor<ProductImage>()
+            val imagesCaptor = argumentCaptor<List<ProductImage>>()
 
             // Context
             whenever(categoryRepository.existsById(request.categoryId)).thenReturn(true)
             whenever(productRepository.save(productCaptor.capture())).thenAnswer {
                 productCaptor.firstValue.withId(1L)
             }
-            whenever(productImageRepository.save(imageCaptor.capture())).thenAnswer {
-                imageCaptor.firstValue.withId(1L)
+            whenever(productImageRepository.saveAll(imagesCaptor.capture())).thenAnswer {
+                imagesCaptor.firstValue.mapIndexed { index, image -> image.withId(index.toLong() + 1) }
             }
 
             // Interaction
@@ -70,20 +70,60 @@ class ProductCommandServiceImplTest {
             assertThat(result.description).isEqualTo(request.description)
             assertThat(result.price).isEqualTo(request.price)
             assertThat(result.status).isEqualTo(request.status)
-            assertThat(result.imageUrl).isEqualTo(request.imageUrl)
+            assertThat(result.imageUrls).containsExactly("https://example.com/image.jpg")
 
-            // 저장된 객체 검증
             val savedProduct = productCaptor.firstValue
             assertThat(savedProduct.name).isEqualTo(request.name)
             assertThat(savedProduct.sellerId).isEqualTo(request.sellerId)
             assertThat(savedProduct.categoryId).isEqualTo(request.categoryId)
 
-            val savedImage = imageCaptor.firstValue
-            assertThat(savedImage.imageUrl).isEqualTo(request.imageUrl)
+            val savedImages = imagesCaptor.firstValue
+            assertThat(savedImages[0].imageUrl).isEqualTo("https://example.com/image.jpg")
 
             verify(categoryRepository).existsById(request.categoryId)
             verify(productRepository).save(any())
-            verify(productImageRepository).save(any())
+            verify(productImageRepository).saveAll(any<List<ProductImage>>())
+        }
+
+        @Test
+        fun 다중_이미지_상품_생성_성공() {
+            // Data
+            val request = ProductCreateRequest(
+                sellerId = 1L,
+                categoryId = 1L,
+                name = "다중 이미지 상품",
+                description = "이미지 3장",
+                price = BigDecimal("30000"),
+                imageUrls = listOf("https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg"),
+                status = ProductStatus.AVAILABLE
+            )
+
+            val productCaptor = argumentCaptor<Product>()
+            val imagesCaptor = argumentCaptor<List<ProductImage>>()
+
+            // Context
+            whenever(categoryRepository.existsById(request.categoryId)).thenReturn(true)
+            whenever(productRepository.save(productCaptor.capture())).thenAnswer {
+                productCaptor.firstValue.withId(1L)
+            }
+            whenever(productImageRepository.saveAll(imagesCaptor.capture())).thenAnswer {
+                imagesCaptor.firstValue.mapIndexed { index, image -> image.withId(index.toLong() + 1) }
+            }
+
+            // Interaction
+            val result = productCommandService.createProduct(request)
+
+            // Assertions
+            assertThat(result.imageUrls).containsExactly(
+                "https://example.com/1.jpg",
+                "https://example.com/2.jpg",
+                "https://example.com/3.jpg"
+            )
+            val savedImages = imagesCaptor.firstValue
+            assertThat(savedImages).hasSize(3)
+            assertThat(savedImages[0].sortOrder).isEqualTo(0)
+            assertThat(savedImages[1].sortOrder).isEqualTo(1)
+            assertThat(savedImages[2].sortOrder).isEqualTo(2)
         }
 
         @Test
@@ -95,20 +135,20 @@ class ProductCommandServiceImplTest {
                 name = "테스트 상품",
                 description = "테스트 상품 설명",
                 price = BigDecimal("10000"),
-                imageUrl = null,
+                imageUrls = null,
                 status = ProductStatus.AVAILABLE
             )
 
             val productCaptor = argumentCaptor<Product>()
-            val imageCaptor = argumentCaptor<ProductImage>()
+            val imagesCaptor = argumentCaptor<List<ProductImage>>()
 
             // Context
             whenever(categoryRepository.existsById(request.categoryId)).thenReturn(true)
             whenever(productRepository.save(productCaptor.capture())).thenAnswer {
                 productCaptor.firstValue.withId(1L)
             }
-            whenever(productImageRepository.save(imageCaptor.capture())).thenAnswer {
-                imageCaptor.firstValue.withId(1L)
+            whenever(productImageRepository.saveAll(imagesCaptor.capture())).thenAnswer {
+                imagesCaptor.firstValue.mapIndexed { index, image -> image.withId(index.toLong() + 1) }
             }
 
             // Interaction
@@ -118,19 +158,18 @@ class ProductCommandServiceImplTest {
             assertThat(result).isNotNull()
             assertThat(result.id).isEqualTo(1L)
             assertThat(result.name).isEqualTo(request.name)
-            assertThat(result.imageUrl).isEqualTo("D:/hoppingmall/product/images/default-product.jpg")
+            assertThat(result.imageUrls).containsExactly("D:/hoppingmall/product/images/default-product.jpg")
 
-            // 저장된 객체 검증
             val savedProduct = productCaptor.firstValue
             assertThat(savedProduct.name).isEqualTo(request.name)
             assertThat(savedProduct.sellerId).isEqualTo(request.sellerId)
 
-            val savedImage = imageCaptor.firstValue
-            assertThat(savedImage.imageUrl).isEqualTo("D:/hoppingmall/product/images/default-product.jpg")
+            val savedImages = imagesCaptor.firstValue
+            assertThat(savedImages[0].imageUrl).isEqualTo("D:/hoppingmall/product/images/default-product.jpg")
 
             verify(categoryRepository).existsById(request.categoryId)
             verify(productRepository).save(any())
-            verify(productImageRepository).save(any())
+            verify(productImageRepository).saveAll(any<List<ProductImage>>())
         }
 
         @Test
@@ -169,24 +208,24 @@ class ProductCommandServiceImplTest {
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
-                imageUrl = "https://example.com/updated-image.jpg",
+                imageUrls = listOf("https://example.com/updated-image.jpg"),
                 status = ProductStatus.SOLD_OUT
             )
 
             val existingProduct = Product.fixture().withId(productId)
             val productCaptor = argumentCaptor<Product>()
-            val imageCaptor = argumentCaptor<ProductImage>()
+            val imagesCaptor = argumentCaptor<List<ProductImage>>()
 
-            val existingImage = ProductImage.fixture(productId = productId)
+            val existingImages = listOf(ProductImage.fixture(productId = productId))
             // Context
             whenever(categoryRepository.existsById(request.categoryId)).thenReturn(true)
             whenever(productRepository.findById(productId)).thenReturn(java.util.Optional.of(existingProduct))
             whenever(productRepository.save(productCaptor.capture())).thenAnswer {
                 productCaptor.firstValue.withId(productId)
             }
-            whenever(productImageRepository.findByProductId(productId)).thenReturn(existingImage)
-            whenever(productImageRepository.save(imageCaptor.capture())).thenAnswer {
-                imageCaptor.firstValue.withId(1L)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(productId)).thenReturn(existingImages)
+            whenever(productImageRepository.saveAll(imagesCaptor.capture())).thenAnswer {
+                imagesCaptor.firstValue.mapIndexed { index, image -> image.withId(index.toLong() + 1) }
             }
 
             // Interaction
@@ -200,13 +239,13 @@ class ProductCommandServiceImplTest {
             assertThat(result.description).isEqualTo(request.description)
             assertThat(result.price).isEqualTo(request.price)
             assertThat(result.status).isEqualTo(request.status)
-            assertThat(result.imageUrl).isEqualTo(request.imageUrl)
+            assertThat(result.imageUrls).containsExactly("https://example.com/updated-image.jpg")
 
             verify(categoryRepository).existsById(request.categoryId)
             verify(productRepository).findById(productId)
             verify(productRepository).save(any())
-            verify(productImageRepository).findByProductId(productId)
-            verify(productImageRepository).save(any())
+            verify(productImageRepository).findByProductIdOrderBySortOrder(productId)
+            verify(productImageRepository).saveAll(any<List<ProductImage>>())
         }
 
         @Test
@@ -218,7 +257,7 @@ class ProductCommandServiceImplTest {
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
-                imageUrl = "https://example.com/updated-image.jpg",
+                imageUrls = listOf("https://example.com/updated-image.jpg"),
                 status = ProductStatus.AVAILABLE
             )
 
@@ -231,8 +270,8 @@ class ProductCommandServiceImplTest {
                 .isInstanceOf(ProductNotFoundException::class.java)
 
             verify(productRepository).findById(productId)
-            verify(productImageRepository, never()).findByProductId(any())
-            verify(productImageRepository, never()).save(any())
+            verify(productImageRepository, never()).findByProductIdOrderBySortOrder(any())
+            verify(productImageRepository, never()).saveAll(any<List<ProductImage>>())
         }
 
         @Test
@@ -267,13 +306,13 @@ class ProductCommandServiceImplTest {
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
-                imageUrl = "https://example.com/new-image.jpg",
+                imageUrls = listOf("https://example.com/new-image.jpg"),
                 status = ProductStatus.AVAILABLE
             )
 
             val existingProduct = Product.fixture().withId(productId)
             val productCaptor = argumentCaptor<Product>()
-            val imageCaptor = argumentCaptor<ProductImage>()
+            val imagesCaptor = argumentCaptor<List<ProductImage>>()
 
             // Context
             whenever(categoryRepository.existsById(request.categoryId)).thenReturn(true)
@@ -281,9 +320,9 @@ class ProductCommandServiceImplTest {
             whenever(productRepository.save(productCaptor.capture())).thenAnswer {
                 productCaptor.firstValue.withId(productId)
             }
-            whenever(productImageRepository.findByProductId(productId)).thenReturn(null)
-            whenever(productImageRepository.save(imageCaptor.capture())).thenAnswer {
-                imageCaptor.firstValue.withId(1L)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(productId)).thenReturn(emptyList())
+            whenever(productImageRepository.saveAll(imagesCaptor.capture())).thenAnswer {
+                imagesCaptor.firstValue.mapIndexed { index, image -> image.withId(index.toLong() + 1) }
             }
 
             // Interaction
@@ -293,12 +332,12 @@ class ProductCommandServiceImplTest {
             assertThat(result).isNotNull()
             assertThat(result.id).isEqualTo(productId)
             assertThat(result.name).isEqualTo(request.name)
-            assertThat(result.imageUrl).isEqualTo(request.imageUrl)
+            assertThat(result.imageUrls).containsExactly("https://example.com/new-image.jpg")
 
             verify(productRepository).findById(productId)
             verify(productRepository).save(any())
-            verify(productImageRepository).findByProductId(productId)
-            verify(productImageRepository).save(any())
+            verify(productImageRepository).findByProductIdOrderBySortOrder(productId)
+            verify(productImageRepository).saveAll(any<List<ProductImage>>())
         }
 
         @Test
@@ -310,13 +349,13 @@ class ProductCommandServiceImplTest {
                 name = "수정된 상품명",
                 description = "수정된 상품 설명",
                 price = BigDecimal("20000"),
-                imageUrl = null,
+                imageUrls = null,
                 status = ProductStatus.AVAILABLE
             )
 
             val existingProduct = Product.fixture().withId(productId)
             val productCaptor = argumentCaptor<Product>()
-            val imageCaptor = argumentCaptor<ProductImage>()
+            val imagesCaptor = argumentCaptor<List<ProductImage>>()
 
             // Context
             whenever(categoryRepository.existsById(request.categoryId)).thenReturn(true)
@@ -324,9 +363,9 @@ class ProductCommandServiceImplTest {
             whenever(productRepository.save(productCaptor.capture())).thenAnswer {
                 productCaptor.firstValue.withId(productId)
             }
-            whenever(productImageRepository.findByProductId(productId)).thenReturn(null)
-            whenever(productImageRepository.save(imageCaptor.capture())).thenAnswer {
-                imageCaptor.firstValue.withId(1L)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(productId)).thenReturn(emptyList())
+            whenever(productImageRepository.saveAll(imagesCaptor.capture())).thenAnswer {
+                imagesCaptor.firstValue.mapIndexed { index, image -> image.withId(index.toLong() + 1) }
             }
 
             // Interaction
@@ -336,12 +375,12 @@ class ProductCommandServiceImplTest {
             assertThat(result).isNotNull()
             assertThat(result.id).isEqualTo(productId)
             assertThat(result.name).isEqualTo(request.name)
-            assertThat(result.imageUrl).isEqualTo("D:/hoppingmall/product/images/default-product.jpg")
+            assertThat(result.imageUrls).containsExactly("D:/hoppingmall/product/images/default-product.jpg")
 
             verify(productRepository).findById(productId)
             verify(productRepository).save(any())
-            verify(productImageRepository).findByProductId(productId)
-            verify(productImageRepository).save(any())
+            verify(productImageRepository).findByProductIdOrderBySortOrder(productId)
+            verify(productImageRepository).saveAll(any<List<ProductImage>>())
         }
     }
 
@@ -357,7 +396,7 @@ class ProductCommandServiceImplTest {
 
             // Context
             whenever(productRepository.findById(productId)).thenReturn(java.util.Optional.of(product))
-            whenever(productImageRepository.findByProductId(productId)).thenReturn(productImage)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(productId)).thenReturn(listOf(productImage))
 
             // Interaction
             productCommandService.deleteProduct(productId)
@@ -379,7 +418,7 @@ class ProductCommandServiceImplTest {
             assertThatThrownBy { productCommandService.deleteProduct(productId) }
                 .isInstanceOf(ProductNotFoundException::class.java)
 
-            verify(productImageRepository, never()).findByProductId(any())
+            verify(productImageRepository, never()).findByProductIdOrderBySortOrder(any())
         }
 
         @Test
@@ -390,7 +429,7 @@ class ProductCommandServiceImplTest {
 
             // Context
             whenever(productRepository.findById(productId)).thenReturn(java.util.Optional.of(product))
-            whenever(productImageRepository.findByProductId(productId)).thenReturn(null)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(productId)).thenReturn(emptyList())
 
             // Interaction
             productCommandService.deleteProduct(productId)

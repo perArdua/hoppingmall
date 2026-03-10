@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository
 @Repository
 interface ProductImageRepository: JpaRepository<ProductImage, Long> {
 
-    fun findByProductId(productId: Long): ProductImage?
+    fun findByProductIdOrderBySortOrder(productId: Long): List<ProductImage>
 
     fun findByProductIdIn(productIds: List<Long>): List<ProductImage>
-} 
+}

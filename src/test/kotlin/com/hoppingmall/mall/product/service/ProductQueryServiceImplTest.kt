@@ -61,9 +61,9 @@ class ProductQueryServiceImplTest {
 
             assertEquals(2, result.content.size)
             assertEquals("상품1", result.content[0].name)
-            assertEquals("https://example.com/image1.jpg", result.content[0].imageUrl)
+            assertEquals(listOf("https://example.com/image1.jpg"), result.content[0].imageUrls)
             assertEquals("상품2", result.content[1].name)
-            assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
+            assertEquals(listOf("https://example.com/image2.jpg"), result.content[1].imageUrls)
             verify(productRepository).findBy(pageable)
             verify(productImageRepository).findByProductIdIn(listOf(1L, 2L))
         }
@@ -76,20 +76,20 @@ class ProductQueryServiceImplTest {
         fun 상품_상세_조회_성공() {
             val productId = 1L
             val product = Product.create(1L, 1L, "상품1", "설명1", BigDecimal("10000"), ProductStatus.AVAILABLE).withId(productId)
-            val image = ProductImage.create(productId, "https://example.com/image.jpg")
+            val images = listOf(ProductImage.create(productId, "https://example.com/image.jpg"))
 
             whenever(cacheManager.getCache("product:notfound")).thenReturn(notFoundCache)
             whenever(notFoundCache.get(productId)).thenReturn(null)
             whenever(productRepository.findNullableById(productId)).thenReturn(product)
-            whenever(productImageRepository.findByProductId(productId)).thenReturn(image)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(productId)).thenReturn(images)
 
             val result = productQueryService.getProductById(productId)
 
             assertEquals(productId, result!!.id)
             assertEquals(product.name, result.name)
-            assertEquals(image.imageUrl, result.imageUrl)
+            assertEquals(listOf("https://example.com/image.jpg"), result.imageUrls)
             verify(productRepository).findNullableById(productId)
-            verify(productImageRepository).findByProductId(productId)
+            verify(productImageRepository).findByProductIdOrderBySortOrder(productId)
         }
 
         @Test
@@ -130,15 +130,15 @@ class ProductQueryServiceImplTest {
             whenever(cacheManager.getCache("product:notfound")).thenReturn(notFoundCache)
             whenever(notFoundCache.get(productId)).thenReturn(null)
             whenever(productRepository.findNullableById(productId)).thenReturn(product)
-            whenever(productImageRepository.findByProductId(productId)).thenReturn(null)
+            whenever(productImageRepository.findByProductIdOrderBySortOrder(productId)).thenReturn(emptyList())
 
             val result = productQueryService.getProductById(productId)
 
             assertEquals(productId, result!!.id)
             assertEquals(product.name, result.name)
-            assertEquals(null, result.imageUrl)
+            assertEquals(emptyList<String>(), result.imageUrls)
             verify(productRepository).findNullableById(productId)
-            verify(productImageRepository).findByProductId(productId)
+            verify(productImageRepository).findByProductIdOrderBySortOrder(productId)
         }
     }
 
@@ -166,10 +166,10 @@ class ProductQueryServiceImplTest {
             assertEquals(2, result.content.size)
             assertEquals(sellerId, result.content[0].sellerId)
             assertEquals("상품1", result.content[0].name)
-            assertEquals("https://example.com/image1.jpg", result.content[0].imageUrl)
+            assertEquals(listOf("https://example.com/image1.jpg"), result.content[0].imageUrls)
             assertEquals(sellerId, result.content[1].sellerId)
             assertEquals("상품2", result.content[1].name)
-            assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
+            assertEquals(listOf("https://example.com/image2.jpg"), result.content[1].imageUrls)
             verify(productRepository).findBySellerId(sellerId, pageable)
             verify(productImageRepository).findByProductIdIn(listOf(1L, 2L))
         }
@@ -199,10 +199,10 @@ class ProductQueryServiceImplTest {
             assertEquals(2, result.content.size)
             assertEquals(categoryId, result.content[0].categoryId)
             assertEquals("상품1", result.content[0].name)
-            assertEquals("https://example.com/image1.jpg", result.content[0].imageUrl)
+            assertEquals(listOf("https://example.com/image1.jpg"), result.content[0].imageUrls)
             assertEquals(categoryId, result.content[1].categoryId)
             assertEquals("상품2", result.content[1].name)
-            assertEquals("https://example.com/image2.jpg", result.content[1].imageUrl)
+            assertEquals(listOf("https://example.com/image2.jpg"), result.content[1].imageUrls)
             verify(productRepository).findByCategoryId(categoryId, pageable)
             verify(productImageRepository).findByProductIdIn(listOf(1L, 2L))
         }
@@ -281,7 +281,7 @@ class ProductQueryServiceImplTest {
 
             assertEquals(1, result.content.size)
             assertEquals("상품1", result.content[0].name)
-            assertEquals("https://example.com/image1.jpg", result.content[0].imageUrl)
+            assertEquals(listOf("https://example.com/image1.jpg"), result.content[0].imageUrls)
         }
 
         @Test
