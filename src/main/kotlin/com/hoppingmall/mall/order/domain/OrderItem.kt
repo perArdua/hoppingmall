@@ -22,6 +22,9 @@ class OrderItem private constructor(
     val orderId: Long,
 
     @Column(nullable = false)
+    val sellerId: Long,
+
+    @Column(nullable = false)
     val productId: Long,
 
     @Column(nullable = false)
@@ -40,6 +43,7 @@ class OrderItem private constructor(
     companion object {
         fun create(
             orderId: Long,
+            sellerId: Long,
             productId: Long,
             productName: String,
             productPrice: BigDecimal,
@@ -47,6 +51,7 @@ class OrderItem private constructor(
         ): OrderItem {
             return OrderItem(
                 orderId = orderId,
+                sellerId = sellerId,
                 productId = productId,
                 productName = productName,
                 productPrice = productPrice,

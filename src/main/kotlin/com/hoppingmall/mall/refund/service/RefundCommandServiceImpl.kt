@@ -7,7 +7,6 @@ import com.hoppingmall.mall.order.exception.OrderNotFoundException
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
 import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
-import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
@@ -35,7 +34,6 @@ class RefundCommandServiceImpl(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val paymentRepository: PaymentRepository,
-    private val productRepository: ProductRepository,
     private val shippingRepository: ShippingRepository,
     private val refundEventPublisher: RefundEventPublisher
 ) : RefundCommandService {
@@ -98,8 +96,7 @@ class RefundCommandServiceImpl(
         }
 
         val firstOrderItem = orderItemMap[request.items.first().orderItemId]!!
-        val product = productRepository.findById(firstOrderItem.productId).orElse(null)
-        val sellerId = product?.sellerId ?: 0L
+        val sellerId = firstOrderItem.sellerId
 
         val refund = Refund.create(
             orderId = request.orderId,

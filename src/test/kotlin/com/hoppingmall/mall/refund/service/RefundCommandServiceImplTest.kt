@@ -9,8 +9,6 @@ import com.hoppingmall.mall.order.exception.OrderNotFoundException
 import com.hoppingmall.mall.payment.domain.Payment
 import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
 import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
-import com.hoppingmall.mall.product.domain.Product
-import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
@@ -48,7 +46,6 @@ class RefundCommandServiceImplTest {
     private val orderRepository: OrderRepository = mock()
     private val orderItemRepository: OrderItemRepository = mock()
     private val paymentRepository: PaymentRepository = mock()
-    private val productRepository: ProductRepository = mock()
     private val shippingRepository: ShippingRepository = mock()
     private val refundEventPublisher: RefundEventPublisher = mock()
 
@@ -58,7 +55,6 @@ class RefundCommandServiceImplTest {
         orderRepository,
         orderItemRepository,
         paymentRepository,
-        productRepository,
         shippingRepository,
         refundEventPublisher
     )
@@ -74,8 +70,7 @@ class RefundCommandServiceImplTest {
             val orderId = 1L
             val order = Order.paidFixture(buyerId = buyerId)
             val payment = Payment.successFixture(orderId = orderId, pointAmount = BigDecimal("1000"))
-            val orderItem = OrderItem.fixture(orderId = orderId, productId = 100L, quantity = 2)
-            val product = Product.fixture(sellerId = 2L).withId(100L)
+            val orderItem = OrderItem.fixture(orderId = orderId, sellerId = 2L, productId = 100L, quantity = 2)
 
             val request = RefundCreateRequest(
                 orderId = orderId,
@@ -88,7 +83,6 @@ class RefundCommandServiceImplTest {
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
             whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(emptyList())
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
-            whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
             whenever(refundRepository.save(any<Refund>())).thenAnswer { invocation ->
                 (invocation.arguments[0] as Refund).withId(1L)
@@ -114,8 +108,7 @@ class RefundCommandServiceImplTest {
             val orderId = 1L
             val order = Order.fixture(buyerId = buyerId, status = OrderStatus.SHIPPED)
             val payment = Payment.successFixture(orderId = orderId)
-            val orderItem = OrderItem.fixture(orderId = orderId, productId = 100L, quantity = 2)
-            val product = Product.fixture(sellerId = 2L).withId(100L)
+            val orderItem = OrderItem.fixture(orderId = orderId, sellerId = 2L, productId = 100L, quantity = 2)
             val shipping = Shipping.inTransitFixture(orderId = orderId)
 
             val request = RefundCreateRequest(
@@ -129,7 +122,6 @@ class RefundCommandServiceImplTest {
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
             whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(emptyList())
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
-            whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(shipping)
             whenever(refundRepository.save(any<Refund>())).thenAnswer { invocation ->
                 (invocation.arguments[0] as Refund).withId(1L)
@@ -154,9 +146,8 @@ class RefundCommandServiceImplTest {
             val orderId = 1L
             val order = Order.paidFixture(buyerId = buyerId)
             val payment = Payment.successFixture(orderId = orderId, amount = BigDecimal("50000"), pointAmount = BigDecimal("1000"))
-            val orderItem1 = OrderItem.fixture(orderId = orderId, productId = 100L, productPrice = BigDecimal("15000"), quantity = 2)
-            val orderItem2 = OrderItem.fixture(orderId = orderId, productId = 200L, productPrice = BigDecimal("20000"), quantity = 1).withId(2L)
-            val product = Product.fixture(sellerId = 2L).withId(100L)
+            val orderItem1 = OrderItem.fixture(orderId = orderId, sellerId = 2L, productId = 100L, productPrice = BigDecimal("15000"), quantity = 2)
+            val orderItem2 = OrderItem.fixture(orderId = orderId, sellerId = 2L, productId = 200L, productPrice = BigDecimal("20000"), quantity = 1).withId(2L)
 
             val request = RefundCreateRequest(
                 orderId = orderId,
@@ -168,7 +159,6 @@ class RefundCommandServiceImplTest {
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
             whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(emptyList())
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem1, orderItem2))
-            whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
             whenever(refundRepository.save(any<Refund>())).thenAnswer { invocation ->
                 (invocation.arguments[0] as Refund).withId(1L)
@@ -325,8 +315,7 @@ class RefundCommandServiceImplTest {
             val orderId = 1L
             val order = Order.paidFixture(buyerId = buyerId)
             val payment = Payment.successFixture(orderId = orderId, amount = BigDecimal("30000"), pointAmount = BigDecimal("1000"))
-            val orderItem = OrderItem.fixture(orderId = orderId, productId = 100L, productPrice = BigDecimal("10000"), quantity = 3)
-            val product = Product.fixture(sellerId = 2L).withId(100L)
+            val orderItem = OrderItem.fixture(orderId = orderId, sellerId = 2L, productId = 100L, productPrice = BigDecimal("10000"), quantity = 3)
 
             val request = RefundCreateRequest(
                 orderId = orderId,
@@ -340,7 +329,6 @@ class RefundCommandServiceImplTest {
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
             whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(listOf(alreadyRefunded))
-            whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
             whenever(refundRepository.save(any<Refund>())).thenAnswer { invocation ->
                 (invocation.arguments[0] as Refund).withId(2L)
@@ -365,8 +353,7 @@ class RefundCommandServiceImplTest {
             val orderId = 1L
             val order = Order.paidFixture(buyerId = buyerId)
             val payment = Payment.successFixture(orderId = orderId, amount = BigDecimal("30000"), pointAmount = BigDecimal("1000"))
-            val orderItem = OrderItem.fixture(orderId = orderId, productId = 100L, productPrice = BigDecimal("10000"), quantity = 3)
-            val product = Product.fixture(sellerId = 2L).withId(100L)
+            val orderItem = OrderItem.fixture(orderId = orderId, sellerId = 2L, productId = 100L, productPrice = BigDecimal("10000"), quantity = 3)
 
             val request = RefundCreateRequest(
                 orderId = orderId,
@@ -380,7 +367,6 @@ class RefundCommandServiceImplTest {
             whenever(paymentRepository.findByOrderId(orderId)).thenReturn(payment)
             whenever(orderItemRepository.findByOrderId(orderId)).thenReturn(listOf(orderItem))
             whenever(refundItemRepository.findRefundedQuantitiesByOrderId(orderId)).thenReturn(listOf(alreadyRefunded))
-            whenever(productRepository.findById(100L)).thenReturn(Optional.of(product))
             whenever(shippingRepository.findByOrderId(orderId)).thenReturn(null)
             whenever(refundRepository.save(any<Refund>())).thenAnswer { invocation ->
                 (invocation.arguments[0] as Refund).withId(2L)

@@ -13,6 +13,8 @@ import com.hoppingmall.mall.order.enum.OrderStatus
 import com.hoppingmall.mall.order.exception.OrderAccessDeniedException
 import com.hoppingmall.mall.order.exception.OrderEmptyItemsException
 import com.hoppingmall.mall.order.exception.OrderNotFoundException
+import com.hoppingmall.mall.product.domain.repository.ProductRepository
+import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,6 +26,7 @@ class OrderCommandServiceImpl(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val cartItemRepository: CartItemRepository,
+    private val productRepository: ProductRepository,
     private val inventoryCommandService: InventoryCommandService
 ) : OrderCommandService {
 
@@ -41,6 +44,12 @@ class OrderCommandServiceImpl(
             throw OrderAccessDeniedException()
         }
 
+        val productIds = cartItems.map { it.productId }.distinct()
+        val productMap = productRepository.findAllById(productIds).associateBy { it.id!! }
+        productIds.forEach { productId ->
+            if (!productMap.containsKey(productId)) throw ProductNotFoundException()
+        }
+
         cartItems.sortedBy { it.productId }.forEach { cartItem ->
             inventoryCommandService.decreaseStock(cartItem.productId, cartItem.quantity)
         }
@@ -52,6 +61,7 @@ class OrderCommandServiceImpl(
         val orderItems = cartItems.map { cartItem ->
             OrderItem.create(
                 orderId = order.id!!,
+                sellerId = productMap[cartItem.productId]!!.sellerId,
                 productId = cartItem.productId,
                 productName = cartItem.productName,
                 productPrice = cartItem.productPrice,

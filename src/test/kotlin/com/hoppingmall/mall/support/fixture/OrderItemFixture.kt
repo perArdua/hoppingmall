@@ -6,6 +6,7 @@ import java.math.BigDecimal
 
 fun OrderItem.Companion.fixture(
     orderId: Long = 1L,
+    sellerId: Long = 2L,
     productId: Long = 100L,
     productName: String = "테스트 상품",
     productPrice: BigDecimal = BigDecimal("15000"),
@@ -13,6 +14,7 @@ fun OrderItem.Companion.fixture(
 ): OrderItem {
     return OrderItem.create(
         orderId = orderId,
+        sellerId = sellerId,
         productId = productId,
         productName = productName,
         productPrice = productPrice,
