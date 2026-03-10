@@ -19,6 +19,7 @@ class OrderItemTest {
         fun 주문_항목을_생성한다() {
             val orderItem = OrderItem.create(
                 orderId = 1L,
+                sellerId = 5L,
                 productId = 100L,
                 productName = "테스트 상품",
                 productPrice = BigDecimal("15000"),
@@ -26,6 +27,7 @@ class OrderItemTest {
             )
 
             assertEquals(1L, orderItem.orderId)
+            assertEquals(5L, orderItem.sellerId)
             assertEquals(100L, orderItem.productId)
             assertEquals("테스트 상품", orderItem.productName)
             assertEquals(BigDecimal("15000"), orderItem.productPrice)
@@ -37,6 +39,7 @@ class OrderItemTest {
         fun 총_가격이_자동_계산된다() {
             val orderItem = OrderItem.create(
                 orderId = 1L,
+                sellerId = 5L,
                 productId = 100L,
                 productName = "상품",
                 productPrice = BigDecimal("25000"),

@@ -14,6 +14,9 @@ import com.hoppingmall.mall.order.exception.OrderAccessDeniedException
 import com.hoppingmall.mall.order.exception.OrderEmptyItemsException
 import com.hoppingmall.mall.order.exception.OrderInvalidStatusException
 import com.hoppingmall.mall.order.exception.OrderNotFoundException
+import com.hoppingmall.mall.product.domain.Product
+import com.hoppingmall.mall.product.domain.repository.ProductRepository
+import com.hoppingmall.mall.product.exception.ProductNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.fixture.paidFixture
 import com.hoppingmall.mall.support.withId
@@ -35,9 +38,10 @@ class OrderCommandServiceImplTest {
     private val orderRepository: OrderRepository = mock()
     private val orderItemRepository: OrderItemRepository = mock()
     private val cartItemRepository: CartItemRepository = mock()
+    private val productRepository: ProductRepository = mock()
     private val inventoryCommandService: InventoryCommandService = mock()
     private val orderCommandService = OrderCommandServiceImpl(
-        orderRepository, orderItemRepository, cartItemRepository, inventoryCommandService
+        orderRepository, orderItemRepository, cartItemRepository, productRepository, inventoryCommandService
     )
 
     @Nested
@@ -50,10 +54,13 @@ class OrderCommandServiceImplTest {
             val request = OrderCreateRequest(cartItemIds = listOf(1L, 2L))
             val cartItem1 = CartItem.fixture(buyerId = 1L, productId = 100L, productName = "상품1", productPrice = BigDecimal("15000"), quantity = 2).withId(1L)
             val cartItem2 = CartItem.fixture(buyerId = 1L, productId = 200L, productName = "상품2", productPrice = BigDecimal("20000"), quantity = 1).withId(2L)
+            val product1 = Product.fixture(sellerId = 10L).withId(100L)
+            val product2 = Product.fixture(sellerId = 20L).withId(200L)
 
             val orderCaptor = argumentCaptor<Order>()
 
             whenever(cartItemRepository.findAllById(request.cartItemIds)).thenReturn(listOf(cartItem1, cartItem2))
+            whenever(productRepository.findAllById(listOf(100L, 200L))).thenReturn(listOf(product1, product2))
             whenever(orderRepository.save(orderCaptor.capture())).thenAnswer {
                 orderCaptor.lastValue.withId(1L)
             }
