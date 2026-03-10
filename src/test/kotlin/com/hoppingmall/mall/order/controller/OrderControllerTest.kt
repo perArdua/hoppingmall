@@ -43,6 +43,7 @@ class OrderControllerTest {
             items = listOf(
                 OrderItemResponse(
                     id = 1L,
+                    sellerId = 2L,
                     productId = 100L,
                     productName = "테스트 상품",
                     productPrice = BigDecimal("25000"),

@@ -67,6 +67,7 @@ class PaymentCompensationConsumerIntegrationTest : IntegrationTestBase() {
         orderItemRepository.save(
             OrderItem.create(
                 orderId = order.id!!,
+                sellerId = 1L,
                 productId = 500L,
                 productName = "테스트 상품",
                 productPrice = BigDecimal("15000"),
@@ -115,6 +116,7 @@ class PaymentCompensationConsumerIntegrationTest : IntegrationTestBase() {
         orderItemRepository.save(
             OrderItem.create(
                 orderId = order.id!!,
+                sellerId = 2L,
                 productId = 600L,
                 productName = "테스트 상품2",
                 productPrice = BigDecimal("20000"),
