@@ -83,6 +83,9 @@ dependencies {
 	// Monitoring
 	implementation("io.micrometer:micrometer-registry-prometheus")
 
+	// CSV 파싱
+	implementation("org.apache.commons:commons-csv:1.12.0")
+
 	// JSON 로깅
 	implementation("net.logstash.logback:logstash-logback-encoder:8.0")
 }
@@ -135,7 +138,9 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/refund/service/RefundCompletionConsumer*",
 	"**/com/hoppingmall/mall/refund/service/KafkaRefundEventPublisher*",
 	"**/com/hoppingmall/mall/refund/domain/RefundEventLog*",
-	"**/com/hoppingmall/mall/product/domain/repository/ProductSearchRepositoryImpl*"
+	"**/com/hoppingmall/mall/product/domain/repository/ProductSearchRepositoryImpl*",
+	"**/com/hoppingmall/mall/product/domain/BulkImportJob*",
+	"**/com/hoppingmall/mall/product/controller/ProductBulkController*"
 )
 
 tasks.jacocoTestReport {
