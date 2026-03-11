@@ -16,9 +16,12 @@ import com.hoppingmall.mall.product.dto.response.*
 import com.hoppingmall.mall.product.exception.ProductException
 import com.hoppingmall.mall.product.exception.code.ProductErrorCode
 import org.slf4j.LoggerFactory
+import org.springframework.cache.CacheManager
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile
 
 @Service
@@ -29,13 +32,15 @@ class BulkImportService(
     private val productImageRepository: ProductImageRepository,
     private val categoryRepository: CategoryRepository,
     private val inventoryCommandService: InventoryCommandService,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val cacheManager: CacheManager
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     companion object {
         private const val DEFAULT_IMAGE_PATH = "D:/hoppingmall/product/images/default-product.jpg"
+        private const val CHUNK_SIZE = 50
     }
 
     fun validate(file: MultipartFile): BulkValidationResponse {
@@ -93,12 +98,24 @@ class BulkImportService(
         job.startImport()
         bulkImportJobRepository.save(job)
 
-        processImportAsync(job.id!!, sellerId, parseResult.rows, parseResult.errors)
+        val jobId = job.id!!
+        val rows = parseResult.rows
+        val errors = parseResult.errors
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun afterCommit() {
+                    processImportAsync(jobId, sellerId, rows, errors)
+                }
+            })
+        } else {
+            processImportAsync(jobId, sellerId, rows, errors)
+        }
 
         return BulkImportProgressResponse.from(job)
     }
 
-    @Async
+    @Async("bulkImportExecutor")
     fun processImportAsync(jobId: Long, sellerId: Long, rows: List<BulkProductRow>, parseErrors: List<BulkRowError>) {
         processImport(jobId, sellerId, rows, parseErrors)
     }
@@ -116,6 +133,8 @@ class BulkImportService(
         parseErrors.filter { it.rowNumber > 0 }.map { it.rowNumber }.distinct().forEach { _ ->
             job.recordFailure()
         }
+
+        val allProductImages = mutableListOf<ProductImage>()
 
         for (row in rows) {
             try {
@@ -140,7 +159,7 @@ class BulkImportService(
                 val productImages = imageUrls.mapIndexed { index, url ->
                     ProductImage.create(productId = product.id!!, imageUrl = url, sortOrder = index)
                 }
-                productImageRepository.saveAll(productImages)
+                allProductImages.addAll(productImages)
 
                 inventoryCommandService.initStock(
                     InventoryInitRequest(productId = product.id!!, stockQuantity = row.stockQuantity)
@@ -154,13 +173,31 @@ class BulkImportService(
             }
         }
 
+        if (allProductImages.isNotEmpty()) {
+            allProductImages.chunked(CHUNK_SIZE).forEach { chunk ->
+                productImageRepository.saveAll(chunk)
+            }
+        }
+
         if (allErrors.isNotEmpty()) {
             job.errorDetails = objectMapper.writeValueAsString(allErrors)
         }
         job.complete()
         bulkImportJobRepository.save(job)
 
+        evictProductCaches()
+
         log.info("대량 등록 완료: jobId={}, success={}, fail={}", jobId, job.successCount, job.failCount)
+    }
+
+    private fun evictProductCaches() {
+        try {
+            cacheManager.getCache("product")?.clear()
+            cacheManager.getCache("product:notfound")?.clear()
+            log.info("대량 등록 후 product 캐시 초기화 완료")
+        } catch (e: Exception) {
+            log.warn("캐시 초기화 실패: {}", e.message)
+        }
     }
 
     @Transactional(readOnly = true)

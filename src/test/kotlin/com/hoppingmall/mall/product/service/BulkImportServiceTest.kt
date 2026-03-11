@@ -25,6 +25,10 @@ import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
+import org.springframework.cache.Cache
+import org.springframework.cache.CacheManager
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal
 import java.util.*
 
@@ -39,6 +43,7 @@ class BulkImportServiceTest {
     private val categoryRepository: CategoryRepository = mock()
     private val inventoryCommandService: InventoryCommandService = mock()
     private val objectMapper = jacksonObjectMapper()
+    private val cacheManager: CacheManager = mock()
 
     private val bulkImportService = BulkImportService(
         csvParsingService,
@@ -47,7 +52,8 @@ class BulkImportServiceTest {
         productImageRepository,
         categoryRepository,
         inventoryCommandService,
-        objectMapper
+        objectMapper,
+        cacheManager
     )
 
     @Nested
@@ -135,6 +141,40 @@ class BulkImportServiceTest {
             val result = bulkImportService.startImport(5L, file)
 
             assertEquals(1L, result.jobId)
+        }
+
+        @Test
+        fun 트랜잭션_커밋_후_비동기_처리를_등록한다() {
+            val file = mock<org.springframework.web.multipart.MultipartFile>()
+            whenever(file.originalFilename).thenReturn("products.csv")
+            val rows = listOf(
+                BulkProductRow(1, "상품1", "설명1", 1L, BigDecimal("15000"), 100, emptyList())
+            )
+
+            whenever(csvParsingService.parse(file)).thenReturn(CsvParsingService.ParseResult(rows, emptyList()))
+            val savedJob = BulkImportJob.create(5L, "products.csv", 1).withId(1L)
+            whenever(bulkImportJobRepository.save(any<BulkImportJob>())).thenReturn(savedJob)
+            whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(savedJob))
+
+            val category1 = Category.fixture(name = "카테고리1").withId(1L)
+            whenever(categoryRepository.findAllById(listOf(1L))).thenReturn(listOf(category1))
+            whenever(productRepository.save(any<Product>())).thenAnswer { invocation ->
+                (invocation.arguments[0] as Product).withId(100L)
+            }
+            whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenAnswer { it.arguments[0] }
+
+            TransactionSynchronizationManager.initSynchronization()
+            try {
+                val result = bulkImportService.startImport(5L, file)
+
+                assertEquals(1L, result.jobId)
+                val synchronizations = TransactionSynchronizationManager.getSynchronizations()
+                assertEquals(1, synchronizations.size)
+
+                synchronizations.forEach { it.afterCommit() }
+            } finally {
+                TransactionSynchronizationManager.clearSynchronization()
+            }
         }
     }
 
