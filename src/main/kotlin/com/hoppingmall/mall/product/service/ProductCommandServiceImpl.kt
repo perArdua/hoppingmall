@@ -2,6 +2,7 @@ package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.category.domain.repository.CategoryRepository
 import com.hoppingmall.mall.category.exception.CategoryNotFoundException
+import com.hoppingmall.mall.global.file.config.FileUploadConfig
 import com.hoppingmall.mall.product.domain.Product
 import com.hoppingmall.mall.product.domain.ProductImage
 import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
@@ -19,12 +20,9 @@ import org.springframework.transaction.annotation.Transactional
 class ProductCommandServiceImpl(
     private val productRepository: ProductRepository,
     private val productImageRepository: ProductImageRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val fileUploadConfig: FileUploadConfig
 ) : ProductCommandService {
-
-    companion object {
-        private const val DEFAULT_IMAGE_PATH = "D:/hoppingmall/product/images/default-product.jpg"
-    }
 
     override fun createProduct(request: ProductCreateRequest): ProductResponse {
         if (!categoryRepository.existsById(request.categoryId)) {
@@ -41,7 +39,7 @@ class ProductCommandServiceImpl(
         )
         val savedProduct = productRepository.save(product)
 
-        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(DEFAULT_IMAGE_PATH)
+        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(fileUploadConfig.defaultImagePath)
         val productImages = imageUrls.mapIndexed { index, url ->
             ProductImage.create(
                 productId = savedProduct.id!!,
@@ -74,7 +72,7 @@ class ProductCommandServiceImpl(
         val existingImages = productImageRepository.findByProductIdOrderBySortOrder(productId)
         existingImages.forEach { it.softDelete() }
 
-        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(DEFAULT_IMAGE_PATH)
+        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(fileUploadConfig.defaultImagePath)
         val newImages = imageUrls.mapIndexed { index, url ->
             ProductImage.create(
                 productId = productId,
