@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.hoppingmall.mall.category.domain.Category
 import com.hoppingmall.mall.category.domain.repository.CategoryRepository
+import com.hoppingmall.mall.global.file.config.FileUploadConfig
 import com.hoppingmall.mall.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.product.domain.BulkImportJob
@@ -44,6 +45,9 @@ class BulkImportServiceTest {
     private val inventoryCommandService: InventoryCommandService = mock()
     private val objectMapper = jacksonObjectMapper()
     private val cacheManager: CacheManager = mock()
+    private val fileUploadConfig: FileUploadConfig = mock {
+        on { defaultImagePath } doReturn "test-upload/product/images/default-product.jpg"
+    }
 
     private val bulkImportService = BulkImportService(
         csvParsingService,
@@ -53,7 +57,8 @@ class BulkImportServiceTest {
         categoryRepository,
         inventoryCommandService,
         objectMapper,
-        cacheManager
+        cacheManager,
+        fileUploadConfig
     )
 
     @Nested
