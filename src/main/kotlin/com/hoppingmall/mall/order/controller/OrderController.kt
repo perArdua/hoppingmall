@@ -53,6 +53,7 @@ class OrderController(
         return ResponseEntity.ok(ApiResponse.success(orders))
     }
 
+    @Idempotent(ttlHours = 24)
     @PatchMapping("/{orderId}/cancel")
     fun cancelOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
@@ -62,6 +63,7 @@ class OrderController(
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 
+    @Idempotent(ttlHours = 24)
     @PatchMapping("/{orderId}/status")
     fun updateOrderStatus(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,

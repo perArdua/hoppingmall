@@ -66,6 +66,7 @@ class RefundController(
         return ResponseEntity.ok(refunds)
     }
 
+    @Idempotent(ttlHours = 24)
     @PatchMapping("/{refundId}/approve")
     fun approveRefund(
         @PathVariable refundId: Long,
@@ -76,6 +77,7 @@ class RefundController(
         return ResponseEntity.ok(response)
     }
 
+    @Idempotent(ttlHours = 24)
     @PatchMapping("/{refundId}/reject")
     fun rejectRefund(
         @PathVariable refundId: Long,
