@@ -70,7 +70,14 @@ class SecurityConfig(
                 it.requestMatchers(
                     HttpMethod.POST,
                     "/api/v1/products",
-                    "/api/v1/products/images/upload"
+                    "/api/v1/products/images/upload",
+                    "/api/v1/products/bulk/validate",
+                    "/api/v1/products/bulk/import"
+                ).hasRole("SELLER")
+                it.requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/products/bulk/{jobId}",
+                    "/api/v1/products/bulk/{jobId}/errors"
                 ).hasRole("SELLER")
                 it.requestMatchers(HttpMethod.PUT, "/api/v1/products/{productId}").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.DELETE, "/api/v1/products/{productId}").hasRole("SELLER")
