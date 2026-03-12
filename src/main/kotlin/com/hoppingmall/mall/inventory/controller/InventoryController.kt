@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.inventory.controller
 
 import com.hoppingmall.mall.global.common.response.ApiResponse
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.mall.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.mall.inventory.dto.response.InventoryResponse
@@ -18,6 +19,7 @@ class InventoryController(
     private val inventoryQueryService: InventoryQueryService
 ) {
 
+    @Idempotent(ttlHours = 24)
     @PostMapping
     fun initStock(
         @Valid @RequestBody request: InventoryInitRequest
@@ -35,6 +37,7 @@ class InventoryController(
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
+    @Idempotent(ttlHours = 24)
     @PatchMapping("/{productId}")
     fun updateStock(
         @PathVariable productId: Long,
