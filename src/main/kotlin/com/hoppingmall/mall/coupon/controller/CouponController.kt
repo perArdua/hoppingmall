@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.coupon.controller
 
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.coupon.dto.request.CouponCreateRequest
 import com.hoppingmall.mall.coupon.dto.response.CouponResponse
 import com.hoppingmall.mall.coupon.dto.response.UserCouponResponse
@@ -24,6 +25,7 @@ class CouponController(
     private val couponQueryService: CouponQueryService
 ) {
 
+    @Idempotent(ttlHours = 24)
     @PostMapping("/admin/coupons")
     fun createCoupon(
         @Valid @RequestBody request: CouponCreateRequest
@@ -39,6 +41,7 @@ class CouponController(
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
+    @Idempotent(ttlHours = 24)
     @PatchMapping("/admin/coupons/{couponId}/status")
     fun changeCouponStatus(
         @PathVariable couponId: Long,
@@ -54,6 +57,7 @@ class CouponController(
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
+    @Idempotent(ttlHours = 24)
     @PostMapping("/coupons/{couponId}/issue")
     fun issueCoupon(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,

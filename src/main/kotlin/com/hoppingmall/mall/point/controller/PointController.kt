@@ -1,5 +1,6 @@
 package com.hoppingmall.mall.point.controller
 
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.point.dto.request.PointUseRequest
 import com.hoppingmall.mall.point.dto.response.PointBalanceResponse
 import com.hoppingmall.mall.point.dto.response.PointHistoryResponse
@@ -42,6 +43,7 @@ class PointController(
         return ResponseEntity.ok(history)
     }
     
+    @Idempotent(ttlHours = 24)
     @PostMapping("/use")
     fun usePoint(
         @Valid @RequestBody request: PointUseRequest,

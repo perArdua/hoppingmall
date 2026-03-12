@@ -2,6 +2,7 @@ package com.hoppingmall.mall.shipping.controller
 
 import com.hoppingmall.mall.global.auth.UserPrincipal
 import com.hoppingmall.mall.global.common.response.ApiResponse
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.shipping.dto.request.ShippingCreateRequest
 import com.hoppingmall.mall.shipping.dto.request.ShippingStatusUpdateRequest
 import com.hoppingmall.mall.shipping.dto.response.ShippingResponse
@@ -20,6 +21,7 @@ class ShippingController(
     private val shippingQueryService: ShippingQueryService
 ) {
 
+    @Idempotent(ttlHours = 24)
     @PostMapping
     fun createShipping(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
@@ -30,6 +32,7 @@ class ShippingController(
             .body(ApiResponse.success(shipping))
     }
 
+    @Idempotent(ttlHours = 24)
     @PatchMapping("/{shippingId}/status")
     fun updateShippingStatus(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,

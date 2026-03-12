@@ -63,6 +63,7 @@ class PaymentController(
         return ResponseEntity.ok(payments)
     }
 
+    @Idempotent(ttlHours = 24)
     @PostMapping("/{paymentId}/cancel")
     fun cancelPayment(
         @PathVariable paymentId: Long,
