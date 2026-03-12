@@ -3,6 +3,7 @@ package com.hoppingmall.mall.product.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.category.domain.repository.CategoryRepository
 import com.hoppingmall.mall.global.enums.ProductStatus
+import com.hoppingmall.mall.global.file.config.FileUploadConfig
 import com.hoppingmall.mall.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.mall.inventory.service.InventoryCommandService
 import com.hoppingmall.mall.product.domain.BulkImportJob
@@ -33,13 +34,13 @@ class BulkImportService(
     private val categoryRepository: CategoryRepository,
     private val inventoryCommandService: InventoryCommandService,
     private val objectMapper: ObjectMapper,
-    private val cacheManager: CacheManager
+    private val cacheManager: CacheManager,
+    private val fileUploadConfig: FileUploadConfig
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        private const val DEFAULT_IMAGE_PATH = "D:/hoppingmall/product/images/default-product.jpg"
         private const val CHUNK_SIZE = 50
     }
 
@@ -155,7 +156,7 @@ class BulkImportService(
                     )
                 )
 
-                val imageUrls = row.imageUrls.ifEmpty { listOf(DEFAULT_IMAGE_PATH) }
+                val imageUrls = row.imageUrls.ifEmpty { listOf(fileUploadConfig.defaultImagePath) }
                 val productImages = imageUrls.mapIndexed { index, url ->
                     ProductImage.create(productId = product.id!!, imageUrl = url, sortOrder = index)
                 }
