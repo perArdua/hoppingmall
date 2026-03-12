@@ -2,6 +2,7 @@ package com.hoppingmall.mall.review.controller
 
 import com.hoppingmall.mall.global.auth.UserPrincipal
 import com.hoppingmall.mall.global.common.response.ApiResponse
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.review.dto.request.ReviewCreateRequest
 import com.hoppingmall.mall.review.dto.request.ReviewUpdateRequest
 import com.hoppingmall.mall.review.dto.response.ReviewResponse
@@ -23,6 +24,7 @@ class ReviewController(
     private val reviewQueryService: ReviewQueryService
 ) {
 
+    @Idempotent(ttlHours = 24)
     @PostMapping("/reviews")
     fun createReview(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
@@ -59,6 +61,7 @@ class ReviewController(
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
+    @Idempotent(ttlHours = 24)
     @PutMapping("/reviews/{reviewId}")
     fun updateReview(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
@@ -69,6 +72,7 @@ class ReviewController(
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
+    @Idempotent(ttlHours = 24)
     @DeleteMapping("/reviews/{reviewId}")
     fun deleteReview(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,

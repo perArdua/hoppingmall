@@ -2,6 +2,7 @@ package com.hoppingmall.mall.wishlist.controller
 
 import com.hoppingmall.mall.global.auth.UserPrincipal
 import com.hoppingmall.mall.global.common.response.ApiResponse
+import com.hoppingmall.mall.global.idempotency.Idempotent
 import com.hoppingmall.mall.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.mall.wishlist.dto.response.WishlistResponse
 import com.hoppingmall.mall.wishlist.service.WishlistCommandService
@@ -22,6 +23,7 @@ class WishlistController(
     private val wishlistQueryService: WishlistQueryService
 ) {
 
+    @Idempotent(ttlHours = 24)
     @PostMapping
     fun addWishlist(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
@@ -32,6 +34,7 @@ class WishlistController(
             .body(ApiResponse.success(wishlist))
     }
 
+    @Idempotent(ttlHours = 24)
     @DeleteMapping("/{wishlistId}")
     fun removeWishlist(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
