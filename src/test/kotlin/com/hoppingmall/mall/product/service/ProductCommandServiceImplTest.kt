@@ -3,6 +3,7 @@ package com.hoppingmall.mall.product.service
 import com.hoppingmall.mall.category.domain.repository.CategoryRepository
 import com.hoppingmall.mall.category.exception.CategoryNotFoundException
 import com.hoppingmall.mall.global.enums.ProductStatus
+import com.hoppingmall.mall.global.file.config.FileUploadConfig
 import com.hoppingmall.mall.product.domain.Product
 import java.math.BigDecimal
 import com.hoppingmall.mall.product.domain.ProductImage
@@ -29,7 +30,10 @@ class ProductCommandServiceImplTest {
     private val productRepository: ProductRepository = mock()
     private val productImageRepository: ProductImageRepository = mock()
     private val categoryRepository: CategoryRepository = mock()
-    private val productCommandService = ProductCommandServiceImpl(productRepository, productImageRepository, categoryRepository)
+    private val fileUploadConfig: FileUploadConfig = mock {
+        on { defaultImagePath } doReturn "test-upload/product/images/default-product.jpg"
+    }
+    private val productCommandService = ProductCommandServiceImpl(productRepository, productImageRepository, categoryRepository, fileUploadConfig)
 
     @Nested
     @DisplayName("createProduct")
@@ -158,14 +162,14 @@ class ProductCommandServiceImplTest {
             assertThat(result).isNotNull()
             assertThat(result.id).isEqualTo(1L)
             assertThat(result.name).isEqualTo(request.name)
-            assertThat(result.imageUrls).containsExactly("D:/hoppingmall/product/images/default-product.jpg")
+            assertThat(result.imageUrls).containsExactly("test-upload/product/images/default-product.jpg")
 
             val savedProduct = productCaptor.firstValue
             assertThat(savedProduct.name).isEqualTo(request.name)
             assertThat(savedProduct.sellerId).isEqualTo(request.sellerId)
 
             val savedImages = imagesCaptor.firstValue
-            assertThat(savedImages[0].imageUrl).isEqualTo("D:/hoppingmall/product/images/default-product.jpg")
+            assertThat(savedImages[0].imageUrl).isEqualTo("test-upload/product/images/default-product.jpg")
 
             verify(categoryRepository).existsById(request.categoryId)
             verify(productRepository).save(any())
@@ -375,7 +379,7 @@ class ProductCommandServiceImplTest {
             assertThat(result).isNotNull()
             assertThat(result.id).isEqualTo(productId)
             assertThat(result.name).isEqualTo(request.name)
-            assertThat(result.imageUrls).containsExactly("D:/hoppingmall/product/images/default-product.jpg")
+            assertThat(result.imageUrls).containsExactly("test-upload/product/images/default-product.jpg")
 
             verify(productRepository).findById(productId)
             verify(productRepository).save(any())

@@ -383,7 +383,7 @@ class ProductControllerTest {
             )
 
             val expectedResponse = ProductImageResponse(
-                imageUrl = "D:/hoppingmall/product/images/uuid.jpg",
+                imageUrl = "test-upload/product/images/uuid.jpg",
                 fileName = "uuid.jpg",
                 fileSize = imageContent.size.toLong()
             )
