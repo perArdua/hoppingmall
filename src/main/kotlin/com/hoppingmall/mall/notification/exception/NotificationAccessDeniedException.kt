@@ -1,0 +1,5 @@
+package com.hoppingmall.mall.notification.exception
+
+import com.hoppingmall.mall.notification.exception.code.NotificationErrorCode
+
+class NotificationAccessDeniedException : NotificationException(NotificationErrorCode.NOTIFICATION_ACCESS_DENIED)
