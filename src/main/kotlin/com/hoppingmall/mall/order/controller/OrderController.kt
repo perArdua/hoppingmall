@@ -15,10 +15,12 @@ import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/orders")
+@Tag(name = "주문")
 class OrderController(
     private val orderCommandService: OrderCommandService,
     private val orderQueryService: OrderQueryService

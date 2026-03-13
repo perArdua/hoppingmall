@@ -5,10 +5,12 @@ import com.hoppingmall.mall.point.dto.response.PointPolicyResponse
 import com.hoppingmall.mall.point.service.PointPolicyService
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/point-policies")
+@Tag(name = "포인트 정책")
 class PointPolicyController(
     private val pointPolicyService: PointPolicyService
 ) {

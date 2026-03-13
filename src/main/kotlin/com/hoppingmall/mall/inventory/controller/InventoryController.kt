@@ -10,10 +10,12 @@ import com.hoppingmall.mall.inventory.service.InventoryQueryService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/inventories")
+@Tag(name = "재고")
 class InventoryController(
     private val inventoryCommandService: InventoryCommandService,
     private val inventoryQueryService: InventoryQueryService

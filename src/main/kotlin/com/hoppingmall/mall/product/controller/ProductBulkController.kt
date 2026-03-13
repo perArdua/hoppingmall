@@ -7,11 +7,13 @@ import com.hoppingmall.mall.product.dto.response.BulkRowError
 import com.hoppingmall.mall.product.dto.response.BulkValidationResponse
 import com.hoppingmall.mall.product.service.BulkImportService
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
 @RestController
 @RequestMapping("/api/v1/products/bulk")
+@Tag(name = "상품 대량 등록")
 class ProductBulkController(
     private val bulkImportService: BulkImportService
 ) {

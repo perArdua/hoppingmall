@@ -86,6 +86,9 @@ dependencies {
 	// CSV 파싱
 	implementation("org.apache.commons:commons-csv:1.12.0")
 
+	// API 문서화
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
+
 	// JSON 로깅
 	implementation("net.logstash.logback:logstash-logback-encoder:8.0")
 }
