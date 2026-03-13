@@ -1,8 +1,6 @@
 package com.hoppingmall.mall.review.service
 
-import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
-import com.hoppingmall.mall.order.domain.repository.OrderRepository
-import com.hoppingmall.mall.order.enum.OrderStatus
+import com.hoppingmall.mall.order.api.OrderQueryPort
 import com.hoppingmall.mall.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.mall.review.domain.Review
 import com.hoppingmall.mall.review.domain.repository.ReviewRepository
@@ -23,24 +21,16 @@ import java.math.RoundingMode
 @Transactional
 class ReviewCommandServiceImpl(
     private val reviewRepository: ReviewRepository,
-    private val orderRepository: OrderRepository,
-    private val orderItemRepository: OrderItemRepository,
+    private val orderQueryPort: OrderQueryPort,
     private val productStatisticsRepository: ProductStatisticsRepository
 ) : ReviewCommandService {
 
     override fun createReview(buyerId: Long, request: ReviewCreateRequest): ReviewResponse {
-        val orderItem = orderItemRepository.findById(request.orderItemId)
-            .orElseThrow { ReviewException(ReviewErrorCode.REVIEW_INVALID_ORDER_ITEM) }
+        val orderItemInfo = orderQueryPort.findOrderItemById(request.orderItemId)
+            ?: throw ReviewException(ReviewErrorCode.REVIEW_INVALID_ORDER_ITEM)
 
-        val order = orderRepository.findById(orderItem.orderId)
-            .orElseThrow { ReviewException(ReviewErrorCode.REVIEW_INVALID_ORDER_ITEM) }
-
-        if (order.status != OrderStatus.DELIVERED) {
+        if (!orderQueryPort.isDelivered(orderItemInfo.orderId, buyerId)) {
             throw ReviewException(ReviewErrorCode.REVIEW_ORDER_NOT_DELIVERED)
-        }
-
-        if (order.buyerId != buyerId) {
-            throw ReviewAccessDeniedException()
         }
 
         if (reviewRepository.existsByOrderItemId(request.orderItemId)) {
@@ -50,14 +40,14 @@ class ReviewCommandServiceImpl(
         val review = Review.create(
             buyerId = buyerId,
             orderItemId = request.orderItemId,
-            productId = orderItem.productId,
+            productId = orderItemInfo.productId,
             rating = request.rating,
             content = request.content,
             imageUrl = request.imageUrl
         )
         val savedReview = reviewRepository.save(review)
 
-        updateProductReviewStats(orderItem.productId)
+        updateProductReviewStats(orderItemInfo.productId)
 
         return ReviewResponse.from(savedReview)
     }

@@ -26,16 +26,21 @@ kotlin {
 
 dependencies {
 	implementation(project(":shared"))
+	implementation(project(":infra"))
 	implementation(project(":order-api"))
 	implementation(project(":product-api"))
 	implementation(project(":payment-api"))
+	implementation(project(":product-domain"))
+	implementation(project(":payment-domain"))
 
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

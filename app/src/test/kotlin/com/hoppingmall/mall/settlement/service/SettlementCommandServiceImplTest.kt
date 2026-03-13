@@ -1,11 +1,9 @@
 package com.hoppingmall.mall.settlement.service
 
-import com.hoppingmall.mall.order.domain.OrderItem
-import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
-import com.hoppingmall.mall.refund.domain.Refund
-import com.hoppingmall.mall.refund.domain.repository.RefundRepository
-import com.hoppingmall.mall.refund.enum.RefundReason
-import com.hoppingmall.mall.refund.enum.RefundStatus
+import com.hoppingmall.mall.order.api.OrderItemInfo
+import com.hoppingmall.mall.order.api.OrderItemQueryPort
+import com.hoppingmall.mall.refund.api.RefundInfo
+import com.hoppingmall.mall.refund.api.RefundQueryPort
 import com.hoppingmall.mall.settlement.domain.Settlement
 import com.hoppingmall.mall.settlement.domain.SettlementItem
 import com.hoppingmall.mall.settlement.domain.repository.SettlementItemRepository
@@ -40,10 +38,10 @@ class SettlementCommandServiceImplTest {
 
     private val settlementRepository: SettlementRepository = mock()
     private val settlementItemRepository: SettlementItemRepository = mock()
-    private val orderItemRepository: OrderItemRepository = mock()
-    private val refundRepository: RefundRepository = mock()
+    private val orderItemQueryPort: OrderItemQueryPort = mock()
+    private val refundQueryPort: RefundQueryPort = mock()
     private val service = SettlementCommandServiceImpl(
-        settlementRepository, settlementItemRepository, orderItemRepository, refundRepository
+        settlementRepository, settlementItemRepository, orderItemQueryPort, refundQueryPort
     )
 
     @Nested
@@ -63,17 +61,18 @@ class SettlementCommandServiceImplTest {
                 request.sellerId, request.periodStart, request.periodEnd
             )).thenReturn(false)
 
-            val orderItem = OrderItem.create(
-                orderId = 1L, sellerId = 1L, productId = 10L,
-                productName = "테스트 상품", productPrice = BigDecimal("50000"), quantity = 2
-            ).withId(1L)
+            val orderItemInfo = OrderItemInfo(
+                id = 1L, orderId = 1L, sellerId = 1L, productId = 10L,
+                productName = "테스트 상품", productPrice = BigDecimal("50000"),
+                quantity = 2, totalPrice = BigDecimal("100000")
+            )
 
-            whenever(orderItemRepository.findDeliveredItemsBySellerAndPeriod(
+            whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(
                 any(), any(), any()
-            )).thenReturn(listOf(orderItem))
+            )).thenReturn(listOf(orderItemInfo))
 
-            whenever(refundRepository.findBySellerIdAndStatusAndCompletedAtBetween(
-                any(), any(), any(), any()
+            whenever(refundQueryPort.findCompletedBySellerAndPeriod(
+                any(), any(), any()
             )).thenReturn(emptyList())
 
             whenever(settlementRepository.save(any<Settlement>())).thenAnswer { invocation ->
@@ -97,24 +96,23 @@ class SettlementCommandServiceImplTest {
                 request.sellerId, request.periodStart, request.periodEnd
             )).thenReturn(false)
 
-            val orderItem = OrderItem.create(
-                orderId = 1L, sellerId = 1L, productId = 10L,
-                productName = "테스트 상품", productPrice = BigDecimal("50000"), quantity = 2
-            ).withId(1L)
-
-            whenever(orderItemRepository.findDeliveredItemsBySellerAndPeriod(
-                any(), any(), any()
-            )).thenReturn(listOf(orderItem))
-
-            val refund = Refund.create(
-                orderId = 1L, paymentId = 1L, buyerId = 2L, sellerId = 1L,
-                reason = RefundReason.CHANGE_OF_MIND, reasonDetail = null,
-                refundAmount = BigDecimal("20000"), isFullRefund = false
+            val orderItemInfo = OrderItemInfo(
+                id = 1L, orderId = 1L, sellerId = 1L, productId = 10L,
+                productName = "테스트 상품", productPrice = BigDecimal("50000"),
+                quantity = 2, totalPrice = BigDecimal("100000")
             )
 
-            whenever(refundRepository.findBySellerIdAndStatusAndCompletedAtBetween(
-                any(), any(), any(), any()
-            )).thenReturn(listOf(refund))
+            whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(
+                any(), any(), any()
+            )).thenReturn(listOf(orderItemInfo))
+
+            val refundInfo = RefundInfo(
+                id = 1L, refundAmount = BigDecimal("20000")
+            )
+
+            whenever(refundQueryPort.findCompletedBySellerAndPeriod(
+                any(), any(), any()
+            )).thenReturn(listOf(refundInfo))
 
             whenever(settlementRepository.save(any<Settlement>())).thenAnswer { invocation ->
                 (invocation.arguments[0] as Settlement).withId(1L)
@@ -157,7 +155,7 @@ class SettlementCommandServiceImplTest {
                 request.sellerId, request.periodStart, request.periodEnd
             )).thenReturn(false)
 
-            whenever(orderItemRepository.findDeliveredItemsBySellerAndPeriod(
+            whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(
                 any(), any(), any()
             )).thenReturn(emptyList())
 

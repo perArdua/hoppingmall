@@ -20,7 +20,7 @@ class ProductHourlyStatistics(
     @Column(name = "statistics_date", nullable = false)
     val statisticsDate: LocalDate,
 
-    @Column(nullable = false)
+    @Column(name = "\"hour\"", nullable = false)
     val hour: Int,
 
     @Column(nullable = false)

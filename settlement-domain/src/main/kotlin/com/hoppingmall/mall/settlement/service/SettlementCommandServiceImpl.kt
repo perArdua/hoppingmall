@@ -1,8 +1,7 @@
 package com.hoppingmall.mall.settlement.service
 
-import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
-import com.hoppingmall.mall.refund.domain.repository.RefundRepository
-import com.hoppingmall.mall.refund.enum.RefundStatus
+import com.hoppingmall.mall.order.api.OrderItemQueryPort
+import com.hoppingmall.mall.refund.api.RefundQueryPort
 import com.hoppingmall.mall.settlement.domain.Settlement
 import com.hoppingmall.mall.settlement.domain.SettlementItem
 import com.hoppingmall.mall.settlement.domain.repository.SettlementItemRepository
@@ -23,8 +22,8 @@ import java.math.RoundingMode
 class SettlementCommandServiceImpl(
     private val settlementRepository: SettlementRepository,
     private val settlementItemRepository: SettlementItemRepository,
-    private val orderItemRepository: OrderItemRepository,
-    private val refundRepository: RefundRepository
+    private val orderItemQueryPort: OrderItemQueryPort,
+    private val refundQueryPort: RefundQueryPort
 ) : SettlementCommandService {
 
     override fun createSettlement(request: CreateSettlementRequest): SettlementResponse {
@@ -42,7 +41,7 @@ class SettlementCommandServiceImpl(
         val startDateTime = request.periodStart.atStartOfDay()
         val endDateTime = request.periodEnd.plusDays(1).atStartOfDay()
 
-        val orderItems = orderItemRepository.findDeliveredItemsBySellerAndPeriod(
+        val orderItems = orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(
             request.sellerId, startDateTime, endDateTime
         )
 
@@ -52,8 +51,8 @@ class SettlementCommandServiceImpl(
 
         val totalSalesAmount = orderItems.sumOf { it.totalPrice }
 
-        val refunds = refundRepository.findBySellerIdAndStatusAndCompletedAtBetween(
-            request.sellerId, RefundStatus.COMPLETED, startDateTime, endDateTime
+        val refunds = refundQueryPort.findCompletedBySellerAndPeriod(
+            request.sellerId, startDateTime, endDateTime
         )
         val totalRefundAmount = refunds.sumOf { it.refundAmount }
 
@@ -78,7 +77,7 @@ class SettlementCommandServiceImpl(
             SettlementItem.create(
                 settlementId = settlement.id!!,
                 orderId = orderItem.orderId,
-                orderItemId = orderItem.id!!,
+                orderItemId = orderItem.id,
                 productName = orderItem.productName,
                 quantity = orderItem.quantity,
                 salesAmount = orderItem.totalPrice
