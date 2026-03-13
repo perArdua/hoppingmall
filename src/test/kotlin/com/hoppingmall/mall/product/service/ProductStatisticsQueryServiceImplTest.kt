@@ -1,9 +1,12 @@
 package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.product.domain.ProductDailyStatistics
+import com.hoppingmall.mall.product.domain.ProductHourlyStatistics
 import com.hoppingmall.mall.product.domain.ProductStatistics
 import com.hoppingmall.mall.product.domain.repository.ProductDailyStatisticsRepository
+import com.hoppingmall.mall.product.domain.repository.ProductHourlyStatisticsRepository
 import com.hoppingmall.mall.product.domain.repository.ProductStatisticsRepository
+import com.hoppingmall.mall.product.dto.HourlyAggregationProjection
 import com.hoppingmall.mall.product.dto.TopProductProjection
 import com.hoppingmall.mall.product.exception.ProductStatisticsNotFoundException
 import com.hoppingmall.mall.support.fixture.fixture
@@ -27,7 +30,8 @@ class ProductStatisticsQueryServiceImplTest {
 
     private val productStatisticsRepository: ProductStatisticsRepository = mock()
     private val productDailyStatisticsRepository: ProductDailyStatisticsRepository = mock()
-    private val service = ProductStatisticsQueryServiceImpl(productStatisticsRepository, productDailyStatisticsRepository)
+    private val productHourlyStatisticsRepository: ProductHourlyStatisticsRepository = mock()
+    private val service = ProductStatisticsQueryServiceImpl(productStatisticsRepository, productDailyStatisticsRepository, productHourlyStatisticsRepository)
 
     @Nested
     @DisplayName("getAll")
@@ -236,6 +240,54 @@ class ProductStatisticsQueryServiceImplTest {
             assertEquals(1, result.size)
             assertEquals(2L, result[0].productId)
             assertEquals(BigDecimal("100000"), result[0].totalAmount)
+        }
+    }
+
+    @Nested
+    @DisplayName("getHourlyStatistics")
+    inner class GetHourlyStatistics {
+        @Test
+        fun 시간대별_통계_조회_성공() {
+            val productId = 1L
+            val date = LocalDate.of(2026, 3, 13)
+            val hourlyList = listOf(
+                ProductHourlyStatistics.create(productId = productId, statisticsDate = date, hour = 10,
+                    hourlySalesQuantity = 20, hourlySalesAmount = BigDecimal("200000")).withId(1L),
+                ProductHourlyStatistics.create(productId = productId, statisticsDate = date, hour = 14,
+                    hourlySalesQuantity = 35, hourlySalesAmount = BigDecimal("350000")).withId(2L)
+            )
+
+            whenever(productHourlyStatisticsRepository.findByProductIdAndStatisticsDateOrderByHourAsc(productId, date))
+                .thenReturn(hourlyList)
+
+            val result = service.getHourlyStatistics(productId, date)
+
+            assertEquals(2, result.size)
+            assertEquals(10, result[0].hour)
+            assertEquals(14, result[1].hour)
+            assertEquals(BigDecimal("350000"), result[1].hourlySalesAmount)
+        }
+    }
+
+    @Nested
+    @DisplayName("getPeakHours")
+    inner class GetPeakHours {
+        @Test
+        fun 피크_타임_조회_성공() {
+            val projection = mock<HourlyAggregationProjection>()
+            whenever(projection.getHour()).thenReturn(14)
+            whenever(projection.getTotalAmount()).thenReturn(BigDecimal("1500000"))
+            whenever(projection.getTotalOrders()).thenReturn(75L)
+
+            whenever(productHourlyStatisticsRepository.findPeakHours(any(), any()))
+                .thenReturn(listOf(projection))
+
+            val result = service.getPeakHours(7)
+
+            assertEquals(1, result.size)
+            assertEquals(14, result[0].hour)
+            assertEquals(BigDecimal("1500000"), result[0].totalSalesAmount)
+            assertEquals(75L, result[0].totalOrderCount)
         }
     }
 }
