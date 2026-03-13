@@ -93,6 +93,16 @@ cors:
   allow-credentials: true
   max-age: 3600
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
+
 logging:
   level:
     org.hibernate.SQL: debug

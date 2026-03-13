@@ -13,11 +13,13 @@ import com.hoppingmall.mall.product.service.ProductQueryService
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
 @RestController
 @RequestMapping("/api/v1/products")
+@Tag(name = "상품")
 class ProductController(
     private val productQueryService: ProductQueryService,
     private val productCommandService: ProductCommandService,

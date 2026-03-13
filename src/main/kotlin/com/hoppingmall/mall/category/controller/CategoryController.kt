@@ -10,10 +10,12 @@ import com.hoppingmall.mall.global.common.response.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/categories")
+@Tag(name = "카테고리")
 class CategoryController(
     private val categoryCommandService: CategoryCommandService,
     private val categoryQueryService: CategoryQueryService
