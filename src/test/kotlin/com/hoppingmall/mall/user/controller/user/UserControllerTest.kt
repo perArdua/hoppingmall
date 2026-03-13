@@ -15,7 +15,7 @@ import org.junit.jupiter.api.*
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.mockito.kotlin.*
-import org.springframework.security.core.userdetails.UserDetails
+import com.hoppingmall.mall.global.auth.UserPrincipal
 
 @DisplayName("UserController")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -90,14 +90,13 @@ class UserControllerTest {
     inner class GetMyProfile {
         @Test
         fun 인증된_사용자의_프로필_조회_성공() {
-            val userDetails = mock<UserDetails>()
             val userId = 1L
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
             val profileResponse = UserProfileResponse(userId, "test@example.com", "홍길동", Role.BUYER.name)
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(userQueryService.getUserProfile(userId)).thenReturn(profileResponse)
 
-            val result = controller.getMyProfile(userDetails)
+            val result = controller.getMyProfile(principal)
 
             assertEquals(ApiResponse.success(profileResponse), result)
             verify(userQueryService).getUserProfile(userId)
@@ -109,14 +108,13 @@ class UserControllerTest {
     inner class UpdateMyProfile {
         @Test
         fun 인증된_사용자의_프로필_수정_성공() {
-            val userDetails = mock<UserDetails>()
             val userId = 1L
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
             val request = UpdateUserRequest("새로운이름", "newPassword123!")
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             doNothing().whenever(userCommandService).updateUserProfile(userId, request)
 
-            val result = controller.updateMyProfile(request, userDetails)
+            val result = controller.updateMyProfile(request, principal)
 
             assertEquals(ApiResponse.success(Unit), result)
             verify(userCommandService).updateUserProfile(userId, request)
@@ -124,14 +122,13 @@ class UserControllerTest {
 
         @Test
         fun 비밀번호_없이_이름만_수정_성공() {
-            val userDetails = mock<UserDetails>()
             val userId = 1L
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
             val request = UpdateUserRequest("새로운이름", null)
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             doNothing().whenever(userCommandService).updateUserProfile(userId, request)
 
-            val result = controller.updateMyProfile(request, userDetails)
+            val result = controller.updateMyProfile(request, principal)
 
             assertEquals(ApiResponse.success(Unit), result)
             verify(userCommandService).updateUserProfile(userId, request)

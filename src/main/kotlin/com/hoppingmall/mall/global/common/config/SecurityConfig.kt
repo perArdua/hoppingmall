@@ -37,7 +37,8 @@ class SecurityConfig(
                 it.requestMatchers(
                     "/swagger-ui/**",
                     "/swagger-ui.html",
-                    "/v3/api-docs/**"
+                    "/v3/api-docs/**",
+                    "/actuator/**"
                 ).permitAll()
                 it.requestMatchers("/api/v1/users/signup", "/api/v1/users/login").permitAll()
                 it.requestMatchers(

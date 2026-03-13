@@ -4,8 +4,8 @@ import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.user.dto.request.seller.SellerApplyRequest
 import com.hoppingmall.mall.user.service.seller.SellerCommandService
 import jakarta.validation.Valid
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -22,9 +22,9 @@ class SellerController(
     @PostMapping("/apply")
     fun applyForSeller(
         @RequestBody @Valid request: SellerApplyRequest,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ApiResponse<Unit> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         sellerCommandService.apply(userId, request)
         return ApiResponse.Companion.success(Unit)
     }

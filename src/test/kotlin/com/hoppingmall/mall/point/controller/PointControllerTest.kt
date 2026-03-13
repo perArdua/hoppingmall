@@ -18,7 +18,7 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.userdetails.UserDetails
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -37,13 +37,12 @@ class PointControllerTest {
         fun 포인트_잔액_조회_성공() {
             val userId = 1L
             val balance = BigDecimal("1000")
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
             val balanceResponse = PointBalanceResponse(balance)
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(pointQueryService.getPointBalance(userId)).thenReturn(balanceResponse)
 
-            val result = pointController.getMyPointBalance(userDetails)
+            val result = pointController.getMyPointBalance(principal)
 
             assertEquals(HttpStatus.OK, result.statusCode)
             assertEquals(balanceResponse, result.body)
@@ -57,7 +56,7 @@ class PointControllerTest {
         @Test
         fun 포인트_내역_조회_성공() {
             val userId = 1L
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
             val page = 0
             val size = 10
             val pageable = PageRequest.of(page, size)
@@ -76,10 +75,9 @@ class PointControllerTest {
             val histories = listOf(historyResponse)
             val pageResponse = PageImpl(histories, pageable, 1)
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(pointQueryService.getPointHistory(userId, pageable)).thenReturn(pageResponse)
 
-            val result = pointController.getMyPointHistory(userDetails, page, size)
+            val result = pointController.getMyPointHistory(principal, page, size)
 
             assertEquals(HttpStatus.OK, result.statusCode)
             assertEquals(pageResponse, result.body)
@@ -98,17 +96,16 @@ class PointControllerTest {
                 orderId = 1L,
                 reason = "상품 구매"
             )
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
             val useResponse = PointUseResponse(
                 usedAmount = BigDecimal("500"),
                 remainingBalance = BigDecimal("500"),
                 orderId = 1L
             )
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(pointCommandService.usePoint(userId, request)).thenReturn(useResponse)
 
-            val result = pointController.usePoint(request, userDetails)
+            val result = pointController.usePoint(request, principal)
 
             assertEquals(HttpStatus.OK, result.statusCode)
             assertEquals(useResponse, result.body)

@@ -9,8 +9,8 @@ import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.ResponseEntity
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.core.userdetails.UserDetails
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
@@ -26,9 +26,9 @@ class PaymentController(
     @PostMapping
     fun processPayment(
         @Valid @RequestBody paymentRequest: PaymentRequest,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<PaymentResponse> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val paymentResponse = paymentCommandService.processPayment(paymentRequest, userId)
         return ResponseEntity.ok(paymentResponse)
     }
@@ -36,20 +36,20 @@ class PaymentController(
     @GetMapping("/{paymentId}")
     fun getPaymentById(
         @PathVariable paymentId: Long,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<PaymentResponse> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val paymentResponse = paymentQueryService.getPaymentById(paymentId, userId)
         return ResponseEntity.ok(paymentResponse)
     }
     
     @GetMapping
     fun getMyPayments(
-        @AuthenticationPrincipal userDetails: UserDetails,
+        @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
     ): ResponseEntity<Page<PaymentResponse>> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val payments = paymentQueryService.getPaymentsByUserId(userId, pageable)
         return ResponseEntity.ok(payments)
@@ -58,9 +58,9 @@ class PaymentController(
     @GetMapping("/order/{orderId}")
     fun getPaymentsByOrderId(
         @PathVariable orderId: Long,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<List<PaymentResponse>> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val payments = paymentQueryService.getPaymentsByOrderId(orderId, userId)
         return ResponseEntity.ok(payments)
     }
@@ -69,9 +69,9 @@ class PaymentController(
     @PostMapping("/{paymentId}/cancel")
     fun cancelPayment(
         @PathVariable paymentId: Long,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<PaymentResponse> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val paymentResponse = paymentCommandService.cancelPayment(paymentId, userId)
         return ResponseEntity.ok(paymentResponse)
     }
