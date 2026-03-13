@@ -11,8 +11,8 @@ import com.hoppingmall.mall.user.dto.response.user.UserProfileResponse
 import com.hoppingmall.mall.user.service.user.UserCommandService
 import com.hoppingmall.mall.user.service.user.UserQueryService
 import jakarta.validation.Valid
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.core.userdetails.UserDetails
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
@@ -43,9 +43,9 @@ class UserController(
 
     @GetMapping("/me")
     fun getMyProfile(
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ApiResponse<UserProfileResponse> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val response = userQueryService.getUserProfile(userId)
         return ApiResponse.Companion.success(response)
     }
@@ -53,9 +53,9 @@ class UserController(
     @PatchMapping("/me")
     fun updateMyProfile(
         @RequestBody @Valid request: UpdateUserRequest,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ApiResponse<Unit> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         userCommandService.updateUserProfile(userId, request)
         return ApiResponse.Companion.success(Unit)
     }
