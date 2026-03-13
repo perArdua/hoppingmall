@@ -19,7 +19,7 @@ import org.mockito.kotlin.*
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
-import org.springframework.security.core.userdetails.UserDetails
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -78,13 +78,12 @@ class RefundControllerTest {
                 items = listOf(RefundItemRequest(orderItemId = 1L, quantity = 2))
             )
             val response = createRefundResponse()
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(refundCommandService.requestRefund(userId, request)).thenReturn(response)
 
             // when
-            val result = refundController.requestRefund(request, userDetails)
+            val result = refundController.requestRefund(request, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -102,13 +101,12 @@ class RefundControllerTest {
             val refundId = 1L
             val userId = 1L
             val response = createRefundResponse()
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(refundQueryService.getRefund(refundId, userId)).thenReturn(response)
 
             // when
-            val result = refundController.getRefund(refundId, userDetails)
+            val result = refundController.getRefund(refundId, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -127,15 +125,14 @@ class RefundControllerTest {
             val page = 0
             val size = 10
             val pageable = PageRequest.of(page, size)
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
             val response = createRefundResponse()
             val pageResponse = PageImpl(listOf(response), pageable, 1)
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(refundQueryService.getMyRefunds(userId, pageable)).thenReturn(pageResponse)
 
             // when
-            val result = refundController.getMyRefunds(userDetails, page, size)
+            val result = refundController.getMyRefunds(principal, page, size)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -154,15 +151,14 @@ class RefundControllerTest {
             val page = 0
             val size = 10
             val pageable = PageRequest.of(page, size)
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(sellerId, "seller@example.com", "SELLER")
             val response = createRefundResponse()
             val pageResponse = PageImpl(listOf(response), pageable, 1)
 
-            whenever(userDetails.username).thenReturn(sellerId.toString())
             whenever(refundQueryService.getSellerRefunds(sellerId, pageable)).thenReturn(pageResponse)
 
             // when
-            val result = refundController.getSellerRefunds(userDetails, page, size)
+            val result = refundController.getSellerRefunds(principal, page, size)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -180,13 +176,12 @@ class RefundControllerTest {
             val refundId = 1L
             val sellerId = 2L
             val response = createRefundResponse(status = RefundStatus.COMPLETED)
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(sellerId, "seller@example.com", "SELLER")
 
-            whenever(userDetails.username).thenReturn(sellerId.toString())
             whenever(refundCommandService.approveRefund(refundId, sellerId)).thenReturn(response)
 
             // when
-            val result = refundController.approveRefund(refundId, userDetails)
+            val result = refundController.approveRefund(refundId, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -205,13 +200,12 @@ class RefundControllerTest {
             val sellerId = 2L
             val request = RefundApprovalRequest(rejectionReason = "반품 불가")
             val response = createRefundResponse(status = RefundStatus.REJECTED)
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(sellerId, "seller@example.com", "SELLER")
 
-            whenever(userDetails.username).thenReturn(sellerId.toString())
             whenever(refundCommandService.rejectRefund(refundId, sellerId, request)).thenReturn(response)
 
             // when
-            val result = refundController.rejectRefund(refundId, request, userDetails)
+            val result = refundController.rejectRefund(refundId, request, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
