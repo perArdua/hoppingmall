@@ -1,8 +1,10 @@
 package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.product.domain.ProductDailyStatistics
+import com.hoppingmall.mall.product.domain.ProductHourlyStatistics
 import com.hoppingmall.mall.product.domain.ProductStatistics
 import com.hoppingmall.mall.product.domain.repository.ProductDailyStatisticsRepository
+import com.hoppingmall.mall.product.domain.repository.ProductHourlyStatisticsRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.mall.support.fixture.fixture
@@ -25,11 +27,13 @@ class ProductStatisticsCommandServiceImplTest {
 
     private val productStatisticsRepository: ProductStatisticsRepository = mock()
     private val productDailyStatisticsRepository: ProductDailyStatisticsRepository = mock()
+    private val productHourlyStatisticsRepository: ProductHourlyStatisticsRepository = mock()
     private val productRepository: ProductRepository = mock()
 
     private val service = ProductStatisticsCommandServiceImpl(
         productStatisticsRepository,
         productDailyStatisticsRepository,
+        productHourlyStatisticsRepository,
         productRepository
     )
 
@@ -165,6 +169,64 @@ class ProductStatisticsCommandServiceImplTest {
 
             assertEquals(3, existingDaily.dailySalesQuantity)
             verify(productDailyStatisticsRepository).save(existingDaily)
+        }
+    }
+
+    @Nested
+    @DisplayName("flushHourlySnapshot")
+    inner class FlushHourlySnapshot {
+        @Test
+        fun 시간별_스냅샷을_저장한다() {
+            val stats = ProductStatistics.fixture(productId = 1L).withId(1L)
+            stats.incrementSales(5, BigDecimal("50000"))
+
+            whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+            whenever(productHourlyStatisticsRepository.findByProductIdAndStatisticsDateAndHour(eq(1L), any(), any()))
+                .thenReturn(null)
+            whenever(productHourlyStatisticsRepository.save(any<ProductHourlyStatistics>()))
+                .thenAnswer { it.arguments[0] }
+
+            service.flushHourlySnapshot()
+
+            verify(productHourlyStatisticsRepository).save(any<ProductHourlyStatistics>())
+        }
+
+        @Test
+        fun 오늘_매출이_없으면_스냅샷을_생략한다() {
+            val stats = ProductStatistics.fixture(
+                productId = 1L,
+                totalSalesQuantity = 100,
+                totalSalesAmount = BigDecimal("1000000")
+            ).withId(1L)
+
+            whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+
+            service.flushHourlySnapshot()
+
+            verify(productHourlyStatisticsRepository, never()).save(any<ProductHourlyStatistics>())
+        }
+
+        @Test
+        fun 기존_시간별_통계가_있으면_업데이트한다() {
+            val stats = ProductStatistics.fixture(productId = 1L).withId(1L)
+            stats.incrementSales(3, BigDecimal("30000"))
+
+            val existingHourly = ProductHourlyStatistics.create(
+                productId = 1L,
+                statisticsDate = LocalDate.now(),
+                hour = java.time.LocalDateTime.now().hour
+            ).withId(1L)
+
+            whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+            whenever(productHourlyStatisticsRepository.findByProductIdAndStatisticsDateAndHour(eq(1L), any(), any()))
+                .thenReturn(existingHourly)
+            whenever(productHourlyStatisticsRepository.save(any<ProductHourlyStatistics>()))
+                .thenAnswer { it.arguments[0] }
+
+            service.flushHourlySnapshot()
+
+            assertEquals(3, existingHourly.hourlySalesQuantity)
+            verify(productHourlyStatisticsRepository).save(existingHourly)
         }
     }
 }
