@@ -13,10 +13,12 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/points")
+@Tag(name = "포인트")
 class PointController(
     private val pointQueryService: PointQueryService,
     private val pointCommandService: PointCommandService

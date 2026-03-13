@@ -12,10 +12,12 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/shipping")
+@Tag(name = "배송")
 class ShippingController(
     private val shippingCommandService: ShippingCommandService,
     private val shippingQueryService: ShippingQueryService

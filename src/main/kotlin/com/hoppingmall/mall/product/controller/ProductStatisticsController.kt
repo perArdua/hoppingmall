@@ -6,11 +6,13 @@ import com.hoppingmall.mall.product.service.ProductStatisticsQueryService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.format.annotation.DateTimeFormat
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
 
 @RestController
 @RequestMapping("/api/v1/admin/product-statistics")
+@Tag(name = "상품 통계 (관리자)")
 class ProductStatisticsController(
     private val productStatisticsQueryService: ProductStatisticsQueryService
 ) {

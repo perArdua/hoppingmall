@@ -12,10 +12,12 @@ import org.springframework.data.domain.Slice
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/notifications")
+@Tag(name = "알림")
 class NotificationController(
     private val notificationQueryService: NotificationQueryService,
     private val notificationCommandService: NotificationCommandService

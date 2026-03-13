@@ -5,10 +5,12 @@ import com.hoppingmall.mall.global.common.domain.DLQStatus
 import com.hoppingmall.mall.global.common.response.ApiResponse
 import com.hoppingmall.mall.global.common.service.DLQService
 import org.springframework.data.domain.Page
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/admin/dlq")
+@Tag(name = "DLQ (관리자)")
 class DLQController(
     private val dlqService: DLQService
 ) {
