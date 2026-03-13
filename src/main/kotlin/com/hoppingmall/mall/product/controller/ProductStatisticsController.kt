@@ -74,4 +74,19 @@ class ProductStatisticsController(
     ): ApiResponse<List<TopProductResponse>> {
         return ApiResponse.success(productStatisticsQueryService.getTopRefundProducts(days, limit))
     }
+
+    @GetMapping("/hourly")
+    fun getHourlyStatistics(
+        @RequestParam productId: Long,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) date: LocalDate
+    ): ApiResponse<List<ProductHourlyStatisticsResponse>> {
+        return ApiResponse.success(productStatisticsQueryService.getHourlyStatistics(productId, date))
+    }
+
+    @GetMapping("/peak-hours")
+    fun getPeakHours(
+        @RequestParam(defaultValue = "7") days: Int
+    ): ApiResponse<List<PeakHourResponse>> {
+        return ApiResponse.success(productStatisticsQueryService.getPeakHours(days))
+    }
 }
