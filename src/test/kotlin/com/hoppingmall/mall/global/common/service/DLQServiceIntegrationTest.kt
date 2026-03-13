@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.context.annotation.Import
+import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.kafka.test.context.EmbeddedKafka
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
@@ -33,6 +34,9 @@ class DLQServiceIntegrationTest {
 
     @MockBean
     private lateinit var outboxEventService: OutboxEventService
+
+    @MockBean
+    private lateinit var redisMessageListenerContainer: RedisMessageListenerContainer
 
     @Autowired
     private lateinit var dlqService: DLQService

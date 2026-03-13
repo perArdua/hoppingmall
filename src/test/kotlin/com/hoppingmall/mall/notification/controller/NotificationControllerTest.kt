@@ -7,6 +7,7 @@ import com.hoppingmall.mall.notification.dto.response.UnreadCountResponse
 import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.notification.service.NotificationCommandService
 import com.hoppingmall.mall.notification.service.NotificationQueryService
+import com.hoppingmall.mall.notification.service.NotificationSseService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -29,7 +30,8 @@ class NotificationControllerTest {
 
     private val notificationQueryService: NotificationQueryService = mock()
     private val notificationCommandService: NotificationCommandService = mock()
-    private val controller = NotificationController(notificationQueryService, notificationCommandService)
+    private val notificationSseService: NotificationSseService = mock()
+    private val controller = NotificationController(notificationQueryService, notificationCommandService, notificationSseService)
 
     private val userPrincipal = UserPrincipal(1L, "test@example.com", "BUYER")
     private val now = LocalDateTime.now()
@@ -47,6 +49,22 @@ class NotificationControllerTest {
             isRead = false,
             createdAt = now
         )
+    }
+
+    @Nested
+    @DisplayName("subscribe")
+    inner class Subscribe {
+
+        @Test
+        fun SSE_구독_연결을_생성한다() {
+            val emitter = org.springframework.web.servlet.mvc.method.annotation.SseEmitter()
+            whenever(notificationSseService.connect(1L)).thenReturn(emitter)
+
+            val result = controller.subscribe(userPrincipal)
+
+            assertEquals(emitter, result)
+            verify(notificationSseService).connect(1L)
+        }
     }
 
     @Nested
