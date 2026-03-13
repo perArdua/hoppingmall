@@ -14,10 +14,12 @@ import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/wishlists")
+@Tag(name = "위시리스트")
 class WishlistController(
     private val wishlistCommandService: WishlistCommandService,
     private val wishlistQueryService: WishlistQueryService

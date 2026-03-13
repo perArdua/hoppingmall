@@ -11,10 +11,12 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/payments")
+@Tag(name = "결제")
 class PaymentController(
     private val paymentCommandService: PaymentCommandService,
     private val paymentQueryService: PaymentQueryService

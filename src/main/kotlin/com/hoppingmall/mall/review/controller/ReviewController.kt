@@ -15,10 +15,12 @@ import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1")
+@Tag(name = "리뷰")
 class ReviewController(
     private val reviewCommandService: ReviewCommandService,
     private val reviewQueryService: ReviewQueryService
