@@ -1,6 +1,7 @@
 package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.product.domain.repository.ProductDailyStatisticsRepository
+import com.hoppingmall.mall.product.domain.repository.ProductHourlyStatisticsRepository
 import com.hoppingmall.mall.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.mall.product.dto.response.*
 import com.hoppingmall.mall.product.exception.ProductStatisticsNotFoundException
@@ -14,7 +15,8 @@ import java.time.LocalDate
 @Transactional(readOnly = true)
 class ProductStatisticsQueryServiceImpl(
     private val productStatisticsRepository: ProductStatisticsRepository,
-    private val productDailyStatisticsRepository: ProductDailyStatisticsRepository
+    private val productDailyStatisticsRepository: ProductDailyStatisticsRepository,
+    private val productHourlyStatisticsRepository: ProductHourlyStatisticsRepository
 ) : ProductStatisticsQueryService {
 
     override fun getAll(pageable: Pageable): Page<ProductStatisticsResponse> {
@@ -79,5 +81,19 @@ class ProductStatisticsQueryServiceImpl(
         return productDailyStatisticsRepository
             .findTopRefundProducts(startDate, endDate, limit)
             .map { TopProductResponse.from(it) }
+    }
+
+    override fun getHourlyStatistics(productId: Long, date: LocalDate): List<ProductHourlyStatisticsResponse> {
+        return productHourlyStatisticsRepository
+            .findByProductIdAndStatisticsDateOrderByHourAsc(productId, date)
+            .map { ProductHourlyStatisticsResponse.from(it) }
+    }
+
+    override fun getPeakHours(days: Int): List<PeakHourResponse> {
+        val endDate = LocalDate.now()
+        val startDate = endDate.minusDays(days.toLong() - 1)
+        return productHourlyStatisticsRepository
+            .findPeakHours(startDate, endDate)
+            .map { PeakHourResponse.from(it) }
     }
 }

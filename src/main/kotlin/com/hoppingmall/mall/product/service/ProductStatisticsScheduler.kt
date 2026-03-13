@@ -51,6 +51,8 @@ class ProductStatisticsScheduler(
         }
 
         logger.info("장바구니/재고 동기화 완료: ${updatedCount}건")
+
+        productStatisticsCommandService.flushHourlySnapshot()
     }
 
     @Scheduled(cron = "0 0 0 * * *")

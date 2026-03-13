@@ -1,8 +1,10 @@
 package com.hoppingmall.mall.product.service
 
 import com.hoppingmall.mall.product.domain.ProductDailyStatistics
+import com.hoppingmall.mall.product.domain.ProductHourlyStatistics
 import com.hoppingmall.mall.product.domain.ProductStatistics
 import com.hoppingmall.mall.product.domain.repository.ProductDailyStatisticsRepository
+import com.hoppingmall.mall.product.domain.repository.ProductHourlyStatisticsRepository
 import com.hoppingmall.mall.product.domain.repository.ProductRepository
 import com.hoppingmall.mall.product.domain.repository.ProductStatisticsRepository
 import org.slf4j.LoggerFactory
@@ -16,6 +18,7 @@ import java.time.LocalDate
 class ProductStatisticsCommandServiceImpl(
     private val productStatisticsRepository: ProductStatisticsRepository,
     private val productDailyStatisticsRepository: ProductDailyStatisticsRepository,
+    private val productHourlyStatisticsRepository: ProductHourlyStatisticsRepository,
     private val productRepository: ProductRepository
 ) : ProductStatisticsCommandService {
 
@@ -70,6 +73,32 @@ class ProductStatisticsCommandServiceImpl(
         }
 
         logger.info("일별 통계 스냅샷 완료: ${allStats.size}건")
+    }
+
+    override fun flushHourlySnapshot() {
+        val now = java.time.LocalDateTime.now()
+        val today = now.toLocalDate()
+        val currentHour = now.hour
+        val allStats = productStatisticsRepository.findAll()
+
+        var flushedCount = 0
+        for (stats in allStats) {
+            if (stats.todaySalesQuantity == 0L && stats.todayRefundQuantity == 0L) continue
+
+            val existing = productHourlyStatisticsRepository
+                .findByProductIdAndStatisticsDateAndHour(stats.productId, today, currentHour)
+
+            val hourly = existing ?: ProductHourlyStatistics.create(
+                productId = stats.productId,
+                statisticsDate = today,
+                hour = currentHour
+            )
+            hourly.updateFromStatistics(stats)
+            productHourlyStatisticsRepository.save(hourly)
+            flushedCount++
+        }
+
+        logger.info("시간별 통계 스냅샷 완료: ${flushedCount}건 (${currentHour}시)")
     }
 
     private fun getOrCreateStatistics(productId: Long): ProductStatistics {

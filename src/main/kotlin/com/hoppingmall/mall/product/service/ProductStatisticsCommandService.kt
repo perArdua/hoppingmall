@@ -7,4 +7,5 @@ interface ProductStatisticsCommandService {
     fun decrementSalesStats(productId: Long, quantity: Long, amount: BigDecimal)
     fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal)
     fun flushDailySnapshot()
+    fun flushHourlySnapshot()
 }
