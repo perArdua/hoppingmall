@@ -11,8 +11,8 @@ import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.ResponseEntity
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.core.userdetails.UserDetails
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
@@ -26,20 +26,20 @@ class PointController(
     
     @GetMapping("/my-balance")
     fun getMyPointBalance(
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<PointBalanceResponse> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val balance = pointQueryService.getPointBalance(userId)
         return ResponseEntity.ok(balance)
     }
     
     @GetMapping("/my-history")
     fun getMyPointHistory(
-        @AuthenticationPrincipal userDetails: UserDetails,
+        @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
     ): ResponseEntity<Page<PointHistoryResponse>> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val history = pointQueryService.getPointHistory(userId, pageable)
         return ResponseEntity.ok(history)
@@ -49,9 +49,9 @@ class PointController(
     @PostMapping("/use")
     fun usePoint(
         @Valid @RequestBody request: PointUseRequest,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<PointUseResponse> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val result = pointCommandService.usePoint(userId, request)
         return ResponseEntity.ok(result)
     }

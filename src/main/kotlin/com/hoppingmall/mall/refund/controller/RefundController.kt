@@ -10,8 +10,8 @@ import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.ResponseEntity
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.core.userdetails.UserDetails
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
@@ -27,9 +27,9 @@ class RefundController(
     @PostMapping
     fun requestRefund(
         @Valid @RequestBody request: RefundCreateRequest,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<RefundResponse> {
-        val buyerId = userDetails.username.toLong()
+        val buyerId = principal.getUserId()
         val response = refundCommandService.requestRefund(buyerId, request)
         return ResponseEntity.ok(response)
     }
@@ -37,20 +37,20 @@ class RefundController(
     @GetMapping("/{refundId}")
     fun getRefund(
         @PathVariable refundId: Long,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<RefundResponse> {
-        val userId = userDetails.username.toLong()
+        val userId = principal.getUserId()
         val response = refundQueryService.getRefund(refundId, userId)
         return ResponseEntity.ok(response)
     }
 
     @GetMapping("/my")
     fun getMyRefunds(
-        @AuthenticationPrincipal userDetails: UserDetails,
+        @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
     ): ResponseEntity<Page<RefundResponse>> {
-        val buyerId = userDetails.username.toLong()
+        val buyerId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val refunds = refundQueryService.getMyRefunds(buyerId, pageable)
         return ResponseEntity.ok(refunds)
@@ -58,11 +58,11 @@ class RefundController(
 
     @GetMapping("/seller")
     fun getSellerRefunds(
-        @AuthenticationPrincipal userDetails: UserDetails,
+        @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
     ): ResponseEntity<Page<RefundResponse>> {
-        val sellerId = userDetails.username.toLong()
+        val sellerId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val refunds = refundQueryService.getSellerRefunds(sellerId, pageable)
         return ResponseEntity.ok(refunds)
@@ -72,9 +72,9 @@ class RefundController(
     @PatchMapping("/{refundId}/approve")
     fun approveRefund(
         @PathVariable refundId: Long,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<RefundResponse> {
-        val approverId = userDetails.username.toLong()
+        val approverId = principal.getUserId()
         val response = refundCommandService.approveRefund(refundId, approverId)
         return ResponseEntity.ok(response)
     }
@@ -84,9 +84,9 @@ class RefundController(
     fun rejectRefund(
         @PathVariable refundId: Long,
         @RequestBody request: RefundApprovalRequest,
-        @AuthenticationPrincipal userDetails: UserDetails
+        @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<RefundResponse> {
-        val approverId = userDetails.username.toLong()
+        val approverId = principal.getUserId()
         val response = refundCommandService.rejectRefund(refundId, approverId, request)
         return ResponseEntity.ok(response)
     }

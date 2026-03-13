@@ -8,8 +8,7 @@ import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
-import org.springframework.security.core.userdetails.User
-import org.springframework.security.core.userdetails.UserDetails
+import com.hoppingmall.mall.global.auth.UserPrincipal
 
 @DisplayName("SellerController")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -24,9 +23,9 @@ class SellerControllerTest {
         @Test
         fun SELLER_사용자가_판매자_승인_신청을_하면_성공_응답이_반환된다() {
             val request = SellerApplyRequest("123-45-67890")
-            val userDetails: UserDetails = User.withUsername("10").password("pass").roles("SELLER").build()
+            val principal = UserPrincipal(10L, "seller@example.com", "SELLER")
 
-            val response: ApiResponse<Unit> = controller.applyForSeller(request, userDetails)
+            val response: ApiResponse<Unit> = controller.applyForSeller(request, principal)
 
             verify(sellerCommandService).apply(10L, request)
             assertEquals("SUCCESS", response.code)

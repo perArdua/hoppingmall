@@ -16,7 +16,7 @@ import org.mockito.kotlin.*
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
-import org.springframework.security.core.userdetails.UserDetails
+import com.hoppingmall.mall.global.auth.UserPrincipal
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -57,13 +57,12 @@ class PaymentControllerTest {
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now()
             )
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(paymentCommandService.processPayment(request, userId)).thenReturn(response)
 
             // when
-            val result = paymentController.processPayment(request, userDetails)
+            val result = paymentController.processPayment(request, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -96,13 +95,12 @@ class PaymentControllerTest {
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now()
             )
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(paymentQueryService.getPaymentById(paymentId, userId)).thenReturn(response)
 
             // when
-            val result = paymentController.getPaymentById(paymentId, userDetails)
+            val result = paymentController.getPaymentById(paymentId, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -121,7 +119,7 @@ class PaymentControllerTest {
             val page = 0
             val size = 10
             val pageable = PageRequest.of(page, size)
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
 
             val paymentResponse = PaymentResponse(
                 id = 1L,
@@ -143,11 +141,10 @@ class PaymentControllerTest {
             val payments = listOf(paymentResponse)
             val pageResponse = PageImpl(payments, pageable, 1)
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(paymentQueryService.getPaymentsByUserId(userId, pageable)).thenReturn(pageResponse)
 
             // when
-            val result = paymentController.getMyPayments(userDetails, page, size)
+            val result = paymentController.getMyPayments(principal, page, size)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -183,13 +180,12 @@ class PaymentControllerTest {
             )
 
             val payments = listOf(paymentResponse)
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(paymentQueryService.getPaymentsByOrderId(orderId, userId)).thenReturn(payments)
 
             // when
-            val result = paymentController.getPaymentsByOrderId(orderId, userDetails)
+            val result = paymentController.getPaymentsByOrderId(orderId, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
@@ -222,13 +218,12 @@ class PaymentControllerTest {
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now()
             )
-            val userDetails: UserDetails = mock()
+            val principal = UserPrincipal(userId, "test@example.com", "BUYER")
 
-            whenever(userDetails.username).thenReturn(userId.toString())
             whenever(paymentCommandService.cancelPayment(paymentId, userId)).thenReturn(response)
 
             // when
-            val result = paymentController.cancelPayment(paymentId, userDetails)
+            val result = paymentController.cancelPayment(paymentId, principal)
 
             // then
             assertEquals(HttpStatus.OK, result.statusCode)
