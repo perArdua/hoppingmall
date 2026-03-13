@@ -7,21 +7,32 @@ import com.hoppingmall.mall.notification.dto.response.UnreadCountResponse
 import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.notification.service.NotificationCommandService
 import com.hoppingmall.mall.notification.service.NotificationQueryService
+import com.hoppingmall.mall.notification.service.NotificationSseService
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.web.PageableDefault
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 
 @RestController
 @RequestMapping("/api/v1/notifications")
 @Tag(name = "알림")
 class NotificationController(
     private val notificationQueryService: NotificationQueryService,
-    private val notificationCommandService: NotificationCommandService
+    private val notificationCommandService: NotificationCommandService,
+    private val notificationSseService: NotificationSseService
 ) {
+
+    @GetMapping("/subscribe", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    fun subscribe(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
+    ): SseEmitter {
+        return notificationSseService.connect(userPrincipal.getUserId())
+    }
 
     @GetMapping
     fun getNotifications(
