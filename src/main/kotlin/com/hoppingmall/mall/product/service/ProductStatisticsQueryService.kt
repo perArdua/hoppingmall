@@ -15,4 +15,6 @@ interface ProductStatisticsQueryService {
     fun getDailyStatistics(productId: Long, startDate: LocalDate, endDate: LocalDate): List<ProductDailyStatisticsResponse>
     fun getTopSellingProducts(days: Int, limit: Int): List<TopProductResponse>
     fun getTopRefundProducts(days: Int, limit: Int): List<TopProductResponse>
+    fun getHourlyStatistics(productId: Long, date: LocalDate): List<ProductHourlyStatisticsResponse>
+    fun getPeakHours(days: Int): List<PeakHourResponse>
 }
