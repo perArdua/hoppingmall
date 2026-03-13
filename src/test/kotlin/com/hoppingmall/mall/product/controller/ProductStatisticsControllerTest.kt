@@ -265,4 +265,57 @@ class ProductStatisticsControllerTest {
             verify(productStatisticsQueryService).getTopRefundProducts(30, 5)
         }
     }
+
+    @Nested
+    @DisplayName("getHourlyStatistics")
+    inner class GetHourlyStatistics {
+        @Test
+        fun 시간대별_통계_조회_성공() {
+            val productId = 1L
+            val date = LocalDate.of(2026, 3, 13)
+            val hourlyList = listOf(
+                ProductHourlyStatisticsResponse(
+                    productId = productId,
+                    statisticsDate = date,
+                    hour = 10,
+                    hourlySalesQuantity = 20,
+                    hourlySalesAmount = BigDecimal("200000"),
+                    hourlyOrderCount = 5,
+                    hourlyRefundQuantity = 0,
+                    hourlyRefundAmount = BigDecimal.ZERO
+                )
+            )
+
+            whenever(productStatisticsQueryService.getHourlyStatistics(productId, date))
+                .thenReturn(hourlyList)
+
+            val result: ApiResponse<List<ProductHourlyStatisticsResponse>> =
+                controller.getHourlyStatistics(productId, date)
+
+            assertEquals("SUCCESS", result.code)
+            assertEquals(1, result.data!!.size)
+            assertEquals(10, result.data!![0].hour)
+            verify(productStatisticsQueryService).getHourlyStatistics(productId, date)
+        }
+    }
+
+    @Nested
+    @DisplayName("getPeakHours")
+    inner class GetPeakHours {
+        @Test
+        fun 피크_타임_조회_성공() {
+            val peakList = listOf(
+                PeakHourResponse(hour = 14, totalSalesAmount = BigDecimal("1500000"), totalOrderCount = 75)
+            )
+
+            whenever(productStatisticsQueryService.getPeakHours(7)).thenReturn(peakList)
+
+            val result: ApiResponse<List<PeakHourResponse>> = controller.getPeakHours(7)
+
+            assertEquals("SUCCESS", result.code)
+            assertEquals(1, result.data!!.size)
+            assertEquals(14, result.data!![0].hour)
+            verify(productStatisticsQueryService).getPeakHours(7)
+        }
+    }
 }
