@@ -90,6 +90,7 @@ class SecurityConfig(
                 it.requestMatchers(HttpMethod.POST, "/api/v1/inventories").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.PATCH, "/api/v1/inventories/{productId}").hasRole("SELLER")
                 it.requestMatchers("/api/v1/seller/dashboard/**").hasRole("SELLER")
+                it.requestMatchers("/api/v1/seller/settlements/**").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.POST, "/api/v1/files/upload").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.POST, "/api/v1/shipping").hasRole("SELLER")
                 it.requestMatchers(HttpMethod.PATCH, "/api/v1/shipping/{shippingId}/status").hasRole("SELLER")
