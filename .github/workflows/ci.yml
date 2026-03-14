@@ -7,16 +7,13 @@ on:
     branches: [develop]
 
 jobs:
-  build-and-test:
+  monolith-test:
+    name: Monolith 테스트
     runs-on: ubuntu-latest
 
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v3
-
-      #      - name: applicaion_local 디코딩 후 파일에 넣기
-      #        run: |
-      #          echo "${{ secrets.APPLICATION_LOCAL_BASE64 }}" | base64 -d > ./src/main/resources/application-local.yml
 
       - name: gradlew에 실행 권한 부여
         run: chmod +x ./gradlew
@@ -37,3 +34,55 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./build/reports/jacoco/test/jacocoTestReport.xml
           flags: unittests
+
+  services-test:
+    name: ${{ matrix.service }} 테스트
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - notification-service
+          - order-service
+          - payment-service
+          - product-service
+          - user-service
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v3
+
+      - name: gradlew에 실행 권한 부여
+        run: chmod +x ./${{ matrix.service }}/gradlew
+
+      - name: JDK 21 설정
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: 테스트
+        run: cd ${{ matrix.service }} && ./gradlew test --no-daemon --build-cache --quiet
+
+  services-docker-build:
+    name: ${{ matrix.service }} Docker 빌드
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - notification-service
+          - order-service
+          - payment-service
+          - product-service
+          - user-service
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v3
+
+      - name: Docker 빌드 검증
+        run: docker build -t ${{ matrix.service }}:ci-test ./${{ matrix.service }}
