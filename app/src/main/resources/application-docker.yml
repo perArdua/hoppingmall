@@ -42,11 +42,6 @@ logging:
     com.hoppingmall: INFO
     org.hibernate.SQL: WARN
 
-jwt:
-  secret: ${JWT_SECRET:default-docker-secret-key-for-development-only-32chars!}
-  access-expiration-ms: 3600000
-  refresh-expiration-ms: 86400000
-
 file:
   upload:
     base-upload-dir: /app/uploads
