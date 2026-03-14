@@ -7,11 +7,8 @@ import com.hoppingmall.mall.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.mall.cartItem.dto.response.CartItemResponse
 import com.hoppingmall.mall.cartItem.exception.CartItemAccessDeniedException
 import com.hoppingmall.mall.cartItem.exception.CartItemNotFoundException
-import com.hoppingmall.mall.product.domain.Product
-import com.hoppingmall.mall.product.domain.ProductImage
-import com.hoppingmall.mall.product.domain.repository.ProductImageRepository
-import com.hoppingmall.mall.product.domain.repository.ProductRepository
-import com.hoppingmall.mall.product.exception.ProductNotFoundException
+import com.hoppingmall.mall.order.exception.OrderProductNotFoundException
+import com.hoppingmall.mall.product.api.ProductQueryPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -19,21 +16,20 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class CartItemCommandServiceImpl(
     private val cartItemRepository: CartItemRepository,
-    private val productRepository: ProductRepository,
-    private val productImageRepository: ProductImageRepository
+    private val productQueryPort: ProductQueryPort
 ) : CartItemCommandService {
 
     override fun addCartItem(buyerId: Long, request: CartItemCreateRequest): CartItemResponse {
-        val product = productRepository.findById(request.productId)
-            .orElseThrow { ProductNotFoundException() }
-        
-        val productImage = productImageRepository.findByProductIdOrderBySortOrder(request.productId).firstOrNull()
+        val product = productQueryPort.findById(request.productId)
+            ?: throw OrderProductNotFoundException()
+
+        val productImageUrl = productQueryPort.findMainImageUrl(request.productId)
         val existingCartItem = cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)
 
         val cartItem = if (existingCartItem != null) {
             updateExistingCartItem(existingCartItem, request.quantity)
         } else {
-            createNewCartItem(buyerId, product, productImage, request.quantity)
+            createNewCartItem(buyerId, product.id, product.name, product.price, productImageUrl, request.quantity)
         }
 
         return CartItemResponse.from(cartItem)
@@ -53,17 +49,19 @@ class CartItemCommandServiceImpl(
     }
 
     private fun createNewCartItem(
-        buyerId: Long, 
-        product: Product, 
-        productImage: ProductImage?, 
+        buyerId: Long,
+        productId: Long,
+        productName: String,
+        productPrice: java.math.BigDecimal,
+        productImageUrl: String?,
         quantity: Int
     ): CartItem {
         val newCartItem = CartItem.create(
             buyerId = buyerId,
-            productId = product.id!!,
-            productName = product.name,
-            productPrice = product.price,
-            productImageUrl = productImage?.imageUrl,
+            productId = productId,
+            productName = productName,
+            productPrice = productPrice,
+            productImageUrl = productImageUrl,
             quantity = quantity
         )
         return cartItemRepository.save(newCartItem)
