@@ -13,5 +13,6 @@ enum class SettlementErrorCode(
     SETTLEMENT_ALREADY_EXISTS("STL003", "해당 기간의 정산이 이미 존재합니다.", HttpStatus.CONFLICT),
     SETTLEMENT_INVALID_PERIOD("STL004", "정산 기간이 유효하지 않습니다.", HttpStatus.BAD_REQUEST),
     SETTLEMENT_ACCESS_DENIED("STL005", "정산에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
-    SETTLEMENT_NO_SALES_DATA("STL006", "해당 기간에 정산할 매출 데이터가 없습니다.", HttpStatus.BAD_REQUEST)
+    SETTLEMENT_NO_SALES_DATA("STL006", "해당 기간에 정산할 매출 데이터가 없습니다.", HttpStatus.BAD_REQUEST),
+    SETTLEMENT_SELLER_NOT_FOUND("STL007", "판매자 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND)
 }

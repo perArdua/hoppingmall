@@ -6,10 +6,10 @@ import com.hoppingmall.mall.settlement.dto.request.CreateSettlementRequest
 import com.hoppingmall.mall.settlement.dto.response.SettlementDetailResponse
 import com.hoppingmall.mall.settlement.dto.response.SettlementResponse
 import com.hoppingmall.mall.settlement.enum.SettlementStatus
+import com.hoppingmall.mall.settlement.exception.SettlementSellerNotFoundException
 import com.hoppingmall.mall.settlement.service.SettlementCommandService
 import com.hoppingmall.mall.settlement.service.SettlementQueryService
-import com.hoppingmall.mall.user.domain.repository.SellerRepository
-import com.hoppingmall.mall.user.exception.seller.SellerNotFoundException
+import com.hoppingmall.mall.user.api.SellerQueryPort
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*
 class SettlementController(
     private val settlementCommandService: SettlementCommandService,
     private val settlementQueryService: SettlementQueryService,
-    private val sellerRepository: SellerRepository
+    private val sellerQueryPort: SellerQueryPort
 ) {
 
     @PostMapping("/api/v1/admin/settlements")
@@ -74,8 +74,8 @@ class SettlementController(
         @RequestParam(required = false) status: SettlementStatus?,
         @PageableDefault(size = 20, sort = ["createdAt"]) pageable: Pageable
     ): ResponseEntity<ApiResponse<Page<SettlementResponse>>> {
-        val seller = sellerRepository.findNullableByUserId(userPrincipal.getUserId())
-            ?: throw SellerNotFoundException()
+        val seller = sellerQueryPort.findByUserId(userPrincipal.getUserId())
+            ?: throw SettlementSellerNotFoundException()
         val result = settlementQueryService.getSettlements(seller.id, status, pageable)
         return ResponseEntity.ok(ApiResponse.success(result))
     }
@@ -85,8 +85,8 @@ class SettlementController(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable settlementId: Long
     ): ResponseEntity<ApiResponse<SettlementDetailResponse>> {
-        val seller = sellerRepository.findNullableByUserId(userPrincipal.getUserId())
-            ?: throw SellerNotFoundException()
+        val seller = sellerQueryPort.findByUserId(userPrincipal.getUserId())
+            ?: throw SettlementSellerNotFoundException()
         val result = settlementQueryService.getSettlementDetail(settlementId, seller.id)
         return ResponseEntity.ok(ApiResponse.success(result))
     }

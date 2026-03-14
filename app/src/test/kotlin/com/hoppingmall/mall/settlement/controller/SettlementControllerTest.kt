@@ -11,8 +11,8 @@ import com.hoppingmall.mall.settlement.service.SettlementCommandService
 import com.hoppingmall.mall.settlement.service.SettlementQueryService
 import com.hoppingmall.mall.support.fixture.fixture
 import com.hoppingmall.mall.support.withId
-import com.hoppingmall.mall.user.domain.Seller
-import com.hoppingmall.mall.user.domain.repository.SellerRepository
+import com.hoppingmall.mall.user.api.SellerInfo
+import com.hoppingmall.mall.user.api.SellerQueryPort
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -35,9 +35,9 @@ class SettlementControllerTest {
 
     private val settlementCommandService: SettlementCommandService = mock()
     private val settlementQueryService: SettlementQueryService = mock()
-    private val sellerRepository: SellerRepository = mock()
+    private val sellerQueryPort: SellerQueryPort = mock()
     private val controller = SettlementController(
-        settlementCommandService, settlementQueryService, sellerRepository
+        settlementCommandService, settlementQueryService, sellerQueryPort
     )
 
     private val adminPrincipal = UserPrincipal(1L, "admin@example.com", "ADMIN")
@@ -120,9 +120,7 @@ class SettlementControllerTest {
 
         @Test
         fun 판매자가_본인_정산_목록을_조회한다() {
-            val seller = mock<Seller>()
-            whenever(seller.id).thenReturn(10L)
-            whenever(sellerRepository.findNullableByUserId(2L)).thenReturn(seller)
+            whenever(sellerQueryPort.findByUserId(2L)).thenReturn(SellerInfo(id = 10L, userId = 2L))
 
             val pageable = PageRequest.of(0, 20)
             whenever(settlementQueryService.getSettlements(eq(10L), eq(null), any()))
@@ -140,9 +138,7 @@ class SettlementControllerTest {
 
         @Test
         fun 판매자가_정산_상세를_조회한다() {
-            val seller = mock<Seller>()
-            whenever(seller.id).thenReturn(10L)
-            whenever(sellerRepository.findNullableByUserId(2L)).thenReturn(seller)
+            whenever(sellerQueryPort.findByUserId(2L)).thenReturn(SellerInfo(id = 10L, userId = 2L))
 
             val settlement = Settlement.fixture(sellerId = 10L).withId(1L)
             val item = SettlementItem.fixture(settlementId = 1L).withId(1L)

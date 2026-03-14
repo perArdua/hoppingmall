@@ -29,7 +29,7 @@ dependencies {
 	implementation(project(":shared"))
 	implementation(project(":infra"))
 	implementation(project(":payment-api"))
-	implementation(project(":user-domain"))
+	implementation(project(":user-api"))
 
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")

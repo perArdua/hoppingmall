@@ -1,6 +1,6 @@
 package com.hoppingmall.mall.refund.domain.repository
 
-import com.hoppingmall.mall.product.dto.RefundAggregation
+import com.hoppingmall.mall.order.api.RefundAggregation
 import com.hoppingmall.mall.refund.domain.RefundItem
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query

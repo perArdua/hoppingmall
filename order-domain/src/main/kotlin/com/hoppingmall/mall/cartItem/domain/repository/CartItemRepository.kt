@@ -1,7 +1,7 @@
 package com.hoppingmall.mall.cartItem.domain.repository
 
 import com.hoppingmall.mall.cartItem.domain.CartItem
-import com.hoppingmall.mall.product.dto.CartAggregation
+import com.hoppingmall.mall.order.api.CartAggregation
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository

@@ -31,6 +31,7 @@ dependencies {
 	implementation(project(":product-api"))
 	implementation(project(":order-api"))
 	implementation(project(":payment-api"))
+	implementation(project(":user-api"))
 	implementation(project(":user-domain"))
 	implementation(project(":product-domain"))
 	implementation(project(":order-domain"))
