@@ -21,7 +21,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 class SecurityConfig(
     private val jwtAuthenticationFilter: Filter,
     private val jwtAuthenticationEntryPoint: AuthenticationEntryPoint,
-    private val corsProperties: CorsProperties
+    private val corsProperties: CorsProperties,
+    private val internalTokenFilter: InternalTokenFilter
 ) {
 
     @Bean
@@ -98,6 +99,7 @@ class SecurityConfig(
                 it.requestMatchers("/api/v1/**").authenticated()
                 it.anyRequest().denyAll()
             }
+            .addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter::class.java)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
