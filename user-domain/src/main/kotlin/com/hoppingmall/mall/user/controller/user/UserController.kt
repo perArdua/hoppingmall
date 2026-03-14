@@ -1,12 +1,7 @@
 package com.hoppingmall.mall.user.controller.user
 
-import com.hoppingmall.mall.global.auth.service.AuthService
 import com.hoppingmall.mall.global.common.response.ApiResponse
-import com.hoppingmall.mall.user.dto.request.user.SignInRequest
-import com.hoppingmall.mall.user.dto.request.user.SignUpRequest
 import com.hoppingmall.mall.user.dto.request.user.UpdateUserRequest
-import com.hoppingmall.mall.user.dto.response.user.SignInResponse
-import com.hoppingmall.mall.user.dto.response.user.SignUpResponse
 import com.hoppingmall.mall.user.dto.response.user.UserProfileResponse
 import com.hoppingmall.mall.user.service.user.UserCommandService
 import com.hoppingmall.mall.user.service.user.UserQueryService
@@ -21,25 +16,8 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "회원")
 class UserController(
     private val userCommandService: UserCommandService,
-    private val userQueryService: UserQueryService,
-    private val authService: AuthService
+    private val userQueryService: UserQueryService
 ) {
-
-    @PostMapping("/signup")
-    fun signUp(
-        @RequestBody @Valid request: SignUpRequest
-    ): ApiResponse<SignUpResponse> {
-        val response = userCommandService.signUp(request)
-        return ApiResponse.Companion.success(response)
-    }
-
-    @PostMapping("/login")
-    fun login(
-        @RequestBody @Valid request: SignInRequest
-    ): ApiResponse<SignInResponse> {
-        val response = authService.login(request)
-        return ApiResponse.Companion.success(response)
-    }
 
     @GetMapping("/me")
     fun getMyProfile(
