@@ -86,6 +86,8 @@ dependencies {
 	implementation("com.bucket4j:bucket4j-redis:8.10.1")
 
 	implementation("io.micrometer:micrometer-registry-prometheus")
+	implementation("io.micrometer:micrometer-tracing-bridge-brave")
+	implementation("io.zipkin.reporter2:zipkin-reporter-brave")
 
 	implementation("org.apache.commons:commons-csv:1.12.0")
 
@@ -122,8 +124,7 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/payment/service/PaymentCompensationConsumer*",
 	"**/com/hoppingmall/mall/payment/service/PaymentEventConsumer*",
 	"**/com/hoppingmall/mall/membership/service/MembershipEventConsumer*",
-	"**/com/hoppingmall/mall/notification/service/NotificationEventConsumer*",
-	"**/com/hoppingmall/mall/membership/domain/MembershipEventLog*",
+"**/com/hoppingmall/mall/membership/domain/MembershipEventLog*",
 	"**/com/hoppingmall/mall/product/service/ProductStatisticsScheduler*",
 	"**/com/hoppingmall/mall/product/service/StatisticsEventConsumer*",
 	"**/com/hoppingmall/mall/product/domain/StatisticsEventLog*",
