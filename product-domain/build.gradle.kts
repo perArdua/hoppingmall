@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring")
 	kotlin("plugin.jpa")
 	id("io.spring.dependency-management")
+	`java-test-fixtures`
 	jacoco
 }
 
@@ -41,6 +42,12 @@ dependencies {
 
 	implementation("org.apache.commons:commons-csv:1.12.0")
 
+	testFixturesImplementation(project(":shared"))
+	testFixturesImplementation(testFixtures(project(":shared")))
+	testFixturesImplementation(project(":product-domain"))
+	testFixturesImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
+	testImplementation(testFixtures(project(":shared")))
+	testImplementation(testFixtures(project(":product-domain")))
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -57,6 +57,12 @@ dependencies {
 
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
+	testImplementation(testFixtures(project(":shared")))
+	testImplementation(testFixtures(project(":user-domain")))
+	testImplementation(testFixtures(project(":product-domain")))
+	testImplementation(testFixtures(project(":order-domain")))
+	testImplementation(testFixtures(project(":payment-domain")))
+	testImplementation(testFixtures(project(":settlement-domain")))
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
