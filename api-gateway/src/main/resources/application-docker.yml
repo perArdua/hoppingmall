@@ -70,6 +70,34 @@ spring:
           filters:
             - name: JwtValidation
 
+        - id: order-service-orders
+          uri: http://order-service:8084
+          predicates:
+            - Path=/api/v1/orders/**
+          filters:
+            - name: JwtValidation
+
+        - id: order-service-cart-items
+          uri: http://order-service:8084
+          predicates:
+            - Path=/api/v1/cart-items/**
+          filters:
+            - name: JwtValidation
+
+        - id: order-service-shipping
+          uri: http://order-service:8084
+          predicates:
+            - Path=/api/v1/shipping/**
+          filters:
+            - name: JwtValidation
+
+        - id: order-service-refunds
+          uri: http://order-service:8084
+          predicates:
+            - Path=/api/v1/refunds/**
+          filters:
+            - name: JwtValidation
+
         - id: monolith-public
           uri: http://monolith:8080
           predicates:

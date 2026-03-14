@@ -116,13 +116,9 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/point/service/PointEventConsumer*",
 	"**/com/hoppingmall/mall/payment/service/PaymentCompensationConsumer*",
 	"**/com/hoppingmall/mall/payment/service/PaymentEventConsumer*",
-	"**/com/hoppingmall/mall/product/service/ProductStatisticsScheduler*",
-	"**/com/hoppingmall/mall/product/service/StatisticsEventConsumer*",
-	"**/com/hoppingmall/mall/product/domain/StatisticsEventLog*",
 	"**/com/hoppingmall/mall/refund/service/RefundCompletionConsumer*",
-	"**/com/hoppingmall/mall/refund/service/KafkaRefundEventPublisher*",
-	"**/com/hoppingmall/mall/refund/domain/RefundEventLog*",
-	"**/com/hoppingmall/mall/global/adapter/**"
+	"**/com/hoppingmall/mall/global/adapter/**",
+	"**/com/hoppingmall/mall/*/controller/Internal*"
 )
 
 tasks.jacocoTestReport {

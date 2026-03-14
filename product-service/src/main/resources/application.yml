@@ -33,6 +33,15 @@ spring:
               - "redis://localhost:7003"
             scanInterval: 1000
 
+  kafka:
+    consumer:
+      bootstrap-servers: localhost:9092
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
 server:
   port: 8083
 
@@ -52,6 +61,8 @@ management:
 services:
   monolith:
     url: http://localhost:8080
+  order-service:
+    url: http://localhost:8084
 
 file:
   upload:

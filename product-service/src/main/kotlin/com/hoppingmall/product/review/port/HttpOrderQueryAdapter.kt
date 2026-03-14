@@ -1,5 +1,6 @@
 package com.hoppingmall.product.review.port
 
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.stereotype.Component
@@ -11,6 +12,8 @@ class HttpOrderQueryAdapter(
     @Value("\${services.monolith.url:http://localhost:8080}") private val monolithUrl: String,
     restTemplateBuilder: RestTemplateBuilder
 ) : OrderQueryPort {
+
+    private val logger = LoggerFactory.getLogger(HttpOrderQueryAdapter::class.java)
 
     private val restTemplate: RestTemplate = restTemplateBuilder
         .connectTimeout(Duration.ofSeconds(2))
@@ -24,6 +27,7 @@ class HttpOrderQueryAdapter(
                 OrderItemInfo::class.java
             )
         } catch (e: Exception) {
+            logger.warn("주문 상품 조회 실패: orderItemId=$orderItemId", e)
             null
         }
     }
@@ -35,6 +39,7 @@ class HttpOrderQueryAdapter(
                 Boolean::class.java
             ) ?: false
         } catch (e: Exception) {
+            logger.warn("배송 완료 여부 조회 실패: orderId=$orderId, buyerId=$buyerId", e)
             false
         }
     }
@@ -47,6 +52,7 @@ class HttpOrderQueryAdapter(
             )
             result?.toList() ?: emptyList()
         } catch (e: Exception) {
+            logger.warn("주문별 상품 목록 조회 실패: orderId=$orderId", e)
             emptyList()
         }
     }
