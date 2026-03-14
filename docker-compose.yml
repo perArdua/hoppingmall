@@ -274,13 +274,16 @@ services:
       context: ./product-service
       dockerfile: Dockerfile
     container_name: product-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis-cluster-init:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
     ports:
       - "8083:8083"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-    depends_on:
-      - mysql
-      - redis-node-1
 
   api-gateway:
     build:
