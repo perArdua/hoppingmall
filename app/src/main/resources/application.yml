@@ -133,3 +133,7 @@ file:
     allowed-domains:
       - product
     sub-directory: images
+
+internal:
+  service:
+    token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}

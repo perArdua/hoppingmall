@@ -232,6 +232,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8080:8080"
 
@@ -282,6 +283,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8083:8083"
 
@@ -300,6 +302,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8084:8084"
 
@@ -318,6 +321,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8085:8085"
 

@@ -39,3 +39,7 @@ services:
     url: http://monolith:8080
   order-service:
     url: http://order-service:8084
+
+internal:
+  service:
+    token: ${INTERNAL_SERVICE_TOKEN}
