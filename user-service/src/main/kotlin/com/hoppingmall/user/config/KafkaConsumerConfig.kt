@@ -1,6 +1,6 @@
-package com.hoppingmall.notification.config
+package com.hoppingmall.user.config
 
-import com.hoppingmall.notification.config.kafka.TracingConsumerInterceptor
+import com.hoppingmall.user.config.kafka.TracingConsumerInterceptor
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.springframework.beans.factory.annotation.Value
