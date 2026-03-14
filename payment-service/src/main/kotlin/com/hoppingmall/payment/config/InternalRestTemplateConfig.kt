@@ -8,6 +8,7 @@ import org.springframework.http.HttpRequest
 import org.springframework.http.client.ClientHttpRequestExecution
 import org.springframework.http.client.ClientHttpRequestInterceptor
 import org.springframework.http.client.ClientHttpResponse
+import org.slf4j.MDC
 
 @Configuration
 class InternalRestTemplateConfig(
@@ -31,6 +32,8 @@ class InternalRestTemplateConfig(
             body: ByteArray,
             execution: ClientHttpRequestExecution
         ): ClientHttpResponse {
+            MDC.get("traceId")?.let { request.headers.set("X-Trace-Id", it) }
+            MDC.get("userId")?.let { request.headers.set("X-User-Id", it) }
             if (request.uri.path.startsWith("/internal/")) {
                 request.headers.set("X-Internal-Token", token)
             }
