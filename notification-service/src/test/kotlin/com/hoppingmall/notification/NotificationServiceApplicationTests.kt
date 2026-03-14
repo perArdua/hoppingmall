@@ -11,14 +11,17 @@ import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.data.redis.serializer.StringRedisSerializer
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.TestPropertySource
 
 @SpringBootTest
+@ActiveProfiles("test")
 @Import(NotificationServiceApplicationTests.TestInfraConfig::class)
 @TestPropertySource(properties = [
     "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2,org.redisson.spring.starter.RedissonAutoConfigurationV4,org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration",
     "spring.main.allow-bean-definition-overriding=true",
-    "spring.kafka.bootstrap-servers=localhost:9092"
+    "spring.kafka.bootstrap-servers=localhost:9092",
+    "spring.kafka.consumer.group-id=notification-service"
 ])
 class NotificationServiceApplicationTests {
 
