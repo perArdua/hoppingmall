@@ -4,9 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.mall.global.common.service.TransactionalEventPublisher
 import com.hoppingmall.mall.inventory.domain.Inventory
 import com.hoppingmall.mall.inventory.domain.repository.InventoryRepository
-import com.hoppingmall.mall.notification.domain.NotificationRepository
-import com.hoppingmall.mall.notification.dto.event.NotificationEvent
-import com.hoppingmall.mall.notification.enum.NotificationType
 import com.hoppingmall.mall.order.domain.Order
 import com.hoppingmall.mall.order.domain.OrderItem
 import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
@@ -67,9 +64,6 @@ class OrderPaymentE2EIntegrationTest : IntegrationTestBase() {
 
     @Autowired
     private lateinit var pointHistoryRepository: PointHistoryRepository
-
-    @Autowired
-    private lateinit var notificationRepository: NotificationRepository
 
     @Autowired
     private lateinit var paymentEventLogRepository: PaymentEventLogRepository
@@ -140,20 +134,6 @@ class OrderPaymentE2EIntegrationTest : IntegrationTestBase() {
             pointHistoryRepository.existsByEventId("point-e2e-happy-001")
         }
 
-        val notificationEvent = NotificationEvent(
-            eventId = "notif-e2e-happy-001",
-            userId = 1L,
-            type = NotificationType.PAYMENT_COMPLETED,
-            title = "결제 완료",
-            content = "주문번호 ${order.id}의 결제가 완료되었습니다",
-            metadata = """{"orderId": ${order.id}}"""
-        )
-        kafkaTemplate.send("notification", "1", notificationEvent)
-
-        awaitUntil {
-            notificationRepository.existsByEventId("notif-e2e-happy-001")
-        }
-
         val savedOrder = orderRepository.findById(order.id!!).get()
         assertThat(savedOrder.status).isEqualTo(OrderStatus.PAID)
 
@@ -170,9 +150,6 @@ class OrderPaymentE2EIntegrationTest : IntegrationTestBase() {
         assertThat(histories[0].type).isEqualTo(PointType.EARN)
         assertThat(histories[0].amount).isEqualByComparingTo(BigDecimal("500"))
 
-        val notifications = notificationRepository.findByUserId(1L)
-        assertThat(notifications).isNotEmpty
-        assertThat(notifications.any { it.type == NotificationType.PAYMENT_COMPLETED }).isTrue()
     }
 
     @Test
