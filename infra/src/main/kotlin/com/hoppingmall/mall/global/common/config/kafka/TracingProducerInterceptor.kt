@@ -8,11 +8,17 @@ import org.slf4j.MDC
 class TracingProducerInterceptor : ProducerInterceptor<String, Any> {
 
     override fun onSend(record: ProducerRecord<String, Any>): ProducerRecord<String, Any> {
-        val traceId = MDC.get(TRACE_ID_KEY)
-        if (traceId != null) {
-            record.headers().add(TRACE_ID_HEADER, traceId.toByteArray(Charsets.UTF_8))
-        }
+        addHeaderFromMdc(record, TRACE_ID_KEY, TRACE_ID_HEADER)
+        addHeaderFromMdc(record, USER_ID_KEY, USER_ID_HEADER)
+        addHeaderFromMdc(record, SERVICE_KEY, SERVICE_HEADER)
         return record
+    }
+
+    private fun addHeaderFromMdc(record: ProducerRecord<String, Any>, mdcKey: String, headerName: String) {
+        val value = MDC.get(mdcKey)
+        if (value != null) {
+            record.headers().add(headerName, value.toByteArray(Charsets.UTF_8))
+        }
     }
 
     override fun onAcknowledgement(metadata: RecordMetadata?, exception: Exception?) {}
@@ -24,5 +30,9 @@ class TracingProducerInterceptor : ProducerInterceptor<String, Any> {
     companion object {
         const val TRACE_ID_KEY = "traceId"
         const val TRACE_ID_HEADER = "X-Trace-Id"
+        const val USER_ID_KEY = "userId"
+        const val USER_ID_HEADER = "X-User-Id"
+        const val SERVICE_KEY = "service"
+        const val SERVICE_HEADER = "X-Service-Name"
     }
 }
