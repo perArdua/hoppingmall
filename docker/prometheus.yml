@@ -21,6 +21,8 @@ scrape_configs:
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['user-service:8082']
+        labels:
+          service: 'user-service'
 
   - job_name: 'product-service'
     metrics_path: '/actuator/prometheus'
@@ -28,6 +30,13 @@ scrape_configs:
       - targets: ['product-service:8083']
         labels:
           service: 'product-service'
+
+  - job_name: 'order-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['order-service:8084']
+        labels:
+          service: 'order-service'
 
   - job_name: 'api-gateway'
     metrics_path: '/actuator/prometheus'
