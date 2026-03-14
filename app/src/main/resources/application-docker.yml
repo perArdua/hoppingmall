@@ -55,3 +55,7 @@ file:
     allowed-domains:
       - product
     sub-directory: images
+
+internal:
+  service:
+    token: ${INTERNAL_SERVICE_TOKEN}
