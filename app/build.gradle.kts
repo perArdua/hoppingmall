@@ -109,13 +109,8 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/global/vo/**",
 	"**/com/hoppingmall/mall/global/jwt/**",
 	"**/exception/**",
-	"**/com/hoppingmall/mall/payment/service/MockPaymentService*",
-	"**/com/hoppingmall/mall/payment/service/KafkaPaymentEventPublisher*",
 	"**/com/hoppingmall/mall/global/common/service/OutboxEventService*",
 	"**/com/hoppingmall/mall/global/common/repository/OutboxEventRepository*",
-	"**/com/hoppingmall/mall/point/service/PointEventConsumer*",
-	"**/com/hoppingmall/mall/payment/service/PaymentCompensationConsumer*",
-	"**/com/hoppingmall/mall/payment/service/PaymentEventConsumer*",
 	"**/com/hoppingmall/mall/refund/service/RefundCompletionConsumer*",
 	"**/com/hoppingmall/mall/global/adapter/**",
 	"**/com/hoppingmall/mall/*/controller/Internal*"

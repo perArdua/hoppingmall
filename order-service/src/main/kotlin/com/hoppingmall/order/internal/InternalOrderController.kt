@@ -49,6 +49,18 @@ class InternalOrderController(
         ))
     }
 
+    @PostMapping("/orders/{orderId}/cancel")
+    fun cancelOrder(@PathVariable orderId: Long): ResponseEntity<Void> {
+        val order = orderRepository.findById(orderId).orElse(null)
+            ?: return ResponseEntity.notFound().build()
+        if (order.isCancelled()) {
+            return ResponseEntity.ok().build()
+        }
+        order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.CANCELLED)
+        orderRepository.save(order)
+        return ResponseEntity.ok().build()
+    }
+
     @GetMapping("/orders/{orderId}/delivered")
     fun isDelivered(@PathVariable orderId: Long, @RequestParam buyerId: Long): ResponseEntity<Boolean> {
         val order = orderRepository.findById(orderId).orElse(null)
