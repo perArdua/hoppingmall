@@ -17,7 +17,8 @@ import org.springframework.test.context.TestPropertySource
 @Import(NotificationServiceApplicationTests.TestInfraConfig::class)
 @TestPropertySource(properties = [
     "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2,org.redisson.spring.starter.RedissonAutoConfigurationV4,org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration",
-    "spring.main.allow-bean-definition-overriding=true"
+    "spring.main.allow-bean-definition-overriding=true",
+    "spring.kafka.bootstrap-servers=localhost:9092"
 ])
 class NotificationServiceApplicationTests {
 
