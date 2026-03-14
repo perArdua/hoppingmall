@@ -269,6 +269,22 @@ services:
     ports:
       - "8082:8082"
 
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: product-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis-cluster-init:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+    ports:
+      - "8083:8083"
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -280,6 +296,8 @@ services:
       user-service:
         condition: service_started
       notification-service:
+        condition: service_started
+      product-service:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker

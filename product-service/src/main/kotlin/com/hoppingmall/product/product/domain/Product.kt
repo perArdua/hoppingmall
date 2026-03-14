@@ -1,0 +1,53 @@
+package com.hoppingmall.product.product.domain
+
+import com.hoppingmall.product.common.BaseEntity
+import com.hoppingmall.product.common.enums.ProductStatus
+import jakarta.persistence.*
+import org.hibernate.annotations.Filter
+import java.math.BigDecimal
+
+@Entity
+@Table(
+    name = "products",
+    indexes = [
+        Index(name = "idx_products_seller_id", columnList = "sellerId"),
+        Index(name = "idx_products_category_id", columnList = "categoryId")
+    ]
+)
+@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
+class Product private constructor(
+
+    @Column(nullable = false)
+    val sellerId: Long,
+
+    @Column(nullable = false)
+    var categoryId: Long,
+
+    @Column(nullable = false)
+    var name: String,
+
+    @Column(columnDefinition = "TEXT")
+    var description: String,
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    var price: BigDecimal,
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var status: ProductStatus = ProductStatus.AVAILABLE
+
+): BaseEntity() {
+
+    companion object {
+        fun create(
+            sellerId: Long,
+            categoryId: Long,
+            name: String,
+            description: String,
+            price: BigDecimal,
+            status: ProductStatus
+        ): Product {
+            return Product(sellerId, categoryId, name, description, price, status)
+        }
+    }
+}

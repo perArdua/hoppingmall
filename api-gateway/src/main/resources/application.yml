@@ -1,0 +1,110 @@
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        - id: user-service-public
+          uri: ${ROUTES_USER_SERVICE:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/users/signup,/api/v1/users/login,/api/v1/auth/refresh
+
+        - id: user-service
+          uri: ${ROUTES_USER_SERVICE:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/users/**,/api/v1/auth/**,/api/v1/sellers/**,/api/v1/admin/**,/api/v1/memberships/**
+          filters:
+            - JwtValidation
+
+        - id: notification-service
+          uri: ${ROUTES_NOTIFICATION_SERVICE:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/notifications/**
+          filters:
+            - JwtValidation
+
+        - id: product-service-products
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/products/**
+          filters:
+            - name: JwtValidation
+
+        - id: product-service-categories
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/categories/**
+          filters:
+            - name: JwtValidation
+
+        - id: product-service-inventory
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/inventory/**
+          filters:
+            - name: JwtValidation
+
+        - id: product-service-reviews
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/reviews/**
+          filters:
+            - name: JwtValidation
+
+        - id: product-service-wishlists
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/wishlists/**
+          filters:
+            - name: JwtValidation
+
+        - id: product-service-statistics
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/statistics/**
+          filters:
+            - name: JwtValidation
+
+        - id: product-service-dashboard
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/seller/dashboard/**
+          filters:
+            - name: JwtValidation
+
+        - id: monolith-public
+          uri: ${ROUTES_MONOLITH:http://localhost:8080}
+          predicates:
+            - Path=/api/v1/point-policies/**,/api/v1/coupons/*/availability
+            - Method=GET
+
+        - id: monolith
+          uri: ${ROUTES_MONOLITH:http://localhost:8080}
+          predicates:
+            - Path=/api/v1/**
+          filters:
+            - JwtValidation
+
+server:
+  port: 8000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,gateway
+  tracing:
+    sampling:
+      probability: 0.0
+    enabled: false
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+
+jwt:
+  secret: ${JWT_SECRET}
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG

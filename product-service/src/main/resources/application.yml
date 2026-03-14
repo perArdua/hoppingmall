@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: product-service
+
+  datasource:
+    url: jdbc:h2:mem:productdb;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        legacy_id_generator_strategy: true
+        default_batch_fetch_size: 100
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+  data:
+    redis:
+      redisson:
+        config: |
+          clusterServersConfig:
+            nodeAddresses:
+              - "redis://localhost:7001"
+              - "redis://localhost:7002"
+              - "redis://localhost:7003"
+            scanInterval: 1000
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    tags:
+      application: product-service
+  tracing:
+    sampling:
+      probability: 0.0
+    enabled: false
+
+services:
+  monolith:
+    url: http://localhost:8080
+
+file:
+  upload:
+    base-upload-dir: ${FILE_UPLOAD_BASE_DIR:/tmp/hoppingmall}
+    max-file-size: 5242880
+    allowed-extensions:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - webp
+    allowed-domains:
+      - product
+    sub-directory: images
