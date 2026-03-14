@@ -53,6 +53,8 @@ dependencies {
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 	implementation("net.logstash.logback:logstash-logback-encoder:8.0")
 	implementation("io.micrometer:micrometer-registry-prometheus")
+	implementation("io.micrometer:micrometer-tracing-bridge-brave")
+	implementation("io.zipkin.reporter2:zipkin-reporter-brave")
 
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
