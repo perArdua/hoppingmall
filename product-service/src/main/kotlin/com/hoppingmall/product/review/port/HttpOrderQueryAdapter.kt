@@ -1,15 +1,21 @@
 package com.hoppingmall.product.review.port
 
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
+import java.time.Duration
 
 @Component
 class HttpOrderQueryAdapter(
-    @Value("\${services.monolith.url:http://localhost:8080}") private val monolithUrl: String
+    @Value("\${services.monolith.url:http://localhost:8080}") private val monolithUrl: String,
+    restTemplateBuilder: RestTemplateBuilder
 ) : OrderQueryPort {
 
-    private val restTemplate = RestTemplate()
+    private val restTemplate: RestTemplate = restTemplateBuilder
+        .connectTimeout(Duration.ofSeconds(2))
+        .readTimeout(Duration.ofSeconds(5))
+        .build()
 
     override fun findOrderItemById(orderItemId: Long): OrderItemInfo? {
         return try {

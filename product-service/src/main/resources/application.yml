@@ -55,7 +55,7 @@ services:
 
 file:
   upload:
-    base-upload-dir: D:/hoppingmall
+    base-upload-dir: ${FILE_UPLOAD_BASE_DIR:/tmp/hoppingmall}
     max-file-size: 5242880
     allowed-extensions:
       - jpg
