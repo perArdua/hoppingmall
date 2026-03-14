@@ -1,22 +1,22 @@
-package com.hoppingmall.mall.product.service
+package com.hoppingmall.product.statistics.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
-import com.hoppingmall.mall.payment.dto.event.PaymentCancelledEvent
-import com.hoppingmall.mall.payment.dto.event.PaymentCompletedEvent
-import com.hoppingmall.mall.product.domain.StatisticsEventLog
-import com.hoppingmall.mall.product.domain.repository.StatisticsEventLogRepository
+import com.hoppingmall.product.product.domain.StatisticsEventLog
+import com.hoppingmall.product.product.domain.repository.StatisticsEventLogRepository
+import com.hoppingmall.product.product.service.ProductStatisticsCommandService
+import com.hoppingmall.product.statistics.dto.PaymentCancelledEvent
+import com.hoppingmall.product.statistics.dto.PaymentCompletedEvent
+import com.hoppingmall.product.statistics.port.OrderItemQueryPort
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
 
 @Service
 class StatisticsEventConsumer(
     private val statisticsEventLogRepository: StatisticsEventLogRepository,
-    private val orderItemRepository: OrderItemRepository,
+    private val orderItemQueryPort: OrderItemQueryPort,
     private val productStatisticsCommandService: ProductStatisticsCommandService,
     private val objectMapper: ObjectMapper
 ) {
@@ -25,14 +25,15 @@ class StatisticsEventConsumer(
 
     @KafkaListener(topics = ["payment"], groupId = "statistics-service")
     @Transactional
-    fun handlePaymentCompleted(event: PaymentCompletedEvent) {
+    fun handlePaymentCompleted(message: String) {
+        val event = objectMapper.readValue(message, PaymentCompletedEvent::class.java)
         try {
             if (statisticsEventLogRepository.existsByEventId(event.transactionId)) {
                 logger.info("이미 처리된 통계 이벤트: ${event.transactionId}")
                 return
             }
 
-            val orderItems = orderItemRepository.findByOrderId(event.orderId)
+            val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
             orderItems.forEach { item ->
                 productStatisticsCommandService.incrementSalesStats(
                     item.productId,
@@ -80,7 +81,7 @@ class StatisticsEventConsumer(
                 return
             }
 
-            val orderItems = orderItemRepository.findByOrderId(event.orderId)
+            val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
             orderItems.forEach { item ->
                 productStatisticsCommandService.decrementSalesStats(
                     item.productId,
