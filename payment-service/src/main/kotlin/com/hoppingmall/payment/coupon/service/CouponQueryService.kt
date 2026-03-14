@@ -1,0 +1,12 @@
+package com.hoppingmall.payment.coupon.service
+
+import com.hoppingmall.payment.coupon.dto.response.CouponResponse
+import com.hoppingmall.payment.coupon.dto.response.UserCouponResponse
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
+
+interface CouponQueryService {
+    fun getAvailableCoupons(): List<CouponResponse>
+    fun getAllCoupons(): List<CouponResponse>
+    fun getMyCoupons(userId: Long, pageable: Pageable): Slice<UserCouponResponse>
+}

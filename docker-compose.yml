@@ -303,6 +303,24 @@ services:
     ports:
       - "8084:8084"
 
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis-cluster-init:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+    ports:
+      - "8085:8085"
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -318,6 +336,8 @@ services:
       product-service:
         condition: service_started
       order-service:
+        condition: service_started
+      payment-service:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
