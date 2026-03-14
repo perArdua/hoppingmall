@@ -16,3 +16,13 @@ scrape_configs:
       - targets: ['notification-service:8081']
         labels:
           service: 'notification-service'
+
+  - job_name: 'user-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['user-service:8082']
+
+  - job_name: 'api-gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['api-gateway:8000']
