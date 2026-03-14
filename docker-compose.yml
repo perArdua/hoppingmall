@@ -269,6 +269,19 @@ services:
     ports:
       - "8082:8082"
 
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: product-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      - mysql
+      - redis-node-1
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -280,6 +293,8 @@ services:
       user-service:
         condition: service_started
       notification-service:
+        condition: service_started
+      product-service:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
