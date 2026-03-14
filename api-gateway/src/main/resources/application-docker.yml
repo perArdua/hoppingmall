@@ -98,11 +98,33 @@ spring:
           filters:
             - name: JwtValidation
 
-        - id: monolith-public
-          uri: http://monolith:8080
+        - id: payment-service-payments
+          uri: http://payment-service:8085
           predicates:
-            - Path=/api/v1/point-policies/**,/api/v1/coupons/*/availability
-            - Method=GET
+            - Path=/api/v1/payments/**
+          filters:
+            - name: JwtValidation
+
+        - id: payment-service-points
+          uri: http://payment-service:8085
+          predicates:
+            - Path=/api/v1/points/**
+          filters:
+            - name: JwtValidation
+
+        - id: payment-service-point-policies
+          uri: http://payment-service:8085
+          predicates:
+            - Path=/api/v1/point-policies/**
+          filters:
+            - name: JwtValidation
+
+        - id: payment-service-coupons
+          uri: http://payment-service:8085
+          predicates:
+            - Path=/api/v1/coupons/**
+          filters:
+            - name: JwtValidation
 
         - id: monolith
           uri: http://monolith:8080
