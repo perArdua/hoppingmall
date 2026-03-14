@@ -64,7 +64,14 @@ jobs:
           cache: 'gradle'
 
       - name: 테스트
-        run: cd ${{ matrix.service }} && ./gradlew test --no-daemon --build-cache --quiet
+        run: cd ${{ matrix.service }} && ./gradlew test --no-daemon --build-cache
+
+      - name: 테스트 리포트 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-test-report
+          path: ${{ matrix.service }}/build/reports/tests/test/
 
   services-docker-build:
     name: ${{ matrix.service }} Docker 빌드

@@ -170,13 +170,6 @@ spring:
           filters:
             - name: JwtValidation
 
-        - id: monolith
-          uri: ${ROUTES_MONOLITH:http://localhost:8080}
-          predicates:
-            - Path=/api/v1/**
-          filters:
-            - JwtValidation
-
 server:
   port: 8000
 
