@@ -1,0 +1,5 @@
+package com.hoppingmall.notification.exception
+
+import com.hoppingmall.notification.exception.code.NotificationErrorCode
+
+class NotificationNotFoundException : NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND)
