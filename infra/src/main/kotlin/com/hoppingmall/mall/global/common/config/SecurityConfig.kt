@@ -94,6 +94,7 @@ class SecurityConfig(
                     .hasAnyRole("SELLER", "ADMIN")
                 it.requestMatchers(HttpMethod.GET, "/api/v1/refunds/seller").hasRole("SELLER")
 
+                it.requestMatchers("/internal/**").permitAll()
                 it.requestMatchers("/api/v1/**").authenticated()
                 it.anyRequest().denyAll()
             }
