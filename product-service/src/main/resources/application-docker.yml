@@ -19,6 +19,12 @@ spring:
               - "redis://redis-node-3:6379"
             scanInterval: 1000
 
+  kafka:
+    consumer:
+      bootstrap-servers: kafka:29092
+    producer:
+      bootstrap-servers: kafka:29092
+
 management:
   tracing:
     sampling:
@@ -31,3 +37,5 @@ management:
 services:
   monolith:
     url: http://monolith:8080
+  order-service:
+    url: http://order-service:8084

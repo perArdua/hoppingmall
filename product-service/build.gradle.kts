@@ -55,6 +55,7 @@ dependencies {
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 
 	implementation("net.logstash.logback:logstash-logback-encoder:8.0")
+	implementation("org.springframework.kafka:spring-kafka")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

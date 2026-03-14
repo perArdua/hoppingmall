@@ -1,8 +1,9 @@
-package com.hoppingmall.mall.product.service
+package com.hoppingmall.product.statistics.service
 
-import com.hoppingmall.mall.cartItem.domain.repository.CartItemRepository
-import com.hoppingmall.mall.inventory.domain.repository.InventoryRepository
-import com.hoppingmall.mall.product.domain.repository.ProductStatisticsRepository
+import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
+import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
+import com.hoppingmall.product.product.service.ProductStatisticsCommandService
+import com.hoppingmall.product.statistics.port.CartItemQueryPort
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
@@ -13,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 @Profile("!test")
 class ProductStatisticsScheduler(
     private val productStatisticsRepository: ProductStatisticsRepository,
-    private val cartItemRepository: CartItemRepository,
+    private val cartItemQueryPort: CartItemQueryPort,
     private val inventoryRepository: InventoryRepository,
     private val productStatisticsCommandService: ProductStatisticsCommandService
 ) {
@@ -30,9 +31,9 @@ class ProductStatisticsScheduler(
             return
         }
 
-        val cartMap = cartItemRepository
+        val cartMap = cartItemQueryPort
             .aggregateCartByProduct()
-            .associateBy { it.getProductId() }
+            .associateBy { it.productId }
 
         val inventoryMap = inventoryRepository.findAll()
             .associateBy { it.productId }
@@ -43,7 +44,7 @@ class ProductStatisticsScheduler(
             val cart = cartMap[stats.productId]
             val inventory = inventoryMap[stats.productId]
 
-            val cartCount = cart?.getBuyerCount() ?: 0L
+            val cartCount = cart?.buyerCount ?: 0L
             val stock = inventory?.stockQuantity ?: 0
 
             stats.updateCartAndInventory(cartCount, stock)
