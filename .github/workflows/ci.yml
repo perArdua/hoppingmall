@@ -10,7 +10,6 @@ jobs:
   monolith-test:
     name: Monolith 테스트
     runs-on: ubuntu-latest
-
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v3
@@ -103,14 +102,20 @@ jobs:
       - services-docker-build
     if: always()
     steps:
-      - name: 실패 여부 확인
+      - name: 모든 선행 job 결과 확인
         run: |
-          if [[ "${{ needs.monolith-test.result }}" != "success" ]]; then
+          echo "monolith-test=${{ needs.monolith-test.result }}"
+          echo "services-test=${{ needs.services-test.result }}"
+          echo "services-docker-build=${{ needs.services-docker-build.result }}"
+
+          if [ "${{ needs.monolith-test.result }}" != "success" ]; then
             exit 1
           fi
-          if [[ "${{ needs.services-test.result }}" != "success" ]]; then
+
+          if [ "${{ needs.services-test.result }}" != "success" ]; then
             exit 1
           fi
-          if [[ "${{ needs.services-docker-build.result }}" != "success" ]]; then
+
+          if [ "${{ needs.services-docker-build.result }}" != "success" ]; then
             exit 1
           fi
