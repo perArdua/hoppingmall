@@ -11,6 +11,8 @@ data class PaymentInfo(
     val id: Long,
     val orderId: Long,
     val amount: BigDecimal,
+    val pointAmount: BigDecimal,
+    val couponId: Long?,
     val status: String,
     val isSuccess: Boolean
 )

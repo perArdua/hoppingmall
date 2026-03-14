@@ -1,7 +1,7 @@
 package com.hoppingmall.mall.order.service
 
 import com.hoppingmall.mall.cartItem.domain.repository.CartItemRepository
-import com.hoppingmall.mall.inventory.service.InventoryCommandService
+import com.hoppingmall.mall.inventory.api.InventoryCommandPort
 import com.hoppingmall.mall.order.domain.Order
 import com.hoppingmall.mall.order.domain.OrderItem
 import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
@@ -13,8 +13,8 @@ import com.hoppingmall.mall.order.enum.OrderStatus
 import com.hoppingmall.mall.order.exception.OrderAccessDeniedException
 import com.hoppingmall.mall.order.exception.OrderEmptyItemsException
 import com.hoppingmall.mall.order.exception.OrderNotFoundException
-import com.hoppingmall.mall.product.domain.repository.ProductRepository
-import com.hoppingmall.mall.product.exception.ProductNotFoundException
+import com.hoppingmall.mall.order.exception.OrderProductNotFoundException
+import com.hoppingmall.mall.product.api.ProductQueryPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -26,8 +26,8 @@ class OrderCommandServiceImpl(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val cartItemRepository: CartItemRepository,
-    private val productRepository: ProductRepository,
-    private val inventoryCommandService: InventoryCommandService
+    private val productQueryPort: ProductQueryPort,
+    private val inventoryCommandPort: InventoryCommandPort
 ) : OrderCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -45,13 +45,14 @@ class OrderCommandServiceImpl(
         }
 
         val productIds = cartItems.map { it.productId }.distinct()
-        val productMap = productRepository.findAllById(productIds).associateBy { it.id!! }
+        val productInfos = productQueryPort.findAllByIds(productIds)
+        val productMap = productInfos.associateBy { it.id }
         productIds.forEach { productId ->
-            if (!productMap.containsKey(productId)) throw ProductNotFoundException()
+            if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
 
         cartItems.sortedBy { it.productId }.forEach { cartItem ->
-            inventoryCommandService.decreaseStock(cartItem.productId, cartItem.quantity)
+            inventoryCommandPort.decreaseStock(cartItem.productId, cartItem.quantity)
         }
 
         val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
@@ -88,7 +89,7 @@ class OrderCommandServiceImpl(
 
         val orderItems = orderItemRepository.findByOrderId(orderId)
         orderItems.forEach { orderItem ->
-            inventoryCommandService.increaseStock(orderItem.productId, orderItem.quantity)
+            inventoryCommandPort.increaseStock(orderItem.productId, orderItem.quantity)
         }
 
         log.info("주문 취소: orderId={}, buyerId={}", orderId, buyerId)

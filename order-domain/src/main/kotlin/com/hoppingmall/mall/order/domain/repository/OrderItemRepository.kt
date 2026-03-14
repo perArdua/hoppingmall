@@ -1,7 +1,7 @@
 package com.hoppingmall.mall.order.domain.repository
 
 import com.hoppingmall.mall.order.domain.OrderItem
-import com.hoppingmall.mall.product.dto.SalesAggregation
+import com.hoppingmall.mall.order.api.SalesAggregation
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param

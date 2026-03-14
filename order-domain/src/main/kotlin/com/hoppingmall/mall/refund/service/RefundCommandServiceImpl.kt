@@ -4,9 +4,8 @@ import com.hoppingmall.mall.order.domain.repository.OrderItemRepository
 import com.hoppingmall.mall.order.domain.repository.OrderRepository
 import com.hoppingmall.mall.order.enum.OrderStatus
 import com.hoppingmall.mall.order.exception.OrderNotFoundException
-import com.hoppingmall.mall.payment.domain.Payment
-import com.hoppingmall.mall.payment.domain.repository.PaymentRepository
-import com.hoppingmall.mall.payment.exception.PaymentNotFoundException
+import com.hoppingmall.mall.payment.api.PaymentInfo
+import com.hoppingmall.mall.payment.api.PaymentQueryPort
 import com.hoppingmall.mall.refund.domain.Refund
 import com.hoppingmall.mall.refund.domain.RefundItem
 import com.hoppingmall.mall.refund.domain.repository.RefundItemRepository
@@ -19,6 +18,7 @@ import com.hoppingmall.mall.refund.dto.response.RefundResponse
 import com.hoppingmall.mall.refund.enum.RefundStatus
 import com.hoppingmall.mall.refund.exception.RefundAccessDeniedException
 import com.hoppingmall.mall.refund.exception.RefundNotFoundException
+import com.hoppingmall.mall.refund.exception.RefundPaymentNotFoundException
 import com.hoppingmall.mall.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.mall.shipping.enum.ShippingStatus
 import org.springframework.stereotype.Service
@@ -33,7 +33,7 @@ class RefundCommandServiceImpl(
     private val refundItemRepository: RefundItemRepository,
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
-    private val paymentRepository: PaymentRepository,
+    private val paymentQueryPort: PaymentQueryPort,
     private val shippingRepository: ShippingRepository,
     private val refundEventPublisher: RefundEventPublisher
 ) : RefundCommandService {
@@ -54,10 +54,10 @@ class RefundCommandServiceImpl(
             )
         }
 
-        val payment = paymentRepository.findByOrderId(request.orderId)
-            ?: throw PaymentNotFoundException()
+        val payment = paymentQueryPort.findByOrderId(request.orderId)
+            ?: throw RefundPaymentNotFoundException()
 
-        if (!payment.isSuccess()) {
+        if (!payment.isSuccess) {
             throw com.hoppingmall.mall.refund.exception.RefundException(
                 com.hoppingmall.mall.refund.exception.code.RefundErrorCode.REFUND_INVALID_PAYMENT_STATUS
             )
@@ -100,7 +100,7 @@ class RefundCommandServiceImpl(
 
         val refund = Refund.create(
             orderId = request.orderId,
-            paymentId = payment.id!!,
+            paymentId = payment.id,
             buyerId = buyerId,
             sellerId = sellerId,
             reason = request.reason,
@@ -147,8 +147,8 @@ class RefundCommandServiceImpl(
         refund.approve(approverId)
 
         val refundItems = refundItemRepository.findByRefundId(refundId)
-        val payment = paymentRepository.findById(refund.paymentId)
-            .orElseThrow { PaymentNotFoundException() }
+        val payment = paymentQueryPort.findById(refund.paymentId)
+            ?: throw RefundPaymentNotFoundException()
 
         publishRefundCompletedEvent(refund, refundItems, payment)
         refund.complete()
@@ -175,7 +175,7 @@ class RefundCommandServiceImpl(
     private fun publishRefundCompletedEvent(
         refund: Refund,
         refundItems: List<RefundItem>,
-        payment: Payment
+        payment: PaymentInfo
     ) {
         val pointRefundAmount = if (refund.isFullRefund) {
             payment.pointAmount
@@ -192,7 +192,7 @@ class RefundCommandServiceImpl(
             RefundCompletedEvent(
                 refundId = refund.id!!,
                 orderId = refund.orderId,
-                paymentId = payment.id!!,
+                paymentId = payment.id,
                 buyerId = refund.buyerId,
                 refundAmount = refund.refundAmount,
                 pointRefundAmount = pointRefundAmount,

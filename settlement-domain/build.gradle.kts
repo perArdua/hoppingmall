@@ -28,7 +28,7 @@ kotlin {
 dependencies {
 	implementation(project(":shared"))
 	implementation(project(":order-api"))
-	implementation(project(":user-domain"))
+	implementation(project(":user-api"))
 
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
