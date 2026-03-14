@@ -73,6 +73,34 @@ spring:
           filters:
             - name: JwtValidation
 
+        - id: order-service-orders
+          uri: ${ROUTES_ORDER_SERVICE:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/orders/**
+          filters:
+            - name: JwtValidation
+
+        - id: order-service-cart-items
+          uri: ${ROUTES_ORDER_SERVICE:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/cart-items/**
+          filters:
+            - name: JwtValidation
+
+        - id: order-service-shipping
+          uri: ${ROUTES_ORDER_SERVICE:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/shipping/**
+          filters:
+            - name: JwtValidation
+
+        - id: order-service-refunds
+          uri: ${ROUTES_ORDER_SERVICE:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/refunds/**
+          filters:
+            - name: JwtValidation
+
         - id: monolith-public
           uri: ${ROUTES_MONOLITH:http://localhost:8080}
           predicates:
