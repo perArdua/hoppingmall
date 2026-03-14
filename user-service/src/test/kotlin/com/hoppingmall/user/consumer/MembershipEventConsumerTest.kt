@@ -1,10 +1,10 @@
-package com.hoppingmall.mall.membership.service
+package com.hoppingmall.user.consumer
 
-import com.hoppingmall.mall.membership.domain.MembershipEventLog
-import com.hoppingmall.mall.membership.domain.repository.MembershipEventLogRepository
-import com.hoppingmall.mall.membership.dto.response.MembershipResponse
-import com.hoppingmall.mall.membership.enum.MembershipGrade
-import com.hoppingmall.mall.payment.dto.event.MembershipUpdateRequestEvent
+import com.hoppingmall.user.domain.MembershipEventLog
+import com.hoppingmall.user.domain.enums.MembershipGrade
+import com.hoppingmall.user.domain.repository.MembershipEventLogRepository
+import com.hoppingmall.user.dto.response.MembershipResponse
+import com.hoppingmall.user.service.MembershipCommandService
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores

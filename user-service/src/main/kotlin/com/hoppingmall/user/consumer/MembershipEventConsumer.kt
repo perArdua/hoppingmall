@@ -1,8 +1,8 @@
-package com.hoppingmall.mall.membership.service
+package com.hoppingmall.user.consumer
 
-import com.hoppingmall.mall.membership.domain.MembershipEventLog
-import com.hoppingmall.mall.membership.domain.repository.MembershipEventLogRepository
-import com.hoppingmall.mall.payment.dto.event.MembershipUpdateRequestEvent
+import com.hoppingmall.user.domain.MembershipEventLog
+import com.hoppingmall.user.domain.repository.MembershipEventLogRepository
+import com.hoppingmall.user.service.MembershipCommandService
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
