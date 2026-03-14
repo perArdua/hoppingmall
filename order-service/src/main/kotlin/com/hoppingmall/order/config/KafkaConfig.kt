@@ -1,9 +1,10 @@
-package com.hoppingmall.payment.config
+package com.hoppingmall.order.config
 
-import com.hoppingmall.payment.config.kafka.TracingConsumerInterceptor
-import com.hoppingmall.payment.config.kafka.TracingProducerInterceptor
+import com.hoppingmall.order.config.kafka.TracingConsumerInterceptor
+import com.hoppingmall.order.config.kafka.TracingProducerInterceptor
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.common.errors.SerializationException
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.slf4j.LoggerFactory
@@ -14,10 +15,9 @@ import org.springframework.context.annotation.Profile
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.kafka.support.serializer.JsonSerializer
 import org.springframework.messaging.converter.MessageConversionException
-import org.apache.kafka.common.errors.SerializationException
-import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.util.backoff.FixedBackOff
 import java.util.UUID
 
@@ -27,10 +27,13 @@ class KafkaConfig {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Value("\${spring.kafka.consumer.bootstrap-servers}")
-    private lateinit var bootstrapServers: String
+    @Value("\${spring.kafka.producer.bootstrap-servers:\${spring.kafka.consumer.bootstrap-servers}}")
+    private lateinit var producerBootstrapServers: String
 
-    @Value("\${spring.kafka.consumer.group-id:payment-service}")
+    @Value("\${spring.kafka.consumer.bootstrap-servers}")
+    private lateinit var consumerBootstrapServers: String
+
+    @Value("\${spring.kafka.consumer.group-id:order-service}")
     private lateinit var groupId: String
 
     @Value("\${spring.kafka.consumer.auto-offset-reset:earliest}")
@@ -41,7 +44,7 @@ class KafkaConfig {
     @Bean
     fun producerFactory(): ProducerFactory<String, Any> {
         val configProps = HashMap<String, Any>()
-        configProps[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
+        configProps[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG] = producerBootstrapServers
         configProps[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
         configProps[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = JsonSerializer::class.java
 
@@ -49,22 +52,23 @@ class KafkaConfig {
         configProps[ProducerConfig.ACKS_CONFIG] = "all"
         configProps[ProducerConfig.RETRIES_CONFIG] = Int.MAX_VALUE
         configProps[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = 5
-        configProps[ProducerConfig.TRANSACTIONAL_ID_CONFIG] = "payment-tx-$instanceId"
+        configProps[ProducerConfig.TRANSACTIONAL_ID_CONFIG] = "order-tx-$instanceId"
 
         configProps[ProducerConfig.BATCH_SIZE_CONFIG] = 16384
         configProps[ProducerConfig.LINGER_MS_CONFIG] = 10
         configProps[ProducerConfig.COMPRESSION_TYPE_CONFIG] = "lz4"
+
         configProps[ProducerConfig.INTERCEPTOR_CLASSES_CONFIG] = listOf(TracingProducerInterceptor::class.java.name)
 
         val producerFactory = DefaultKafkaProducerFactory<String, Any>(configProps)
-        producerFactory.setTransactionIdPrefix("payment-tx-$instanceId-")
+        producerFactory.setTransactionIdPrefix("order-tx-$instanceId-")
         return producerFactory
     }
 
     @Bean
     fun kafkaTemplate(): KafkaTemplate<String, Any> {
         val template = KafkaTemplate(producerFactory())
-        template.setTransactionIdPrefix("payment-tx-$instanceId-")
+        template.setTransactionIdPrefix("order-tx-$instanceId-")
         return template
     }
 
@@ -76,7 +80,7 @@ class KafkaConfig {
     @Bean
     fun consumerFactory(): ConsumerFactory<String, Any> {
         val configProps = HashMap<String, Any>()
-        configProps[ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
+        configProps[ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG] = consumerBootstrapServers
         configProps[ConsumerConfig.GROUP_ID_CONFIG] = groupId
         configProps[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = autoOffsetReset
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
@@ -98,6 +102,7 @@ class KafkaConfig {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
         factory.setConcurrency(4)
+        factory.setRecordInterceptor(TracingConsumerInterceptor())
 
         val errorHandler = DefaultErrorHandler(
             { record, exception ->
@@ -112,7 +117,6 @@ class KafkaConfig {
             MessageConversionException::class.java
         )
         factory.setCommonErrorHandler(errorHandler)
-        factory.setRecordInterceptor(TracingConsumerInterceptor())
 
         return factory
     }
