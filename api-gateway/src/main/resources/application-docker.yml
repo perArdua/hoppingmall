@@ -154,13 +154,6 @@ spring:
           filters:
             - name: JwtValidation
 
-        - id: monolith
-          uri: http://monolith:8080
-          predicates:
-            - Path=/api/v1/**
-          filters:
-            - JwtValidation
-
 management:
   tracing:
     sampling:
