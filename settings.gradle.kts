@@ -6,6 +6,7 @@ include(
 	"product-api",
 	"order-api",
 	"payment-api",
+	"user-api",
 	"user-domain",
 	"product-domain",
 	"order-domain",
