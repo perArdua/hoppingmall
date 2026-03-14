@@ -5,8 +5,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
-import org.springframework.security.authentication.AuthenticationManager
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
@@ -40,7 +38,6 @@ class SecurityConfig(
                     "/v3/api-docs/**",
                     "/actuator/**"
                 ).permitAll()
-                it.requestMatchers("/api/v1/users/signup", "/api/v1/users/login").permitAll()
                 it.requestMatchers(
                     HttpMethod.GET,
                     "/api/v1/products",
@@ -68,10 +65,8 @@ class SecurityConfig(
                 ).permitAll()
                 it.requestMatchers(HttpMethod.GET, "/api/v1/coupons/available").permitAll()
 
-                it.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/point-policies/**").hasRole("ADMIN")
                 it.requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
-                it.requestMatchers(HttpMethod.GET, "/api/v1/memberships/users/{userId}").hasRole("ADMIN")
 
                 it.requestMatchers(
                     HttpMethod.POST,
@@ -123,9 +118,4 @@ class SecurityConfig(
 
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
-
-    @Bean
-    fun authenticationManager(authConfig: AuthenticationConfiguration): AuthenticationManager {
-        return authConfig.authenticationManager
-    }
 }

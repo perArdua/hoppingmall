@@ -1,0 +1,3 @@
+package com.hoppingmall.user.exception.seller
+
+class SellerBusinessNumberDuplicateException : SellerException(SellerErrorCode.BUSINESS_NUMBER_DUPLICATED)
