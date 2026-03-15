@@ -1,5 +1,6 @@
 package com.hoppingmall.product.internal
 
+import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.inventory.service.InventoryCommandService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -21,4 +22,40 @@ class InternalInventoryController(
         inventoryCommandService.increaseStock(productId, quantity)
         return ResponseEntity.ok().build()
     }
+
+    @PostMapping("/{productId}/reserve")
+    fun reserveStock(
+        @PathVariable productId: Long,
+        @RequestParam quantity: Int
+    ): ResponseEntity<ReservationResponse> {
+        val reservationId = inventoryCommandService.reserveStock(productId, quantity)
+        return ResponseEntity.ok(ReservationResponse(reservationId))
+    }
+
+    @PostMapping("/reservations/batch-confirm")
+    fun confirmReservations(
+        @RequestBody reservationIds: List<String>
+    ): ResponseEntity<ConfirmationResponse> {
+        return try {
+            inventoryCommandService.confirmReservations(reservationIds)
+            ResponseEntity.ok(ConfirmationResponse(true))
+        } catch (e: ReservationConfirmFailedException) {
+            ResponseEntity.ok(ConfirmationResponse(false))
+        }
+    }
+
+    @PostMapping("/reservations/{reservationId}/cancel")
+    fun cancelReservation(@PathVariable reservationId: String): ResponseEntity<Void> {
+        inventoryCommandService.cancelReservation(reservationId)
+        return ResponseEntity.ok().build()
+    }
+
+    @PostMapping("/reservations/batch-cancel")
+    fun cancelReservations(@RequestBody reservationIds: List<String>): ResponseEntity<Void> {
+        inventoryCommandService.cancelReservations(reservationIds)
+        return ResponseEntity.ok().build()
+    }
+
+    data class ReservationResponse(val reservationId: String)
+    data class ConfirmationResponse(val confirmed: Boolean)
 }
