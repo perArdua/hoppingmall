@@ -42,7 +42,6 @@ dependencies {
 	implementation(project(":order-domain"))
 	implementation(project(":payment-domain"))
 	implementation(project(":notification-domain"))
-	implementation(project(":settlement-domain"))
 
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -68,7 +67,6 @@ dependencies {
 	testImplementation(testFixtures(project(":product-domain")))
 	testImplementation(testFixtures(project(":order-domain")))
 	testImplementation(testFixtures(project(":payment-domain")))
-	testImplementation(testFixtures(project(":settlement-domain")))
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
