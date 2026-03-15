@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:test_settlement_db;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+
+jwt:
+  secret: test-secret-key-for-testing-purposes-only-32chars!
+
+internal:
+  service:
+    token: test-internal-token
+
+services:
+  order-service:
+    url: http://localhost:8084
+  user-service:
+    url: http://localhost:8082
