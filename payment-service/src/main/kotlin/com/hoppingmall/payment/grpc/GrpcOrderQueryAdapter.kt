@@ -4,6 +4,7 @@ import com.hoppingmall.order.grpc.OrderIdRequest
 import com.hoppingmall.order.grpc.OrderQueryServiceGrpc
 import com.hoppingmall.payment.port.OrderItemInfo
 import com.hoppingmall.payment.port.OrderQueryPort
+import com.hoppingmall.payment.port.exception.OrderItemQueryFailedException
 import io.grpc.StatusRuntimeException
 import net.devh.boot.grpc.client.inject.GrpcClient
 import org.slf4j.LoggerFactory
@@ -33,8 +34,8 @@ class GrpcOrderQueryAdapter(
                 )
             }
         } catch (e: StatusRuntimeException) {
-            log.warn("주문 상품 조회 실패: orderId=$orderId", e)
-            emptyList()
+            log.error("주문 상품 조회 실패: orderId=$orderId", e)
+            throw OrderItemQueryFailedException(orderId, e)
         }
     }
 }

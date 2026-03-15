@@ -1,6 +1,8 @@
 package com.hoppingmall.payment.port
 
+import com.hoppingmall.payment.port.exception.OrderCancellationFailedException
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.stereotype.Component
@@ -9,16 +11,20 @@ import java.time.Duration
 
 @Component
 class HttpOrderCommandAdapter(
-    @Value("\${services.order-service.url:http://localhost:8084}") private val orderServiceUrl: String,
-    restTemplateBuilder: RestTemplateBuilder
+    private val orderServiceUrl: String,
+    private val restTemplate: RestTemplate
 ) : OrderCommandPort {
 
-    private val logger = LoggerFactory.getLogger(HttpOrderCommandAdapter::class.java)
+    @Autowired
+    constructor(
+        @Value("\${services.order-service.url:http://localhost:8084}") orderServiceUrl: String,
+        restTemplateBuilder: RestTemplateBuilder
+    ) : this(
+        orderServiceUrl,
+        restTemplateBuilder.connectTimeout(Duration.ofSeconds(2)).readTimeout(Duration.ofSeconds(5)).build()
+    )
 
-    private val restTemplate: RestTemplate = restTemplateBuilder
-        .connectTimeout(Duration.ofSeconds(2))
-        .readTimeout(Duration.ofSeconds(5))
-        .build()
+    private val logger = LoggerFactory.getLogger(HttpOrderCommandAdapter::class.java)
 
     override fun cancelOrder(orderId: Long): Boolean {
         return try {
@@ -29,8 +35,8 @@ class HttpOrderCommandAdapter(
             )
             true
         } catch (e: Exception) {
-            logger.warn("주문 취소 실패: orderId=$orderId", e)
-            false
+            logger.error("주문 취소 실패: orderId=$orderId", e)
+            throw OrderCancellationFailedException(orderId, e)
         }
     }
 }
