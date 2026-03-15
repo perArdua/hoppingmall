@@ -11,7 +11,7 @@ import java.time.LocalDate
 @Entity
 @Table(
     name = "product_hourly_statistics",
-    uniqueConstraints = [UniqueConstraint(columnNames = ["product_id", "statistics_date", "hour"])]
+    uniqueConstraints = [UniqueConstraint(columnNames = ["product_id", "statistics_date", "\"hour\""])]
 )
 class ProductHourlyStatistics(
     @Column(name = "product_id", nullable = false)
