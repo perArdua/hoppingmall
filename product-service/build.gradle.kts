@@ -4,6 +4,7 @@ plugins {
 	kotlin("plugin.jpa") version "1.9.25"
 	id("org.springframework.boot") version "3.5.0"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("com.google.protobuf") version "0.9.4"
 }
 
 group = "com.hoppingmall"
@@ -24,6 +25,10 @@ kotlin {
 repositories {
 	mavenCentral()
 }
+
+val grpcVersion = "1.62.2"
+val grpcKotlinVersion = "1.4.1"
+val protobufVersion = "3.25.3"
 
 dependencies {
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
@@ -63,8 +68,40 @@ dependencies {
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.assertj:assertj-core:3.24.2")
 	testImplementation("org.springframework.security:spring-security-test")
+
+	implementation("io.grpc:grpc-protobuf:$grpcVersion")
+	implementation("io.grpc:grpc-stub:$grpcVersion")
+	implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
+	implementation("com.google.protobuf:protobuf-kotlin:$protobufVersion")
+	implementation("net.devh:grpc-spring-boot-starter:3.1.0.RELEASE")
+	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 }
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+protobuf {
+	protoc {
+		artifact = "com.google.protobuf:protoc:$protobufVersion"
+	}
+	plugins {
+		create("grpc") {
+			artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
+		}
+		create("grpckt") {
+			artifact = "io.grpc:protoc-gen-grpc-kotlin:$grpcKotlinVersion:jdk8@jar"
+		}
+	}
+	generateProtoTasks {
+		all().forEach {
+			it.plugins {
+				create("grpc")
+				create("grpckt")
+			}
+			it.builtins {
+				create("kotlin")
+			}
+		}
+	}
 }

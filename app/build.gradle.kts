@@ -4,6 +4,7 @@ plugins {
 	kotlin("plugin.jpa")
 	id("org.springframework.boot")
 	id("io.spring.dependency-management")
+	id("com.google.protobuf")
 	jacoco
 }
 
@@ -18,6 +19,10 @@ kotlin {
 		freeCompilerArgs.addAll("-Xjsr305=strict")
 	}
 }
+
+val grpcVersion = "1.62.2"
+val grpcKotlinVersion = "1.4.1"
+val protobufVersion = "3.25.3"
 
 configurations {
 	compileOnly {
@@ -72,6 +77,13 @@ dependencies {
 	testImplementation("org.springframework.kafka:spring-kafka-test")
 	testImplementation("org.springframework.security:spring-security-test")
 
+	implementation("io.grpc:grpc-protobuf:$grpcVersion")
+	implementation("io.grpc:grpc-stub:$grpcVersion")
+	implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
+	implementation("com.google.protobuf:protobuf-kotlin:$protobufVersion")
+	implementation("net.devh:grpc-spring-boot-starter:3.1.0.RELEASE")
+	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+
 	implementation("org.springframework.boot:spring-boot-starter-data-redis") {
 		exclude(group = "io.lettuce", module = "lettuce-core")
 	}
@@ -114,7 +126,8 @@ val jacocoExcludedDirs = listOf(
 	"**/com/hoppingmall/mall/global/common/repository/OutboxEventRepository*",
 	"**/com/hoppingmall/mall/refund/service/RefundCompletionConsumer*",
 	"**/com/hoppingmall/mall/global/adapter/**",
-	"**/com/hoppingmall/mall/*/controller/Internal*"
+	"**/com/hoppingmall/mall/*/controller/Internal*",
+	"**/grpc/**"
 )
 
 tasks.jacocoTestReport {
@@ -156,6 +169,31 @@ tasks.jacocoTestCoverageVerification {
 				counter = "LINE"
 				value = "COVEREDRATIO"
 				minimum = "0.80".toBigDecimal()
+			}
+		}
+	}
+}
+
+protobuf {
+	protoc {
+		artifact = "com.google.protobuf:protoc:$protobufVersion"
+	}
+	plugins {
+		create("grpc") {
+			artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
+		}
+		create("grpckt") {
+			artifact = "io.grpc:protoc-gen-grpc-kotlin:$grpcKotlinVersion:jdk8@jar"
+		}
+	}
+	generateProtoTasks {
+		all().forEach {
+			it.plugins {
+				create("grpc")
+				create("grpckt")
+			}
+			it.builtins {
+				create("kotlin")
 			}
 		}
 	}

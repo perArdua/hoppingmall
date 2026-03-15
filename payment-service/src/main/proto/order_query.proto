@@ -1,0 +1,41 @@
+syntax = "proto3";
+package hoppingmall.order;
+option java_package = "com.hoppingmall.order.grpc";
+option java_multiple_files = true;
+
+service OrderQueryService {
+  rpc FindOrderItemsByOrderId (OrderIdRequest) returns (OrderItemListResponse);
+  rpc IsDelivered (DeliveredCheckRequest) returns (DeliveredResponse);
+  rpc FindOrderItemById (OrderItemIdRequest) returns (OrderItemResponse);
+}
+
+service CartItemQueryService {
+  rpc AggregateCartByProduct (Empty) returns (CartAggregateResponse);
+}
+
+message OrderIdRequest { int64 order_id = 1; }
+message OrderItemIdRequest { int64 order_item_id = 1; }
+message DeliveredCheckRequest {
+  int64 order_id = 1;
+  int64 buyer_id = 2;
+}
+message DeliveredResponse { bool delivered = 1; }
+message Empty {}
+
+message OrderItemResponse {
+  int64 id = 1;
+  int64 order_id = 2;
+  int64 seller_id = 3;
+  int64 product_id = 4;
+  string product_name = 5;
+  string product_price = 6;
+  int32 quantity = 7;
+  string total_price = 8;
+}
+message OrderItemListResponse { repeated OrderItemResponse items = 1; }
+
+message CartAggregation {
+  int64 product_id = 1;
+  int64 buyer_count = 2;
+}
+message CartAggregateResponse { repeated CartAggregation aggregations = 1; }
