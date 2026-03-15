@@ -14,7 +14,7 @@ import java.util.UUID
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class MdcFilter(
-    @Value("\${spring.application.name}") private val serviceName: String
+    @Value("\${spring.application.name:order-service}") private val serviceName: String
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(
