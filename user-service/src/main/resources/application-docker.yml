@@ -37,6 +37,10 @@ management:
     tracing:
       endpoint: http://zipkin:9411/api/v2/spans
 
+internal:
+  service:
+    token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
+
 logging:
   level:
     root: INFO
