@@ -45,6 +45,13 @@ scrape_configs:
         labels:
           service: 'payment-service'
 
+  - job_name: 'settlement-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['settlement-service:8086']
+        labels:
+          service: 'settlement-service'
+
   - job_name: 'api-gateway'
     metrics_path: '/actuator/prometheus'
     static_configs:
