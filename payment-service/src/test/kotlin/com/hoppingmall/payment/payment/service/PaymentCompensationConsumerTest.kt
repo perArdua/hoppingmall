@@ -1,16 +1,12 @@
 package com.hoppingmall.payment.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.LongNode
+import com.fasterxml.jackson.databind.node.TextNode
 import com.hoppingmall.payment.payment.domain.CompensationEventLog
 import com.hoppingmall.payment.payment.domain.CompensationEventLogStatus
 import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
-import com.hoppingmall.payment.port.InventoryCommandPort
-import com.hoppingmall.payment.port.OrderCommandPort
-import com.hoppingmall.payment.port.OrderItemInfo
-import com.hoppingmall.payment.port.OrderQueryPort
-import com.hoppingmall.payment.port.exception.OrderCancellationFailedException
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -20,7 +16,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
-import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -33,15 +29,6 @@ class PaymentCompensationConsumerTest {
 
     @Mock
     private lateinit var compensationEventLogService: CompensationEventLogService
-
-    @Mock
-    private lateinit var orderCommandPort: OrderCommandPort
-
-    @Mock
-    private lateinit var orderQueryPort: OrderQueryPort
-
-    @Mock
-    private lateinit var inventoryCommandPort: InventoryCommandPort
 
     @Mock
     private lateinit var refundPointsService: RefundPointsService
@@ -87,17 +74,12 @@ class PaymentCompensationConsumerTest {
     )
 
     @Test
-    fun 결제_실패_시_주문_취소_및_재고_복구를_수행한다() {
+    fun 결제_실패_시_보상_완료_기록만_수행한다() {
         whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any()))
             .thenReturn(pendingLog())
-        whenever(orderCommandPort.cancelOrder(200L)).thenReturn(true)
-        whenever(orderQueryPort.findOrderItemsByOrderId(200L))
-            .thenReturn(listOf(OrderItemInfo(1L, 10L, 2, BigDecimal("20000"))))
 
         consumer.handlePaymentFailed(failedEvent)
 
-        verify(orderCommandPort).cancelOrder(200L)
-        verify(inventoryCommandPort).increaseStock(10L, 2)
         verify(compensationEventLogService).markCompleted("evt-1")
     }
 
@@ -108,40 +90,11 @@ class PaymentCompensationConsumerTest {
 
         consumer.handlePaymentFailed(failedEvent)
 
-        verify(orderCommandPort, never()).cancelOrder(any())
-        verify(inventoryCommandPort, never()).increaseStock(any(), any())
         verify(compensationEventLogService, never()).markCompleted(any())
     }
 
     @Test
-    fun 주문이_이미_취소되어도_재고_복구는_계속_수행한다() {
-        whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any()))
-            .thenReturn(pendingLog())
-        whenever(orderCommandPort.cancelOrder(200L)).thenReturn(false)
-        whenever(orderQueryPort.findOrderItemsByOrderId(200L))
-            .thenReturn(listOf(OrderItemInfo(1L, 10L, 2, BigDecimal("20000"))))
-
-        consumer.handlePaymentFailed(failedEvent)
-
-        verify(inventoryCommandPort).increaseStock(10L, 2)
-        verify(compensationEventLogService).markCompleted("evt-1")
-    }
-
-    @Test
-    fun 주문_취소_실패_시_예외가_전파된다() {
-        whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any()))
-            .thenReturn(pendingLog())
-        whenever(orderCommandPort.cancelOrder(200L))
-            .thenThrow(OrderCancellationFailedException(200L, RuntimeException("Connection refused")))
-
-        assertThatThrownBy { consumer.handlePaymentFailed(failedEvent) }
-            .isInstanceOf(OrderCancellationFailedException::class.java)
-
-        verify(compensationEventLogService, never()).markCompleted(any())
-    }
-
-    @Test
-    fun 결제_취소_시_주문_취소_재고_복구_포인트_환불을_수행한다() {
+    fun 결제_취소_시_포인트_환불만_수행한다() {
         val cancelLog = CompensationEventLog(
             eventId = "evt-2",
             compensationType = "PAYMENT_CANCELLED",
@@ -151,14 +104,9 @@ class PaymentCompensationConsumerTest {
         )
         whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any()))
             .thenReturn(cancelLog)
-        whenever(orderCommandPort.cancelOrder(200L)).thenReturn(true)
-        whenever(orderQueryPort.findOrderItemsByOrderId(200L))
-            .thenReturn(listOf(OrderItemInfo(1L, 10L, 2, BigDecimal("20000"))))
 
         consumer.handlePaymentCancelled(cancelledEvent)
 
-        verify(orderCommandPort).cancelOrder(200L)
-        verify(inventoryCommandPort).increaseStock(10L, 2)
         verify(refundPointsService).refundPoints(1L, 100L)
         verify(compensationEventLogService).markCompleted("evt-2")
     }
@@ -177,7 +125,57 @@ class PaymentCompensationConsumerTest {
 
         consumer.handlePaymentCancelled(cancelledEvent)
 
-        verify(orderCommandPort, never()).cancelOrder(any())
+        verify(refundPointsService, never()).refundPoints(any(), any())
+    }
+
+    @Test
+    fun 결제_역보상_요청_시_포인트_환불을_수행한다() {
+        val node = mock<com.fasterxml.jackson.databind.JsonNode>()
+        whenever(objectMapper.readTree(any<String>())).thenReturn(node)
+        whenever(node.get("eventType")).thenReturn(TextNode("PaymentReversalRequested"))
+        whenever(node.get("eventId")).thenReturn(TextNode("reversal-evt-1"))
+        whenever(node.get("orderId")).thenReturn(LongNode(200L))
+        whenever(node.get("paymentId")).thenReturn(LongNode(100L))
+        whenever(node.get("userId")).thenReturn(LongNode(1L))
+
+        val pendingReversalLog = CompensationEventLog(
+            eventId = "reversal-evt-1",
+            compensationType = "PAYMENT_REVERSAL",
+            paymentId = 100L,
+            orderId = 200L,
+            status = CompensationEventLogStatus.PENDING
+        )
+        whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any()))
+            .thenReturn(pendingReversalLog)
+
+        consumer.handlePaymentReversal("{}")
+
+        verify(refundPointsService).refundPoints(1L, 100L)
+        verify(compensationEventLogService).markCompleted("reversal-evt-1")
+    }
+
+    @Test
+    fun 이미_처리된_역보상_이벤트는_스킵한다() {
+        val node = mock<com.fasterxml.jackson.databind.JsonNode>()
+        whenever(objectMapper.readTree(any<String>())).thenReturn(node)
+        whenever(node.get("eventType")).thenReturn(TextNode("PaymentReversalRequested"))
+        whenever(node.get("eventId")).thenReturn(TextNode("reversal-evt-1"))
+        whenever(node.get("orderId")).thenReturn(LongNode(200L))
+        whenever(node.get("paymentId")).thenReturn(LongNode(100L))
+        whenever(node.get("userId")).thenReturn(LongNode(1L))
+
+        val completedReversalLog = CompensationEventLog(
+            eventId = "reversal-evt-1",
+            compensationType = "PAYMENT_REVERSAL",
+            paymentId = 100L,
+            orderId = 200L,
+            status = CompensationEventLogStatus.COMPLETED
+        )
+        whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any()))
+            .thenReturn(completedReversalLog)
+
+        consumer.handlePaymentReversal("{}")
+
         verify(refundPointsService, never()).refundPoints(any(), any())
     }
 }

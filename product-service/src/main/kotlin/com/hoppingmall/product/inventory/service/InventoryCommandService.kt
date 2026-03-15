@@ -9,4 +9,8 @@ interface InventoryCommandService {
     fun updateStock(productId: Long, request: InventoryUpdateRequest): InventoryResponse
     fun decreaseStock(productId: Long, quantity: Int)
     fun increaseStock(productId: Long, quantity: Int)
+    fun reserveStock(productId: Long, quantity: Int): String
+    fun confirmReservations(reservationIds: List<String>): Boolean
+    fun cancelReservation(reservationId: String)
+    fun cancelReservations(reservationIds: List<String>)
 }
