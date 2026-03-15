@@ -50,8 +50,17 @@ class OrderCommandServiceImpl(
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
 
-        cartItems.sortedBy { it.productId }.forEach { cartItem ->
-            inventoryCommandPort.decreaseStock(cartItem.productId, cartItem.quantity)
+        val reservationMap = mutableMapOf<Long, String>()
+        try {
+            cartItems.sortedBy { it.productId }.forEach { cartItem ->
+                val reservationId = inventoryCommandPort.reserveStock(cartItem.productId, cartItem.quantity)
+                reservationMap[cartItem.productId] = reservationId
+            }
+        } catch (e: Exception) {
+            if (reservationMap.isNotEmpty()) {
+                inventoryCommandPort.cancelReservations(reservationMap.values.toList())
+            }
+            throw e
         }
 
         val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
@@ -65,7 +74,8 @@ class OrderCommandServiceImpl(
                 productId = cartItem.productId,
                 productName = cartItem.productName,
                 productPrice = cartItem.productPrice,
-                quantity = cartItem.quantity
+                quantity = cartItem.quantity,
+                reservationId = reservationMap[cartItem.productId]
             )
         }
         val savedOrderItems = orderItemRepository.saveAll(orderItems)
@@ -84,11 +94,20 @@ class OrderCommandServiceImpl(
             throw OrderAccessDeniedException()
         }
 
+        if (!order.isCancellable()) {
+            throw com.hoppingmall.order.order.exception.OrderInvalidStatusException()
+        }
+
         order.updateStatus(OrderStatus.CANCELLED)
 
         val orderItems = orderItemRepository.findByOrderId(orderId)
-        orderItems.forEach { orderItem ->
-            inventoryCommandPort.increaseStock(orderItem.productId, orderItem.quantity)
+        val reservationIds = orderItems.mapNotNull { it.reservationId }
+        if (reservationIds.isNotEmpty()) {
+            inventoryCommandPort.cancelReservations(reservationIds)
+        } else {
+            orderItems.forEach { orderItem ->
+                inventoryCommandPort.increaseStock(orderItem.productId, orderItem.quantity)
+            }
         }
 
         log.info("주문 취소: orderId={}, buyerId={}", orderId, buyerId)

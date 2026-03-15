@@ -1,18 +1,32 @@
 package com.hoppingmall.order.refund.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.order.port.TransactionalEventPublisherPort
 import com.hoppingmall.order.refund.dto.event.RefundCompletedEvent
-import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 
 @Component
 class KafkaRefundEventPublisher(
-    private val kafkaTemplate: KafkaTemplate<String, String>,
-    private val objectMapper: ObjectMapper
+    private val transactionalEventPublisherPort: TransactionalEventPublisherPort
 ) : RefundEventPublisher {
 
     override fun publishRefundCompletedEvent(event: RefundCompletedEvent) {
-        val payload = objectMapper.writeValueAsString(event)
-        kafkaTemplate.send("refund-completion", event.refundId.toString(), payload)
+        transactionalEventPublisherPort.publishEvent(
+            aggregateType = "Refund",
+            aggregateId = event.refundId.toString(),
+            eventType = "RefundCompleted",
+            eventData = mapOf(
+                "eventType" to "RefundCompleted",
+                "eventId" to event.eventId,
+                "refundId" to event.refundId,
+                "orderId" to event.orderId,
+                "paymentId" to event.paymentId,
+                "buyerId" to event.buyerId,
+                "refundAmount" to event.refundAmount,
+                "pointRefundAmount" to event.pointRefundAmount,
+                "isFullRefund" to event.isFullRefund
+            ),
+            topic = "refund-completion",
+            partitionKey = event.refundId.toString()
+        )
     }
 }
