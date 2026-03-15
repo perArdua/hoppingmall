@@ -1,9 +1,9 @@
 spring:
   application:
-    name: product-service
+    name: order-service
 
   datasource:
-    url: jdbc:h2:mem:productdb;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    url: jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1;MODE=MYSQL
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -36,14 +36,19 @@ spring:
   kafka:
     consumer:
       bootstrap-servers: localhost:9092
+      group-id: order-service
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         spring.json.trusted.packages: "*"
+    producer:
+      bootstrap-servers: localhost:9092
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 server:
-  port: 8083
+  port: 8084
 
 management:
   endpoints:
@@ -52,7 +57,7 @@ management:
         include: health,metrics,prometheus
   metrics:
     tags:
-      application: product-service
+      application: order-service
   tracing:
     sampling:
       probability: 0.0
@@ -61,22 +66,8 @@ management:
 services:
   monolith:
     url: http://localhost:8080
-  order-service:
-    url: http://localhost:8084
-
-file:
-  upload:
-    base-upload-dir: ${FILE_UPLOAD_BASE_DIR:/tmp/hoppingmall}
-    max-file-size: 5242880
-    allowed-extensions:
-      - jpg
-      - jpeg
-      - png
-      - gif
-      - webp
-    allowed-domains:
-      - product
-    sub-directory: images
+  product-service:
+    url: http://localhost:8083
 
 internal:
   service:
@@ -84,8 +75,11 @@ internal:
 
 grpc:
   server:
-    port: 9093
+    port: 9094
   client:
-    order-service:
-      address: static://localhost:9094
+    product-service:
+      address: static://localhost:9093
+      negotiation-type: plaintext
+    payment-service:
+      address: static://localhost:9095
       negotiation-type: plaintext
