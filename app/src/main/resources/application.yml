@@ -137,3 +137,7 @@ file:
 internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
+
+grpc:
+  server:
+    port: 9080

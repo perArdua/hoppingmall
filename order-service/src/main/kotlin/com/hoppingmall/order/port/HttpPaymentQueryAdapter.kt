@@ -3,11 +3,13 @@ package com.hoppingmall.order.port
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
 import java.time.Duration
 
 @Component
+@Profile("!grpc")
 class HttpPaymentQueryAdapter(
     @Value("\${services.monolith.url:http://localhost:8080}") private val monolithUrl: String,
     restTemplateBuilder: RestTemplateBuilder
