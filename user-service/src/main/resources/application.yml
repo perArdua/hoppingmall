@@ -63,6 +63,10 @@ jwt:
   access-expiration-ms: 3600000
   refresh-expiration-ms: 86400000
 
+internal:
+  service:
+    token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
+
 springdoc:
   api-docs:
     path: /v3/api-docs
