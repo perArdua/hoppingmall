@@ -109,4 +109,50 @@ class StatisticsEventConsumer(
             throw e
         }
     }
+
+    @KafkaListener(topics = ["payment-reversal"], groupId = "statistics-compensation-service")
+    @Transactional
+    fun handlePaymentReversal(message: String) {
+        val node = objectMapper.readTree(message)
+        val eventType = node.get("eventType")?.asText()
+
+        if (eventType != "PaymentReversalRequested") return
+
+        val eventId = node.get("eventId")?.asText() ?: return
+        val orderId = node.get("orderId")?.asLong() ?: return
+
+        try {
+            if (statisticsEventLogRepository.existsByEventId(eventId)) {
+                logger.info("이미 처리된 통계 역보상 이벤트: $eventId")
+                return
+            }
+
+            val orderItems = orderItemQueryPort.findByOrderId(orderId)
+            orderItems.forEach { item ->
+                productStatisticsCommandService.decrementSalesStats(
+                    item.productId,
+                    item.quantity.toLong(),
+                    item.totalPrice
+                )
+            }
+
+            try {
+                statisticsEventLogRepository.save(
+                    StatisticsEventLog(
+                        eventId = eventId,
+                        eventType = "PaymentReversalRequested",
+                        orderId = orderId
+                    )
+                )
+            } catch (e: DataIntegrityViolationException) {
+                logger.info("이미 처리된 통계 역보상 이벤트: $eventId")
+                return
+            }
+
+            logger.info("결제 역보상 통계 반영: orderId=$orderId")
+        } catch (e: Exception) {
+            logger.error("결제 역보상 통계 처리 실패: $eventId, 오류: ${e.message}")
+            throw e
+        }
+    }
 }
