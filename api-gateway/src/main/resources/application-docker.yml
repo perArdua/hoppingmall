@@ -1,4 +1,14 @@
 spring:
+  data:
+    redis:
+      host: ""
+      port: 0
+      cluster:
+        nodes:
+          - redis-node-1:7001
+          - redis-node-2:7002
+          - redis-node-3:7003
+
   cloud:
     gateway:
       routes:
