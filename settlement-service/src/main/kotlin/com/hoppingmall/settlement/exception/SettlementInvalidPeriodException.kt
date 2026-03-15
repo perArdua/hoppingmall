@@ -1,0 +1,5 @@
+package com.hoppingmall.settlement.exception
+
+import com.hoppingmall.settlement.exception.code.SettlementErrorCode
+
+class SettlementInvalidPeriodException : SettlementException(SettlementErrorCode.SETTLEMENT_INVALID_PERIOD)
