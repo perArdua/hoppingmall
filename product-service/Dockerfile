@@ -1,4 +1,5 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY gradlew ./
 COPY gradle ./gradle

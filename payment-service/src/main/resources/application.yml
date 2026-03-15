@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: payment-service
+
+  datasource:
+    url: jdbc:h2:mem:paymentdb;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        legacy_id_generator_strategy: true
+        default_batch_fetch_size: 100
+
+  data:
+    redis:
+      redisson:
+        config: |
+          clusterServersConfig:
+            nodeAddresses:
+              - "redis://localhost:7001"
+              - "redis://localhost:7002"
+              - "redis://localhost:7003"
+            scanInterval: 1000
+
+  kafka:
+    consumer:
+      bootstrap-servers: localhost:9092
+      group-id: payment-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      bootstrap-servers: localhost:9092
+
+server:
+  port: 8085
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    tags:
+      application: payment-service
+  tracing:
+    sampling:
+      probability: 0.0
+    enabled: false
+
+services:
+  monolith:
+    url: http://localhost:8080
+  order-service:
+    url: http://localhost:8084
+  product-service:
+    url: http://localhost:8083
+
+internal:
+  service:
+    token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
+
+grpc:
+  server:
+    port: 9095
+  client:
+    order-service:
+      address: static://localhost:9094
+      negotiation-type: plaintext
+    monolith:
+      address: static://localhost:9080
+      negotiation-type: plaintext

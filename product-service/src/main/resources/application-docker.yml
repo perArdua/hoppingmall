@@ -43,3 +43,9 @@ services:
 internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN}
+
+grpc:
+  client:
+    order-service:
+      address: static://order-service:9094
+      negotiation-type: plaintext
