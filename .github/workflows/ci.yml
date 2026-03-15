@@ -10,7 +10,6 @@ jobs:
   monolith-test:
     name: Monolith 테스트
     runs-on: ubuntu-latest
-
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v3
@@ -93,3 +92,30 @@ jobs:
 
       - name: Docker 빌드 검증
         run: docker build -t ${{ matrix.service }}:ci-test ./${{ matrix.service }}
+
+  final-check:
+    name: CI 최종 검증
+    runs-on: ubuntu-latest
+    needs:
+      - monolith-test
+      - services-test
+      - services-docker-build
+    if: always()
+    steps:
+      - name: 모든 선행 job 결과 확인
+        run: |
+          echo "monolith-test=${{ needs.monolith-test.result }}"
+          echo "services-test=${{ needs.services-test.result }}"
+          echo "services-docker-build=${{ needs.services-docker-build.result }}"
+
+          if [ "${{ needs.monolith-test.result }}" != "success" ]; then
+            exit 1
+          fi
+
+          if [ "${{ needs.services-test.result }}" != "success" ]; then
+            exit 1
+          fi
+
+          if [ "${{ needs.services-docker-build.result }}" != "success" ]; then
+            exit 1
+          fi
