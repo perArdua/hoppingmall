@@ -37,7 +37,10 @@ class OrderItem private constructor(
     val quantity: Int,
 
     @Column(nullable = false, precision = 10, scale = 2)
-    val totalPrice: BigDecimal
+    val totalPrice: BigDecimal,
+
+    @Column(length = 36)
+    val reservationId: String? = null
 ) : BaseEntity() {
 
     companion object {
@@ -47,7 +50,8 @@ class OrderItem private constructor(
             productId: Long,
             productName: String,
             productPrice: BigDecimal,
-            quantity: Int
+            quantity: Int,
+            reservationId: String? = null
         ): OrderItem {
             return OrderItem(
                 orderId = orderId,
@@ -56,7 +60,8 @@ class OrderItem private constructor(
                 productName = productName,
                 productPrice = productPrice,
                 quantity = quantity,
-                totalPrice = productPrice.multiply(BigDecimal(quantity))
+                totalPrice = productPrice.multiply(BigDecimal(quantity)),
+                reservationId = reservationId
             )
         }
     }
