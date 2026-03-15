@@ -1,6 +1,8 @@
 package com.hoppingmall.payment.port
 
+import com.hoppingmall.payment.port.exception.OrderItemQueryFailedException
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.context.annotation.Profile
@@ -11,16 +13,20 @@ import java.time.Duration
 @Component
 @Profile("!grpc")
 class HttpOrderQueryAdapter(
-    @Value("\${services.order-service.url:http://localhost:8084}") private val orderServiceUrl: String,
-    restTemplateBuilder: RestTemplateBuilder
+    private val orderServiceUrl: String,
+    private val restTemplate: RestTemplate
 ) : OrderQueryPort {
 
-    private val logger = LoggerFactory.getLogger(HttpOrderQueryAdapter::class.java)
+    @Autowired
+    constructor(
+        @Value("\${services.order-service.url:http://localhost:8084}") orderServiceUrl: String,
+        restTemplateBuilder: RestTemplateBuilder
+    ) : this(
+        orderServiceUrl,
+        restTemplateBuilder.connectTimeout(Duration.ofSeconds(2)).readTimeout(Duration.ofSeconds(5)).build()
+    )
 
-    private val restTemplate: RestTemplate = restTemplateBuilder
-        .connectTimeout(Duration.ofSeconds(2))
-        .readTimeout(Duration.ofSeconds(5))
-        .build()
+    private val logger = LoggerFactory.getLogger(HttpOrderQueryAdapter::class.java)
 
     override fun findOrderItemsByOrderId(orderId: Long): List<OrderItemInfo> {
         return try {
@@ -30,8 +36,8 @@ class HttpOrderQueryAdapter(
             )
             result?.toList() ?: emptyList()
         } catch (e: Exception) {
-            logger.warn("주문 상품 조회 실패: orderId=$orderId", e)
-            emptyList()
+            logger.error("주문 상품 조회 실패: orderId=$orderId", e)
+            throw OrderItemQueryFailedException(orderId, e)
         }
     }
 }

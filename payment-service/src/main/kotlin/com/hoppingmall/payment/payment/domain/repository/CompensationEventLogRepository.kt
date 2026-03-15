@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository
 @Repository
 interface CompensationEventLogRepository : JpaRepository<CompensationEventLog, Long> {
     fun existsByEventId(eventId: String): Boolean
+    fun findByEventId(eventId: String): CompensationEventLog?
 }
