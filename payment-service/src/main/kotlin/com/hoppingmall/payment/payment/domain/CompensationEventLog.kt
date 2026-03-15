@@ -3,6 +3,8 @@ package com.hoppingmall.payment.payment.domain
 import com.hoppingmall.payment.common.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 
@@ -22,5 +24,16 @@ class CompensationEventLog(
     val paymentId: Long,
 
     @Column(nullable = false)
-    val orderId: Long
-) : BaseEntity()
+    val orderId: Long,
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var status: CompensationEventLogStatus = CompensationEventLogStatus.PENDING
+) : BaseEntity() {
+
+    fun complete() {
+        this.status = CompensationEventLogStatus.COMPLETED
+    }
+
+    fun isCompleted(): Boolean = this.status == CompensationEventLogStatus.COMPLETED
+}
