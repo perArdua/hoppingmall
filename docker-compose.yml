@@ -266,11 +266,12 @@ services:
       redis-cluster-init:
         condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: docker,grpc
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8080:8080"
+      - "9080:9080"
 
   notification-service:
     build:
@@ -317,11 +318,12 @@ services:
       redis-cluster-init:
         condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: docker,grpc
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8083:8083"
+      - "9093:9093"
 
   order-service:
     build:
@@ -336,11 +338,12 @@ services:
       redis-cluster-init:
         condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: docker,grpc
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8084:8084"
+      - "9094:9094"
 
   payment-service:
     build:
@@ -355,11 +358,12 @@ services:
       redis-cluster-init:
         condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: docker,grpc
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8085:8085"
+      - "9095:9095"
 
   api-gateway:
     build:

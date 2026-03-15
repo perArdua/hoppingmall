@@ -1,0 +1,85 @@
+spring:
+  application:
+    name: order-service
+
+  datasource:
+    url: jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        legacy_id_generator_strategy: true
+        default_batch_fetch_size: 100
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+  data:
+    redis:
+      redisson:
+        config: |
+          clusterServersConfig:
+            nodeAddresses:
+              - "redis://localhost:7001"
+              - "redis://localhost:7002"
+              - "redis://localhost:7003"
+            scanInterval: 1000
+
+  kafka:
+    consumer:
+      bootstrap-servers: localhost:9092
+      group-id: order-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      bootstrap-servers: localhost:9092
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8084
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    tags:
+      application: order-service
+  tracing:
+    sampling:
+      probability: 0.0
+    enabled: false
+
+services:
+  monolith:
+    url: http://localhost:8080
+  product-service:
+    url: http://localhost:8083
+
+internal:
+  service:
+    token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
+
+grpc:
+  server:
+    port: 9094
+  client:
+    product-service:
+      address: static://localhost:9093
+      negotiation-type: plaintext
+    payment-service:
+      address: static://localhost:9095
+      negotiation-type: plaintext
