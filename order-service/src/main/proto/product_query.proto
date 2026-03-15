@@ -1,0 +1,24 @@
+syntax = "proto3";
+package hoppingmall.product;
+option java_package = "com.hoppingmall.product.grpc";
+option java_multiple_files = true;
+
+service ProductQueryService {
+  rpc FindProductById (ProductIdRequest) returns (ProductResponse);
+  rpc FindProductsByIds (ProductIdsRequest) returns (ProductListResponse);
+  rpc FindProductImageUrl (ProductIdRequest) returns (ImageUrlResponse);
+}
+
+message ProductIdRequest { int64 product_id = 1; }
+message ProductIdsRequest { repeated int64 product_ids = 1; }
+message ProductResponse {
+  int64 id = 1;
+  string name = 2;
+  string price = 3;
+  int64 seller_id = 4;
+}
+message ProductListResponse { repeated ProductResponse products = 1; }
+message ImageUrlResponse {
+  string image_url = 1;
+  bool found = 2;
+}
