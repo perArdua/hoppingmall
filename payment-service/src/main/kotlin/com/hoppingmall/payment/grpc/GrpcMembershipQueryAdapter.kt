@@ -3,6 +3,8 @@ package com.hoppingmall.payment.grpc
 import com.hoppingmall.mall.membership.grpc.MembershipQueryServiceGrpc
 import com.hoppingmall.mall.membership.grpc.UserIdRequest
 import com.hoppingmall.payment.port.MembershipQueryPort
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import io.grpc.StatusRuntimeException
 import net.devh.boot.grpc.client.inject.GrpcClient
 import org.slf4j.LoggerFactory
@@ -18,15 +20,17 @@ class GrpcMembershipQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcMembershipQueryAdapter::class.java)
 
+    @CircuitBreaker(name = "membership-query", fallbackMethod = "getPointEarningRateFallback")
+    @Retry(name = "grpc")
     override fun getPointEarningRate(userId: Long): BigDecimal {
-        return try {
-            val response = stub.getPointEarningRate(
-                UserIdRequest.newBuilder().setUserId(userId).build()
-            )
-            response.earningRate.toBigDecimalOrNull() ?: BigDecimal.ZERO
-        } catch (e: StatusRuntimeException) {
-            log.warn("멤버십 적립률 조회 실패: userId=$userId", e)
-            BigDecimal("0.01")
-        }
+        val response = stub.getPointEarningRate(
+            UserIdRequest.newBuilder().setUserId(userId).build()
+        )
+        return response.earningRate.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    }
+
+    private fun getPointEarningRateFallback(userId: Long, e: Exception): BigDecimal {
+        log.warn("CB fallback: 멤버십 적립률 조회 실패 userId=$userId", e)
+        return BigDecimal("0.01")
     }
 }

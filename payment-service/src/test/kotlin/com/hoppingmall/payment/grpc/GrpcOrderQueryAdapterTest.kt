@@ -48,12 +48,11 @@ class GrpcOrderQueryAdapterTest {
     }
 
     @Test
-    fun gRPC_호출_실패_시_OrderItemQueryFailedException을_던진다() {
+    fun gRPC_호출_실패_시_예외를_전파한다() {
         whenever(stub.findOrderItemsByOrderId(any()))
             .thenThrow(StatusRuntimeException(Status.UNAVAILABLE))
 
         assertThatThrownBy { adapter.findOrderItemsByOrderId(1L) }
-            .isInstanceOf(OrderItemQueryFailedException::class.java)
-            .hasMessageContaining("orderId=1")
+            .isInstanceOf(StatusRuntimeException::class.java)
     }
 }

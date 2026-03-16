@@ -247,6 +247,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - ./docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus

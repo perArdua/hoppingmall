@@ -1,5 +1,7 @@
 package com.hoppingmall.order.port
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -22,27 +24,31 @@ class HttpPaymentQueryAdapter(
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
+    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByOrderIdFallback")
+    @Retry(name = "payment-query")
     override fun findByOrderId(orderId: Long): PaymentInfo? {
-        return try {
-            restTemplate.getForObject(
-                "$monolithUrl/internal/api/v1/payments/by-order/$orderId",
-                PaymentInfo::class.java
-            )
-        } catch (e: Exception) {
-            logger.warn("주문별 결제 조회 실패: orderId=$orderId", e)
-            null
-        }
+        return restTemplate.getForObject(
+            "$monolithUrl/internal/api/v1/payments/by-order/$orderId",
+            PaymentInfo::class.java
+        )
     }
 
+    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByIdFallback")
+    @Retry(name = "payment-query")
     override fun findById(paymentId: Long): PaymentInfo? {
-        return try {
-            restTemplate.getForObject(
-                "$monolithUrl/internal/api/v1/payments/$paymentId",
-                PaymentInfo::class.java
-            )
-        } catch (e: Exception) {
-            logger.warn("결제 조회 실패: paymentId=$paymentId", e)
-            null
-        }
+        return restTemplate.getForObject(
+            "$monolithUrl/internal/api/v1/payments/$paymentId",
+            PaymentInfo::class.java
+        )
+    }
+
+    private fun findByOrderIdFallback(orderId: Long, e: Exception): PaymentInfo? {
+        logger.warn("CB fallback: 주문별 결제 조회 실패 orderId=$orderId", e)
+        return null
+    }
+
+    private fun findByIdFallback(paymentId: Long, e: Exception): PaymentInfo? {
+        logger.warn("CB fallback: 결제 조회 실패 paymentId=$paymentId", e)
+        return null
     }
 }
