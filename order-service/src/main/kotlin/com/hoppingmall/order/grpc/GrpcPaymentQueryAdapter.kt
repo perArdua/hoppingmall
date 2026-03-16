@@ -6,6 +6,8 @@ import com.hoppingmall.payment.grpc.PaymentIdRequest
 import com.hoppingmall.payment.grpc.PaymentOrderIdRequest
 import com.hoppingmall.payment.grpc.PaymentQueryServiceGrpc
 import com.hoppingmall.payment.grpc.PaymentResponse
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import net.devh.boot.grpc.client.inject.GrpcClient
@@ -22,34 +24,34 @@ class GrpcPaymentQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcPaymentQueryAdapter::class.java)
 
+    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByOrderIdFallback")
+    @Retry(name = "payment-query")
     override fun findByOrderId(orderId: Long): PaymentInfo? {
-        return try {
-            val response = stub.findPaymentByOrderId(
-                PaymentOrderIdRequest.newBuilder().setOrderId(orderId).build()
-            )
-            response.toPaymentInfo()
-        } catch (e: StatusRuntimeException) {
-            if (e.status.code == Status.Code.NOT_FOUND) null
-            else {
-                log.warn("결제 조회 실패: orderId=$orderId", e)
-                null
-            }
-        }
+        val response = stub.findPaymentByOrderId(
+            PaymentOrderIdRequest.newBuilder().setOrderId(orderId).build()
+        )
+        return response.toPaymentInfo()
     }
 
+    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByIdFallback")
+    @Retry(name = "payment-query")
     override fun findById(paymentId: Long): PaymentInfo? {
-        return try {
-            val response = stub.findPaymentById(
-                PaymentIdRequest.newBuilder().setPaymentId(paymentId).build()
-            )
-            response.toPaymentInfo()
-        } catch (e: StatusRuntimeException) {
-            if (e.status.code == Status.Code.NOT_FOUND) null
-            else {
-                log.warn("결제 조회 실패: paymentId=$paymentId", e)
-                null
-            }
-        }
+        val response = stub.findPaymentById(
+            PaymentIdRequest.newBuilder().setPaymentId(paymentId).build()
+        )
+        return response.toPaymentInfo()
+    }
+
+    private fun findByOrderIdFallback(orderId: Long, e: Exception): PaymentInfo? {
+        if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
+        log.warn("CB fallback: 결제 조회 실패 orderId=$orderId", e)
+        return null
+    }
+
+    private fun findByIdFallback(paymentId: Long, e: Exception): PaymentInfo? {
+        if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
+        log.warn("CB fallback: 결제 조회 실패 paymentId=$paymentId", e)
+        return null
     }
 
     private fun PaymentResponse.toPaymentInfo() = PaymentInfo(
