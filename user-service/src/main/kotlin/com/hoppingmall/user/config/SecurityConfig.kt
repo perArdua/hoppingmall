@@ -14,7 +14,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
-    private val jwtAuthenticationFilter: JwtAuthenticationFilter
+    private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val internalTokenFilter: InternalTokenFilter
 ) {
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -25,11 +26,13 @@ class SecurityConfig(
                 auth
                     .requestMatchers("/actuator/**").permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                    .requestMatchers("/internal/**").permitAll()
                     .requestMatchers("/api/v1/users/signup", "/api/v1/users/login").permitAll()
                     .requestMatchers("/api/v1/auth/refresh").permitAll()
                     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                     .anyRequest().authenticated()
             }
+            .addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter::class.java)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
         return http.build()
     }

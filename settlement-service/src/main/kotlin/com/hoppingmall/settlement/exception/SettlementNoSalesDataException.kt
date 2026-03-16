@@ -1,0 +1,5 @@
+package com.hoppingmall.settlement.exception
+
+import com.hoppingmall.settlement.exception.code.SettlementErrorCode
+
+class SettlementNoSalesDataException : SettlementException(SettlementErrorCode.SETTLEMENT_NO_SALES_DATA)

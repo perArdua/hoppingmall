@@ -37,8 +37,8 @@ spring:
           filters:
             - name: JwtValidation
 
-        - id: monolith-admin-settlements
-          uri: ${ROUTES_MONOLITH:http://localhost:8080}
+        - id: settlement-service-admin-settlements
+          uri: ${ROUTES_SETTLEMENT_SERVICE:http://localhost:8086}
           predicates:
             - Path=/api/v1/admin/settlements/**
           filters:
@@ -107,8 +107,8 @@ spring:
           filters:
             - name: JwtValidation
 
-        - id: monolith-seller-settlements
-          uri: ${ROUTES_MONOLITH:http://localhost:8080}
+        - id: settlement-service-seller-settlements
+          uri: ${ROUTES_SETTLEMENT_SERVICE:http://localhost:8086}
           predicates:
             - Path=/api/v1/seller/settlements/**
           filters:

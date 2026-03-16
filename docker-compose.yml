@@ -304,6 +304,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8082:8082"
 
@@ -365,6 +366,21 @@ services:
       - "8085:8085"
       - "9095:9095"
 
+  settlement-service:
+    build:
+      context: ./settlement-service
+      dockerfile: Dockerfile
+    container_name: settlement-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
+    ports:
+      - "8086:8086"
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -384,6 +400,8 @@ services:
       order-service:
         condition: service_started
       payment-service:
+        condition: service_started
+      settlement-service:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
