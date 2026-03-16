@@ -1,6 +1,5 @@
 package com.hoppingmall.payment.port
 
-import com.hoppingmall.payment.port.exception.OrderCancellationFailedException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -15,6 +14,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
+import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.client.RestTemplate
 
 @DisplayName("HttpOrderCommandAdapter")
@@ -38,14 +38,13 @@ class HttpOrderCommandAdapterTest {
     }
 
     @Test
-    fun 주문_취소_실패_시_OrderCancellationFailedException을_던진다() {
+    fun 주문_취소_실패_시_예외를_던진다() {
         server.expect(requestTo("http://localhost:8084/internal/api/v1/orders/1/cancel"))
             .andExpect(method(HttpMethod.POST))
             .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR))
 
         assertThatThrownBy { adapter.cancelOrder(1L) }
-            .isInstanceOf(OrderCancellationFailedException::class.java)
-            .hasMessageContaining("orderId=1")
+            .isInstanceOf(HttpServerErrorException::class.java)
 
         server.verify()
     }

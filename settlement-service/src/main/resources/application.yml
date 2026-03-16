@@ -29,6 +29,9 @@ management:
     web:
       exposure:
         include: health,metrics,prometheus
+  health:
+    circuitbreakers:
+      enabled: true
   metrics:
     tags:
       application: settlement-service
@@ -55,3 +58,62 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+resilience4j:
+  circuitbreaker:
+    circuitBreakerAspectOrder: 2
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        slowCallDurationThreshold: 3s
+        slowCallRateThreshold: 80
+        recordExceptions:
+          - java.lang.Exception
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException$NotFound
+          - org.springframework.web.client.HttpClientErrorException$BadRequest
+      settlement:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 2
+        slowCallDurationThreshold: 8s
+        slowCallRateThreshold: 80
+        recordExceptions:
+          - java.lang.Exception
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException$NotFound
+          - org.springframework.web.client.HttpClientErrorException$BadRequest
+    instances:
+      order-item-query:
+        baseConfig: settlement
+      refund-query:
+        baseConfig: settlement
+      seller-query:
+        baseConfig: settlement
+  retry:
+    retryAspectOrder: 1
+    configs:
+      settlement:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+    instances:
+      order-item-query:
+        baseConfig: settlement
+      refund-query:
+        baseConfig: settlement
+      seller-query:
+        baseConfig: settlement

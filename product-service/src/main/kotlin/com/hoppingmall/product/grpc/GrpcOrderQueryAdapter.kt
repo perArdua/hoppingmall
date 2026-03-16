@@ -3,6 +3,8 @@ package com.hoppingmall.product.grpc
 import com.hoppingmall.order.grpc.*
 import com.hoppingmall.product.review.port.OrderItemInfo
 import com.hoppingmall.product.review.port.OrderQueryPort
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import net.devh.boot.grpc.client.inject.GrpcClient
@@ -19,46 +21,50 @@ class GrpcOrderQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcOrderQueryAdapter::class.java)
 
+    @CircuitBreaker(name = "order-query", fallbackMethod = "isDeliveredFallback")
+    @Retry(name = "grpc")
     override fun isDelivered(orderId: Long, buyerId: Long): Boolean {
-        return try {
-            val response = stub.isDelivered(
-                DeliveredCheckRequest.newBuilder()
-                    .setOrderId(orderId)
-                    .setBuyerId(buyerId)
-                    .build()
-            )
-            response.delivered
-        } catch (e: StatusRuntimeException) {
-            log.warn("배송 완료 확인 실패: orderId=$orderId, buyerId=$buyerId", e)
-            false
-        }
+        val response = stub.isDelivered(
+            DeliveredCheckRequest.newBuilder()
+                .setOrderId(orderId)
+                .setBuyerId(buyerId)
+                .build()
+        )
+        return response.delivered
     }
 
+    @CircuitBreaker(name = "order-query", fallbackMethod = "findOrderItemByIdFallback")
+    @Retry(name = "grpc")
     override fun findOrderItemById(orderItemId: Long): OrderItemInfo? {
-        return try {
-            val response = stub.findOrderItemById(
-                OrderItemIdRequest.newBuilder().setOrderItemId(orderItemId).build()
-            )
-            response.toReviewOrderItemInfo()
-        } catch (e: StatusRuntimeException) {
-            if (e.status.code == Status.Code.NOT_FOUND) null
-            else {
-                log.warn("주문 상품 조회 실패: orderItemId=$orderItemId", e)
-                null
-            }
-        }
+        val response = stub.findOrderItemById(
+            OrderItemIdRequest.newBuilder().setOrderItemId(orderItemId).build()
+        )
+        return response.toReviewOrderItemInfo()
     }
 
+    @CircuitBreaker(name = "order-query", fallbackMethod = "findOrderItemsByOrderIdFallback")
+    @Retry(name = "grpc")
     override fun findOrderItemsByOrderId(orderId: Long): List<OrderItemInfo> {
-        return try {
-            val response = stub.findOrderItemsByOrderId(
-                OrderIdRequest.newBuilder().setOrderId(orderId).build()
-            )
-            response.itemsList.map { it.toReviewOrderItemInfo() }
-        } catch (e: StatusRuntimeException) {
-            log.warn("주문 상품 목록 조회 실패: orderId=$orderId", e)
-            emptyList()
-        }
+        val response = stub.findOrderItemsByOrderId(
+            OrderIdRequest.newBuilder().setOrderId(orderId).build()
+        )
+        return response.itemsList.map { it.toReviewOrderItemInfo() }
+    }
+
+    private fun isDeliveredFallback(orderId: Long, buyerId: Long, e: Exception): Boolean {
+        log.warn("CB fallback: 배송 완료 확인 실패 orderId=$orderId, buyerId=$buyerId", e)
+        return false
+    }
+
+    private fun findOrderItemByIdFallback(orderItemId: Long, e: Exception): OrderItemInfo? {
+        if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
+        log.warn("CB fallback: 주문 상품 조회 실패 orderItemId=$orderItemId", e)
+        return null
+    }
+
+    private fun findOrderItemsByOrderIdFallback(orderId: Long, e: Exception): List<OrderItemInfo> {
+        log.warn("CB fallback: 주문 상품 목록 조회 실패 orderId=$orderId", e)
+        return emptyList()
     }
 
     private fun OrderItemResponse.toReviewOrderItemInfo() = OrderItemInfo(

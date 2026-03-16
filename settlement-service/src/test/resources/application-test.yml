@@ -21,3 +21,39 @@ services:
     url: http://localhost:8084
   user-service:
     url: http://localhost:8082
+
+resilience4j:
+  circuitbreaker:
+    circuitBreakerAspectOrder: 2
+    configs:
+      settlement:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 2
+        slowCallDurationThreshold: 8s
+        recordExceptions:
+          - java.lang.Exception
+    instances:
+      order-item-query:
+        baseConfig: settlement
+      refund-query:
+        baseConfig: settlement
+      seller-query:
+        baseConfig: settlement
+  retry:
+    retryAspectOrder: 1
+    configs:
+      settlement:
+        maxAttempts: 1
+        retryExceptions:
+          - java.io.IOException
+    instances:
+      order-item-query:
+        baseConfig: settlement
+      refund-query:
+        baseConfig: settlement
+      seller-query:
+        baseConfig: settlement

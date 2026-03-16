@@ -1,6 +1,5 @@
 package com.hoppingmall.payment.port
 
-import com.hoppingmall.payment.port.exception.InventoryRestoreFailedException
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -15,6 +14,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
+import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.client.RestTemplate
 
 @DisplayName("HttpInventoryCommandAdapter")
@@ -36,15 +36,13 @@ class HttpInventoryCommandAdapterTest {
     }
 
     @Test
-    fun 재고_복구_실패_시_InventoryRestoreFailedException을_던진다() {
+    fun 재고_복구_실패_시_예외를_던진다() {
         server.expect(requestTo("http://localhost:8083/internal/api/v1/inventory/10/increase?quantity=5"))
             .andExpect(method(HttpMethod.POST))
             .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR))
 
         assertThatThrownBy { adapter.increaseStock(10L, 5) }
-            .isInstanceOf(InventoryRestoreFailedException::class.java)
-            .hasMessageContaining("productId=10")
-            .hasMessageContaining("quantity=5")
+            .isInstanceOf(HttpServerErrorException::class.java)
 
         server.verify()
     }

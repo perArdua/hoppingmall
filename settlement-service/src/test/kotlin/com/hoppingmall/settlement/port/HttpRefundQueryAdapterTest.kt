@@ -1,6 +1,5 @@
 package com.hoppingmall.settlement.port
 
-import com.hoppingmall.settlement.exception.ServiceCommunicationException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -83,6 +82,6 @@ class HttpRefundQueryAdapterTest {
 
         assertThatThrownBy {
             adapter.findCompletedBySellerAndPeriod(sellerId, startDate, endDate)
-        }.isInstanceOf(ServiceCommunicationException::class.java)
+        }.isInstanceOf(RuntimeException::class.java)
     }
 }

@@ -1,5 +1,7 @@
 package com.hoppingmall.product.statistics.port
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -22,16 +24,18 @@ class HttpOrderItemQueryAdapter(
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
+    @CircuitBreaker(name = "order-item-query", fallbackMethod = "findByOrderIdFallback")
+    @Retry(name = "order-item-query")
     override fun findByOrderId(orderId: Long): List<OrderItemInfo> {
-        return try {
-            val result = restTemplate.getForObject(
-                "$orderServiceUrl/internal/api/v1/orders/$orderId/items",
-                Array<OrderItemInfo>::class.java
-            )
-            result?.toList() ?: emptyList()
-        } catch (e: Exception) {
-            logger.warn("주문 상품 조회 실패: orderId=$orderId", e)
-            emptyList()
-        }
+        val result = restTemplate.getForObject(
+            "$orderServiceUrl/internal/api/v1/orders/$orderId/items",
+            Array<OrderItemInfo>::class.java
+        )
+        return result?.toList() ?: emptyList()
+    }
+
+    private fun findByOrderIdFallback(orderId: Long, e: Exception): List<OrderItemInfo> {
+        logger.warn("CB fallback: 주문 상품 조회 실패 orderId=$orderId", e)
+        return emptyList()
     }
 }

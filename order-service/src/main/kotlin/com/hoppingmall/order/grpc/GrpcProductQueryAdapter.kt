@@ -5,6 +5,8 @@ import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.product.grpc.ProductIdRequest
 import com.hoppingmall.product.grpc.ProductIdsRequest
 import com.hoppingmall.product.grpc.ProductQueryServiceGrpc
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import net.devh.boot.grpc.client.inject.GrpcClient
@@ -21,54 +23,58 @@ class GrpcProductQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcProductQueryAdapter::class.java)
 
+    @CircuitBreaker(name = "product-query", fallbackMethod = "findProductByIdFallback")
+    @Retry(name = "product-query")
     override fun findProductById(productId: Long): ProductInfo? {
-        return try {
-            val response = stub.findProductById(
-                ProductIdRequest.newBuilder().setProductId(productId).build()
-            )
-            ProductInfo(
-                id = response.id,
-                name = response.name,
-                price = response.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                sellerId = response.sellerId
-            )
-        } catch (e: StatusRuntimeException) {
-            if (e.status.code == Status.Code.NOT_FOUND) null
-            else {
-                log.warn("상품 조회 실패: productId=$productId", e)
-                null
-            }
-        }
+        val response = stub.findProductById(
+            ProductIdRequest.newBuilder().setProductId(productId).build()
+        )
+        return ProductInfo(
+            id = response.id,
+            name = response.name,
+            price = response.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+            sellerId = response.sellerId
+        )
     }
 
+    @CircuitBreaker(name = "product-query", fallbackMethod = "findProductsByIdsFallback")
+    @Retry(name = "product-query")
     override fun findProductsByIds(productIds: List<Long>): List<ProductInfo> {
-        return try {
-            val response = stub.findProductsByIds(
-                ProductIdsRequest.newBuilder().addAllProductIds(productIds).build()
+        val response = stub.findProductsByIds(
+            ProductIdsRequest.newBuilder().addAllProductIds(productIds).build()
+        )
+        return response.productsList.map {
+            ProductInfo(
+                id = it.id,
+                name = it.name,
+                price = it.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                sellerId = it.sellerId
             )
-            response.productsList.map {
-                ProductInfo(
-                    id = it.id,
-                    name = it.name,
-                    price = it.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                    sellerId = it.sellerId
-                )
-            }
-        } catch (e: StatusRuntimeException) {
-            log.warn("상품 목록 조회 실패: productIds=$productIds", e)
-            emptyList()
         }
     }
 
+    @CircuitBreaker(name = "product-query", fallbackMethod = "findProductImageUrlFallback")
+    @Retry(name = "product-query")
     override fun findProductImageUrl(productId: Long): String? {
-        return try {
-            val response = stub.findProductImageUrl(
-                ProductIdRequest.newBuilder().setProductId(productId).build()
-            )
-            if (response.found) response.imageUrl else null
-        } catch (e: StatusRuntimeException) {
-            log.warn("상품 이미지 URL 조회 실패: productId=$productId", e)
-            null
-        }
+        val response = stub.findProductImageUrl(
+            ProductIdRequest.newBuilder().setProductId(productId).build()
+        )
+        return if (response.found) response.imageUrl else null
+    }
+
+    private fun findProductByIdFallback(productId: Long, e: Exception): ProductInfo? {
+        if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
+        log.warn("CB fallback: 상품 조회 실패 productId=$productId", e)
+        return null
+    }
+
+    private fun findProductsByIdsFallback(productIds: List<Long>, e: Exception): List<ProductInfo> {
+        log.warn("CB fallback: 상품 목록 조회 실패 productIds=$productIds", e)
+        return emptyList()
+    }
+
+    private fun findProductImageUrlFallback(productId: Long, e: Exception): String? {
+        log.warn("CB fallback: 상품 이미지 URL 조회 실패 productId=$productId", e)
+        return null
     }
 }
