@@ -1,7 +1,7 @@
 package com.hoppingmall.payment.port
 
 import com.hoppingmall.payment.port.exception.InventoryRestoreFailedException
-import org.slf4j.LoggerFactory
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -24,18 +24,12 @@ class HttpInventoryCommandAdapter(
         restTemplateBuilder.connectTimeout(Duration.ofSeconds(2)).readTimeout(Duration.ofSeconds(5)).build()
     )
 
-    private val logger = LoggerFactory.getLogger(HttpInventoryCommandAdapter::class.java)
-
+    @CircuitBreaker(name = "inventory-command")
     override fun increaseStock(productId: Long, quantity: Int) {
-        try {
-            restTemplate.postForEntity(
-                "$productServiceUrl/internal/api/v1/inventory/$productId/increase?quantity=$quantity",
-                null,
-                Void::class.java
-            )
-        } catch (e: Exception) {
-            logger.error("재고 복구 실패: productId=$productId, quantity=$quantity", e)
-            throw InventoryRestoreFailedException(productId, quantity, e)
-        }
+        restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/$productId/increase?quantity=$quantity",
+            null,
+            Void::class.java
+        )
     }
 }

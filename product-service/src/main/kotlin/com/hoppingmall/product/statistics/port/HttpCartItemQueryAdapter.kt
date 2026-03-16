@@ -1,5 +1,7 @@
 package com.hoppingmall.product.statistics.port
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -22,16 +24,18 @@ class HttpCartItemQueryAdapter(
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
+    @CircuitBreaker(name = "cart-query", fallbackMethod = "aggregateCartByProductFallback")
+    @Retry(name = "cart-query")
     override fun aggregateCartByProduct(): List<CartAggregation> {
-        return try {
-            val result = restTemplate.getForObject(
-                "$orderServiceUrl/internal/api/v1/cart-items/aggregate",
-                Array<CartAggregation>::class.java
-            )
-            result?.toList() ?: emptyList()
-        } catch (e: Exception) {
-            logger.warn("장바구니 집계 조회 실패", e)
-            emptyList()
-        }
+        val result = restTemplate.getForObject(
+            "$orderServiceUrl/internal/api/v1/cart-items/aggregate",
+            Array<CartAggregation>::class.java
+        )
+        return result?.toList() ?: emptyList()
+    }
+
+    private fun aggregateCartByProductFallback(e: Exception): List<CartAggregation> {
+        logger.warn("CB fallback: 장바구니 집계 조회 실패", e)
+        return emptyList()
     }
 }

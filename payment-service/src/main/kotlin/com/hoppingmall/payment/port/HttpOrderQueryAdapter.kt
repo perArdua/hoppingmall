@@ -1,6 +1,8 @@
 package com.hoppingmall.payment.port
 
 import com.hoppingmall.payment.port.exception.OrderItemQueryFailedException
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -28,16 +30,18 @@ class HttpOrderQueryAdapter(
 
     private val logger = LoggerFactory.getLogger(HttpOrderQueryAdapter::class.java)
 
+    @CircuitBreaker(name = "order-query", fallbackMethod = "findOrderItemsByOrderIdFallback")
+    @Retry(name = "order-query")
     override fun findOrderItemsByOrderId(orderId: Long): List<OrderItemInfo> {
-        return try {
-            val result = restTemplate.getForObject(
-                "$orderServiceUrl/internal/api/v1/orders/$orderId/items",
-                Array<OrderItemInfo>::class.java
-            )
-            result?.toList() ?: emptyList()
-        } catch (e: Exception) {
-            logger.error("주문 상품 조회 실패: orderId=$orderId", e)
-            throw OrderItemQueryFailedException(orderId, e)
-        }
+        val result = restTemplate.getForObject(
+            "$orderServiceUrl/internal/api/v1/orders/$orderId/items",
+            Array<OrderItemInfo>::class.java
+        )
+        return result?.toList() ?: emptyList()
+    }
+
+    private fun findOrderItemsByOrderIdFallback(orderId: Long, e: Exception): List<OrderItemInfo> {
+        logger.error("CB fallback: 주문 상품 조회 실패 orderId=$orderId", e)
+        throw OrderItemQueryFailedException(orderId, e)
     }
 }

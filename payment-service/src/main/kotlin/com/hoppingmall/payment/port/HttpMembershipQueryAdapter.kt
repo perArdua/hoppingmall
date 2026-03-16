@@ -1,5 +1,7 @@
 package com.hoppingmall.payment.port
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -23,16 +25,17 @@ class HttpMembershipQueryAdapter(
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
+    @CircuitBreaker(name = "membership-query", fallbackMethod = "getPointEarningRateFallback")
+    @Retry(name = "membership-query")
     override fun getPointEarningRate(userId: Long): BigDecimal {
-        return try {
-            val result = restTemplate.getForObject(
-                "$monolithUrl/internal/api/v1/memberships/by-user/$userId/earning-rate",
-                BigDecimal::class.java
-            )
-            result ?: BigDecimal("0.01")
-        } catch (e: Exception) {
-            logger.warn("멤버십 적립률 조회 실패: userId=$userId", e)
-            BigDecimal("0.01")
-        }
+        return restTemplate.getForObject(
+            "$monolithUrl/internal/api/v1/memberships/by-user/$userId/earning-rate",
+            BigDecimal::class.java
+        ) ?: BigDecimal("0.01")
+    }
+
+    private fun getPointEarningRateFallback(userId: Long, e: Exception): BigDecimal {
+        logger.warn("CB fallback: 멤버십 적립률 조회 실패 userId=$userId", e)
+        return BigDecimal("0.01")
     }
 }
