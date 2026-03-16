@@ -12,6 +12,5 @@ include(
 	"order-domain",
 	"payment-domain",
 	"notification-domain",
-	"settlement-domain",
 	"app"
 )

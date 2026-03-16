@@ -1,0 +1,5 @@
+package com.hoppingmall.settlement.exception
+
+import com.hoppingmall.settlement.exception.code.SettlementErrorCode
+
+class SettlementAccessDeniedException : SettlementException(SettlementErrorCode.SETTLEMENT_ACCESS_DENIED)

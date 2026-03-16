@@ -46,6 +46,7 @@ jobs:
           - order-service
           - payment-service
           - product-service
+          - settlement-service
           - user-service
 
     steps:
@@ -84,6 +85,7 @@ jobs:
           - order-service
           - payment-service
           - product-service
+          - settlement-service
           - user-service
 
     steps:
