@@ -57,6 +57,9 @@ management:
     sampling:
       probability: 0.0
     enabled: false
+  health:
+    circuitbreakers:
+      enabled: true
 
 services:
   monolith:
@@ -89,3 +92,56 @@ grpc:
     order-service:
       address: static://localhost:9094
       negotiation-type: plaintext
+
+resilience4j:
+  circuitbreaker:
+    circuitBreakerAspectOrder: 2
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        slowCallDurationThreshold: 3s
+        slowCallRateThreshold: 80
+        recordExceptions:
+          - java.lang.Exception
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException$NotFound
+          - org.springframework.web.client.HttpClientErrorException$BadRequest
+    instances:
+      order-query:
+        baseConfig: default
+      cart-query:
+        baseConfig: default
+      order-item-query:
+        baseConfig: default
+  retry:
+    retryAspectOrder: 1
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+      grpc:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - io.grpc.StatusRuntimeException
+          - java.io.IOException
+    instances:
+      order-query:
+        baseConfig: default
+      cart-query:
+        baseConfig: default
+      order-item-query:
+        baseConfig: default
