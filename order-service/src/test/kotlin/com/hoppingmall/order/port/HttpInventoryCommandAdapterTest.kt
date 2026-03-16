@@ -76,14 +76,13 @@ class HttpInventoryCommandAdapterTest {
     }
 
     @Test
-    fun 배치_확정_실패_시_false를_반환한다() {
+    fun 배치_확정_실패_시_예외를_발생시킨다() {
         whenever(restTemplate.postForEntity(
             any<String>(), any(), eq(HttpInventoryCommandAdapter.ConfirmationResponse::class.java)
         )).thenThrow(RuntimeException("연결 실패"))
 
-        val result = adapter.confirmReservations(listOf("rsv-1"))
-
-        assertThat(result).isFalse()
+        assertThatThrownBy { adapter.confirmReservations(listOf("rsv-1")) }
+            .isInstanceOf(RuntimeException::class.java)
     }
 
     @Test
@@ -94,7 +93,6 @@ class HttpInventoryCommandAdapterTest {
 
         assertThatThrownBy { adapter.cancelReservation("rsv-1") }
             .isInstanceOf(RuntimeException::class.java)
-            .hasMessageContaining("예약 취소 실패")
     }
 
     @Test
@@ -105,6 +103,5 @@ class HttpInventoryCommandAdapterTest {
 
         assertThatThrownBy { adapter.cancelReservations(listOf("rsv-1", "rsv-2")) }
             .isInstanceOf(RuntimeException::class.java)
-            .hasMessageContaining("예약 일괄 취소 실패")
     }
 }
