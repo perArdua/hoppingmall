@@ -1,5 +1,8 @@
 package com.hoppingmall.order.port
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.stereotype.Component
@@ -12,85 +15,74 @@ class HttpInventoryCommandAdapter(
     restTemplateBuilder: RestTemplateBuilder
 ) : InventoryCommandPort {
 
+    private val logger = LoggerFactory.getLogger(HttpInventoryCommandAdapter::class.java)
+
     private val restTemplate: RestTemplate = restTemplateBuilder
         .connectTimeout(Duration.ofSeconds(2))
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
+    @CircuitBreaker(name = "inventory-command")
     override fun decreaseStock(productId: Long, quantity: Int) {
-        try {
-            restTemplate.postForEntity(
-                "$productServiceUrl/internal/api/v1/inventory/$productId/decrease?quantity=$quantity",
-                null,
-                Void::class.java
-            )
-        } catch (e: Exception) {
-            throw RuntimeException("재고 감소 실패: productId=$productId, quantity=$quantity", e)
-        }
+        restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/$productId/decrease?quantity=$quantity",
+            null,
+            Void::class.java
+        )
     }
 
+    @CircuitBreaker(name = "inventory-command")
     override fun increaseStock(productId: Long, quantity: Int) {
-        try {
-            restTemplate.postForEntity(
-                "$productServiceUrl/internal/api/v1/inventory/$productId/increase?quantity=$quantity",
-                null,
-                Void::class.java
-            )
-        } catch (e: Exception) {
-            throw RuntimeException("재고 증가 실패: productId=$productId, quantity=$quantity", e)
-        }
+        restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/$productId/increase?quantity=$quantity",
+            null,
+            Void::class.java
+        )
     }
 
+    @CircuitBreaker(name = "inventory-command")
     override fun reserveStock(productId: Long, quantity: Int): String {
-        try {
-            val response = restTemplate.postForEntity(
-                "$productServiceUrl/internal/api/v1/inventory/$productId/reserve?quantity=$quantity",
-                null,
-                ReservationResponse::class.java
-            )
-            return response.body?.reservationId
-                ?: throw RuntimeException("재고 예약 응답 없음: productId=$productId")
-        } catch (e: Exception) {
-            if (e is RuntimeException && e.message?.startsWith("재고 예약 응답 없음") == true) throw e
-            throw RuntimeException("재고 예약 실패: productId=$productId, quantity=$quantity", e)
-        }
+        val response = restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/$productId/reserve?quantity=$quantity",
+            null,
+            ReservationResponse::class.java
+        )
+        return response.body?.reservationId
+            ?: throw RuntimeException("재고 예약 응답 없음: productId=$productId")
     }
 
+    @CircuitBreaker(name = "inventory-command", fallbackMethod = "confirmReservationsFallback")
+    @Retry(name = "product-query")
     override fun confirmReservations(reservationIds: List<String>): Boolean {
-        return try {
-            val response = restTemplate.postForEntity(
-                "$productServiceUrl/internal/api/v1/inventory/reservations/batch-confirm",
-                reservationIds,
-                ConfirmationResponse::class.java
-            )
-            response.body?.confirmed ?: false
-        } catch (e: Exception) {
-            false
-        }
+        val response = restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/reservations/batch-confirm",
+            reservationIds,
+            ConfirmationResponse::class.java
+        )
+        return response.body?.confirmed ?: false
     }
 
+    @CircuitBreaker(name = "inventory-command")
     override fun cancelReservation(reservationId: String) {
-        try {
-            restTemplate.postForEntity(
-                "$productServiceUrl/internal/api/v1/inventory/reservations/$reservationId/cancel",
-                null,
-                Void::class.java
-            )
-        } catch (e: Exception) {
-            throw RuntimeException("예약 취소 실패: reservationId=$reservationId", e)
-        }
+        restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/reservations/$reservationId/cancel",
+            null,
+            Void::class.java
+        )
     }
 
+    @CircuitBreaker(name = "inventory-command")
     override fun cancelReservations(reservationIds: List<String>) {
-        try {
-            restTemplate.postForEntity(
-                "$productServiceUrl/internal/api/v1/inventory/reservations/batch-cancel",
-                reservationIds,
-                Void::class.java
-            )
-        } catch (e: Exception) {
-            throw RuntimeException("예약 일괄 취소 실패: reservationIds=$reservationIds", e)
-        }
+        restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/reservations/batch-cancel",
+            reservationIds,
+            Void::class.java
+        )
+    }
+
+    private fun confirmReservationsFallback(reservationIds: List<String>, e: Exception): Boolean {
+        logger.warn("CB fallback: 예약 확정 실패 reservationIds=$reservationIds", e)
+        return false
     }
 
     data class ReservationResponse(val reservationId: String = "")

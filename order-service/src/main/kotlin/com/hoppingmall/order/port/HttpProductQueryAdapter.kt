@@ -1,5 +1,7 @@
 package com.hoppingmall.order.port
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -22,41 +24,47 @@ class HttpProductQueryAdapter(
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
+    @CircuitBreaker(name = "product-query", fallbackMethod = "findProductByIdFallback")
+    @Retry(name = "product-query")
     override fun findProductById(productId: Long): ProductInfo? {
-        return try {
-            restTemplate.getForObject(
-                "$productServiceUrl/internal/api/v1/products/$productId",
-                ProductInfo::class.java
-            )
-        } catch (e: Exception) {
-            logger.warn("상품 조회 실패: productId=$productId", e)
-            null
-        }
+        return restTemplate.getForObject(
+            "$productServiceUrl/internal/api/v1/products/$productId",
+            ProductInfo::class.java
+        )
     }
 
+    @CircuitBreaker(name = "product-query", fallbackMethod = "findProductsByIdsFallback")
+    @Retry(name = "product-query")
     override fun findProductsByIds(productIds: List<Long>): List<ProductInfo> {
-        return try {
-            val ids = productIds.joinToString(",")
-            val result = restTemplate.getForObject(
-                "$productServiceUrl/internal/api/v1/products?ids=$ids",
-                Array<ProductInfo>::class.java
-            )
-            result?.toList() ?: emptyList()
-        } catch (e: Exception) {
-            logger.warn("상품 목록 조회 실패: productIds=$productIds", e)
-            emptyList()
-        }
+        val ids = productIds.joinToString(",")
+        val result = restTemplate.getForObject(
+            "$productServiceUrl/internal/api/v1/products?ids=$ids",
+            Array<ProductInfo>::class.java
+        )
+        return result?.toList() ?: emptyList()
     }
 
+    @CircuitBreaker(name = "product-query", fallbackMethod = "findProductImageUrlFallback")
+    @Retry(name = "product-query")
     override fun findProductImageUrl(productId: Long): String? {
-        return try {
-            restTemplate.getForObject(
-                "$productServiceUrl/internal/api/v1/products/$productId/image-url",
-                String::class.java
-            )
-        } catch (e: Exception) {
-            logger.warn("상품 이미지 URL 조회 실패: productId=$productId", e)
-            null
-        }
+        return restTemplate.getForObject(
+            "$productServiceUrl/internal/api/v1/products/$productId/image-url",
+            String::class.java
+        )
+    }
+
+    private fun findProductByIdFallback(productId: Long, e: Exception): ProductInfo? {
+        logger.warn("CB fallback: 상품 조회 실패 productId=$productId", e)
+        return null
+    }
+
+    private fun findProductsByIdsFallback(productIds: List<Long>, e: Exception): List<ProductInfo> {
+        logger.warn("CB fallback: 상품 목록 조회 실패 productIds=$productIds", e)
+        return emptyList()
+    }
+
+    private fun findProductImageUrlFallback(productId: Long, e: Exception): String? {
+        logger.warn("CB fallback: 상품 이미지 URL 조회 실패 productId=$productId", e)
+        return null
     }
 }

@@ -1,7 +1,6 @@
 package com.hoppingmall.payment.port
 
-import com.hoppingmall.payment.port.exception.OrderCancellationFailedException
-import org.slf4j.LoggerFactory
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -24,19 +23,13 @@ class HttpOrderCommandAdapter(
         restTemplateBuilder.connectTimeout(Duration.ofSeconds(2)).readTimeout(Duration.ofSeconds(5)).build()
     )
 
-    private val logger = LoggerFactory.getLogger(HttpOrderCommandAdapter::class.java)
-
+    @CircuitBreaker(name = "order-command")
     override fun cancelOrder(orderId: Long): Boolean {
-        return try {
-            restTemplate.postForEntity(
-                "$orderServiceUrl/internal/api/v1/orders/$orderId/cancel",
-                null,
-                Void::class.java
-            )
-            true
-        } catch (e: Exception) {
-            logger.error("주문 취소 실패: orderId=$orderId", e)
-            throw OrderCancellationFailedException(orderId, e)
-        }
+        restTemplate.postForEntity(
+            "$orderServiceUrl/internal/api/v1/orders/$orderId/cancel",
+            null,
+            Void::class.java
+        )
+        return true
     }
 }
