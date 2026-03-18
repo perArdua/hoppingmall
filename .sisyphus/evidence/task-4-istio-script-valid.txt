@@ -1,0 +1,2 @@
+bash -n scripts/install-istio.sh: PASS
+chmod +x scripts/install-istio.sh: APPLIED
