@@ -67,6 +67,10 @@ internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
 
+grpc:
+  server:
+    port: 9082
+
 springdoc:
   api-docs:
     path: /v3/api-docs

@@ -41,6 +41,10 @@ internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN}
 
+grpc:
+  server:
+    port: 9082
+
 logging:
   level:
     root: INFO
