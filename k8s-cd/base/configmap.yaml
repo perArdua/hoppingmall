@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hoppingmall-config
+  namespace: hoppingmall
+data:
+  MYSQL_HOST: mysql.hoppingmall.svc.cluster.local
+  MYSQL_PORT: "3306"
+  KAFKA_BOOTSTRAP_SERVERS: kafka.hoppingmall.svc.cluster.local:29092
+  REDIS_HOST: redis.hoppingmall.svc.cluster.local
+  REDIS_PORT: "6379"
+  ZIPKIN_ENDPOINT: http://zipkin.hoppingmall.svc.cluster.local:9411/api/v2/spans
+  USER_SERVICE_URL: http://user-service.hoppingmall.svc.cluster.local:8082
+  PRODUCT_SERVICE_URL: http://product-service.hoppingmall.svc.cluster.local:8083
+  ORDER_SERVICE_URL: http://order-service.hoppingmall.svc.cluster.local:8084
+  PAYMENT_SERVICE_URL: http://payment-service.hoppingmall.svc.cluster.local:8085
+  SETTLEMENT_SERVICE_URL: http://settlement-service.hoppingmall.svc.cluster.local:8086
+  NOTIFICATION_SERVICE_URL: http://notification-service.hoppingmall.svc.cluster.local:8081
