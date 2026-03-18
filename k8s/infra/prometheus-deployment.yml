@@ -10,13 +10,6 @@ data:
       evaluation_interval: 15s
 
     scrape_configs:
-      - job_name: 'monolith'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['monolith.hoppingmall.svc.cluster.local:8080']
-            labels:
-              service: 'monolith'
-
       - job_name: 'notification-service'
         metrics_path: '/actuator/prometheus'
         static_configs:
