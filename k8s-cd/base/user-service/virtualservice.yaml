@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: user-service-vs
+  namespace: hoppingmall
+spec:
+  hosts:
+    - user-service-stable
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: user-service-stable
+            subset: stable
+            port:
+              number: 8082
+          weight: 100
+        - destination:
+            host: user-service-canary
+            subset: canary
+            port:
+              number: 8082
+          weight: 0

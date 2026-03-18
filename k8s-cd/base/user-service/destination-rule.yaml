@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: user-service-dr
+  namespace: hoppingmall
+spec:
+  host: user-service-stable
+  subsets:
+    - name: stable
+      labels:
+        app: user-service
+    - name: canary
+      labels:
+        app: user-service
