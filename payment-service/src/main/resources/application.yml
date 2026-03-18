@@ -62,8 +62,8 @@ management:
       enabled: true
 
 services:
-  monolith:
-    url: http://localhost:8080
+  user-service:
+    url: http://localhost:8082
   order-service:
     url: http://localhost:8084
   product-service:
@@ -80,8 +80,8 @@ grpc:
     order-service:
       address: static://localhost:9094
       negotiation-type: plaintext
-    monolith:
-      address: static://localhost:9080
+    user-service:
+      address: static://localhost:9082
       negotiation-type: plaintext
 
 resilience4j:

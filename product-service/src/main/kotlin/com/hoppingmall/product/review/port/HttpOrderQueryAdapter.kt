@@ -13,7 +13,7 @@ import java.time.Duration
 @Component
 @Profile("!grpc")
 class HttpOrderQueryAdapter(
-    @Value("\${services.monolith.url:http://localhost:8080}") private val monolithUrl: String,
+    @Value("\${services.order-service.url:http://localhost:8084}") private val orderServiceUrl: String,
     restTemplateBuilder: RestTemplateBuilder
 ) : OrderQueryPort {
 
@@ -28,7 +28,7 @@ class HttpOrderQueryAdapter(
     @Retry(name = "order-query")
     override fun findOrderItemById(orderItemId: Long): OrderItemInfo? {
         return restTemplate.getForObject(
-            "$monolithUrl/internal/api/v1/order-items/$orderItemId",
+            "$orderServiceUrl/internal/api/v1/order-items/$orderItemId",
             OrderItemInfo::class.java
         )
     }
@@ -37,7 +37,7 @@ class HttpOrderQueryAdapter(
     @Retry(name = "order-query")
     override fun isDelivered(orderId: Long, buyerId: Long): Boolean {
         return restTemplate.getForObject(
-            "$monolithUrl/internal/api/v1/orders/$orderId/delivered?buyerId=$buyerId",
+            "$orderServiceUrl/internal/api/v1/orders/$orderId/delivered?buyerId=$buyerId",
             Boolean::class.java
         ) ?: false
     }
@@ -46,7 +46,7 @@ class HttpOrderQueryAdapter(
     @Retry(name = "order-query")
     override fun findOrderItemsByOrderId(orderId: Long): List<OrderItemInfo> {
         val result = restTemplate.getForObject(
-            "$monolithUrl/internal/api/v1/orders/$orderId/items",
+            "$orderServiceUrl/internal/api/v1/orders/$orderId/items",
             Array<OrderItemInfo>::class.java
         )
         return result?.toList() ?: emptyList()

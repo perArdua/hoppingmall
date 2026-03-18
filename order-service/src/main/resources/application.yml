@@ -67,8 +67,8 @@ management:
       enabled: true
 
 services:
-  monolith:
-    url: http://localhost:8080
+  payment-service:
+    url: http://localhost:8085
   product-service:
     url: http://localhost:8083
 

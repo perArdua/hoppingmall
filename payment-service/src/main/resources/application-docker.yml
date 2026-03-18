@@ -35,8 +35,8 @@ management:
       endpoint: http://zipkin:9411/api/v2/spans
 
 services:
-  monolith:
-    url: http://monolith:8080
+  user-service:
+    url: http://user-service:8082
   order-service:
     url: http://order-service:8084
   product-service:
@@ -51,6 +51,6 @@ grpc:
     order-service:
       address: static://order-service:9094
       negotiation-type: plaintext
-    monolith:
-      address: static://monolith:9080
+    user-service:
+      address: static://user-service:9082
       negotiation-type: plaintext

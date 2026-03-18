@@ -13,7 +13,7 @@ import java.time.Duration
 @Component
 @Profile("!grpc")
 class HttpPaymentQueryAdapter(
-    @Value("\${services.monolith.url:http://localhost:8080}") private val monolithUrl: String,
+    @Value("\${services.payment-service.url:http://localhost:8085}") private val paymentServiceUrl: String,
     restTemplateBuilder: RestTemplateBuilder
 ) : PaymentQueryPort {
 
@@ -28,7 +28,7 @@ class HttpPaymentQueryAdapter(
     @Retry(name = "payment-query")
     override fun findByOrderId(orderId: Long): PaymentInfo? {
         return restTemplate.getForObject(
-            "$monolithUrl/internal/api/v1/payments/by-order/$orderId",
+            "$paymentServiceUrl/internal/api/v1/payments/by-order/$orderId",
             PaymentInfo::class.java
         )
     }
@@ -37,7 +37,7 @@ class HttpPaymentQueryAdapter(
     @Retry(name = "payment-query")
     override fun findById(paymentId: Long): PaymentInfo? {
         return restTemplate.getForObject(
-            "$monolithUrl/internal/api/v1/payments/$paymentId",
+            "$paymentServiceUrl/internal/api/v1/payments/$paymentId",
             PaymentInfo::class.java
         )
     }
