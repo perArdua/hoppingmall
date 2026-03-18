@@ -1,6 +1,0 @@
-package com.hoppingmall.mall.coupon.enum
-
-enum class DiscountType {
-    FIXED_AMOUNT,
-    PERCENTAGE
-}
