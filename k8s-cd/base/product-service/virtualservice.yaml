@@ -1,0 +1,41 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: product-service-vs
+  namespace: hoppingmall
+spec:
+  hosts:
+    - product-service-stable
+  http:
+    - name: primary
+      match:
+        - port: 8083
+      route:
+        - destination:
+            host: product-service-stable
+            subset: stable
+            port:
+              number: 8083
+          weight: 100
+        - destination:
+            host: product-service-canary
+            subset: canary
+            port:
+              number: 8083
+          weight: 0
+    - name: grpc-primary
+      match:
+        - port: 9093
+      route:
+        - destination:
+            host: product-service-stable
+            subset: stable
+            port:
+              number: 9093
+          weight: 100
+        - destination:
+            host: product-service-canary
+            subset: canary
+            port:
+              number: 9093
+          weight: 0
