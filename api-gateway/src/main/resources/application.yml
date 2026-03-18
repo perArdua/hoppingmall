@@ -44,8 +44,8 @@ spring:
           filters:
             - JwtValidation
 
-        - id: monolith-admin-dlq
-          uri: ${ROUTES_MONOLITH:http://localhost:8080}
+        - id: payment-service-admin-dlq
+          uri: ${ROUTES_PAYMENT_SERVICE:http://localhost:8085}
           predicates:
             - Path=/api/v1/admin/dlq/**
           filters:

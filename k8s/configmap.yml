@@ -10,7 +10,6 @@ data:
   REDIS_HOST: redis.hoppingmall.svc.cluster.local
   REDIS_PORT: "6379"
   ZIPKIN_ENDPOINT: http://zipkin.hoppingmall.svc.cluster.local:9411/api/v2/spans
-  MONOLITH_URL: http://monolith.hoppingmall.svc.cluster.local:8080
   USER_SERVICE_URL: http://user-service.hoppingmall.svc.cluster.local:8082
   PRODUCT_SERVICE_URL: http://product-service.hoppingmall.svc.cluster.local:8083
   ORDER_SERVICE_URL: http://order-service.hoppingmall.svc.cluster.local:8084
