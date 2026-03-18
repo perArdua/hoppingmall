@@ -62,8 +62,6 @@ management:
       enabled: true
 
 services:
-  monolith:
-    url: http://localhost:8080
   order-service:
     url: http://localhost:8084
 

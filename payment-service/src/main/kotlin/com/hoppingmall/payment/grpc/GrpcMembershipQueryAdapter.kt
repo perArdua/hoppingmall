@@ -15,7 +15,7 @@ import java.math.BigDecimal
 @Component
 @Profile("grpc")
 class GrpcMembershipQueryAdapter(
-    @GrpcClient("monolith") private val stub: MembershipQueryServiceGrpc.MembershipQueryServiceBlockingStub
+    @GrpcClient("user-service") private val stub: MembershipQueryServiceGrpc.MembershipQueryServiceBlockingStub
 ) : MembershipQueryPort {
 
     private val log = LoggerFactory.getLogger(GrpcMembershipQueryAdapter::class.java)

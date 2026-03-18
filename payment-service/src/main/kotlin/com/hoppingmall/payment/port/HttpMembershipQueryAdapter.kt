@@ -14,7 +14,7 @@ import java.time.Duration
 @Component
 @Profile("!grpc")
 class HttpMembershipQueryAdapter(
-    @Value("\${services.monolith.url:http://localhost:8080}") private val monolithUrl: String,
+    @Value("\${services.user-service.url:http://localhost:8082}") private val userServiceUrl: String,
     restTemplateBuilder: RestTemplateBuilder
 ) : MembershipQueryPort {
 
@@ -29,7 +29,7 @@ class HttpMembershipQueryAdapter(
     @Retry(name = "membership-query")
     override fun getPointEarningRate(userId: Long): BigDecimal {
         return restTemplate.getForObject(
-            "$monolithUrl/internal/api/v1/memberships/by-user/$userId/earning-rate",
+            "$userServiceUrl/internal/api/v1/memberships/by-user/$userId/earning-rate",
             BigDecimal::class.java
         ) ?: BigDecimal("0.01")
     }

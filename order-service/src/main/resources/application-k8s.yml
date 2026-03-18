@@ -35,8 +35,8 @@ management:
       endpoint: http://zipkin.hoppingmall.svc.cluster.local:9411/api/v2/spans
 
 services:
-  monolith:
-    url: http://monolith.hoppingmall.svc.cluster.local:8080
+  payment-service:
+    url: http://payment-service.hoppingmall.svc.cluster.local:8085
   product-service:
     url: http://product-service.hoppingmall.svc.cluster.local:8083
 

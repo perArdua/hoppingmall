@@ -35,8 +35,8 @@ management:
       endpoint: http://zipkin.hoppingmall.svc.cluster.local:9411/api/v2/spans
 
 services:
-  monolith:
-    url: http://monolith.hoppingmall.svc.cluster.local:8080
+  user-service:
+    url: http://user-service.hoppingmall.svc.cluster.local:8082
   order-service:
     url: http://order-service.hoppingmall.svc.cluster.local:8084
   product-service:
@@ -51,6 +51,6 @@ grpc:
     order-service:
       address: static://order-service.hoppingmall.svc.cluster.local:9094
       negotiation-type: plaintext
-    monolith:
-      address: static://monolith.hoppingmall.svc.cluster.local:9080
+    user-service:
+      address: static://user-service.hoppingmall.svc.cluster.local:9082
       negotiation-type: plaintext
