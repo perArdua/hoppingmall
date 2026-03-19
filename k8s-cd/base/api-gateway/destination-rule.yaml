@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-gateway-destrule
+  namespace: hoppingmall
+spec:
+  host: api-gateway
+  subsets:
+    - name: stable
+      labels:
+        app: api-gateway
+    - name: canary
+      labels:
+        app: api-gateway

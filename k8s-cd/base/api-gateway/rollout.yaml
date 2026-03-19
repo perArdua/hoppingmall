@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: api-gateway
+  namespace: hoppingmall
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  strategy:
+    canary:
+      canaryService: api-gateway-canary
+      stableService: api-gateway
+      trafficRouting:
+        istio:
+          virtualServices:
+            - name: api-gateway-vsvc
+              routes:
+                - primary
+          destinationRule:
+            name: api-gateway-destrule
+            canarySubsetName: canary
+            stableSubsetName: stable
+      steps:
+        - setWeight: 20
+        - pause: {}
+        - setWeight: 50
+        - pause: {}
+        - setWeight: 100
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+        - name: api-gateway
+          image: api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "k8s"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hoppingmall-secret
+                  key: JWT_SECRET
+          envFrom:
+            - configMapRef:
+                name: hoppingmall-config
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
