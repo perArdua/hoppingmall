@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vsvc
+  namespace: hoppingmall
+spec:
+  hosts:
+    - api-gateway
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: api-gateway
+            subset: stable
+          weight: 100
+        - destination:
+            host: api-gateway
+            subset: canary
+          weight: 0

@@ -1,0 +1,31 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: user-service-vsvc
+  namespace: hoppingmall
+spec:
+  hosts:
+    - user-service
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: user-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: user-service
+            subset: canary
+          weight: 0
+    - name: grpc
+      match:
+        - port: 9082
+      route:
+        - destination:
+            host: user-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: user-service
+            subset: canary
+          weight: 0

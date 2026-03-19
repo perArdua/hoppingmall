@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: product-service-destrule
+  namespace: hoppingmall
+spec:
+  host: product-service
+  subsets:
+    - name: stable
+      labels:
+        app: product-service
+    - name: canary
+      labels:
+        app: product-service
