@@ -34,11 +34,16 @@ class CartItem private constructor(
     val productImageUrl: String?,
 
     @Column
-    val quantity: Int,
+    var quantity: Int,
 
     @Column(precision = 10, scale = 2)
-    val totalPrice: BigDecimal,
+    var totalPrice: BigDecimal,
 ): BaseEntity() {
+
+    fun updateQuantity(newQuantity: Int) {
+        this.quantity = newQuantity
+        this.totalPrice = productPrice.multiply(BigDecimal(newQuantity))
+    }
     companion object {
         fun create(
             buyerId: Long,
