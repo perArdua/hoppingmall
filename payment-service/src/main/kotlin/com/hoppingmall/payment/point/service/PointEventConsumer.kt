@@ -10,6 +10,7 @@ import com.hoppingmall.payment.point.domain.PointHistoryRepository
 import com.hoppingmall.payment.point.domain.PointRepository
 import com.hoppingmall.payment.point.enum.PointType
 import org.slf4j.LoggerFactory
+import org.springframework.cache.CacheManager
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -21,7 +22,8 @@ class PointEventConsumer(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
     private val transactionalEventPublisher: TransactionalEventPublisher,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val cacheManager: CacheManager
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -38,6 +40,7 @@ class PointEventConsumer(
             val point = findOrCreatePoint(event.userId)
             point.balance += event.earnAmount
             val savedPoint = pointRepository.save(point)
+            cacheManager.getCache("point-balance")?.evict(event.userId)
 
             pointHistoryRepository.save(
                 PointHistory(
