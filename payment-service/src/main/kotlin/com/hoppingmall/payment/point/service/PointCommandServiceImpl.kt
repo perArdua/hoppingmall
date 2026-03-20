@@ -8,6 +8,7 @@ import com.hoppingmall.payment.point.dto.request.PointUseRequest
 import com.hoppingmall.payment.point.dto.response.PointUseResponse
 import com.hoppingmall.payment.point.enum.PointType
 import com.hoppingmall.payment.point.exception.PointInsufficientBalanceException
+import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -19,6 +20,7 @@ class PointCommandServiceImpl(
     private val pointHistoryRepository: PointHistoryRepository
 ) : PointCommandService {
 
+    @CacheEvict(cacheNames = ["point-balance"], key = "#userId")
     override fun usePoint(userId: Long, request: PointUseRequest): PointUseResponse {
         val point = findOrCreatePoint(userId)
         validateSufficientBalance(point, request.amount)
@@ -43,6 +45,7 @@ class PointCommandServiceImpl(
         )
     }
 
+    @CacheEvict(cacheNames = ["point-balance"], key = "#userId")
     override fun refundPoints(userId: Long, amount: BigDecimal, paymentId: Long, orderId: Long) {
         if (amount <= BigDecimal.ZERO) return
 

@@ -8,6 +8,7 @@ import com.hoppingmall.notification.enums.NotificationType
 import com.hoppingmall.notification.service.NotificationSseService
 import com.hoppingmall.notification.service.SseNotificationMessage
 import org.slf4j.LoggerFactory
+import org.springframework.cache.CacheManager
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.kafka.annotation.KafkaListener
@@ -20,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional
 class NotificationEventConsumer(
     private val notificationRepository: NotificationRepository,
     private val redisTemplate: RedisTemplate<String, String>,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val cacheManager: CacheManager
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -66,6 +68,7 @@ class NotificationEventConsumer(
                 return
             }
 
+            cacheManager.getCache("unread-count")?.evict(userId)
             publishSseEvent(saved)
             log.info("알림 처리 완료: userId={}, type={}, title={}", userId, type, title)
         } catch (e: Exception) {

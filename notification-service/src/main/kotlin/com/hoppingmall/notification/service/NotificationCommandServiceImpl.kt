@@ -3,6 +3,7 @@ package com.hoppingmall.notification.service
 import com.hoppingmall.notification.domain.NotificationRepository
 import com.hoppingmall.notification.exception.NotificationAccessDeniedException
 import com.hoppingmall.notification.exception.NotificationNotFoundException
+import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -12,6 +13,7 @@ class NotificationCommandServiceImpl(
     private val notificationRepository: NotificationRepository
 ) : NotificationCommandService {
 
+    @CacheEvict(cacheNames = ["unread-count"], key = "#userId")
     override fun markAsRead(notificationId: Long, userId: Long) {
         val notification = notificationRepository.findById(notificationId)
             .orElseThrow { NotificationNotFoundException() }
@@ -23,6 +25,7 @@ class NotificationCommandServiceImpl(
         notification.markAsRead()
     }
 
+    @CacheEvict(cacheNames = ["unread-count"], key = "#userId")
     override fun markAllAsRead(userId: Long) {
         notificationRepository.markAllAsRead(userId)
     }
