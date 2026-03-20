@@ -3,8 +3,8 @@ package com.hoppingmall.product.review.service
 import com.hoppingmall.product.review.domain.repository.ReviewRepository
 import com.hoppingmall.product.review.dto.response.ReviewResponse
 import com.hoppingmall.product.review.exception.ReviewNotFoundException
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -20,12 +20,12 @@ class ReviewQueryServiceImpl(
         return ReviewResponse.from(review)
     }
 
-    override fun getReviewsByProductId(productId: Long, pageable: Pageable): Page<ReviewResponse> {
+    override fun getReviewsByProductId(productId: Long, pageable: Pageable): Slice<ReviewResponse> {
         return reviewRepository.findByProductId(productId, pageable)
             .map { ReviewResponse.from(it) }
     }
 
-    override fun getMyReviews(buyerId: Long, pageable: Pageable): Page<ReviewResponse> {
+    override fun getMyReviews(buyerId: Long, pageable: Pageable): Slice<ReviewResponse> {
         return reviewRepository.findByBuyerId(buyerId, pageable)
             .map { ReviewResponse.from(it) }
     }

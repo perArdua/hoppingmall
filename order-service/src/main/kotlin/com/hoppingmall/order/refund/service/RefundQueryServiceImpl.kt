@@ -5,8 +5,8 @@ import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.dto.response.RefundResponse
 import com.hoppingmall.order.refund.exception.RefundAccessDeniedException
 import com.hoppingmall.order.refund.exception.RefundNotFoundException
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -27,7 +27,7 @@ class RefundQueryServiceImpl(
         return RefundResponse.from(refund, items)
     }
 
-    override fun getMyRefunds(buyerId: Long, pageable: Pageable): Page<RefundResponse> {
+    override fun getMyRefunds(buyerId: Long, pageable: Pageable): Slice<RefundResponse> {
         val refundPage = refundRepository.findByBuyerId(buyerId, pageable)
         val refundIds = refundPage.content.mapNotNull { it.id }
         val itemsByRefundId = if (refundIds.isNotEmpty()) {
@@ -38,7 +38,7 @@ class RefundQueryServiceImpl(
         }
     }
 
-    override fun getSellerRefunds(sellerId: Long, pageable: Pageable): Page<RefundResponse> {
+    override fun getSellerRefunds(sellerId: Long, pageable: Pageable): Slice<RefundResponse> {
         val refundPage = refundRepository.findBySellerId(sellerId, pageable)
         val refundIds = refundPage.content.mapNotNull { it.id }
         val itemsByRefundId = if (refundIds.isNotEmpty()) {

@@ -7,8 +7,8 @@ import com.hoppingmall.payment.point.dto.response.PointUseResponse
 import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.point.service.PointQueryService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Slice
 import org.springframework.http.ResponseEntity
 import com.hoppingmall.payment.common.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -37,7 +37,7 @@ class PointController(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<Page<PointHistoryResponse>> {
+    ): ResponseEntity<Slice<PointHistoryResponse>> {
         val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val history = pointQueryService.getPointHistory(userId, pageable)

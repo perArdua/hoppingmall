@@ -5,6 +5,7 @@ import com.hoppingmall.product.product.dto.response.*
 import com.hoppingmall.product.product.service.ProductStatisticsQueryService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.format.annotation.DateTimeFormat
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
@@ -30,7 +31,7 @@ class ProductStatisticsController(
     fun getBySellerId(
         @PathVariable sellerId: Long,
         pageable: Pageable
-    ): ApiResponse<Page<ProductStatisticsResponse>> {
+    ): ApiResponse<Slice<ProductStatisticsResponse>> {
         return ApiResponse.success(productStatisticsQueryService.getBySellerId(sellerId, pageable))
     }
 
@@ -38,7 +39,7 @@ class ProductStatisticsController(
     fun getByCategoryId(
         @PathVariable categoryId: Long,
         pageable: Pageable
-    ): ApiResponse<Page<ProductStatisticsResponse>> {
+    ): ApiResponse<Slice<ProductStatisticsResponse>> {
         return ApiResponse.success(productStatisticsQueryService.getByCategoryId(categoryId, pageable))
     }
 

@@ -2,8 +2,8 @@ package com.hoppingmall.product.product.domain.repository
 
 import com.hoppingmall.product.product.domain.ProductStatistics
 import jakarta.persistence.LockModeType
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
@@ -14,8 +14,8 @@ import java.math.BigDecimal
 @Repository
 interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     fun findByProductId(productId: Long): ProductStatistics?
-    fun findBySellerId(sellerId: Long, pageable: Pageable): Page<ProductStatistics>
-    fun findByCategoryId(categoryId: Long, pageable: Pageable): Page<ProductStatistics>
+    fun findBySellerId(sellerId: Long, pageable: Pageable): Slice<ProductStatistics>
+    fun findByCategoryId(categoryId: Long, pageable: Pageable): Slice<ProductStatistics>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.productId = :productId")

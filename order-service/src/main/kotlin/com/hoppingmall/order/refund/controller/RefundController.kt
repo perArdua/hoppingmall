@@ -8,8 +8,8 @@ import com.hoppingmall.order.refund.dto.response.RefundResponse
 import com.hoppingmall.order.refund.service.RefundCommandService
 import com.hoppingmall.order.refund.service.RefundQueryService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Slice
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -49,7 +49,7 @@ class RefundController(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<Page<RefundResponse>> {
+    ): ResponseEntity<Slice<RefundResponse>> {
         val buyerId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val refunds = refundQueryService.getMyRefunds(buyerId, pageable)
@@ -61,7 +61,7 @@ class RefundController(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<Page<RefundResponse>> {
+    ): ResponseEntity<Slice<RefundResponse>> {
         val sellerId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val refunds = refundQueryService.getSellerRefunds(sellerId, pageable)
