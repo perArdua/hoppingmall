@@ -84,13 +84,13 @@ class PointEventConsumer(
 
     private fun findOrCreatePoint(userId: Long): Point {
         return try {
-            pointRepository.findByUserId(userId)
+            pointRepository.findByUserIdForUpdate(userId)
                 ?: run {
                     val newPoint = Point(userId = userId)
                     pointRepository.save(newPoint)
                 }
         } catch (e: DataIntegrityViolationException) {
-            pointRepository.findByUserId(userId)
+            pointRepository.findByUserIdForUpdate(userId)
                 ?: throw IllegalStateException("포인트 생성/조회 실패: 사용자 $userId")
         }
     }
