@@ -37,16 +37,8 @@ class CartItemCommandServiceImpl(
     }
 
     private fun updateExistingCartItem(existingCartItem: CartItem, additionalQuantity: Int): CartItem {
-        val updatedQuantity = existingCartItem.quantity + additionalQuantity
-        val updatedCartItem = CartItem.create(
-            buyerId = existingCartItem.buyerId,
-            productId = existingCartItem.productId,
-            productName = existingCartItem.productName,
-            productPrice = existingCartItem.productPrice,
-            productImageUrl = existingCartItem.productImageUrl,
-            quantity = updatedQuantity
-        )
-        return cartItemRepository.save(updatedCartItem)
+        existingCartItem.updateQuantity(existingCartItem.quantity + additionalQuantity)
+        return existingCartItem
     }
 
     private fun createNewCartItem(
@@ -74,17 +66,9 @@ class CartItemCommandServiceImpl(
             throw CartItemAccessDeniedException()
         }
 
-        val updatedCartItem = CartItem.create(
-            buyerId = cartItem.buyerId,
-            productId = cartItem.productId,
-            productName = cartItem.productName,
-            productPrice = cartItem.productPrice,
-            productImageUrl = cartItem.productImageUrl,
-            quantity = request.quantity
-        )
-        val savedCartItem = cartItemRepository.save(updatedCartItem)
+        cartItem.updateQuantity(request.quantity)
 
-        return CartItemResponse.from(savedCartItem)
+        return CartItemResponse.from(cartItem)
     }
 
     override fun removeCartItem(buyerId: Long, cartItemId: Long) {
