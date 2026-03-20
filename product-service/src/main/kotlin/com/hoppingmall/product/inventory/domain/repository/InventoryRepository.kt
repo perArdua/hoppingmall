@@ -17,4 +17,6 @@ interface InventoryRepository : JpaRepository<Inventory, Long> {
     fun findByProductIdForUpdate(@Param("productId") productId: Long): Inventory?
 
     fun existsByProductId(productId: Long): Boolean
+
+    fun findAllByProductIdIn(productIds: List<Long>): List<Inventory>
 }
