@@ -18,7 +18,7 @@ class RefundPointsService(
         val earnHistory = pointHistoryRepository.findByPaymentIdAndType(paymentId, PointType.EARN)
             ?: return
 
-        val point = pointRepository.findByUserId(userId) ?: return
+        val point = pointRepository.findByUserIdForUpdate(userId) ?: return
 
         point.usePoints(earnHistory.amount)
         pointRepository.save(point)

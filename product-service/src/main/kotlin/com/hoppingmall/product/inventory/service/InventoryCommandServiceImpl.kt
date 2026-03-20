@@ -102,13 +102,13 @@ class InventoryCommandServiceImpl(
                     targetStatus = ReservationStatus.CANCELLED,
                     updatedAt = LocalDateTime.now()
                 )
-                reservationIds.forEach { rsvId ->
-                    val reservation = inventoryReservationRepository.findByReservationId(rsvId) ?: return@forEach
-                    if (reservation.status == ReservationStatus.CANCELLED) {
+                reservationIds.mapNotNull { rsvId -> inventoryReservationRepository.findByReservationId(rsvId) }
+                    .filter { it.status == ReservationStatus.CANCELLED }
+                    .sortedBy { it.productId }
+                    .forEach { reservation ->
                         val inventory = inventoryRepository.findByProductIdForUpdate(reservation.productId) ?: return@forEach
                         inventory.increaseStock(reservation.quantity)
                     }
-                }
             }
             throw ReservationConfirmFailedException()
         }
