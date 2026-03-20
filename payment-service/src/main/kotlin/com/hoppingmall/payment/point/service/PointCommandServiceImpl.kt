@@ -73,13 +73,13 @@ class PointCommandServiceImpl(
 
     private fun findOrCreatePoint(userId: Long): Point {
         return try {
-            pointRepository.findByUserId(userId)
+            pointRepository.findByUserIdForUpdate(userId)
                 ?: run {
                     val newPoint = Point(userId = userId)
                     pointRepository.save(newPoint)
                 }
         } catch (e: org.springframework.dao.DataIntegrityViolationException) {
-            pointRepository.findByUserId(userId)
+            pointRepository.findByUserIdForUpdate(userId)
                 ?: throw IllegalStateException("포인트 생성 실패: 사용자 $userId")
         }
     }
