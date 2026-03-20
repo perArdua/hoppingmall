@@ -1,0 +1,31 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: order-service-vsvc
+  namespace: hoppingmall
+spec:
+  hosts:
+    - order-service
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: order-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: order-service
+            subset: canary
+          weight: 0
+    - name: grpc
+      match:
+        - port: 9094
+      route:
+        - destination:
+            host: order-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: order-service
+            subset: canary
+          weight: 0

@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: notification-service-destrule
+  namespace: hoppingmall
+spec:
+  host: notification-service
+  subsets:
+    - name: stable
+      labels:
+        app: notification-service
+    - name: canary
+      labels:
+        app: notification-service

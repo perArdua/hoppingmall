@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: settlement-service-destrule
+  namespace: hoppingmall
+spec:
+  host: settlement-service
+  subsets:
+    - name: stable
+      labels:
+        app: settlement-service
+    - name: canary
+      labels:
+        app: settlement-service

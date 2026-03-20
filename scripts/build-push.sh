@@ -3,7 +3,7 @@ set -euo pipefail
 
 REGISTRY="localhost:5001"
 TAG=$(git rev-parse --short HEAD)
-SERVICES=("api-gateway" "user-service" "product-service")
+SERVICES=("api-gateway" "user-service" "product-service" "order-service" "payment-service" "notification-service" "settlement-service")
 
 if [[ $# -gt 0 ]]; then
   SERVICES=("$@")

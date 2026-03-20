@@ -1,26 +1,26 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: product-service
+  name: settlement-service
   namespace: hoppingmall
 spec:
   replicas: 1
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: product-service
+      app: settlement-service
   strategy:
     canary:
-      canaryService: product-service-canary
-      stableService: product-service
+      canaryService: settlement-service-canary
+      stableService: settlement-service
       trafficRouting:
         istio:
           virtualServices:
-            - name: product-service-vsvc
+            - name: settlement-service-vsvc
               routes:
                 - primary
           destinationRule:
-            name: product-service-destrule
+            name: settlement-service-destrule
             canarySubsetName: canary
             stableSubsetName: stable
       steps:
@@ -32,20 +32,19 @@ spec:
   template:
     metadata:
       labels:
-        app: product-service
+        app: settlement-service
       annotations:
         sidecar.istio.io/inject: "true"
     spec:
       containers:
-        - name: product-service
-          image: product-service:latest
+        - name: settlement-service
+          image: settlement-service:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8083
-            - containerPort: 9093
+            - containerPort: 8086
           env:
             - name: SPRING_PROFILES_ACTIVE
-              value: "k8s,grpc"
+              value: "k8s"
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC"
             - name: JWT_SECRET
@@ -69,19 +68,15 @@ spec:
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8083
+              port: 8086
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8083
+              port: 8086
             initialDelaySeconds: 60
             periodSeconds: 15
-          volumeMounts:
-            - name: redisson-config
-              mountPath: /config
-              readOnly: true
           resources:
             requests:
               memory: "384Mi"
@@ -89,7 +84,3 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
-      volumes:
-        - name: redisson-config
-          configMap:
-            name: redisson-config

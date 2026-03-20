@@ -5,4 +5,4 @@ resources:
 images:
   - name: user-service
     newName: localhost:5001/user-service
-    newTag: latest
+    newTag: fix4

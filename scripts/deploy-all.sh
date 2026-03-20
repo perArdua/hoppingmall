@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TAG=$(git rev-parse --short HEAD)
-SERVICES=("api-gateway" "user-service" "product-service")
+SERVICES=("api-gateway" "user-service" "product-service" "order-service" "payment-service" "notification-service" "settlement-service")
 
 echo "==> Updating image tags to ${TAG}"
 for svc in "${SERVICES[@]}"; do

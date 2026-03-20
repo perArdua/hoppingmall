@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: order-service
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/perArdua/hoppingmall.git
+    targetRevision: develop
+    path: k8s-cd/overlays/local/order-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: hoppingmall
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

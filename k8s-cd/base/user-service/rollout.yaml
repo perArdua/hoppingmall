@@ -78,6 +78,10 @@ spec:
               port: 8082
             initialDelaySeconds: 60
             periodSeconds: 15
+          volumeMounts:
+            - name: redisson-config
+              mountPath: /config
+              readOnly: true
           resources:
             requests:
               memory: "384Mi"
@@ -85,3 +89,7 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+      volumes:
+        - name: redisson-config
+          configMap:
+            name: redisson-config

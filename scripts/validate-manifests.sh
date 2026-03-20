@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVICES=("api-gateway" "user-service" "product-service")
+SERVICES=("api-gateway" "user-service" "product-service" "order-service" "payment-service" "notification-service" "settlement-service")
 SKIP_KINDS="Rollout,AnalysisTemplate,VirtualService,DestinationRule,Application"
 FAILED=0
 
