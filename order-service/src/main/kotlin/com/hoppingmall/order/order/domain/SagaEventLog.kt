@@ -21,9 +21,27 @@ class SagaEventLog(
     val orderId: Long,
 
     @Column(nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "saga_event_log_steps", joinColumns = [JoinColumn(name = "saga_event_log_id")])
+    @Column(name = "step")
+    val completedSteps: MutableSet<String> = mutableSetOf()
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
+
+    fun markStepCompleted(step: String) {
+        completedSteps.add(step)
+    }
+
+    fun isStepCompleted(step: String): Boolean = step in completedSteps
+
+    fun isFullyCompleted(): Boolean = completedSteps.containsAll(setOf(LOCAL_COMPLETED, REMOTE_COMPLETED))
+
+    companion object {
+        const val LOCAL_COMPLETED = "LOCAL_COMPLETED"
+        const val REMOTE_COMPLETED = "REMOTE_COMPLETED"
+    }
 }

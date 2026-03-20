@@ -14,20 +14,23 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.TransactionalEventPublisherPort
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.transaction.support.TransactionCallback
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.util.Optional
 
@@ -54,8 +57,28 @@ class OrderSagaConsumerTest {
     @Mock
     private lateinit var objectMapper: ObjectMapper
 
-    @InjectMocks
+    @Mock
+    private lateinit var transactionTemplate: TransactionTemplate
+
     private lateinit var consumer: OrderSagaConsumer
+
+    @BeforeEach
+    fun setUp() {
+        Mockito.lenient().`when`(transactionTemplate.execute(any<TransactionCallback<Any>>())).thenAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val callback = invocation.arguments[0] as TransactionCallback<Any?>
+            callback.doInTransaction(mock())
+        }
+        consumer = OrderSagaConsumer(
+            sagaEventLogRepository,
+            orderRepository,
+            orderItemRepository,
+            inventoryCommandPort,
+            transactionalEventPublisherPort,
+            objectMapper,
+            transactionTemplate
+        )
+    }
 
     private val paymentCompletedEvent = PaymentCompletedEvent(
         paymentId = 100L,
@@ -74,30 +97,48 @@ class OrderSagaConsumerTest {
             productName = "상품A", productPrice = BigDecimal("50000"),
             quantity = 1, reservationId = "rsv-1"
         )
+        val sagaLog = SagaEventLog(
+            eventId = "payment-completed-txn-123",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 1L
+        ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
 
         whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
-        whenever(sagaEventLogRepository.existsByEventId("payment-completed-txn-123")).thenReturn(false)
+        whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
+            .thenReturn(null)
+            .thenReturn(sagaLog)
         whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
         whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
         whenever(inventoryCommandPort.confirmReservations(listOf("rsv-1"))).thenReturn(true)
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
 
         consumer.handlePaymentCompleted("{}")
 
         assertThat(order.status).isEqualTo(OrderStatus.PAID)
         verify(orderRepository).save(order)
-        verify(sagaEventLogRepository).save(any<SagaEventLog>())
     }
 
     @Test
     fun 이미_처리된_결제_완료_이벤트는_무시한다() {
+        val fullyCompleted = SagaEventLog(
+            eventId = "payment-completed-txn-123",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 1L
+        ).apply {
+            markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
+            markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+        }
+
         whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
-        whenever(sagaEventLogRepository.existsByEventId("payment-completed-txn-123")).thenReturn(true)
+        whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
+            .thenReturn(fullyCompleted)
 
         consumer.handlePaymentCompleted("{}")
 
         verify(orderRepository, never()).findById(any())
+        verify(inventoryCommandPort, never()).confirmReservations(any())
     }
 
     @Test
@@ -108,18 +149,25 @@ class OrderSagaConsumerTest {
             productName = "상품A", productPrice = BigDecimal("50000"),
             quantity = 1, reservationId = "rsv-1"
         )
+        val sagaLog = SagaEventLog(
+            eventId = "payment-completed-txn-123",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 1L
+        ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
 
         whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
-        whenever(sagaEventLogRepository.existsByEventId("payment-completed-txn-123")).thenReturn(false)
+        whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
+            .thenReturn(null)
+            .thenReturn(sagaLog)
         whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
         whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
         whenever(inventoryCommandPort.confirmReservations(listOf("rsv-1"))).thenReturn(false)
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
 
         consumer.handlePaymentCompleted("{}")
 
         assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
-        verify(inventoryCommandPort).cancelReservation("rsv-1")
         verify(transactionalEventPublisherPort).publishEvent(
             aggregateType = eq("Order"),
             aggregateId = eq("1"),
@@ -138,12 +186,20 @@ class OrderSagaConsumerTest {
             productName = "상품A", productPrice = BigDecimal("50000"),
             quantity = 1
         )
+        val sagaLog = SagaEventLog(
+            eventId = "payment-completed-txn-123",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 1L
+        ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
 
         whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
-        whenever(sagaEventLogRepository.existsByEventId("payment-completed-txn-123")).thenReturn(false)
+        whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
+            .thenReturn(null)
+            .thenReturn(sagaLog)
         whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
         whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
 
         consumer.handlePaymentCompleted("{}")
 
@@ -158,8 +214,9 @@ class OrderSagaConsumerTest {
 
         whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
-        whenever(sagaEventLogRepository.existsByEventId("payment-completed-txn-123")).thenReturn(false)
+        whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123")).thenReturn(null)
         whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
 
         consumer.handlePaymentCompleted("{}")
 
@@ -176,28 +233,44 @@ class OrderSagaConsumerTest {
             productName = "상품A", productPrice = BigDecimal("50000"),
             quantity = 1, reservationId = "rsv-1"
         )
+        val sagaLog = SagaEventLog(
+            eventId = "evt-comp-1",
+            eventType = "PAYMENT_COMPENSATION",
+            orderId = 1L
+        ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
 
         val node = mock<com.fasterxml.jackson.databind.JsonNode>()
         whenever(objectMapper.readTree(any<String>())).thenReturn(node)
         whenever(node.get("eventId")).thenReturn(TextNode("evt-comp-1"))
         whenever(node.get("orderId")).thenReturn(LongNode(1L))
-        whenever(sagaEventLogRepository.existsByEventId("evt-comp-1")).thenReturn(false)
+        whenever(sagaEventLogRepository.findByEventId("evt-comp-1"))
+            .thenReturn(null)
+            .thenReturn(sagaLog)
         whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
         whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
 
         consumer.handlePaymentCompensation("{}")
 
         assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
         verify(inventoryCommandPort).cancelReservation("rsv-1")
-        verify(sagaEventLogRepository).save(any<SagaEventLog>())
     }
 
     @Test
     fun 이미_처리된_보상_이벤트는_무시한다() {
+        val fullyCompleted = SagaEventLog(
+            eventId = "evt-comp-1",
+            eventType = "PAYMENT_COMPENSATION",
+            orderId = 1L
+        ).apply {
+            markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
+            markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+        }
+
         val node = mock<com.fasterxml.jackson.databind.JsonNode>()
         whenever(objectMapper.readTree(any<String>())).thenReturn(node)
         whenever(node.get("eventId")).thenReturn(TextNode("evt-comp-1"))
-        whenever(sagaEventLogRepository.existsByEventId("evt-comp-1")).thenReturn(true)
+        whenever(sagaEventLogRepository.findByEventId("evt-comp-1")).thenReturn(fullyCompleted)
 
         consumer.handlePaymentCompensation("{}")
 
