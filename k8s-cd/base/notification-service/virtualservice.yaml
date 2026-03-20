@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: notification-service-vsvc
+  namespace: hoppingmall
+spec:
+  hosts:
+    - notification-service
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: notification-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: notification-service
+            subset: canary
+          weight: 0

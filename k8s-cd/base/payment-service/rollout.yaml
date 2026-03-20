@@ -1,26 +1,26 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: product-service
+  name: payment-service
   namespace: hoppingmall
 spec:
   replicas: 1
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: product-service
+      app: payment-service
   strategy:
     canary:
-      canaryService: product-service-canary
-      stableService: product-service
+      canaryService: payment-service-canary
+      stableService: payment-service
       trafficRouting:
         istio:
           virtualServices:
-            - name: product-service-vsvc
+            - name: payment-service-vsvc
               routes:
                 - primary
           destinationRule:
-            name: product-service-destrule
+            name: payment-service-destrule
             canarySubsetName: canary
             stableSubsetName: stable
       steps:
@@ -32,17 +32,17 @@ spec:
   template:
     metadata:
       labels:
-        app: product-service
+        app: payment-service
       annotations:
         sidecar.istio.io/inject: "true"
     spec:
       containers:
-        - name: product-service
-          image: product-service:latest
+        - name: payment-service
+          image: payment-service:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8083
-            - containerPort: 9093
+            - containerPort: 8085
+            - containerPort: 9095
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "k8s,grpc"
@@ -69,14 +69,14 @@ spec:
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8083
+              port: 8085
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8083
-            initialDelaySeconds: 60
+              port: 8085
+            initialDelaySeconds: 180
             periodSeconds: 15
           volumeMounts:
             - name: redisson-config
@@ -84,10 +84,10 @@ spec:
               readOnly: true
           resources:
             requests:
-              memory: "384Mi"
+              memory: "512Mi"
               cpu: "250m"
             limits:
-              memory: "512Mi"
+              memory: "768Mi"
               cpu: "500m"
       volumes:
         - name: redisson-config

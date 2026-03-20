@@ -5,4 +5,4 @@ resources:
 images:
   - name: product-service
     newName: localhost:5001/product-service
-    newTag: latest
+    newTag: fix4

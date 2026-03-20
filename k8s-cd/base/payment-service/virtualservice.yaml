@@ -1,0 +1,31 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: payment-service-vsvc
+  namespace: hoppingmall
+spec:
+  hosts:
+    - payment-service
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: payment-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: payment-service
+            subset: canary
+          weight: 0
+    - name: grpc
+      match:
+        - port: 9095
+      route:
+        - destination:
+            host: payment-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: payment-service
+            subset: canary
+          weight: 0

@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: settlement-service-vsvc
+  namespace: hoppingmall
+spec:
+  hosts:
+    - settlement-service
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: settlement-service
+            subset: stable
+          weight: 100
+        - destination:
+            host: settlement-service
+            subset: canary
+          weight: 0

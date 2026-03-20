@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: payment-service-destrule
+  namespace: hoppingmall
+spec:
+  host: payment-service
+  subsets:
+    - name: stable
+      labels:
+        app: payment-service
+    - name: canary
+      labels:
+        app: payment-service
