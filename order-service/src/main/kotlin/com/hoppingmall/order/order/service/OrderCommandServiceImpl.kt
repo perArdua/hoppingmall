@@ -50,18 +50,8 @@ class OrderCommandServiceImpl(
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
 
-        val reservationMap = mutableMapOf<Long, String>()
-        try {
-            cartItems.sortedBy { it.productId }.forEach { cartItem ->
-                val reservationId = inventoryCommandPort.reserveStock(cartItem.productId, cartItem.quantity)
-                reservationMap[cartItem.productId] = reservationId
-            }
-        } catch (e: Exception) {
-            if (reservationMap.isNotEmpty()) {
-                inventoryCommandPort.cancelReservations(reservationMap.values.toList())
-            }
-            throw e
-        }
+        val items = cartItems.map { it.productId to it.quantity }
+        val reservationMap = inventoryCommandPort.batchReserveStock(items)
 
         val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
 

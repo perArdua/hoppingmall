@@ -140,4 +140,19 @@ class InventoryCommandServiceImpl(
     override fun cancelReservations(reservationIds: List<String>) {
         reservationIds.forEach { cancelReservation(it) }
     }
+
+    override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
+        val sorted = items.sortedBy { it.first }
+        val reservationMap = mutableMapOf<Long, String>()
+        try {
+            sorted.forEach { (productId, quantity) ->
+                val reservationId = reserveStock(productId, quantity)
+                reservationMap[productId] = reservationId
+            }
+        } catch (e: Exception) {
+            reservationMap.values.forEach { cancelReservation(it) }
+            throw e
+        }
+        return reservationMap
+    }
 }

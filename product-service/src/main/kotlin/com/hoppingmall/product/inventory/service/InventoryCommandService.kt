@@ -13,4 +13,5 @@ interface InventoryCommandService {
     fun confirmReservations(reservationIds: List<String>): Boolean
     fun cancelReservation(reservationId: String)
     fun cancelReservations(reservationIds: List<String>)
+    fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String>
 }

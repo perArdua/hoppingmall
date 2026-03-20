@@ -56,6 +56,14 @@ class InternalInventoryController(
         return ResponseEntity.ok().build()
     }
 
+    @PostMapping("/batch-reserve")
+    fun batchReserveStock(@RequestBody items: List<ReserveRequest>): ResponseEntity<Map<Long, String>> {
+        val pairs = items.map { it.productId to it.quantity }
+        val result = inventoryCommandService.batchReserveStock(pairs)
+        return ResponseEntity.ok(result)
+    }
+
+    data class ReserveRequest(val productId: Long, val quantity: Int)
     data class ReservationResponse(val reservationId: String)
     data class ConfirmationResponse(val confirmed: Boolean)
 }
