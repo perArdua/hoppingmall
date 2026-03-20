@@ -25,11 +25,11 @@ import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.math.RoundingMode
 
 @Service
-@Transactional
 class RefundCommandServiceImpl(
     private val refundRepository: RefundRepository,
     private val refundItemRepository: RefundItemRepository,
@@ -37,23 +37,13 @@ class RefundCommandServiceImpl(
     private val orderItemRepository: OrderItemRepository,
     private val paymentQueryPort: PaymentQueryPort,
     private val shippingRepository: ShippingRepository,
-    private val refundEventPublisher: RefundEventPublisher
+    private val refundEventPublisher: RefundEventPublisher,
+    private val transactionTemplate: TransactionTemplate
 ) : RefundCommandService {
 
     private val refundableOrderStatuses = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
 
     override fun requestRefund(buyerId: Long, request: RefundCreateRequest): RefundResponse {
-        val order = orderRepository.findById(request.orderId)
-            .orElseThrow { OrderNotFoundException() }
-
-        if (order.buyerId != buyerId) {
-            throw RefundAccessDeniedException()
-        }
-
-        if (order.status !in refundableOrderStatuses) {
-            throw RefundException(RefundErrorCode.REFUND_INVALID_ORDER_STATUS)
-        }
-
         val payment = paymentQueryPort.findByOrderId(request.orderId)
             ?: throw RefundPaymentNotFoundException()
 
@@ -61,96 +51,115 @@ class RefundCommandServiceImpl(
             throw RefundException(RefundErrorCode.REFUND_INVALID_PAYMENT_STATUS)
         }
 
-        val orderItems = orderItemRepository.findByOrderId(request.orderId)
-        val orderItemMap = orderItems.associateBy { it.id!! }
+        return transactionTemplate.execute { _ ->
+            val order = orderRepository.findById(request.orderId)
+                .orElseThrow { OrderNotFoundException() }
 
-        val refundedQuantities = refundItemRepository.findRefundedQuantitiesByOrderId(request.orderId)
-        val refundedMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedQuantity.toInt() }
-
-        request.items.forEach { item ->
-            val orderItem = orderItemMap[item.orderItemId]
-                ?: throw RefundException(RefundErrorCode.REFUND_INVALID_ITEM)
-            val alreadyRefunded = refundedMap[item.orderItemId] ?: 0
-            val availableQuantity = orderItem.quantity - alreadyRefunded
-            if (item.quantity > availableQuantity) {
-                throw RefundException(RefundErrorCode.REFUND_QUANTITY_EXCEEDED)
+            if (order.buyerId != buyerId) {
+                throw RefundAccessDeniedException()
             }
-        }
 
-        val refundAmount = request.items.sumOf { item ->
-            val orderItem = orderItemMap[item.orderItemId]!!
-            orderItem.productPrice.multiply(BigDecimal(item.quantity))
-        }
+            if (order.status !in refundableOrderStatuses) {
+                throw RefundException(RefundErrorCode.REFUND_INVALID_ORDER_STATUS)
+            }
 
-        val requestItemMap = request.items.associate { it.orderItemId to it.quantity }
-        val isFullRefund = orderItems.all { orderItem ->
-            val alreadyRefunded = refundedMap[orderItem.id!!] ?: 0
-            val currentRefund = requestItemMap[orderItem.id!!] ?: 0
-            alreadyRefunded + currentRefund == orderItem.quantity
-        }
+            val orderItems = orderItemRepository.findByOrderId(request.orderId)
+            val orderItemMap = orderItems.associateBy { it.id!! }
 
-        val firstOrderItem = orderItemMap[request.items.first().orderItemId]!!
-        val sellerId = firstOrderItem.sellerId
+            val refundedQuantities = refundItemRepository.findRefundedQuantitiesByOrderId(request.orderId)
+            val refundedMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedQuantity.toInt() }
 
-        val refund = Refund.create(
-            orderId = request.orderId,
-            paymentId = payment.id,
-            buyerId = buyerId,
-            sellerId = sellerId,
-            reason = request.reason,
-            reasonDetail = request.reasonDetail,
-            refundAmount = refundAmount,
-            isFullRefund = isFullRefund
-        )
-        val savedRefund = refundRepository.save(refund)
+            request.items.forEach { item ->
+                val orderItem = orderItemMap[item.orderItemId]
+                    ?: throw RefundException(RefundErrorCode.REFUND_INVALID_ITEM)
+                val alreadyRefunded = refundedMap[item.orderItemId] ?: 0
+                val availableQuantity = orderItem.quantity - alreadyRefunded
+                if (item.quantity > availableQuantity) {
+                    throw RefundException(RefundErrorCode.REFUND_QUANTITY_EXCEEDED)
+                }
+            }
 
-        val refundItems = request.items.map { item ->
-            val orderItem = orderItemMap[item.orderItemId]!!
-            RefundItem.create(
-                refundId = savedRefund.id!!,
-                orderItemId = item.orderItemId,
-                productId = orderItem.productId,
-                productName = orderItem.productName,
-                productPrice = orderItem.productPrice,
-                quantity = item.quantity
+            val refundAmount = request.items.sumOf { item ->
+                val orderItem = orderItemMap[item.orderItemId]!!
+                orderItem.productPrice.multiply(BigDecimal(item.quantity))
+            }
+
+            val requestItemMap = request.items.associate { it.orderItemId to it.quantity }
+            val isFullRefund = orderItems.all { orderItem ->
+                val alreadyRefunded = refundedMap[orderItem.id!!] ?: 0
+                val currentRefund = requestItemMap[orderItem.id!!] ?: 0
+                alreadyRefunded + currentRefund == orderItem.quantity
+            }
+
+            val firstOrderItem = orderItemMap[request.items.first().orderItemId]!!
+            val sellerId = firstOrderItem.sellerId
+
+            val refund = Refund.create(
+                orderId = request.orderId,
+                paymentId = payment.id,
+                buyerId = buyerId,
+                sellerId = sellerId,
+                reason = request.reason,
+                reasonDetail = request.reasonDetail,
+                refundAmount = refundAmount,
+                isFullRefund = isFullRefund
             )
-        }
-        val savedRefundItems = refundItemRepository.saveAll(refundItems)
+            val savedRefund = refundRepository.save(refund)
 
-        val shipping = shippingRepository.findByOrderId(request.orderId)
-        val isAutoApprove = shipping == null || shipping.status == ShippingStatus.PREPARING
+            val refundItems = request.items.map { item ->
+                val orderItem = orderItemMap[item.orderItemId]!!
+                RefundItem.create(
+                    refundId = savedRefund.id!!,
+                    orderItemId = item.orderItemId,
+                    productId = orderItem.productId,
+                    productName = orderItem.productName,
+                    productPrice = orderItem.productPrice,
+                    quantity = item.quantity
+                )
+            }
+            val savedRefundItems = refundItemRepository.saveAll(refundItems)
 
-        if (isAutoApprove) {
-            savedRefund.approve(buyerId)
-            publishRefundCompletedEvent(savedRefund, savedRefundItems, payment)
-            savedRefund.complete()
-            refundRepository.save(savedRefund)
-        }
+            val shipping = shippingRepository.findByOrderId(request.orderId)
+            val isAutoApprove = shipping == null || shipping.status == ShippingStatus.PREPARING
 
-        return RefundResponse.from(savedRefund, savedRefundItems)
+            if (isAutoApprove) {
+                savedRefund.approve(buyerId)
+                publishRefundCompletedEvent(savedRefund, savedRefundItems, payment)
+                savedRefund.complete()
+                refundRepository.save(savedRefund)
+            }
+
+            RefundResponse.from(savedRefund, savedRefundItems)
+        }!!
     }
 
     override fun approveRefund(refundId: Long, approverId: Long): RefundResponse {
-        val refund = refundRepository.findById(refundId)
-            .orElseThrow { RefundNotFoundException() }
+        val payment = paymentQueryPort.findById(
+            refundRepository.findById(refundId)
+                .orElseThrow { RefundNotFoundException() }.paymentId
+        ) ?: throw RefundPaymentNotFoundException()
 
-        if (refund.sellerId != approverId) {
-            throw RefundAccessDeniedException()
-        }
+        return transactionTemplate.execute { _ ->
+            val refund = refundRepository.findById(refundId)
+                .orElseThrow { RefundNotFoundException() }
 
-        refund.approve(approverId)
+            if (refund.sellerId != approverId) {
+                throw RefundAccessDeniedException()
+            }
 
-        val refundItems = refundItemRepository.findByRefundId(refundId)
-        val payment = paymentQueryPort.findById(refund.paymentId)
-            ?: throw RefundPaymentNotFoundException()
+            refund.approve(approverId)
 
-        publishRefundCompletedEvent(refund, refundItems, payment)
-        refund.complete()
-        refundRepository.save(refund)
+            val refundItems = refundItemRepository.findByRefundId(refundId)
 
-        return RefundResponse.from(refund, refundItems)
+            publishRefundCompletedEvent(refund, refundItems, payment)
+            refund.complete()
+            refundRepository.save(refund)
+
+            RefundResponse.from(refund, refundItems)
+        }!!
     }
 
+    @Transactional
     override fun rejectRefund(refundId: Long, approverId: Long, request: RefundApprovalRequest): RefundResponse {
         val refund = refundRepository.findById(refundId)
             .orElseThrow { RefundNotFoundException() }
