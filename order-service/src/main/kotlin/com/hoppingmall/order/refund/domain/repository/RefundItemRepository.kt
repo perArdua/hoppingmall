@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository
 @Repository
 interface RefundItemRepository : JpaRepository<RefundItem, Long> {
     fun findByRefundId(refundId: Long): List<RefundItem>
+    fun findByRefundIdIn(refundIds: List<Long>): List<RefundItem>
 
     @Query(
         value = """

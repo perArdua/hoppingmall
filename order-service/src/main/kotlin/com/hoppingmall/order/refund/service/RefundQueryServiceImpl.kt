@@ -28,16 +28,24 @@ class RefundQueryServiceImpl(
     }
 
     override fun getMyRefunds(buyerId: Long, pageable: Pageable): Page<RefundResponse> {
-        return refundRepository.findByBuyerId(buyerId, pageable).map { refund ->
-            val items = refundItemRepository.findByRefundId(refund.id!!)
-            RefundResponse.from(refund, items)
+        val refundPage = refundRepository.findByBuyerId(buyerId, pageable)
+        val refundIds = refundPage.content.mapNotNull { it.id }
+        val itemsByRefundId = if (refundIds.isNotEmpty()) {
+            refundItemRepository.findByRefundIdIn(refundIds).groupBy { it.refundId }
+        } else emptyMap()
+        return refundPage.map { refund ->
+            RefundResponse.from(refund, itemsByRefundId[refund.id] ?: emptyList())
         }
     }
 
     override fun getSellerRefunds(sellerId: Long, pageable: Pageable): Page<RefundResponse> {
-        return refundRepository.findBySellerId(sellerId, pageable).map { refund ->
-            val items = refundItemRepository.findByRefundId(refund.id!!)
-            RefundResponse.from(refund, items)
+        val refundPage = refundRepository.findBySellerId(sellerId, pageable)
+        val refundIds = refundPage.content.mapNotNull { it.id }
+        val itemsByRefundId = if (refundIds.isNotEmpty()) {
+            refundItemRepository.findByRefundIdIn(refundIds).groupBy { it.refundId }
+        } else emptyMap()
+        return refundPage.map { refund ->
+            RefundResponse.from(refund, itemsByRefundId[refund.id] ?: emptyList())
         }
     }
 }
