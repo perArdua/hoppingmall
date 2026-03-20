@@ -51,7 +51,7 @@ class HttpInventoryCommandAdapter(
             ?: throw RuntimeException("재고 예약 응답 없음: productId=$productId")
     }
 
-    @CircuitBreaker(name = "inventory-command", fallbackMethod = "confirmReservationsFallback")
+    @CircuitBreaker(name = "inventory-command")
     @Retry(name = "product-query")
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         val response = restTemplate.postForEntity(
@@ -80,11 +80,20 @@ class HttpInventoryCommandAdapter(
         )
     }
 
-    private fun confirmReservationsFallback(reservationIds: List<String>, e: Exception): Boolean {
-        logger.warn("CB fallback: 예약 확정 실패 reservationIds=$reservationIds", e)
-        return false
+    @CircuitBreaker(name = "inventory-command")
+    override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
+        val requestBody = items.map { BatchReserveRequest(it.first, it.second) }
+        val responseType = object : org.springframework.core.ParameterizedTypeReference<Map<Long, String>>() {}
+        val response = restTemplate.exchange(
+            "$productServiceUrl/internal/api/v1/inventory/batch-reserve",
+            org.springframework.http.HttpMethod.POST,
+            org.springframework.http.HttpEntity(requestBody),
+            responseType
+        )
+        return response.body ?: throw RuntimeException("배치 재고 예약 응답 없음")
     }
 
     data class ReservationResponse(val reservationId: String = "")
     data class ConfirmationResponse(val confirmed: Boolean = false)
+    data class BatchReserveRequest(val productId: Long, val quantity: Int)
 }
