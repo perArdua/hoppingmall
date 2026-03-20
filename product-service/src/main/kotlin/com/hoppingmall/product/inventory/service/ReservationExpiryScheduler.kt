@@ -32,7 +32,7 @@ class ReservationExpiryScheduler(
 
         logger.info("만료 예약 처리 시작: ${expiredReservations.size}건")
 
-        expiredReservations.forEach { reservation ->
+        expiredReservations.sortedBy { it.productId }.forEach { reservation ->
             val updated = inventoryReservationRepository.updateStatusByCas(
                 reservationId = reservation.reservationId,
                 expectedStatus = ReservationStatus.RESERVED,
