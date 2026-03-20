@@ -3,13 +3,20 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.product.common.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "product_statistics")
+@Table(
+    name = "product_statistics",
+    indexes = [
+        Index(name = "idx_product_statistics_seller_id", columnList = "sellerId"),
+        Index(name = "idx_product_statistics_category_id", columnList = "categoryId")
+    ]
+)
 class ProductStatistics private constructor(
     @Column(unique = true, nullable = false)
     val productId: Long,
