@@ -4,8 +4,8 @@ import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -24,7 +24,7 @@ class PaymentQueryServiceImpl(
         return PaymentResponse.from(payment)
     }
 
-    override fun getPaymentsByUserId(userId: Long, pageable: Pageable): Page<PaymentResponse> {
+    override fun getPaymentsByUserId(userId: Long, pageable: Pageable): Slice<PaymentResponse> {
         return paymentRepository.findByUserId(userId, pageable)
             .map { PaymentResponse.from(it) }
     }

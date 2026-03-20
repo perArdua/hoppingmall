@@ -9,8 +9,8 @@ import com.hoppingmall.product.review.dto.response.ReviewResponse
 import com.hoppingmall.product.review.service.ReviewCommandService
 import com.hoppingmall.product.review.service.ReviewQueryService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -49,7 +49,7 @@ class ReviewController(
     fun getProductReviews(
         @PathVariable productId: Long,
         @PageableDefault(size = 10) pageable: Pageable
-    ): ResponseEntity<ApiResponse<Page<ReviewResponse>>> {
+    ): ResponseEntity<ApiResponse<Slice<ReviewResponse>>> {
         val response = reviewQueryService.getReviewsByProductId(productId, pageable)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
@@ -58,7 +58,7 @@ class ReviewController(
     fun getMyReviews(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PageableDefault(size = 10) pageable: Pageable
-    ): ResponseEntity<ApiResponse<Page<ReviewResponse>>> {
+    ): ResponseEntity<ApiResponse<Slice<ReviewResponse>>> {
         val response = reviewQueryService.getMyReviews(userPrincipal.getUserId(), pageable)
         return ResponseEntity.ok(ApiResponse.success(response))
     }

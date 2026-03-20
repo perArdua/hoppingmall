@@ -10,8 +10,8 @@ import com.hoppingmall.product.product.dto.response.SellerTodaySummaryResponse
 import com.hoppingmall.product.product.exception.ProductException
 import com.hoppingmall.product.product.exception.ProductStatisticsNotFoundException
 import com.hoppingmall.product.product.exception.code.ProductErrorCode
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -24,7 +24,7 @@ class SellerDashboardServiceImpl(
     private val productHourlyStatisticsRepository: ProductHourlyStatisticsRepository
 ) : SellerDashboardService {
 
-    override fun getOverview(sellerId: Long, pageable: Pageable): Page<ProductStatisticsResponse> {
+    override fun getOverview(sellerId: Long, pageable: Pageable): Slice<ProductStatisticsResponse> {
         return productStatisticsRepository.findBySellerId(sellerId, pageable)
             .map { ProductStatisticsResponse.from(it) }
     }

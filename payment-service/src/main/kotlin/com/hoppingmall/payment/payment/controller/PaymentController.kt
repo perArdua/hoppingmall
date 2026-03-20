@@ -5,8 +5,8 @@ import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.service.PaymentCommandService
 import com.hoppingmall.payment.payment.service.PaymentQueryService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Slice
 import org.springframework.http.ResponseEntity
 import com.hoppingmall.payment.common.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -46,7 +46,7 @@ class PaymentController(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<Page<PaymentResponse>> {
+    ): ResponseEntity<Slice<PaymentResponse>> {
         val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val payments = paymentQueryService.getPaymentsByUserId(userId, pageable)

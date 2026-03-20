@@ -8,8 +8,8 @@ import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
 import com.hoppingmall.product.wishlist.service.WishlistQueryService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -50,7 +50,7 @@ class WishlistController(
     fun getWishlists(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<Page<WishlistResponse>>> {
+    ): ResponseEntity<ApiResponse<Slice<WishlistResponse>>> {
         val wishlists = wishlistQueryService.getWishlists(userPrincipal.getUserId(), pageable)
         return ResponseEntity.ok(ApiResponse.success(wishlists))
     }

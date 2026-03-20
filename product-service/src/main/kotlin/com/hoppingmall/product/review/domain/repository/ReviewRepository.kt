@@ -1,8 +1,8 @@
 package com.hoppingmall.product.review.domain.repository
 
 import com.hoppingmall.product.review.domain.Review
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -10,8 +10,8 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface ReviewRepository : JpaRepository<Review, Long> {
-    fun findByProductId(productId: Long, pageable: Pageable): Page<Review>
-    fun findByBuyerId(buyerId: Long, pageable: Pageable): Page<Review>
+    fun findByProductId(productId: Long, pageable: Pageable): Slice<Review>
+    fun findByBuyerId(buyerId: Long, pageable: Pageable): Slice<Review>
     fun existsByOrderItemId(orderItemId: Long): Boolean
     fun findNullableById(id: Long): Review?
 

@@ -7,8 +7,8 @@ import com.hoppingmall.product.product.dto.response.ProductHourlyStatisticsRespo
 import com.hoppingmall.product.product.dto.response.ProductStatisticsResponse
 import com.hoppingmall.product.product.dto.response.SellerTodaySummaryResponse
 import com.hoppingmall.product.product.service.SellerDashboardService
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -30,7 +30,7 @@ class SellerDashboardController(
     fun getOverview(
         @AuthenticationPrincipal principal: UserPrincipal,
         pageable: Pageable
-    ): ApiResponse<Page<ProductStatisticsResponse>> {
+    ): ApiResponse<Slice<ProductStatisticsResponse>> {
         return ApiResponse.success(sellerDashboardService.getOverview(principal.getUserId(), pageable))
     }
 

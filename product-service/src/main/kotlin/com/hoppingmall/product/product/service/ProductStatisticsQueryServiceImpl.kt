@@ -7,6 +7,7 @@ import com.hoppingmall.product.product.dto.response.*
 import com.hoppingmall.product.product.exception.ProductStatisticsNotFoundException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -30,12 +31,12 @@ class ProductStatisticsQueryServiceImpl(
         return ProductStatisticsResponse.from(statistics)
     }
 
-    override fun getBySellerId(sellerId: Long, pageable: Pageable): Page<ProductStatisticsResponse> {
+    override fun getBySellerId(sellerId: Long, pageable: Pageable): Slice<ProductStatisticsResponse> {
         return productStatisticsRepository.findBySellerId(sellerId, pageable)
             .map { ProductStatisticsResponse.from(it) }
     }
 
-    override fun getByCategoryId(categoryId: Long, pageable: Pageable): Page<ProductStatisticsResponse> {
+    override fun getByCategoryId(categoryId: Long, pageable: Pageable): Slice<ProductStatisticsResponse> {
         return productStatisticsRepository.findByCategoryId(categoryId, pageable)
             .map { ProductStatisticsResponse.from(it) }
     }
