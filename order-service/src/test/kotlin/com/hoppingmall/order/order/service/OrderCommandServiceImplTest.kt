@@ -63,7 +63,7 @@ class OrderCommandServiceImplTest {
 
         whenever(cartItemRepository.findAllById(listOf(1L))).thenReturn(listOf(cartItem))
         whenever(productQueryPort.findProductsByIds(listOf(100L))).thenReturn(listOf(productInfo))
-        whenever(inventoryCommandPort.reserveStock(100L, 2)).thenReturn("rsv-1")
+        whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 2))).thenReturn(mapOf(100L to "rsv-1"))
         whenever(orderRepository.save(any<Order>())).thenAnswer {
             val order = it.arguments[0] as Order
             setEntityId(order, 1L)
@@ -78,7 +78,7 @@ class OrderCommandServiceImplTest {
 
         val result = service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L)))
 
-        verify(inventoryCommandPort).reserveStock(100L, 2)
+        verify(inventoryCommandPort).batchReserveStock(listOf(100L to 2))
         assertThat(result).isNotNull
     }
 
@@ -91,13 +91,10 @@ class OrderCommandServiceImplTest {
 
         whenever(cartItemRepository.findAllById(listOf(1L, 2L))).thenReturn(listOf(cartItem1, cartItem2))
         whenever(productQueryPort.findProductsByIds(any())).thenReturn(listOf(productInfo1, productInfo2))
-        whenever(inventoryCommandPort.reserveStock(100L, 1)).thenReturn("rsv-1")
-        whenever(inventoryCommandPort.reserveStock(200L, 1)).thenThrow(RuntimeException("재고 부족"))
+        whenever(inventoryCommandPort.batchReserveStock(any())).thenThrow(RuntimeException("재고 부족"))
 
         assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
             .isInstanceOf(RuntimeException::class.java)
-
-        verify(inventoryCommandPort).cancelReservations(listOf("rsv-1"))
     }
 
     @Test
