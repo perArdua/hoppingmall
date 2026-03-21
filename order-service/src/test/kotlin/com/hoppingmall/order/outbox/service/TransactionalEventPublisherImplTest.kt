@@ -16,13 +16,13 @@ import org.mockito.kotlin.verify
 class TransactionalEventPublisherImplTest {
 
     @Mock
-    private lateinit var outboxEventService: OutboxEventService
+    private lateinit var outboxEventWriter: OutboxEventWriter
 
     @InjectMocks
     private lateinit var publisher: TransactionalEventPublisherImpl
 
     @Test
-    fun publishEvent_호출_시_OutboxEventService의_saveEvent를_위임한다() {
+    fun publishEvent_호출_시_OutboxEventWriter의_saveEvent를_위임한다() {
         val eventData = mapOf<String, Any>("orderId" to 1L, "status" to "CREATED")
 
         publisher.publishEvent(
@@ -34,7 +34,7 @@ class TransactionalEventPublisherImplTest {
             partitionKey = "1"
         )
 
-        verify(outboxEventService).saveEvent(
+        verify(outboxEventWriter).saveEvent(
             aggregateType = "Order",
             aggregateId = "1",
             eventType = "OrderCreated",

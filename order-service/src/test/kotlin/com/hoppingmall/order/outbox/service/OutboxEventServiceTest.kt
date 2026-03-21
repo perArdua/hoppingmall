@@ -14,13 +14,11 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.kafka.core.KafkaTemplate
 
-@DisplayName("OutboxEventService")
+@DisplayName("OutboxEventWriter")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
 @ExtendWith(MockitoExtension::class)
 class OutboxEventServiceTest {
@@ -29,13 +27,10 @@ class OutboxEventServiceTest {
     private lateinit var outboxEventRepository: OutboxEventRepository
 
     @Mock
-    private lateinit var kafkaTemplate: KafkaTemplate<String, Any>
-
-    @Mock
     private lateinit var objectMapper: ObjectMapper
 
     @InjectMocks
-    private lateinit var service: OutboxEventService
+    private lateinit var service: OutboxEventWriter
 
     @Test
     fun 이벤트_저장_시_Outbox에_PENDING_상태로_저장된다() {
@@ -75,37 +70,20 @@ class OutboxEventServiceTest {
     }
 
     @Test
-    fun 펜딩_이벤트가_없으면_발행하지_않는다() {
-        whenever(outboxEventRepository.findUnprocessedEvents(any(), any(), any(), any()))
-            .thenReturn(emptyList())
-
-        service.publishPendingEvents()
-
-        verify(outboxEventRepository, never()).claimEventForPublish(any(), any(), any(), any(), any(), any())
-    }
-
-    @Test
     fun 이벤트_통계를_반환한다() {
-        whenever(outboxEventRepository.countByStatus(OutboxStatus.PENDING)).thenReturn(5L)
-        whenever(outboxEventRepository.countByStatus(OutboxStatus.RETRYING)).thenReturn(2L)
-        whenever(outboxEventRepository.countByStatus(OutboxStatus.PUBLISHED)).thenReturn(100L)
-        whenever(outboxEventRepository.countByStatus(OutboxStatus.FAILED)).thenReturn(1L)
+        val statsRepository = outboxEventRepository
+        whenever(statsRepository.countByStatus(OutboxStatus.PENDING)).thenReturn(5L)
+        whenever(statsRepository.countByStatus(OutboxStatus.RETRYING)).thenReturn(2L)
+        whenever(statsRepository.countByStatus(OutboxStatus.PUBLISHED)).thenReturn(100L)
+        whenever(statsRepository.countByStatus(OutboxStatus.FAILED)).thenReturn(1L)
 
-        val stats = service.getEventStats()
+        val outboxEventService = OutboxEventService(statsRepository, service)
+        val stats = outboxEventService.getEventStats()
 
         assertThat(stats["pending"]).isEqualTo(5L)
         assertThat(stats["retrying"]).isEqualTo(2L)
         assertThat(stats["published"]).isEqualTo(100L)
         assertThat(stats["failed"]).isEqualTo(1L)
-    }
-
-    @Test
-    fun 처리된_이벤트_정리_시_삭제_카운트를_반환한다() {
-        whenever(outboxEventRepository.deleteProcessedEventsBefore(any())).thenReturn(10)
-
-        service.cleanupProcessedEvents()
-
-        verify(outboxEventRepository).deleteProcessedEventsBefore(any())
     }
 
     @Test

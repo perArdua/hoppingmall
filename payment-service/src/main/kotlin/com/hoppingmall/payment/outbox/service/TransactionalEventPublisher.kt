@@ -5,7 +5,7 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class TransactionalEventPublisher(
-    private val outboxEventService: OutboxEventService
+    private val outboxEventWriter: OutboxEventWriter
 ) {
     @Transactional(rollbackFor = [Exception::class])
     fun publishEvent(
@@ -16,7 +16,7 @@ class TransactionalEventPublisher(
         topic: String,
         partitionKey: String? = null
     ) {
-        outboxEventService.saveEvent(
+        outboxEventWriter.saveEvent(
             aggregateType = aggregateType,
             aggregateId = aggregateId,
             eventType = eventType,

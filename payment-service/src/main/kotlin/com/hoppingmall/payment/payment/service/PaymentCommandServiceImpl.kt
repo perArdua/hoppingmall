@@ -22,6 +22,7 @@ class PaymentCommandServiceImpl(
     private val paymentRepository: PaymentRepository,
     private val paymentService: PaymentService,
     private val paymentEventService: PaymentEventService,
+    private val paymentNotificationService: PaymentNotificationService,
     private val couponCommandService: CouponCommandService,
     transactionManager: PlatformTransactionManager
 ) : PaymentCommandService {
@@ -75,7 +76,7 @@ class PaymentCommandServiceImpl(
                     couponCommandService.restoreCouponByPayment(couponId!!, userId)
                 }
                 paymentEventService.publishPaymentFailedEvent(saved)
-                paymentEventService.publishPaymentFailedNotification(saved)
+                paymentNotificationService.publishPaymentFailedNotification(saved)
             }
 
             saved
@@ -101,7 +102,7 @@ class PaymentCommandServiceImpl(
         val cancelledPayment = paymentRepository.save(payment)
 
         paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
-        paymentEventService.publishPaymentCancelledNotification(cancelledPayment)
+        paymentNotificationService.publishPaymentCancelledNotification(cancelledPayment)
 
         log.info("결제 취소: paymentId={}, orderId={}, userId={}", paymentId, payment.orderId, userId)
         return PaymentResponse.from(cancelledPayment)
@@ -127,6 +128,6 @@ class PaymentCommandServiceImpl(
             paymentEventService.publishPointEarnRequestEvent(payment)
             paymentEventService.publishMembershipUpdateEvent(payment)
         }
-        paymentEventService.publishPaymentCompletedNotification(payment)
+        paymentNotificationService.publishPaymentCompletedNotification(payment)
     }
 }

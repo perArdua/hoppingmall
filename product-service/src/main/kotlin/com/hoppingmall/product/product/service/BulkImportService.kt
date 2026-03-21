@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile
 
 @Service
 class BulkImportService(
+    private val bulkImportValidator: BulkImportValidator,
     private val csvParsingService: CsvParsingService,
     private val bulkImportJobRepository: BulkImportJobRepository,
     private val productRepository: ProductRepository,
@@ -45,42 +46,7 @@ class BulkImportService(
     }
 
     fun validate(file: MultipartFile): BulkValidationResponse {
-        val parseResult = csvParsingService.parse(file)
-        val errors = parseResult.errors.toMutableList()
-        val validRows = parseResult.rows
-
-        val categoryIds = validRows.map { it.categoryId }.distinct()
-        val existingCategoryIds = categoryRepository.findAllById(categoryIds).map { it.id!! }.toSet()
-        validRows.forEach { row ->
-            if (row.categoryId !in existingCategoryIds) {
-                errors.add(BulkRowError(row.rowNumber, "categoryId", "존재하지 않는 카테고리입니다: ${row.categoryId}"))
-            }
-        }
-
-        val errorRowNumbers = errors.filter { it.rowNumber > 0 }.map { it.rowNumber }.toSet()
-        val validRowNumbers = validRows.map { it.rowNumber }.toSet() - errorRowNumbers
-        val parseErrorRowNumbers = parseResult.errors.filter { it.rowNumber > 0 }.map { it.rowNumber }.toSet()
-
-        val preview = validRows.filter { it.rowNumber in validRowNumbers }.map { row ->
-            BulkProductPreview(
-                rowNumber = row.rowNumber,
-                name = row.name,
-                categoryId = row.categoryId,
-                price = row.price.toPlainString(),
-                stockQuantity = row.stockQuantity
-            )
-        }
-
-        val totalRows = validRows.size + parseErrorRowNumbers.size
-        val invalidRowCount = errorRowNumbers.size + parseErrorRowNumbers.size
-
-        return BulkValidationResponse(
-            totalRows = totalRows,
-            validRows = preview.size,
-            invalidRows = invalidRowCount,
-            errors = errors,
-            preview = preview
-        )
+        return bulkImportValidator.validate(file)
     }
 
     @Transactional

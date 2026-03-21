@@ -1,24 +1,19 @@
 package com.hoppingmall.payment.payment.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.payment.dto.event.MembershipUpdateRequestEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.payment.common.NotificationType
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
-import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 
 @Service
 class PaymentEventService(
     private val paymentEventPublisher: PaymentEventPublisher,
-    private val transactionalEventPublisher: TransactionalEventPublisher,
-    private val pointEarnRateStrategy: PointEarnRateStrategy,
-    private val objectMapper: ObjectMapper
+    private val pointEarnRateStrategy: PointEarnRateStrategy
 ) {
 
     fun publishPaymentCompletedEvent(payment: Payment) {
@@ -64,35 +59,6 @@ class PaymentEventService(
         paymentEventPublisher.publishMembershipUpdateEvent(event)
     }
 
-    fun publishPaymentCompletedNotification(payment: Payment) {
-        val eventId = payment.transactionId ?: "payment-${payment.id}"
-        val metadata = objectMapper.writeValueAsString(
-            mapOf(
-            "orderId" to payment.orderId,
-            "paymentId" to payment.id!!,
-            "amount" to payment.amount.toString(),
-            "method" to payment.method.toString(),
-            "transactionId" to payment.transactionId
-            )
-        )
-
-        transactionalEventPublisher.publishEvent(
-            aggregateType = "Payment",
-            aggregateId = payment.id!!.toString(),
-            eventType = "PaymentCompletedNotificationRequested",
-            eventData = mapOf(
-                "eventId" to eventId,
-                "userId" to payment.userId,
-                "type" to NotificationType.PAYMENT_COMPLETED.toString(),
-                "title" to "결제가 완료되었습니다",
-                "content" to "주문번호 ${payment.orderId}의 결제가 성공적으로 완료되었습니다. 결제 금액: ${payment.amount}원",
-                "metadata" to metadata
-            ),
-            topic = "notification",
-            partitionKey = payment.userId.toString()
-        )
-    }
-
     fun publishPaymentFailedEvent(payment: Payment) {
         val eventId = "payment-failed-${payment.id}"
         val event = PaymentFailedEvent(
@@ -117,61 +83,5 @@ class PaymentEventService(
             transactionId = payment.transactionId!!
         )
         paymentEventPublisher.publishPaymentCancelledEvent(event)
-    }
-
-    fun publishPaymentFailedNotification(payment: Payment) {
-        val eventId = "payment-failed-notification-${payment.id}"
-        val metadata = objectMapper.writeValueAsString(
-            mapOf(
-                "orderId" to payment.orderId,
-                "paymentId" to payment.id!!,
-                "amount" to payment.amount.toString(),
-                "reason" to (payment.errorMessage ?: "결제 실패")
-            )
-        )
-
-        transactionalEventPublisher.publishEvent(
-            aggregateType = "Payment",
-            aggregateId = payment.id!!.toString(),
-            eventType = "PaymentFailedNotificationRequested",
-            eventData = mapOf(
-                "eventId" to eventId,
-                "userId" to payment.userId,
-                "type" to NotificationType.PAYMENT_FAILED.toString(),
-                "title" to "결제가 실패했습니다",
-                "content" to "주문번호 ${payment.orderId}의 결제가 실패했습니다. 사유: ${payment.errorMessage ?: "결제 실패"}",
-                "metadata" to metadata
-            ),
-            topic = "notification",
-            partitionKey = payment.userId.toString()
-        )
-    }
-
-    fun publishPaymentCancelledNotification(payment: Payment) {
-        val eventId = "payment-cancelled-notification-${payment.id}"
-        val metadata = objectMapper.writeValueAsString(
-            mapOf(
-                "orderId" to payment.orderId,
-                "paymentId" to payment.id!!,
-                "amount" to payment.amount.toString(),
-                "transactionId" to payment.transactionId
-            )
-        )
-
-        transactionalEventPublisher.publishEvent(
-            aggregateType = "Payment",
-            aggregateId = payment.id!!.toString(),
-            eventType = "PaymentCancelledNotificationRequested",
-            eventData = mapOf(
-                "eventId" to eventId,
-                "userId" to payment.userId,
-                "type" to NotificationType.PAYMENT_CANCELLED.toString(),
-                "title" to "결제가 취소되었습니다",
-                "content" to "주문번호 ${payment.orderId}의 결제가 취소되었습니다. 취소 금액: ${payment.amount}원",
-                "metadata" to metadata
-            ),
-            topic = "notification",
-            partitionKey = payment.userId.toString()
-        )
     }
 }
