@@ -4,14 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.payment.common.NotificationType
 import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.payment.point.domain.Point
 import com.hoppingmall.payment.point.domain.PointHistory
 import com.hoppingmall.payment.point.domain.PointHistoryRepository
 import com.hoppingmall.payment.point.domain.PointRepository
 import com.hoppingmall.payment.point.enum.PointType
 import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -23,7 +21,8 @@ class PointEventConsumer(
     private val pointHistoryRepository: PointHistoryRepository,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper,
-    private val cacheManager: CacheManager
+    private val cacheManager: CacheManager,
+    private val pointDomainService: PointDomainService
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -37,7 +36,7 @@ class PointEventConsumer(
                 return
             }
 
-            val point = findOrCreatePoint(event.userId)
+            val point = pointDomainService.findOrCreatePoint(event.userId)
             point.balance += event.earnAmount
             val savedPoint = pointRepository.save(point)
             cacheManager.getCache("point-balance")?.evict(event.userId)
@@ -82,19 +81,6 @@ class PointEventConsumer(
         } catch (e: Exception) {
             log.error("포인트 적립 처리 실패: userId={}, orderId={}, 오류={}", event.userId, event.orderId, e.message)
             throw e
-        }
-    }
-
-    private fun findOrCreatePoint(userId: Long): Point {
-        return try {
-            pointRepository.findByUserIdForUpdate(userId)
-                ?: run {
-                    val newPoint = Point(userId = userId)
-                    pointRepository.save(newPoint)
-                }
-        } catch (e: DataIntegrityViolationException) {
-            pointRepository.findByUserIdForUpdate(userId)
-                ?: throw IllegalStateException("포인트 생성/조회 실패: 사용자 $userId")
         }
     }
 }

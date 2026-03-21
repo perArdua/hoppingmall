@@ -3,7 +3,7 @@ package com.hoppingmall.payment.config
 import com.hoppingmall.payment.config.kafka.TracingConsumerInterceptor
 import com.hoppingmall.payment.config.kafka.TracingProducerInterceptor
 import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
-import com.hoppingmall.payment.dlq.service.DLQService
+import com.hoppingmall.payment.dlq.service.DLQCommandService
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -26,7 +26,7 @@ import java.util.UUID
 @Configuration
 @Profile("!test")
 class KafkaConfig(
-    private val dlqService: DLQService
+    private val dlqCommandService: DLQCommandService
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -116,7 +116,7 @@ class KafkaConfig(
                     exception = exception.message,
                     timestamp = System.currentTimeMillis()
                 )
-                dlqService.saveDLQMessage(deadLetterMessage)
+                dlqCommandService.saveDLQMessage(deadLetterMessage)
             },
             FixedBackOff(1000L, 3)
         )

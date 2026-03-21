@@ -1,6 +1,5 @@
 package com.hoppingmall.payment.point.service
 
-import com.hoppingmall.payment.point.domain.Point
 import com.hoppingmall.payment.point.domain.PointHistory
 import com.hoppingmall.payment.point.domain.PointRepository
 import com.hoppingmall.payment.point.domain.PointHistoryRepository
@@ -17,12 +16,13 @@ import java.math.BigDecimal
 @Transactional
 class PointCommandServiceImpl(
     private val pointRepository: PointRepository,
-    private val pointHistoryRepository: PointHistoryRepository
+    private val pointHistoryRepository: PointHistoryRepository,
+    private val pointDomainService: PointDomainService
 ) : PointCommandService {
 
     @CacheEvict(cacheNames = ["point-balance"], key = "#userId")
     override fun usePoint(userId: Long, request: PointUseRequest): PointUseResponse {
-        val point = findOrCreatePoint(userId)
+        val point = pointDomainService.findOrCreatePoint(userId)
         validateSufficientBalance(point, request.amount)
 
         point.balance = point.balance.subtract(request.amount)
@@ -52,7 +52,7 @@ class PointCommandServiceImpl(
         val eventId = "refund-point-$paymentId-$orderId"
         if (pointHistoryRepository.existsByEventId(eventId)) return
 
-        val point = findOrCreatePoint(userId)
+        val point = pointDomainService.findOrCreatePoint(userId)
         point.balance = point.balance.add(amount)
         pointRepository.save(point)
 
@@ -68,22 +68,9 @@ class PointCommandServiceImpl(
         pointHistoryRepository.save(pointHistory)
     }
 
-    private fun validateSufficientBalance(point: Point, useAmount: BigDecimal) {
+    private fun validateSufficientBalance(point: com.hoppingmall.payment.point.domain.Point, useAmount: BigDecimal) {
         if (point.balance < useAmount) {
             throw PointInsufficientBalanceException()
-        }
-    }
-
-    private fun findOrCreatePoint(userId: Long): Point {
-        return try {
-            pointRepository.findByUserIdForUpdate(userId)
-                ?: run {
-                    val newPoint = Point(userId = userId)
-                    pointRepository.save(newPoint)
-                }
-        } catch (e: org.springframework.dao.DataIntegrityViolationException) {
-            pointRepository.findByUserIdForUpdate(userId)
-                ?: throw IllegalStateException("포인트 생성 실패: 사용자 $userId")
         }
     }
 }

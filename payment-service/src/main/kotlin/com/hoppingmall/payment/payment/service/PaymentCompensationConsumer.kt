@@ -1,8 +1,7 @@
 package com.hoppingmall.payment.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
-import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
+import com.hoppingmall.payment.payment.service.strategy.CompensationEventHandlerRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -11,6 +10,7 @@ import org.springframework.stereotype.Service
 class PaymentCompensationConsumer(
     private val compensationEventLogService: CompensationEventLogService,
     private val refundPointsService: RefundPointsService,
+    private val compensationEventHandlerRegistry: CompensationEventHandlerRegistry,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -21,16 +21,11 @@ class PaymentCompensationConsumer(
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
 
-        when (eventType) {
-            "PaymentFailed" -> {
-                val event = objectMapper.treeToValue(node, PaymentFailedEvent::class.java)
-                handlePaymentFailed(event)
-            }
-            "PaymentCancelled" -> {
-                val event = objectMapper.treeToValue(node, PaymentCancelledEvent::class.java)
-                handlePaymentCancelled(event)
-            }
-            else -> logger.warn("알 수 없는 보상 이벤트 타입: $eventType")
+        val handler = eventType?.let { compensationEventHandlerRegistry.getHandler(it) }
+        if (handler != null) {
+            handler.handle(node)
+        } else {
+            logger.warn("알 수 없는 보상 이벤트 타입: $eventType")
         }
     }
 
@@ -67,49 +62,6 @@ class PaymentCompensationConsumer(
             logger.info("결제 역보상 처리 완료: orderId=$orderId, paymentId=$paymentId")
         } catch (e: Exception) {
             logger.error("결제 역보상 처리 실패: $eventId, 오류: ${e.message}")
-            throw e
-        }
-    }
-
-    fun handlePaymentFailed(event: PaymentFailedEvent) {
-        try {
-            val log = compensationEventLogService.saveIfAbsent(
-                eventId = event.eventId,
-                compensationType = "PAYMENT_FAILED",
-                paymentId = event.paymentId,
-                orderId = event.orderId
-            )
-            if (log.isCompleted()) {
-                logger.info("이미 처리 완료된 보상 이벤트: ${event.eventId}")
-                return
-            }
-
-            compensationEventLogService.markCompleted(event.eventId)
-            logger.info("결제 실패 보상 처리 완료: orderId=${event.orderId}")
-        } catch (e: Exception) {
-            logger.error("결제 실패 보상 처리 실패: ${event.eventId}, 오류: ${e.message}")
-            throw e
-        }
-    }
-
-    fun handlePaymentCancelled(event: PaymentCancelledEvent) {
-        try {
-            val log = compensationEventLogService.saveIfAbsent(
-                eventId = event.eventId,
-                compensationType = "PAYMENT_CANCELLED",
-                paymentId = event.paymentId,
-                orderId = event.orderId
-            )
-            if (log.isCompleted()) {
-                logger.info("이미 처리 완료된 보상 이벤트: ${event.eventId}")
-                return
-            }
-
-            refundPointsService.refundPoints(event.userId, event.paymentId)
-            compensationEventLogService.markCompleted(event.eventId)
-            logger.info("결제 취소 보상 처리 완료: orderId=${event.orderId}")
-        } catch (e: Exception) {
-            logger.error("결제 취소 보상 처리 실패: ${event.eventId}, 오류: ${e.message}")
             throw e
         }
     }
