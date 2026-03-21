@@ -13,6 +13,8 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
 
     fun findByReservationId(reservationId: String): InventoryReservation?
 
+    fun findByReservationIdIn(reservationIds: List<String>): List<InventoryReservation>
+
     @Modifying(clearAutomatically = true)
     @Query("""
         UPDATE InventoryReservation r

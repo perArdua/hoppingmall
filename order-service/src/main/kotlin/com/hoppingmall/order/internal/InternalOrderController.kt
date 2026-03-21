@@ -8,6 +8,7 @@ import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -55,6 +56,7 @@ class InternalOrderController(
     }
 
     @PostMapping("/orders/{orderId}/cancel")
+    @Transactional
     fun cancelOrder(@PathVariable orderId: Long): ResponseEntity<Void> {
         val order = orderRepository.findById(orderId).orElse(null)
             ?: return ResponseEntity.notFound().build()

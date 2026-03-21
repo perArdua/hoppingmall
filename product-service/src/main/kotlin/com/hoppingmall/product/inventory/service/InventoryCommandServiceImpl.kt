@@ -95,6 +95,13 @@ class InventoryCommandServiceImpl(
         )
 
         if (updatedCount != reservationIds.size) {
+            val reservations = inventoryReservationRepository.findByReservationIdIn(reservationIds)
+            val allConfirmed = reservations.size == reservationIds.size &&
+                reservations.all { it.status == ReservationStatus.CONFIRMED }
+            if (allConfirmed) {
+                return true
+            }
+
             if (updatedCount > 0) {
                 inventoryReservationRepository.batchUpdateStatusByCas(
                     reservationIds = reservationIds,
