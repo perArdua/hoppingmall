@@ -2,7 +2,7 @@ package com.hoppingmall.payment.coupon.domain
 
 import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.DiscountType
-import com.hoppingmall.payment.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 import org.hibernate.annotations.Filter
 import java.math.BigDecimal

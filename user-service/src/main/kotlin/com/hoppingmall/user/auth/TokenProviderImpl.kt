@@ -1,7 +1,7 @@
 package com.hoppingmall.user.auth
 
 import com.hoppingmall.user.auth.exception.InvalidTokenException
-import com.hoppingmall.user.common.UserPrincipal
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.user.common.enums.Role
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts

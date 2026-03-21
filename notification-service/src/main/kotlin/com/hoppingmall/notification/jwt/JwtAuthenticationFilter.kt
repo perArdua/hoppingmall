@@ -1,6 +1,6 @@
 package com.hoppingmall.notification.jwt
 
-import com.hoppingmall.notification.common.UserPrincipal
+import com.hoppingmall.common.UserPrincipal
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse

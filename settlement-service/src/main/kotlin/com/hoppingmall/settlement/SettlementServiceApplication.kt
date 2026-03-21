@@ -4,7 +4,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableScheduling
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = ["com.hoppingmall.settlement", "com.hoppingmall.common"])
 @EnableScheduling
 class SettlementServiceApplication
 

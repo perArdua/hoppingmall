@@ -1,6 +1,6 @@
 package com.hoppingmall.user.auth
 
-import com.hoppingmall.user.common.UserPrincipal
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.user.common.enums.Role
 
 interface TokenProvider {

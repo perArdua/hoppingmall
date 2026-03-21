@@ -1,6 +1,6 @@
 package com.hoppingmall.product.category.exception.code
 
-import com.hoppingmall.product.common.ErrorCode
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 enum class CategoryErrorCode(

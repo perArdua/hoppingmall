@@ -1,7 +1,7 @@
 package com.hoppingmall.settlement.controller
 
-import com.hoppingmall.settlement.common.ApiResponse
-import com.hoppingmall.settlement.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.settlement.dto.request.CreateSettlementRequest
 import com.hoppingmall.settlement.dto.response.SettlementDetailResponse
 import com.hoppingmall.settlement.dto.response.SettlementResponse

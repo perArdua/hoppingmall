@@ -1,5 +1,6 @@
 package com.hoppingmall.product.config
 
+import com.hoppingmall.common.config.InternalTokenFilter
 import com.hoppingmall.product.jwt.JwtAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

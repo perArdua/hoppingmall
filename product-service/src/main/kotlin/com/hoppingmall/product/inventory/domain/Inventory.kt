@@ -1,6 +1,6 @@
 package com.hoppingmall.product.inventory.domain
 
-import com.hoppingmall.product.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockException
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

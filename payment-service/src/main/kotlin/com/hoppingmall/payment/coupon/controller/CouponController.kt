@@ -6,8 +6,8 @@ import com.hoppingmall.payment.coupon.dto.response.UserCouponResponse
 import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.service.CouponCommandService
 import com.hoppingmall.payment.coupon.service.CouponQueryService
-import com.hoppingmall.payment.common.UserPrincipal
-import com.hoppingmall.payment.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice

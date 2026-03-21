@@ -1,7 +1,7 @@
 package com.hoppingmall.payment.internal
 
-import com.hoppingmall.payment.common.BusinessException
-import com.hoppingmall.payment.common.ErrorCode
+import com.hoppingmall.common.BusinessException
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 class DistributedLockException : BusinessException(DistributedLockErrorCode.LOCK_ACQUISITION_FAILED)

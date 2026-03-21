@@ -1,6 +1,6 @@
 package com.hoppingmall.order.jwt
 
-import com.hoppingmall.order.common.UserPrincipal
+import com.hoppingmall.common.UserPrincipal
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse

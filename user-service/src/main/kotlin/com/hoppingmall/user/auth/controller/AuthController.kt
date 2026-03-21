@@ -3,7 +3,7 @@ package com.hoppingmall.user.auth.controller
 import com.hoppingmall.user.auth.dto.TokenRefreshRequest
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
 import com.hoppingmall.user.auth.service.AuthService
-import com.hoppingmall.user.common.ApiResponse
+import com.hoppingmall.common.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*

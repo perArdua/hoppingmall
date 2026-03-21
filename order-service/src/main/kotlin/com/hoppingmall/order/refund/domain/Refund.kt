@@ -1,6 +1,6 @@
 package com.hoppingmall.order.refund.domain
 
-import com.hoppingmall.order.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.refund.exception.RefundInvalidStatusException

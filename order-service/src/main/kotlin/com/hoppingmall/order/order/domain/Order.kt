@@ -1,6 +1,6 @@
 package com.hoppingmall.order.order.domain
 
-import com.hoppingmall.order.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import jakarta.persistence.*

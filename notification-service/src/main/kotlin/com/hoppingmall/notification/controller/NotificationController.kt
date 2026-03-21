@@ -1,7 +1,7 @@
 package com.hoppingmall.notification.controller
 
-import com.hoppingmall.notification.common.ApiResponse
-import com.hoppingmall.notification.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.notification.dto.response.NotificationResponse
 import com.hoppingmall.notification.dto.response.UnreadCountResponse
 import com.hoppingmall.notification.enums.NotificationType

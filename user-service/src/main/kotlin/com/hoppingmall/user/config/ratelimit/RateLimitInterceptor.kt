@@ -1,6 +1,6 @@
 package com.hoppingmall.user.config.ratelimit
 
-import com.hoppingmall.user.common.UserPrincipal
+import com.hoppingmall.common.UserPrincipal
 import io.github.bucket4j.Bandwidth
 import io.github.bucket4j.BucketConfiguration
 import io.github.bucket4j.distributed.proxy.ProxyManager

@@ -1,6 +1,6 @@
 package com.hoppingmall.product.product.exception
 
-import com.hoppingmall.product.common.BusinessException
+import com.hoppingmall.common.BusinessException
 import com.hoppingmall.product.product.exception.code.ProductErrorCode
 
 open class ProductException(

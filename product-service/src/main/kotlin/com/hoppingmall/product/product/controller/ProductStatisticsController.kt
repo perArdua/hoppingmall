@@ -1,6 +1,6 @@
 package com.hoppingmall.product.product.controller
 
-import com.hoppingmall.product.common.ApiResponse
+import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.product.product.dto.response.*
 import com.hoppingmall.product.product.service.ProductStatisticsQueryService
 import org.springframework.data.domain.Page

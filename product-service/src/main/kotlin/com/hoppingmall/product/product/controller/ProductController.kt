@@ -1,6 +1,6 @@
 package com.hoppingmall.product.product.controller
 
-import com.hoppingmall.product.common.ApiResponse
+import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import com.hoppingmall.product.product.dto.request.ProductSearchCondition

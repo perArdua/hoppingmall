@@ -1,6 +1,6 @@
 package com.hoppingmall.order.refund.domain
 
-import com.hoppingmall.order.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index

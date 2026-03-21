@@ -1,4 +1,6 @@
 spring:
+  main:
+    allow-bean-definition-overriding: true
   kafka:
     bootstrap-servers: kafka.hoppingmall.svc.cluster.local:29092
     consumer:
@@ -20,6 +22,8 @@ spring:
       ddl-auto: update
   data:
     redis:
+      host: redis.hoppingmall.svc.cluster.local
+      port: 6379
       redisson:
         config: |
           singleServerConfig:

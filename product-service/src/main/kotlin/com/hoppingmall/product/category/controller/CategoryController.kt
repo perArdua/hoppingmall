@@ -6,7 +6,7 @@ import com.hoppingmall.product.category.dto.response.CategoryResponse
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import com.hoppingmall.product.category.service.CategoryCommandService
 import com.hoppingmall.product.category.service.CategoryQueryService
-import com.hoppingmall.product.common.ApiResponse
+import com.hoppingmall.common.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

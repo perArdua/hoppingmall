@@ -1,6 +1,6 @@
 package com.hoppingmall.user.domain
 
-import com.hoppingmall.user.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 import org.hibernate.annotations.Filter
 

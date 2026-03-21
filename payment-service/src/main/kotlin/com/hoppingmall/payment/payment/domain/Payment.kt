@@ -1,6 +1,6 @@
 package com.hoppingmall.payment.payment.domain
 
-import com.hoppingmall.payment.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import jakarta.persistence.*

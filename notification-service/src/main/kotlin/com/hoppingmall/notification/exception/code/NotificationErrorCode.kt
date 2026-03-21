@@ -1,6 +1,6 @@
 package com.hoppingmall.notification.exception.code
 
-import com.hoppingmall.notification.common.ErrorCode
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 enum class NotificationErrorCode(

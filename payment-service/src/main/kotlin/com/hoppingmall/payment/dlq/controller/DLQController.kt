@@ -1,6 +1,6 @@
 package com.hoppingmall.payment.dlq.controller
 
-import com.hoppingmall.payment.common.ApiResponse
+import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.payment.dlq.domain.DLQMessage
 import com.hoppingmall.payment.dlq.domain.DLQStatus
 import com.hoppingmall.payment.dlq.service.DLQCommandService
