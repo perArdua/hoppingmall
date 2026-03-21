@@ -38,6 +38,15 @@ class Product private constructor(
 
 ): BaseEntity() {
 
+    fun update(name: String, description: String, price: BigDecimal, categoryId: Long, status: ProductStatus) {
+        require(price > BigDecimal.ZERO) { "가격은 0보다 커야 합니다" }
+        this.name = name
+        this.description = description
+        this.price = price
+        this.categoryId = categoryId
+        this.status = status
+    }
+
     companion object {
         fun create(
             sellerId: Long,

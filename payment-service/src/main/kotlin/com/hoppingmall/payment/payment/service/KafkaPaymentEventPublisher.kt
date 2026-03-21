@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.payment.service
 
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.payment.dto.event.MembershipUpdateRequestEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
@@ -29,7 +30,7 @@ class KafkaPaymentEventPublisher(
                 "transactionId" to event.transactionId,
                 "completedAt" to event.completedAt
             ),
-            topic = "payment",
+            topic = KafkaTopics.PAYMENT,
             partitionKey = event.paymentId.toString()
         )
     }
@@ -47,7 +48,7 @@ class KafkaPaymentEventPublisher(
                 "earnAmount" to event.earnAmount,
                 "reason" to (event.reason ?: "결제 완료 적립")
             ),
-            topic = "point-earn-request",
+            topic = KafkaTopics.POINT_EARN_REQUEST,
             partitionKey = event.userId.toString()
         )
     }
@@ -64,7 +65,7 @@ class KafkaPaymentEventPublisher(
                 "paymentId" to event.paymentId,
                 "amount" to event.amount
             ),
-            topic = "membership-update-request",
+            topic = KafkaTopics.MEMBERSHIP_UPDATE_REQUEST,
             partitionKey = event.userId.toString()
         )
     }
@@ -82,7 +83,7 @@ class KafkaPaymentEventPublisher(
                 "amount" to event.amount,
                 "reason" to event.reason
             ),
-            topic = "payment-compensation",
+            topic = KafkaTopics.PAYMENT_COMPENSATION,
             partitionKey = event.orderId.toString()
         )
     }
@@ -100,7 +101,7 @@ class KafkaPaymentEventPublisher(
                 "amount" to event.amount,
                 "transactionId" to event.transactionId
             ),
-            topic = "payment-compensation",
+            topic = KafkaTopics.PAYMENT_COMPENSATION,
             partitionKey = event.orderId.toString()
         )
     }

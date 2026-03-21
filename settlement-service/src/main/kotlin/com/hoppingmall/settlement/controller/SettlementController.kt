@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -26,7 +27,7 @@ class SettlementController(
 
     @PostMapping("/api/v1/admin/settlements")
     fun createSettlement(
-        @RequestBody request: CreateSettlementRequest
+        @Valid @RequestBody request: CreateSettlementRequest
     ): ResponseEntity<ApiResponse<SettlementResponse>> {
         val result = settlementCommandService.createSettlement(request)
         return ResponseEntity.ok(ApiResponse.success(result))

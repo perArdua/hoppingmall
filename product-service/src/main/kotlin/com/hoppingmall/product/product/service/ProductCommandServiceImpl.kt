@@ -61,11 +61,13 @@ class ProductCommandServiceImpl(
         val product = productRepository.findById(productId)
             .orElseThrow { ProductNotFoundException() }
 
-        product.categoryId = request.categoryId
-        product.name = request.name
-        product.description = request.description
-        product.price = request.price
-        product.status = request.status
+        product.update(
+            name = request.name,
+            description = request.description,
+            price = request.price,
+            categoryId = request.categoryId,
+            status = request.status
+        )
 
         val updatedProduct = productRepository.save(product)
 

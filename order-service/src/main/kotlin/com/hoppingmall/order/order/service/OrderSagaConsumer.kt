@@ -6,6 +6,7 @@ import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.TransactionalEventPublisherPort
@@ -27,7 +28,7 @@ class OrderSagaConsumer(
 ) {
     private val logger = LoggerFactory.getLogger(OrderSagaConsumer::class.java)
 
-    @KafkaListener(topics = ["payment"], groupId = "order-saga-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "order-saga-service")
     fun handlePaymentCompleted(message: String) {
         val event = objectMapper.readValue(message, PaymentCompletedEvent::class.java)
         val eventId = "payment-completed-${event.transactionId}"
@@ -122,7 +123,7 @@ class OrderSagaConsumer(
                 "userId" to event.userId,
                 "reason" to "RESERVATION_EXPIRED"
             ),
-            topic = "payment-reversal",
+            topic = KafkaTopics.PAYMENT_REVERSAL,
             partitionKey = event.orderId.toString()
         )
 
@@ -139,7 +140,7 @@ class OrderSagaConsumer(
         return orderItems.mapNotNull { it.reservationId }
     }
 
-    @KafkaListener(topics = ["payment-compensation"], groupId = "order-saga-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "order-saga-service")
     fun handlePaymentCompensation(message: String) {
         val node = objectMapper.readTree(message)
         val eventId = node.get("eventId")?.asText() ?: return

@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.redis.core.RedisTemplate
+import com.hoppingmall.common.KafkaTopics
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
@@ -27,7 +28,7 @@ class NotificationEventConsumer(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @KafkaListener(topics = ["notification"], groupId = "notification-service")
+    @KafkaListener(topics = [KafkaTopics.NOTIFICATION], groupId = "notification-service")
     fun handleNotificationEvent(
         @Payload event: Map<String, Any>
     ) {

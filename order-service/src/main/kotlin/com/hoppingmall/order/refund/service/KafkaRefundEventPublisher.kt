@@ -1,5 +1,6 @@
 package com.hoppingmall.order.refund.service
 
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.port.TransactionalEventPublisherPort
 import com.hoppingmall.order.refund.dto.event.RefundCompletedEvent
 import org.springframework.stereotype.Component
@@ -25,7 +26,7 @@ class KafkaRefundEventPublisher(
                 "pointRefundAmount" to event.pointRefundAmount,
                 "isFullRefund" to event.isFullRefund
             ),
-            topic = "refund-completion",
+            topic = KafkaTopics.REFUND_COMPLETION,
             partitionKey = event.refundId.toString()
         )
     }

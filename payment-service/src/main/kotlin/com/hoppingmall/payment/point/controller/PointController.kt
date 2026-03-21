@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.point.controller
 
+import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.payment.point.dto.request.PointUseRequest
 import com.hoppingmall.payment.point.dto.response.PointBalanceResponse
 import com.hoppingmall.payment.point.dto.response.PointHistoryResponse
@@ -9,7 +10,6 @@ import com.hoppingmall.payment.point.service.PointQueryService
 import jakarta.validation.Valid
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Slice
-import org.springframework.http.ResponseEntity
 import com.hoppingmall.common.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -26,10 +26,10 @@ class PointController(
     @GetMapping("/my-balance")
     fun getMyPointBalance(
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ResponseEntity<PointBalanceResponse> {
+    ): ApiResponse<PointBalanceResponse> {
         val userId = principal.getUserId()
         val balance = pointQueryService.getPointBalance(userId)
-        return ResponseEntity.ok(balance)
+        return ApiResponse.success(balance)
     }
 
     @GetMapping("/my-history")
@@ -37,20 +37,20 @@ class PointController(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<Slice<PointHistoryResponse>> {
+    ): ApiResponse<Slice<PointHistoryResponse>> {
         val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         val history = pointQueryService.getPointHistory(userId, pageable)
-        return ResponseEntity.ok(history)
+        return ApiResponse.success(history)
     }
 
     @PostMapping("/use")
     fun usePoint(
         @Valid @RequestBody request: PointUseRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ResponseEntity<PointUseResponse> {
+    ): ApiResponse<PointUseResponse> {
         val userId = principal.getUserId()
         val result = pointCommandService.usePoint(userId, request)
-        return ResponseEntity.ok(result)
+        return ApiResponse.success(result)
     }
 }

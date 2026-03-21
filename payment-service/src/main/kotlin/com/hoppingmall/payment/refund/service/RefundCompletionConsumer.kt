@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.payment.port.InventoryCommandPort
 import com.hoppingmall.payment.port.OrderCommandPort
 import com.hoppingmall.payment.port.ProductStatisticsPort
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.refund.domain.RefundEventLog
 import com.hoppingmall.payment.refund.domain.repository.RefundEventLogRepository
 import com.hoppingmall.payment.refund.dto.event.RefundCompletedEvent
@@ -26,7 +27,7 @@ class RefundCompletionConsumer(
 
     private val logger = LoggerFactory.getLogger(RefundCompletionConsumer::class.java)
 
-    @KafkaListener(topics = ["refund-completion"], groupId = "refund-completion-service")
+    @KafkaListener(topics = [KafkaTopics.REFUND_COMPLETION], groupId = "refund-completion-service")
     fun handleRefundCompletionEvent(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
