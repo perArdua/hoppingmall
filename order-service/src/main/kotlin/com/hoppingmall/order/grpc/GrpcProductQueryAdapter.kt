@@ -33,7 +33,8 @@ class GrpcProductQueryAdapter(
             id = response.id,
             name = response.name,
             price = response.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-            sellerId = response.sellerId
+            sellerId = response.sellerId,
+            imageUrl = response.imageUrl.takeIf { it.isNotBlank() }
         )
     }
 
@@ -53,15 +54,6 @@ class GrpcProductQueryAdapter(
         }
     }
 
-    @CircuitBreaker(name = "product-query", fallbackMethod = "findProductImageUrlFallback")
-    @Retry(name = "product-query")
-    override fun findProductImageUrl(productId: Long): String? {
-        val response = stub.findProductImageUrl(
-            ProductIdRequest.newBuilder().setProductId(productId).build()
-        )
-        return if (response.found) response.imageUrl else null
-    }
-
     private fun findProductByIdFallback(productId: Long, e: Exception): ProductInfo? {
         if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
         log.warn("CB fallback: 상품 조회 실패 productId=$productId", e)
@@ -71,10 +63,5 @@ class GrpcProductQueryAdapter(
     private fun findProductsByIdsFallback(productIds: List<Long>, e: Exception): List<ProductInfo> {
         log.warn("CB fallback: 상품 목록 조회 실패 productIds=$productIds", e)
         return emptyList()
-    }
-
-    private fun findProductImageUrlFallback(productId: Long, e: Exception): String? {
-        log.warn("CB fallback: 상품 이미지 URL 조회 실패 productId=$productId", e)
-        return null
     }
 }

@@ -24,13 +24,12 @@ class CartItemCommandServiceImpl(
         val product = productQueryPort.findProductById(request.productId)
             ?: throw CartItemProductNotFoundException()
 
-        val productImageUrl = productQueryPort.findProductImageUrl(request.productId)
         val existingCartItem = cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)
 
         val cartItem = if (existingCartItem != null) {
             updateExistingCartItem(existingCartItem, request.quantity)
         } else {
-            createNewCartItem(buyerId, product, productImageUrl, request.quantity)
+            createNewCartItem(buyerId, product, product.imageUrl, request.quantity)
         }
 
         return CartItemResponse.from(cartItem)
