@@ -4,16 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.payment.payment.domain.PaymentEventLog
 import com.hoppingmall.payment.payment.domain.repository.PaymentEventLogRepository
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
-import com.hoppingmall.payment.payment.enum.PaymentMethod
+import com.hoppingmall.payment.payment.service.strategy.PaymentMethodProcessorRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
-import java.math.BigDecimal
 
 @Service
 class PaymentEventConsumer(
     private val paymentEventLogRepository: PaymentEventLogRepository,
+    private val paymentMethodProcessorRegistry: PaymentMethodProcessorRegistry,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -54,20 +54,7 @@ class PaymentEventConsumer(
     }
 
     private fun processPayment(paymentEvent: PaymentCompletedEvent) {
-        when (paymentEvent.method) {
-            PaymentMethod.CREDIT_CARD -> processCreditCardPayment(paymentEvent)
-            PaymentMethod.BANK_TRANSFER -> processBankTransferPayment(paymentEvent)
-        }
-    }
-
-    private fun processCreditCardPayment(paymentEvent: PaymentCompletedEvent) {
-        if (paymentEvent.amount > BigDecimal("1000000")) {
-            throw RuntimeException("대금액 결제는 별도 승인이 필요합니다")
-        }
-        logger.info("신용카드 결제 처리: ${paymentEvent.orderId}")
-    }
-
-    private fun processBankTransferPayment(paymentEvent: PaymentCompletedEvent) {
-        logger.info("계좌이체 결제 처리: ${paymentEvent.orderId}")
+        val processor = paymentMethodProcessorRegistry.getProcessor(paymentEvent.method)
+        processor.process(paymentEvent)
     }
 }

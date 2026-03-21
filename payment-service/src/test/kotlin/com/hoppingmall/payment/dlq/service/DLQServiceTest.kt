@@ -17,7 +17,7 @@ import org.mockito.kotlin.*
 import org.springframework.kafka.core.KafkaTemplate
 import java.util.*
 
-@DisplayName("DLQService")
+@DisplayName("DLQCommandService")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 @ExtendWith(MockitoExtension::class)
 class DLQServiceTest {
@@ -29,7 +29,7 @@ class DLQServiceTest {
     private lateinit var kafkaTemplate: KafkaTemplate<String, Any>
 
     @InjectMocks
-    private lateinit var dlqService: DLQService
+    private lateinit var dlqCommandService: DLQCommandService
 
     private fun createDeadLetterMessage(
         topic: String = "test-topic",
@@ -92,7 +92,7 @@ class DLQServiceTest {
             deadLetterMessage.originalOffset
         )).thenReturn(false)
 
-        dlqService.saveDLQMessage(deadLetterMessage)
+        dlqCommandService.saveDLQMessage(deadLetterMessage)
 
         verify(dlqMessageRepository).save(any<DLQMessage>())
     }
@@ -106,7 +106,7 @@ class DLQServiceTest {
             deadLetterMessage.originalOffset
         )).thenReturn(true)
 
-        dlqService.saveDLQMessage(deadLetterMessage)
+        dlqCommandService.saveDLQMessage(deadLetterMessage)
 
         verify(dlqMessageRepository, never()).save(any<DLQMessage>())
     }
@@ -123,7 +123,7 @@ class DLQServiceTest {
         whenever(dlqMessageRepository.findById(dlqMessageId))
             .thenReturn(Optional.of(dlqMessage))
 
-        val result = dlqService.retryDLQMessage(dlqMessageId)
+        val result = dlqCommandService.retryDLQMessage(dlqMessageId)
 
         assertTrue(result)
         verify(kafkaTemplate).send(
@@ -147,7 +147,7 @@ class DLQServiceTest {
         whenever(dlqMessageRepository.findById(dlqMessageId))
             .thenReturn(Optional.of(dlqMessage))
 
-        val result = dlqService.retryDLQMessage(dlqMessageId)
+        val result = dlqCommandService.retryDLQMessage(dlqMessageId)
 
         assertFalse(result)
         assertEquals(DLQStatus.FAILED, dlqMessage.status)

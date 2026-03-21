@@ -5,28 +5,25 @@ import com.hoppingmall.payment.dlq.domain.DLQStatus
 import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
 import com.hoppingmall.payment.dlq.domain.repository.DLQMessageRepository
 import org.slf4j.LoggerFactory
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 @Transactional
-class DLQService(
+class DLQCommandService(
     private val dlqMessageRepository: DLQMessageRepository,
     private val kafkaTemplate: KafkaTemplate<String, Any>
 ) {
 
-    private val logger = LoggerFactory.getLogger(DLQService::class.java)
+    private val logger = LoggerFactory.getLogger(DLQCommandService::class.java)
 
     private val processingMessages = ConcurrentHashMap<String, Boolean>()
 
     companion object {
         private const val MAX_RETRY_COUNT = 3
-        private const val AUTO_RETRY_BATCH_SIZE = 20
     }
 
     fun saveDLQMessage(deadLetterMessage: DeadLetterMessage) {
@@ -70,45 +67,6 @@ class DLQService(
             logger.error("DLQ 메시지 저장 실패: topic={}, error={}", deadLetterMessage.originalTopic, e.message, e)
             throw e
         }
-    }
-
-    @Transactional(readOnly = true)
-    fun getDLQMessages(topic: String, page: Int = 0, size: Int = 100): Page<DLQMessage> {
-        val pageable = PageRequest.of(page, size)
-        return dlqMessageRepository.findByOriginalTopicOrderByCreatedAtDesc(topic, pageable)
-    }
-
-    @Transactional(readOnly = true)
-    fun getDLQMessagesByStatus(status: DLQStatus, page: Int = 0, size: Int = 100): Page<DLQMessage> {
-        val pageable = PageRequest.of(page, size)
-        return dlqMessageRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
-    }
-
-    @Transactional(readOnly = true)
-    fun getDLQStats(): Map<String, Any> {
-        val totalCount = dlqMessageRepository.count()
-        val pendingCount = dlqMessageRepository.countByStatus(DLQStatus.PENDING)
-        val processedCount = dlqMessageRepository.countByStatus(DLQStatus.PROCESSED)
-        val failedCount = dlqMessageRepository.countByStatus(DLQStatus.FAILED)
-
-        val topicStats = dlqMessageRepository.getDLQStatsByTopic()
-
-        return mapOf(
-            "totalMessages" to totalCount,
-            "pendingCount" to pendingCount,
-            "processedCount" to processedCount,
-            "failedCount" to failedCount,
-            "topicStats" to topicStats.map { stats ->
-                mapOf(
-                    "topic" to stats.topic,
-                    "total" to stats.totalCount,
-                    "pending" to stats.pendingCount,
-                    "processed" to stats.processedCount,
-                    "failed" to stats.failedCount
-                )
-            },
-            "lastUpdated" to System.currentTimeMillis()
-        )
     }
 
     fun retryDLQMessage(dlqMessageId: Long): Boolean {
@@ -217,33 +175,7 @@ class DLQService(
         return deleteCount
     }
 
-    @Scheduled(fixedDelay = 30_000)
-    fun autoRetryPendingMessages() {
-        val now = System.currentTimeMillis()
-        val pageable = PageRequest.of(0, AUTO_RETRY_BATCH_SIZE)
-        val retryableMessages = dlqMessageRepository.findAutoRetryableMessages(
-            DLQStatus.PENDING, MAX_RETRY_COUNT, now, pageable
-        )
-
-        if (retryableMessages.isEmpty) return
-
-        logger.info("DLQ 자동 재처리 시작: {} 건", retryableMessages.content.size)
-
-        var successCount = 0
-        var failureCount = 0
-
-        retryableMessages.content.forEach { message ->
-            if (retryDLQMessage(message.id!!)) {
-                successCount++
-            } else {
-                failureCount++
-            }
-        }
-
-        logger.info("DLQ 자동 재처리 완료: 성공={}, 실패={}", successCount, failureCount)
-    }
-
-    private fun reconstructOriginalMessage(dlqMessage: DLQMessage): Any? {
+    fun reconstructOriginalMessage(dlqMessage: DLQMessage): Any? {
         return try {
             dlqMessage.originalValue?.let { value ->
                 when {
