@@ -17,7 +17,8 @@ import java.time.LocalDateTime
         )
     ],
     indexes = [
-        Index(name = "idx_settlement_summaries_seller_id", columnList = "sellerId")
+        Index(name = "idx_settlement_summaries_seller_id", columnList = "sellerId"),
+        Index(name = "idx_settlement_summaries_status", columnList = "status")
     ]
 )
 class SettlementSummary(
