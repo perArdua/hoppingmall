@@ -5,6 +5,7 @@ COPY gradlew ./
 COPY gradle ./gradle
 COPY build.gradle.kts settings.gradle.kts ./
 COPY src ./src
+COPY hoppingmall-common /hoppingmall-common
 RUN chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
