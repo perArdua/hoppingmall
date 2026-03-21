@@ -12,17 +12,21 @@ import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 
 @Service
-@Transactional
 class PaymentCommandServiceImpl(
     private val paymentRepository: PaymentRepository,
     private val paymentService: PaymentService,
     private val paymentEventService: PaymentEventService,
-    private val couponCommandService: CouponCommandService
+    private val couponCommandService: CouponCommandService,
+    transactionManager: PlatformTransactionManager
 ) : PaymentCommandService {
+
+    private val transactionTemplate = TransactionTemplate(transactionManager)
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -30,54 +34,60 @@ class PaymentCommandServiceImpl(
         var couponDiscountAmount = BigDecimal.ZERO
         var couponId: Long? = null
 
-        if (paymentRequest.couponId != null) {
-            couponDiscountAmount = couponCommandService.useCoupon(
+        val savedPayment = transactionTemplate.execute {
+            if (paymentRequest.couponId != null) {
+                couponDiscountAmount = couponCommandService.useCoupon(
+                    userId = userId,
+                    couponId = paymentRequest.couponId,
+                    orderAmount = paymentRequest.amount,
+                    orderId = paymentRequest.orderId
+                )
+                couponId = paymentRequest.couponId
+            }
+
+            val payment = Payment.create(
+                orderId = paymentRequest.orderId,
                 userId = userId,
-                couponId = paymentRequest.couponId,
-                orderAmount = paymentRequest.amount,
-                orderId = paymentRequest.orderId
+                amount = paymentRequest.amount.subtract(couponDiscountAmount),
+                method = paymentRequest.method,
+                pointAmount = paymentRequest.pointAmount,
+                couponId = couponId,
+                couponDiscountAmount = couponDiscountAmount
             )
-            couponId = paymentRequest.couponId
-        }
 
-        val payment = Payment.create(
-            orderId = paymentRequest.orderId,
-            userId = userId,
-            amount = paymentRequest.amount.subtract(couponDiscountAmount),
-            method = paymentRequest.method,
-            pointAmount = paymentRequest.pointAmount,
-            couponId = couponId,
-            couponDiscountAmount = couponDiscountAmount
-        )
-
-        val savedPayment = paymentRepository.save(payment)
+            paymentRepository.save(payment)
+        }!!
 
         val paymentResult = paymentService.processPayment(savedPayment)
 
-        val updatedPayment = updatePaymentWithResult(savedPayment, paymentResult)
+        val finalPayment = transactionTemplate.execute {
+            val updatedPayment = updatePaymentWithResult(savedPayment, paymentResult)
+            val saved = paymentRepository.save(updatedPayment)
 
-        val finalPayment = paymentRepository.save(updatedPayment)
-
-        if (finalPayment.status == PaymentStatus.SUCCESS) {
-            log.info("결제 성공: paymentId={}, orderId={}, userId={}, amount={}", finalPayment.id, finalPayment.orderId, userId, finalPayment.amount)
-            publishPaymentEvents(finalPayment)
-        }
-
-        if (finalPayment.status == PaymentStatus.FAILED) {
-            log.warn("결제 실패: paymentId={}, orderId={}, userId={}, error={}", finalPayment.id, finalPayment.orderId, userId, finalPayment.errorMessage)
-            if (couponId != null) {
-                couponCommandService.restoreCouponByPayment(couponId, userId)
+            if (saved.status == PaymentStatus.SUCCESS) {
+                log.info("결제 성공: paymentId={}, orderId={}, userId={}, amount={}", saved.id, saved.orderId, userId, saved.amount)
+                publishPaymentEvents(saved)
             }
-            paymentEventService.publishPaymentFailedEvent(finalPayment)
-            paymentEventService.publishPaymentFailedNotification(finalPayment)
-        }
+
+            if (saved.status == PaymentStatus.FAILED) {
+                log.warn("결제 실패: paymentId={}, orderId={}, userId={}, error={}", saved.id, saved.orderId, userId, saved.errorMessage)
+                if (couponId != null) {
+                    couponCommandService.restoreCouponByPayment(couponId!!, userId)
+                }
+                paymentEventService.publishPaymentFailedEvent(saved)
+                paymentEventService.publishPaymentFailedNotification(saved)
+            }
+
+            saved
+        }!!
 
         return PaymentResponse.from(finalPayment)
     }
 
+    @Transactional
     override fun cancelPayment(paymentId: Long, userId: Long): PaymentResponse {
-        val payment = paymentRepository.findById(paymentId)
-            .orElseThrow { PaymentNotFoundException() }
+        val payment = paymentRepository.findByIdForUpdate(paymentId)
+            ?: throw PaymentNotFoundException()
 
         if (payment.userId != userId) {
             throw PaymentAccessDeniedException()

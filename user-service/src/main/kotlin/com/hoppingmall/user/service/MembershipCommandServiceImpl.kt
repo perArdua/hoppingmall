@@ -26,7 +26,7 @@ class MembershipCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["membership"], key = "#userId")
     override fun addPurchaseAmount(userId: Long, amount: BigDecimal): MembershipResponse {
-        val membership = membershipRepository.findByUserId(userId)
+        val membership = membershipRepository.findByUserIdForUpdate(userId)
             ?: membershipRepository.save(Membership.create(userId))
         membership.addPurchaseAmount(amount)
         val saved = membershipRepository.save(membership)
