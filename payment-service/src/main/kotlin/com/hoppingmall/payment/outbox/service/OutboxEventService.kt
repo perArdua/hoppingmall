@@ -7,7 +7,6 @@ import com.hoppingmall.payment.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
-import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -91,7 +90,6 @@ class OutboxEventService(
         }
     }
 
-    @Async
     @Transactional
     fun publishEvent(eventId: Long) {
         var event: OutboxEvent? = null

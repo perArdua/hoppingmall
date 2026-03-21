@@ -1,10 +1,6 @@
 package com.hoppingmall.payment.refund.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.hoppingmall.payment.coupon.service.CouponCommandService
-import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
-import com.hoppingmall.payment.payment.enum.PaymentStatus
-import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.port.InventoryCommandPort
 import com.hoppingmall.payment.port.OrderCommandPort
 import com.hoppingmall.payment.port.ProductStatisticsPort
@@ -16,15 +12,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
 @Service
 class RefundCompletionConsumer(
     private val refundEventLogRepository: RefundEventLogRepository,
-    private val paymentRepository: PaymentRepository,
-    private val pointCommandService: PointCommandService,
-    private val couponCommandService: CouponCommandService,
+    private val refundLocalOperationService: RefundLocalOperationService,
     private val inventoryCommandPort: InventoryCommandPort,
     private val orderCommandPort: OrderCommandPort,
     private val productStatisticsPort: ProductStatisticsPort,
@@ -81,7 +74,7 @@ class RefundCompletionConsumer(
 
             val eventLog = existingLog ?: createEventLog(event)
 
-            executeLocalOperations(event, eventLog)
+            refundLocalOperationService.execute(event, eventLog)
             executeInventoryOperations(event, eventLog)
             executeOrderOperations(event, eventLog)
 
@@ -106,40 +99,6 @@ class RefundCompletionConsumer(
             refundEventLogRepository.findByEventId(event.eventId)
                 ?: throw e
         }
-    }
-
-    @Transactional
-    fun executeLocalOperations(event: RefundCompletedEvent, eventLog: RefundEventLog) {
-        if (event.isFullRefund) {
-            if (!eventLog.isStepCompleted(RefundEventLog.PAYMENT_UPDATED)) {
-                val payment = paymentRepository.findById(event.paymentId).orElse(null)
-                if (payment != null) {
-                    payment.updateStatus(PaymentStatus.REFUNDED)
-                    paymentRepository.save(payment)
-                }
-                eventLog.markStepCompleted(RefundEventLog.PAYMENT_UPDATED)
-            }
-
-            if (!eventLog.isStepCompleted(RefundEventLog.COUPON_RESTORED) && event.couponId != null) {
-                couponCommandService.restoreCouponByOrder(event.orderId)
-                eventLog.markStepCompleted(RefundEventLog.COUPON_RESTORED)
-            }
-        } else {
-            eventLog.markStepCompleted(RefundEventLog.PAYMENT_UPDATED)
-            eventLog.markStepCompleted(RefundEventLog.COUPON_RESTORED)
-        }
-
-        if (!eventLog.isStepCompleted(RefundEventLog.POINTS_REFUNDED)) {
-            pointCommandService.refundPoints(
-                userId = event.buyerId,
-                amount = event.pointRefundAmount,
-                paymentId = event.paymentId,
-                orderId = event.orderId
-            )
-            eventLog.markStepCompleted(RefundEventLog.POINTS_REFUNDED)
-        }
-
-        refundEventLogRepository.save(eventLog)
     }
 
     fun executeInventoryOperations(event: RefundCompletedEvent, eventLog: RefundEventLog) {
