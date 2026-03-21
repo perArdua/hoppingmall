@@ -2,6 +2,7 @@ package com.hoppingmall.order.shipping.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.order.common.NotificationType
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
@@ -127,7 +128,7 @@ class ShippingCommandServiceImpl(
                 "content" to content,
                 "metadata" to metadata
             ),
-            topic = "notification",
+            topic = KafkaTopics.NOTIFICATION,
             partitionKey = shipping.buyerId.toString()
         )
     }

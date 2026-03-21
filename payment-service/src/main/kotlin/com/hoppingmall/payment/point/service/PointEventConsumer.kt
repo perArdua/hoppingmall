@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.point.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.common.NotificationType
 import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
@@ -27,7 +28,7 @@ class PointEventConsumer(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @KafkaListener(topics = ["point-earn-request"], groupId = "point-service")
+    @KafkaListener(topics = [KafkaTopics.POINT_EARN_REQUEST], groupId = "point-service")
     fun handlePointEarnRequest(message: String) {
         val event = objectMapper.readValue(message, PointEarnRequestEvent::class.java)
         try {
@@ -75,7 +76,7 @@ class PointEventConsumer(
                     "content" to "주문번호 ${event.orderId}의 포인트 ${event.earnAmount}점이 적립되었습니다. 현재 잔액: ${savedPoint.balance}점",
                     "metadata" to metadata
                 ),
-                topic = "notification",
+                topic = KafkaTopics.NOTIFICATION,
                 partitionKey = event.userId.toString()
             )
         } catch (e: Exception) {

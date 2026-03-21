@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.common.NotificationType
 import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
@@ -39,7 +40,7 @@ class PaymentNotificationService(
             aggregateId = payment.id!!.toString(),
             eventType = "PaymentCompletedNotificationRequested",
             eventData = eventData,
-            topic = "notification",
+            topic = KafkaTopics.NOTIFICATION,
             partitionKey = payment.userId.toString()
         )
     }
@@ -69,7 +70,7 @@ class PaymentNotificationService(
             aggregateId = payment.id!!.toString(),
             eventType = "PaymentFailedNotificationRequested",
             eventData = eventData,
-            topic = "notification",
+            topic = KafkaTopics.NOTIFICATION,
             partitionKey = payment.userId.toString()
         )
     }
@@ -99,7 +100,7 @@ class PaymentNotificationService(
             aggregateId = payment.id!!.toString(),
             eventType = "PaymentCancelledNotificationRequested",
             eventData = eventData,
-            topic = "notification",
+            topic = KafkaTopics.NOTIFICATION,
             partitionKey = payment.userId.toString()
         )
     }

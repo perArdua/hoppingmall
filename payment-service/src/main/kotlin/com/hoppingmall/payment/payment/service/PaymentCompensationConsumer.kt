@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.payment.service.strategy.CompensationEventHandlerRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
@@ -16,7 +17,7 @@ class PaymentCompensationConsumer(
 
     private val logger = LoggerFactory.getLogger(PaymentCompensationConsumer::class.java)
 
-    @KafkaListener(topics = ["payment-compensation"], groupId = "payment-compensation-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "payment-compensation-service")
     fun handleCompensationEvent(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
@@ -29,7 +30,7 @@ class PaymentCompensationConsumer(
         }
     }
 
-    @KafkaListener(topics = ["payment-reversal"], groupId = "payment-compensation-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_REVERSAL], groupId = "payment-compensation-service")
     fun handlePaymentReversal(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()

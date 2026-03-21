@@ -5,6 +5,7 @@ import com.hoppingmall.user.domain.repository.MembershipEventLogRepository
 import com.hoppingmall.user.service.MembershipCommandService
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
+import com.hoppingmall.common.KafkaTopics
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -18,7 +19,7 @@ class MembershipEventConsumer(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @KafkaListener(topics = ["membership-update-request"], groupId = "membership-service")
+    @KafkaListener(topics = [KafkaTopics.MEMBERSHIP_UPDATE_REQUEST], groupId = "membership-service")
     fun handleMembershipUpdateRequest(event: MembershipUpdateRequestEvent) {
         try {
             if (membershipEventLogRepository.existsByEventId(event.eventId)) {

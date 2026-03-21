@@ -1,6 +1,7 @@
 package com.hoppingmall.product.statistics.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.product.product.domain.StatisticsEventLog
 import com.hoppingmall.product.product.domain.repository.StatisticsEventLogRepository
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
@@ -23,7 +24,7 @@ class StatisticsEventConsumer(
 
     private val logger = LoggerFactory.getLogger(StatisticsEventConsumer::class.java)
 
-    @KafkaListener(topics = ["payment"], groupId = "statistics-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "statistics-service")
     @Transactional
     fun handlePaymentCompleted(message: String) {
         val event = objectMapper.readValue(message, PaymentCompletedEvent::class.java)
@@ -62,7 +63,7 @@ class StatisticsEventConsumer(
         }
     }
 
-    @KafkaListener(topics = ["payment-compensation"], groupId = "statistics-compensation-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "statistics-compensation-service")
     @Transactional
     fun handleCompensationEvent(message: String) {
         val node = objectMapper.readTree(message)
@@ -110,7 +111,7 @@ class StatisticsEventConsumer(
         }
     }
 
-    @KafkaListener(topics = ["payment-reversal"], groupId = "statistics-compensation-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_REVERSAL], groupId = "statistics-compensation-service")
     @Transactional
     fun handlePaymentReversal(message: String) {
         val node = objectMapper.readTree(message)
