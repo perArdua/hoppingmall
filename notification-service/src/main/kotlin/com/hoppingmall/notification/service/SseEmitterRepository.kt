@@ -3,14 +3,15 @@ package com.hoppingmall.notification.service
 import org.springframework.stereotype.Repository
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 @Repository
 class SseEmitterRepository {
 
-    private val emitters = ConcurrentHashMap<Long, MutableList<SseEmitter>>()
+    private val emitters = ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>>()
 
     fun save(userId: Long, emitter: SseEmitter): SseEmitter {
-        emitters.computeIfAbsent(userId) { mutableListOf() }.add(emitter)
+        emitters.computeIfAbsent(userId) { CopyOnWriteArrayList() }.add(emitter)
         return emitter
     }
 
@@ -19,9 +20,8 @@ class SseEmitterRepository {
     }
 
     fun remove(userId: Long, emitter: SseEmitter) {
-        emitters[userId]?.remove(emitter)
-        if (emitters[userId]?.isEmpty() == true) {
-            emitters.remove(userId)
+        emitters.compute(userId) { _, list ->
+            list?.apply { remove(emitter) }?.ifEmpty { null }
         }
     }
 }

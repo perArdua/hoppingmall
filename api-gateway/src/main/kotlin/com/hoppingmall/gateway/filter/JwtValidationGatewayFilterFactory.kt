@@ -39,6 +39,7 @@ class JwtValidationGatewayFilterFactory(
                 val role = claims["role"] as? String ?: "BUYER"
 
                 val modifiedRequest = request.mutate()
+                    .headers { it.remove("x-user-id"); it.remove("x-user-role") }
                     .header("x-user-id", userId)
                     .header("x-user-role", role)
                     .build()
