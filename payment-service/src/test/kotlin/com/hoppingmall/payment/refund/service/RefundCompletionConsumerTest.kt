@@ -1,12 +1,6 @@
 package com.hoppingmall.payment.refund.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.hoppingmall.payment.coupon.service.CouponCommandService
-import com.hoppingmall.payment.payment.domain.Payment
-import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
-import com.hoppingmall.payment.payment.enum.PaymentMethod
-import com.hoppingmall.payment.payment.enum.PaymentStatus
-import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.port.InventoryCommandPort
 import com.hoppingmall.payment.port.OrderCommandPort
 import com.hoppingmall.payment.port.ProductStatisticsPort
@@ -24,7 +18,6 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import java.math.BigDecimal
-import java.util.*
 
 @DisplayName("RefundCompletionConsumer")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -35,13 +28,7 @@ class RefundCompletionConsumerTest {
     private lateinit var refundEventLogRepository: RefundEventLogRepository
 
     @Mock
-    private lateinit var paymentRepository: PaymentRepository
-
-    @Mock
-    private lateinit var pointCommandService: PointCommandService
-
-    @Mock
-    private lateinit var couponCommandService: CouponCommandService
+    private lateinit var refundLocalOperationService: RefundLocalOperationService
 
     @Mock
     private lateinit var inventoryCommandPort: InventoryCommandPort
@@ -119,35 +106,19 @@ class RefundCompletionConsumerTest {
     fun 전체_환불_완료_처리_성공() {
         val event = fullRefundEvent()
         val eventLog = newEventLog()
-        val payment = Payment.create(
-            orderId = 100L,
-            userId = 300L,
-            amount = BigDecimal("50000"),
-            method = PaymentMethod.CREDIT_CARD
-        )
 
         whenever(refundEventLogRepository.findByEventId(event.eventId)).thenReturn(null)
         whenever(refundEventLogRepository.save(any<RefundEventLog>())).thenReturn(eventLog)
-        whenever(paymentRepository.findById(event.paymentId)).thenReturn(Optional.of(payment))
         whenever(orderCommandPort.cancelOrder(event.orderId)).thenReturn(true)
 
         consumer.processRefundCompletion(event)
 
-        verify(paymentRepository).findById(event.paymentId)
-        verify(paymentRepository).save(payment)
-        verify(couponCommandService).restoreCouponByOrder(event.orderId)
-        verify(pointCommandService).refundPoints(
-            userId = event.buyerId,
-            amount = event.pointRefundAmount,
-            paymentId = event.paymentId,
-            orderId = event.orderId
-        )
+        verify(refundLocalOperationService).execute(eq(event), any())
         verify(inventoryCommandPort).increaseStock(1L, 2)
         verify(inventoryCommandPort).increaseStock(2L, 1)
         verify(productStatisticsPort).incrementRefundStats(1L, 2L, BigDecimal("25000"))
         verify(productStatisticsPort).incrementRefundStats(2L, 1L, BigDecimal("25000"))
         verify(orderCommandPort).cancelOrder(event.orderId)
-        verify(refundEventLogRepository, times(4)).save(any<RefundEventLog>())
     }
 
     @Test
@@ -160,14 +131,7 @@ class RefundCompletionConsumerTest {
 
         consumer.processRefundCompletion(event)
 
-        verify(paymentRepository, never()).findById(any())
-        verify(couponCommandService, never()).restoreCouponByOrder(any())
-        verify(pointCommandService).refundPoints(
-            userId = event.buyerId,
-            amount = event.pointRefundAmount,
-            paymentId = event.paymentId,
-            orderId = event.orderId
-        )
+        verify(refundLocalOperationService).execute(eq(event), any())
         verify(inventoryCommandPort).increaseStock(1L, 1)
         verify(productStatisticsPort).incrementRefundStats(1L, 1L, BigDecimal("25000"))
         verify(orderCommandPort, never()).cancelOrder(any())
@@ -183,8 +147,7 @@ class RefundCompletionConsumerTest {
         consumer.processRefundCompletion(event)
 
         verify(refundEventLogRepository, never()).save(any<RefundEventLog>())
-        verify(paymentRepository, never()).findById(any())
-        verify(pointCommandService, never()).refundPoints(any(), any(), any(), any())
+        verify(refundLocalOperationService, never()).execute(any(), any())
         verify(inventoryCommandPort, never()).increaseStock(any(), any())
         verify(orderCommandPort, never()).cancelOrder(any())
     }
@@ -202,9 +165,7 @@ class RefundCompletionConsumerTest {
 
         consumer.processRefundCompletion(event)
 
-        verify(paymentRepository, never()).findById(any())
-        verify(couponCommandService, never()).restoreCouponByOrder(any())
-        verify(pointCommandService, never()).refundPoints(any(), any(), any(), any())
+        verify(refundLocalOperationService).execute(eq(event), any())
         verify(inventoryCommandPort).increaseStock(1L, 2)
         verify(inventoryCommandPort).increaseStock(2L, 1)
         verify(productStatisticsPort).incrementRefundStats(1L, 2L, BigDecimal("25000"))
