@@ -11,7 +11,8 @@ import org.hibernate.annotations.Filter
     name = "shippings",
     indexes = [
         Index(name = "idx_shippings_order_id", columnList = "orderId"),
-        Index(name = "idx_shippings_buyer_id", columnList = "buyerId")
+        Index(name = "idx_shippings_buyer_id", columnList = "buyerId"),
+        Index(name = "idx_shippings_tracking_number", columnList = "trackingNumber")
     ]
 )
 @Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
