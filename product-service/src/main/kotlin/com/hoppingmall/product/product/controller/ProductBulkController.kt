@@ -1,7 +1,7 @@
 package com.hoppingmall.product.product.controller
 
-import com.hoppingmall.product.common.ApiResponse
-import com.hoppingmall.product.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.product.product.dto.response.BulkImportProgressResponse
 import com.hoppingmall.product.product.dto.response.BulkRowError
 import com.hoppingmall.product.product.dto.response.BulkValidationResponse

@@ -1,6 +1,6 @@
 package com.hoppingmall.settlement.exception.code
 
-import com.hoppingmall.settlement.common.ErrorCode
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 enum class SettlementErrorCode(

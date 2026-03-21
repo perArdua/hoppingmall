@@ -1,7 +1,7 @@
 package com.hoppingmall.user.config
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.hoppingmall.user.common.ApiResponse
+import com.hoppingmall.common.ApiResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.MediaType

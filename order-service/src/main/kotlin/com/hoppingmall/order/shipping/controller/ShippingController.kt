@@ -1,7 +1,7 @@
 package com.hoppingmall.order.shipping.controller
 
-import com.hoppingmall.order.common.ApiResponse
-import com.hoppingmall.order.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.order.common.idempotency.Idempotent
 import com.hoppingmall.order.shipping.dto.request.ShippingCreateRequest
 import com.hoppingmall.order.shipping.dto.request.ShippingStatusUpdateRequest

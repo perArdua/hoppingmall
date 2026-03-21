@@ -1,6 +1,6 @@
 package com.hoppingmall.order.order.exception.code
 
-import com.hoppingmall.order.common.ErrorCode
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 enum class OrderErrorCode(

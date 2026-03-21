@@ -1,7 +1,7 @@
 package com.hoppingmall.user.controller
 
-import com.hoppingmall.user.common.ApiResponse
-import com.hoppingmall.user.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.user.dto.request.SellerApplyRequest
 import com.hoppingmall.user.service.SellerCommandService
 import io.swagger.v3.oas.annotations.tags.Tag

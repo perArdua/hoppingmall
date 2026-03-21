@@ -1,6 +1,6 @@
 package com.hoppingmall.payment.jwt
 
-import com.hoppingmall.payment.common.UserPrincipal
+import com.hoppingmall.common.UserPrincipal
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse

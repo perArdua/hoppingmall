@@ -1,6 +1,6 @@
 package com.hoppingmall.payment.point.exception.code
 
-import com.hoppingmall.payment.common.ErrorCode
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 enum class PointErrorCode(

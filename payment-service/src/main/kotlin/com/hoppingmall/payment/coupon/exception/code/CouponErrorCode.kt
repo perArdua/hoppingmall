@@ -1,6 +1,6 @@
 package com.hoppingmall.payment.coupon.exception.code
 
-import com.hoppingmall.payment.common.ErrorCode
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 enum class CouponErrorCode(

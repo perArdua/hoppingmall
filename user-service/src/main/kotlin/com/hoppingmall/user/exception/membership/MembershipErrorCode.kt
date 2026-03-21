@@ -1,6 +1,6 @@
 package com.hoppingmall.user.exception.membership
 
-import com.hoppingmall.user.common.ErrorCode
+import com.hoppingmall.common.ErrorCode
 import org.springframework.http.HttpStatus
 
 enum class MembershipErrorCode(

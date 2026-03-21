@@ -1,6 +1,6 @@
 package com.hoppingmall.settlement.domain
 
-import com.hoppingmall.settlement.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.settlement.enums.SettlementStatus
 import jakarta.persistence.*
 import java.math.BigDecimal

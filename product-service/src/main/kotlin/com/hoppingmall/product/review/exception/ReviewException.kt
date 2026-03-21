@@ -1,6 +1,6 @@
 package com.hoppingmall.product.review.exception
 
-import com.hoppingmall.product.common.BusinessException
+import com.hoppingmall.common.BusinessException
 import com.hoppingmall.product.review.exception.code.ReviewErrorCode
 
 open class ReviewException(

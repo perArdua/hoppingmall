@@ -1,6 +1,6 @@
 package com.hoppingmall.payment.point.domain
 
-import com.hoppingmall.payment.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 import java.math.BigDecimal
 

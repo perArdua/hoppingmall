@@ -1,6 +1,6 @@
 package com.hoppingmall.user.domain
 
-import com.hoppingmall.user.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password

@@ -1,6 +1,6 @@
 package com.hoppingmall.notification.domain
 
-import com.hoppingmall.notification.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.notification.enums.NotificationType
 import jakarta.persistence.*
 

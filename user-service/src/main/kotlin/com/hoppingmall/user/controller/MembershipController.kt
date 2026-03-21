@@ -1,7 +1,7 @@
 package com.hoppingmall.user.controller
 
-import com.hoppingmall.user.common.ApiResponse
-import com.hoppingmall.user.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.user.dto.response.MembershipResponse
 import com.hoppingmall.user.service.MembershipCommandService
 import com.hoppingmall.user.service.MembershipQueryService

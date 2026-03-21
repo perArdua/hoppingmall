@@ -5,8 +5,8 @@ import com.hoppingmall.order.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.order.cartItem.dto.response.CartItemResponse
 import com.hoppingmall.order.cartItem.service.CartItemCommandService
 import com.hoppingmall.order.cartItem.service.CartItemQueryService
-import com.hoppingmall.order.common.ApiResponse
-import com.hoppingmall.order.common.UserPrincipal
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice

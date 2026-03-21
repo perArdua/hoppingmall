@@ -1,6 +1,6 @@
 package com.hoppingmall.product.review.domain
 
-import com.hoppingmall.product.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 import org.hibernate.annotations.Filter
 

@@ -1,7 +1,7 @@
 package com.hoppingmall.payment.coupon.domain
 
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
-import com.hoppingmall.payment.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 import org.hibernate.annotations.Filter
 import java.time.LocalDateTime

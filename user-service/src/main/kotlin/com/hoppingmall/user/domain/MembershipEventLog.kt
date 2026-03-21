@@ -1,6 +1,6 @@
 package com.hoppingmall.user.domain
 
-import com.hoppingmall.user.common.BaseEntity
+import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table

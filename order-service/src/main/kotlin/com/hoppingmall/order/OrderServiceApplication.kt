@@ -5,7 +5,7 @@ import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.annotation.EnableScheduling
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = ["com.hoppingmall.order", "com.hoppingmall.common"])
 @EnableAsync
 @EnableScheduling
 class OrderServiceApplication
