@@ -15,11 +15,14 @@ class GrpcProductQueryService(
     override suspend fun findProductById(request: ProductIdRequest): ProductResponse {
         val product = productRepository.findNullableById(request.productId)
             ?: throw StatusException(Status.NOT_FOUND)
+        val firstImageUrl = productImageRepository.findByProductIdOrderBySortOrder(request.productId)
+            .firstOrNull()?.imageUrl ?: ""
         return productResponse {
             id = product.id!!
             name = product.name
             price = product.price.toPlainString()
             sellerId = product.sellerId
+            imageUrl = firstImageUrl
         }
     }
 

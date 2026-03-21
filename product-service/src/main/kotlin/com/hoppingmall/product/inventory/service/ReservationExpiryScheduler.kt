@@ -32,22 +32,28 @@ class ReservationExpiryScheduler(
 
         logger.info("만료 예약 처리 시작: ${expiredReservations.size}건")
 
-        expiredReservations.sortedBy { it.productId }.forEach { reservation ->
-            val updated = inventoryReservationRepository.updateStatusByCas(
-                reservationId = reservation.reservationId,
-                expectedStatus = ReservationStatus.RESERVED,
-                targetStatus = ReservationStatus.EXPIRED,
-                updatedAt = LocalDateTime.now()
-            )
-
-            if (updated > 0) {
-                val inventory = inventoryRepository.findByProductIdForUpdate(reservation.productId)
-                if (inventory != null) {
-                    inventory.increaseStock(reservation.quantity)
-                    logger.info("예약 만료 처리: reservationId=${reservation.reservationId}, " +
-                        "productId=${reservation.productId}, quantity=${reservation.quantity}")
+        expiredReservations.sortedBy { it.productId }
+            .groupBy { it.productId }
+            .forEach { (productId, reservations) ->
+                val expiredQuantity = reservations.sumOf { reservation ->
+                    val updated = inventoryReservationRepository.updateStatusByCas(
+                        reservationId = reservation.reservationId,
+                        expectedStatus = ReservationStatus.RESERVED,
+                        targetStatus = ReservationStatus.EXPIRED,
+                        updatedAt = LocalDateTime.now()
+                    )
+                    if (updated > 0) {
+                        logger.info("예약 만료 처리: reservationId=${reservation.reservationId}, " +
+                            "productId=${reservation.productId}, quantity=${reservation.quantity}")
+                        reservation.quantity
+                    } else {
+                        0
+                    }
+                }
+                if (expiredQuantity > 0) {
+                    val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+                    inventory?.increaseStock(expiredQuantity)
                 }
             }
-        }
     }
 }

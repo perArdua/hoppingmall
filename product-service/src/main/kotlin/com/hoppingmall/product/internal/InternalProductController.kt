@@ -17,12 +17,15 @@ class InternalProductController(
     fun getProduct(@PathVariable id: Long): ResponseEntity<ProductInfo> {
         val product = productRepository.findNullableById(id)
             ?: return ResponseEntity.notFound().build()
+        val firstImageUrl = productImageRepository.findByProductIdOrderBySortOrder(id)
+            .firstOrNull()?.imageUrl
         return ResponseEntity.ok(
             ProductInfo(
                 id = product.id!!,
                 name = product.name,
                 price = product.price,
-                sellerId = product.sellerId
+                sellerId = product.sellerId,
+                imageUrl = firstImageUrl
             )
         )
     }
@@ -52,6 +55,7 @@ class InternalProductController(
         val id: Long,
         val name: String,
         val price: BigDecimal,
-        val sellerId: Long
+        val sellerId: Long,
+        val imageUrl: String? = null
     )
 }

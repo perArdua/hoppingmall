@@ -16,6 +16,7 @@ message ProductResponse {
   string name = 2;
   string price = 3;
   int64 seller_id = 4;
+  string image_url = 5;
 }
 message ProductListResponse { repeated ProductResponse products = 1; }
 message ImageUrlResponse {
