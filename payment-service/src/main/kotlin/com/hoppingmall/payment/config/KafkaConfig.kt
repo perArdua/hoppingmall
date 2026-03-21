@@ -2,6 +2,8 @@ package com.hoppingmall.payment.config
 
 import com.hoppingmall.payment.config.kafka.TracingConsumerInterceptor
 import com.hoppingmall.payment.config.kafka.TracingProducerInterceptor
+import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
+import com.hoppingmall.payment.dlq.service.DLQService
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -23,7 +25,9 @@ import java.util.UUID
 
 @Configuration
 @Profile("!test")
-class KafkaConfig {
+class KafkaConfig(
+    private val dlqService: DLQService
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -103,6 +107,16 @@ class KafkaConfig {
             { record, exception ->
                 log.error("Kafka 메시지 처리 실패 (DLQ): topic={}, offset={}, error={}",
                     record.topic(), record.offset(), exception.message)
+                val deadLetterMessage = DeadLetterMessage(
+                    originalTopic = record.topic(),
+                    originalPartition = record.partition(),
+                    originalOffset = record.offset(),
+                    originalKey = record.key()?.toString(),
+                    originalValue = record.value()?.toString(),
+                    exception = exception.message,
+                    timestamp = System.currentTimeMillis()
+                )
+                dlqService.saveDLQMessage(deadLetterMessage)
             },
             FixedBackOff(1000L, 3)
         )
