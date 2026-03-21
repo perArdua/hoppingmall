@@ -3,21 +3,19 @@ package com.hoppingmall.product.product.domain.repository
 import com.hoppingmall.product.common.enums.ProductStatus
 import com.hoppingmall.product.product.domain.Product
 import jakarta.persistence.EntityManager
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.domain.SliceImpl
-import javax.sql.DataSource
 import java.math.BigDecimal
 
 class ProductSearchRepositoryImpl(
     private val entityManager: EntityManager,
-    private val dataSource: DataSource
+    @Value("\${spring.datasource.url:}")
+    private val datasourceUrl: String
 ) : ProductSearchRepository {
 
-    private val useFullText: Boolean by lazy {
-        val url = dataSource.connection.use { it.metaData.url }
-        url.contains("mysql", ignoreCase = true)
-    }
+    private val useFullText: Boolean = datasourceUrl.contains("mysql", ignoreCase = true)
 
     override fun searchProducts(
         keyword: String?,

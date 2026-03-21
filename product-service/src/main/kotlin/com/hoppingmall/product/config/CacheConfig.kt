@@ -3,7 +3,8 @@ package com.hoppingmall.product.config
 import com.github.benmanes.caffeine.cache.Caffeine
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.EnableCaching
-import org.springframework.cache.caffeine.CaffeineCacheManager
+import org.springframework.cache.caffeine.CaffeineCache
+import org.springframework.cache.support.SimpleCacheManager
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.util.concurrent.TimeUnit
@@ -14,12 +15,29 @@ class CacheConfig {
 
     @Bean
     fun cacheManager(): CacheManager {
-        val cacheManager = CaffeineCacheManager()
-        cacheManager.setCaffeine(
+        val productCache = CaffeineCache(
+            "product",
             Caffeine.newBuilder()
-                .maximumSize(1000)
+                .maximumSize(500)
                 .expireAfterWrite(10, TimeUnit.MINUTES)
+                .build()
         )
-        return cacheManager
+        val inventoryCache = CaffeineCache(
+            "inventory",
+            Caffeine.newBuilder()
+                .maximumSize(500)
+                .expireAfterWrite(5, TimeUnit.MINUTES)
+                .build()
+        )
+        val categoryCache = CaffeineCache(
+            "category",
+            Caffeine.newBuilder()
+                .maximumSize(200)
+                .expireAfterWrite(60, TimeUnit.MINUTES)
+                .build()
+        )
+        return SimpleCacheManager().apply {
+            setCaches(listOf(productCache, inventoryCache, categoryCache))
+        }
     }
 }
