@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.dlq.service
 
+import com.hoppingmall.payment.config.OutboxMetrics
 import com.hoppingmall.payment.dlq.domain.DLQMessage
 import com.hoppingmall.payment.dlq.domain.DLQStatus
 import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
@@ -27,6 +28,9 @@ class DLQServiceTest {
 
     @Mock
     private lateinit var kafkaTemplate: KafkaTemplate<String, Any>
+
+    @Mock
+    private lateinit var outboxMetrics: OutboxMetrics
 
     @InjectMocks
     private lateinit var dlqCommandService: DLQCommandService

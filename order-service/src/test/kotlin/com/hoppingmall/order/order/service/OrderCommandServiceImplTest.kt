@@ -11,6 +11,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
@@ -52,6 +53,9 @@ class OrderCommandServiceImplTest {
 
     @Mock
     private lateinit var inventoryCommandPort: InventoryCommandPort
+
+    @Mock
+    private lateinit var orderMetrics: OrderMetrics
 
     @InjectMocks
     private lateinit var service: OrderCommandServiceImpl
