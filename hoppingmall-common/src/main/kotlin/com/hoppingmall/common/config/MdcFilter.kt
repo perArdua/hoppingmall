@@ -1,5 +1,6 @@
 package com.hoppingmall.common.config
 
+import io.micrometer.tracing.Tracer
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -12,9 +13,10 @@ import org.springframework.web.filter.OncePerRequestFilter
 import java.util.UUID
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 class MdcFilter(
-    @Value("\${spring.application.name:unknown}") private val serviceName: String
+    @Value("\${spring.application.name:unknown}") private val serviceName: String,
+    private val tracer: Tracer
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(
@@ -22,16 +24,21 @@ class MdcFilter(
         response: HttpServletResponse,
         filterChain: FilterChain
     ) {
-        val rawTraceId = request.getHeader(TRACE_ID_HEADER)
-        val traceId = if (isValidTraceId(rawTraceId)) rawTraceId!! else generateTraceId()
         try {
+            val otelTraceId = tracer.currentSpan()?.context()?.traceId()
+            val rawTraceId = request.getHeader(TRACE_ID_HEADER)
+            val traceId = otelTraceId
+                ?: if (isValidTraceId(rawTraceId)) rawTraceId!! else generateTraceId()
+
             MDC.put(TRACE_ID_KEY, traceId)
             MDC.put(SERVICE_KEY, serviceName)
             request.getHeader("x-user-id")?.let { MDC.put(USER_ID_KEY, it) }
             response.setHeader(TRACE_ID_HEADER, traceId)
             filterChain.doFilter(request, response)
         } finally {
-            MDC.clear()
+            MDC.remove(TRACE_ID_KEY)
+            MDC.remove(SERVICE_KEY)
+            MDC.remove(USER_ID_KEY)
         }
     }
 
