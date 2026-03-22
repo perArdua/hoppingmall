@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.payment.service
 
+import com.hoppingmall.payment.config.PaymentMetrics
 import com.hoppingmall.payment.coupon.service.CouponCommandService
 import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
@@ -24,6 +25,7 @@ class PaymentCommandServiceImpl(
     private val paymentEventService: PaymentEventService,
     private val paymentNotificationService: PaymentNotificationService,
     private val couponCommandService: CouponCommandService,
+    private val paymentMetrics: PaymentMetrics,
     transactionManager: PlatformTransactionManager
 ) : PaymentCommandService {
 
@@ -31,7 +33,7 @@ class PaymentCommandServiceImpl(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse {
+    override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse = paymentMetrics.recordProcessingTime {
         var couponDiscountAmount = BigDecimal.ZERO
         var couponId: Long? = null
 
@@ -67,11 +69,13 @@ class PaymentCommandServiceImpl(
 
             if (saved.status == PaymentStatus.SUCCESS) {
                 log.info("결제 성공: paymentId={}, orderId={}, userId={}, amount={}", saved.id, saved.orderId, userId, saved.amount)
+                paymentMetrics.recordPaymentCompleted(saved.amount, saved.method.name)
                 publishPaymentEvents(saved)
             }
 
             if (saved.status == PaymentStatus.FAILED) {
                 log.warn("결제 실패: paymentId={}, orderId={}, userId={}, error={}", saved.id, saved.orderId, userId, saved.errorMessage)
+                paymentMetrics.recordPaymentFailed()
                 if (couponId != null) {
                     couponCommandService.restoreCouponByPayment(couponId!!, userId)
                 }
@@ -82,7 +86,7 @@ class PaymentCommandServiceImpl(
             saved
         }!!
 
-        return PaymentResponse.from(finalPayment)
+        PaymentResponse.from(finalPayment)
     }
 
     @Transactional
@@ -101,6 +105,7 @@ class PaymentCommandServiceImpl(
         payment.status = PaymentStatus.CANCELLED
         val cancelledPayment = paymentRepository.save(payment)
 
+        paymentMetrics.recordPaymentCancelled()
         paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
         paymentNotificationService.publishPaymentCancelledNotification(cancelledPayment)
 

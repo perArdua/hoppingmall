@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.outbox.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.payment.config.OutboxMetrics
 import com.hoppingmall.payment.outbox.domain.OutboxEvent
 import com.hoppingmall.payment.outbox.domain.OutboxStatus
 import com.hoppingmall.payment.outbox.repository.OutboxEventRepository
@@ -17,7 +18,8 @@ import java.util.concurrent.CompletableFuture
 class OutboxEventPublisher(
     private val outboxEventRepository: OutboxEventRepository,
     private val kafkaTemplate: KafkaTemplate<String, Any>,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val outboxMetrics: OutboxMetrics
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
@@ -96,6 +98,7 @@ class OutboxEventPublisher(
     private fun handlePublishSuccess(event: OutboxEvent, result: SendResult<String, Any>) {
         event.markAsProcessed()
         outboxEventRepository.save(event)
+        outboxMetrics.recordOutboxPublished(event.topic)
 
         logger.info("Outbox event published successfully: " +
             "eventId=${event.id}, topic=${event.topic}, " +
@@ -114,6 +117,7 @@ class OutboxEventPublisher(
             logger.warn("Outbox event failed, will retry: eventId=${event.id}, " +
                 "retryCount=${event.retryCount}, error=$errorMessage")
         }
+        outboxMetrics.recordOutboxFailed(event.topic)
 
         outboxEventRepository.save(event)
     }

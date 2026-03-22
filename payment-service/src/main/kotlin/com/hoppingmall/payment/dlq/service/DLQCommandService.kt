@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.dlq.service
 
+import com.hoppingmall.payment.config.OutboxMetrics
 import com.hoppingmall.payment.dlq.domain.DLQMessage
 import com.hoppingmall.payment.dlq.domain.DLQStatus
 import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
@@ -15,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap
 @Transactional
 class DLQCommandService(
     private val dlqMessageRepository: DLQMessageRepository,
-    private val kafkaTemplate: KafkaTemplate<String, Any>
+    private val kafkaTemplate: KafkaTemplate<String, Any>,
+    private val outboxMetrics: OutboxMetrics
 ) {
 
     private val logger = LoggerFactory.getLogger(DLQCommandService::class.java)
@@ -60,6 +62,7 @@ class DLQCommandService(
 
             dlqMessage.nextRetryAt = DLQMessage.calculateNextRetryAt(0)
             dlqMessageRepository.save(dlqMessage)
+            outboxMetrics.recordDlqSaved(deadLetterMessage.originalTopic)
             logger.info("DLQ 메시지 저장 완료: topic={}, partition={}, offset={}",
                 deadLetterMessage.originalTopic, deadLetterMessage.originalPartition, deadLetterMessage.originalOffset)
 
@@ -107,11 +110,13 @@ class DLQCommandService(
             dlqMessage.markAsProcessed("수동 재처리 성공")
             dlqMessageRepository.save(dlqMessage)
 
+            outboxMetrics.recordDlqRetrySuccess()
             logger.info("DLQ 메시지 재처리 성공: id={}, topic={}", dlqMessageId, dlqMessage.originalTopic)
             true
 
         } catch (e: Exception) {
             logger.error("DLQ 메시지 재처리 실패: id={}, error={}", dlqMessageId, e.message, e)
+            outboxMetrics.recordDlqRetryFailed()
 
             try {
                 val dlqMessage = dlqMessageRepository.findById(dlqMessageId).orElse(null)
