@@ -115,6 +115,20 @@
       }
     }
   ],
+    {
+      "title": "Event Flow Traces (Tempo)",
+      "type": "table",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "queryType": "nativeSearch",
+          "limit": 20
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    }
+  ],
   "schemaVersion": 39,
   "tags": ["kafka", "outbox", "observability"],
   "templating": { "list": [] },

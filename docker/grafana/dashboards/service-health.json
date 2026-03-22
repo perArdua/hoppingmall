@@ -71,6 +71,20 @@
       "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
     }
   ],
+    {
+      "title": "Recent Traces (Tempo)",
+      "type": "table",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "queryType": "nativeSearch",
+          "limit": 15
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    }
+  ],
   "schemaVersion": 39,
   "tags": ["service-health"],
   "templating": {
