@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring") version "1.9.25"
 	kotlin("plugin.jpa") version "1.9.25"
 	id("io.spring.dependency-management") version "1.1.7"
+	`java-library`
 }
 
 group = "com.hoppingmall"
@@ -30,4 +31,6 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("net.logstash.logback:logstash-logback-encoder:8.0")
+	api("io.micrometer:micrometer-tracing-bridge-otel")
+	api("io.opentelemetry:opentelemetry-exporter-otlp")
 }

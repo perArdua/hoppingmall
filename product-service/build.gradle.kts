@@ -56,8 +56,8 @@ dependencies {
 	implementation("org.apache.commons:commons-csv:1.12.0")
 
 	implementation("io.micrometer:micrometer-registry-prometheus")
-	implementation("io.micrometer:micrometer-tracing-bridge-brave")
-	implementation("io.zipkin.reporter2:zipkin-reporter-brave")
+	implementation("io.micrometer:micrometer-tracing-bridge-otel")
+	implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 
