@@ -46,7 +46,10 @@ class Coupon private constructor(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: CouponStatus = CouponStatus.ACTIVE
+    var status: CouponStatus = CouponStatus.ACTIVE,
+
+    @Version
+    val version: Long = 0
 ) : BaseEntity() {
 
     companion object {

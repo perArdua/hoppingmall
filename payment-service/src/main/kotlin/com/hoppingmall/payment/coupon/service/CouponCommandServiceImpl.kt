@@ -11,6 +11,7 @@ import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
 import com.hoppingmall.payment.coupon.exception.*
 import com.hoppingmall.payment.internal.DistributedLockExecutor
+import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
@@ -64,33 +65,38 @@ class CouponCommandServiceImpl(
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun issueCoupon(userId: Long, couponId: Long): UserCouponResponse {
         return distributedLockExecutor.withLock("coupon:issue:$couponId") {
-            val coupon = couponRepository.findActiveById(couponId)
-                ?: throw CouponNotFoundException()
+            try {
+                val coupon = couponRepository.findActiveById(couponId)
+                    ?: throw CouponNotFoundException()
 
-            if (coupon.isExpired()) {
-                throw CouponExpiredException()
-            }
+                if (coupon.isExpired()) {
+                    throw CouponExpiredException()
+                }
 
-            if (coupon.isExhausted()) {
+                if (coupon.isExhausted()) {
+                    throw CouponExhaustedException()
+                }
+
+                if (!coupon.isValid()) {
+                    throw CouponNotAvailableException()
+                }
+
+                if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
+                    throw CouponAlreadyIssuedException()
+                }
+
+                coupon.issue()
+                couponRepository.save(coupon)
+
+                val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
+                val savedUserCoupon = userCouponRepository.save(userCoupon)
+
+                log.info("쿠폰 발급: userId={}, couponId={}, remaining={}", userId, couponId, coupon.totalQuantity - coupon.issuedQuantity)
+                UserCouponResponse.from(savedUserCoupon, coupon)
+            } catch (e: ObjectOptimisticLockingFailureException) {
+                log.warn("쿠폰 발급 동시성 충돌 (version mismatch): userId={}, couponId={}", userId, couponId)
                 throw CouponExhaustedException()
             }
-
-            if (!coupon.isValid()) {
-                throw CouponNotAvailableException()
-            }
-
-            if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
-                throw CouponAlreadyIssuedException()
-            }
-
-            coupon.issue()
-            couponRepository.save(coupon)
-
-            val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
-            val savedUserCoupon = userCouponRepository.save(userCoupon)
-
-            log.info("쿠폰 발급: userId={}, couponId={}, remaining={}", userId, couponId, coupon.totalQuantity - coupon.issuedQuantity)
-            UserCouponResponse.from(savedUserCoupon, coupon)
         }
     }
 

@@ -16,11 +16,10 @@ class DistributedLockExecutor(
     fun <T : Any> withLock(
         key: String,
         waitTime: Duration = Duration.ofSeconds(3),
-        leaseTime: Duration = Duration.ofSeconds(5),
         action: () -> T
     ): T {
         val lock = redissonClient.getLock(key)
-        val acquired = lock.tryLock(waitTime.toMillis(), leaseTime.toMillis(), TimeUnit.MILLISECONDS)
+        val acquired = lock.tryLock(waitTime.toMillis(), -1, TimeUnit.MILLISECONDS)
         if (!acquired) {
             throw DistributedLockException()
         }
@@ -37,11 +36,10 @@ class DistributedLockExecutor(
     fun withLockVoid(
         key: String,
         waitTime: Duration = Duration.ofSeconds(3),
-        leaseTime: Duration = Duration.ofSeconds(5),
         action: () -> Unit
     ) {
         val lock = redissonClient.getLock(key)
-        val acquired = lock.tryLock(waitTime.toMillis(), leaseTime.toMillis(), TimeUnit.MILLISECONDS)
+        val acquired = lock.tryLock(waitTime.toMillis(), -1, TimeUnit.MILLISECONDS)
         if (!acquired) {
             throw DistributedLockException()
         }
