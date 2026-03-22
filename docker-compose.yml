@@ -203,11 +203,17 @@ services:
       host.docker.internal:7006
       --cluster-replicas 1 --cluster-yes"
 
-  zipkin:
-    image: openzipkin/zipkin:latest
-    container_name: zipkin
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: tempo
+    command: ["-config.file=/etc/tempo/tempo.yml"]
     ports:
-      - "9411:9411"
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./docker/tempo.yml:/etc/tempo/tempo.yml
+      - tempo-data:/tmp/tempo
 
   prometheus:
     image: prom/prometheus:latest
@@ -253,7 +259,7 @@ services:
     depends_on:
       - prometheus
       - loki
-      - zipkin
+      - tempo
 
   notification-service:
     build:
@@ -394,3 +400,4 @@ volumes:
   mysql-data:
   prometheus-data:
   grafana-data:
+  tempo-data:
