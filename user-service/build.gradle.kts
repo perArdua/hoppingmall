@@ -77,6 +77,7 @@ dependencies {
 	implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
 	implementation("com.google.protobuf:protobuf-kotlin:$protobufVersion")
 	implementation("net.devh:grpc-spring-boot-starter:3.1.0.RELEASE")
+	implementation("io.opentelemetry.instrumentation:opentelemetry-grpc-1.6:2.12.0-alpha")
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 }
 

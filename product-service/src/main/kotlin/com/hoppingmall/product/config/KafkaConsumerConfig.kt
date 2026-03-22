@@ -1,6 +1,6 @@
 package com.hoppingmall.product.config
 
-import com.hoppingmall.product.config.kafka.TracingConsumerInterceptor
+import com.hoppingmall.product.config.kafka.BusinessContextConsumerInterceptor
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.errors.SerializationException
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -56,7 +56,7 @@ class KafkaConsumerConfig {
     fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
-        factory.setRecordInterceptor(TracingConsumerInterceptor())
+        factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
 
         val errorHandler = DefaultErrorHandler(
             { record, exception ->

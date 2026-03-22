@@ -1,7 +1,7 @@
 package com.hoppingmall.payment.config
 
-import com.hoppingmall.payment.config.kafka.TracingConsumerInterceptor
-import com.hoppingmall.payment.config.kafka.TracingProducerInterceptor
+import com.hoppingmall.payment.config.kafka.BusinessContextConsumerInterceptor
+import com.hoppingmall.payment.config.kafka.BusinessContextProducerInterceptor
 import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
 import com.hoppingmall.payment.dlq.service.DLQCommandService
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -58,7 +58,7 @@ class KafkaConfig(
         configProps[ProducerConfig.BATCH_SIZE_CONFIG] = 16384
         configProps[ProducerConfig.LINGER_MS_CONFIG] = 10
         configProps[ProducerConfig.COMPRESSION_TYPE_CONFIG] = "lz4"
-        configProps[ProducerConfig.INTERCEPTOR_CLASSES_CONFIG] = listOf(TracingProducerInterceptor::class.java.name)
+        configProps[ProducerConfig.INTERCEPTOR_CLASSES_CONFIG] = listOf(BusinessContextProducerInterceptor::class.java.name)
 
         val producerFactory = DefaultKafkaProducerFactory<String, Any>(configProps)
         producerFactory.setTransactionIdPrefix("payment-tx-$instanceId-")
@@ -126,7 +126,7 @@ class KafkaConfig(
             MessageConversionException::class.java
         )
         factory.setCommonErrorHandler(errorHandler)
-        factory.setRecordInterceptor(TracingConsumerInterceptor())
+        factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
 
         return factory
     }
