@@ -13,6 +13,7 @@ import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
+import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
 import org.slf4j.LoggerFactory
@@ -27,7 +28,8 @@ class OrderCommandServiceImpl(
     private val orderItemRepository: OrderItemRepository,
     private val cartItemRepository: CartItemRepository,
     private val productQueryPort: ProductQueryPort,
-    private val inventoryCommandPort: InventoryCommandPort
+    private val inventoryCommandPort: InventoryCommandPort,
+    private val orderMetrics: OrderMetrics
 ) : OrderCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -72,6 +74,7 @@ class OrderCommandServiceImpl(
 
         cartItemRepository.deleteAllById(request.cartItemIds)
 
+        orderMetrics.recordOrderCreated(totalAmount)
         log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
         return OrderResponse.from(order, savedOrderItems)
     }
@@ -100,6 +103,7 @@ class OrderCommandServiceImpl(
             }
         }
 
+        orderMetrics.recordOrderCancelled()
         log.info("주문 취소: orderId={}, buyerId={}", orderId, buyerId)
         return OrderResponse.from(order, orderItems)
     }
