@@ -1,5 +1,6 @@
 package com.hoppingmall.gateway.filter
 
+import io.micrometer.tracing.Tracer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -14,7 +15,7 @@ import reactor.core.publisher.Mono
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class TracingGlobalFilterTest {
 
-    private val filter = TracingGlobalFilter()
+    private val filter = TracingGlobalFilter(Tracer.NOOP)
 
     private fun chainCapturing(captured: MutableList<ServerWebExchange>) =
         org.springframework.cloud.gateway.filter.GatewayFilterChain { exchange ->
