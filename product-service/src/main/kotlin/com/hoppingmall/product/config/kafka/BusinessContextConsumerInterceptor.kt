@@ -4,12 +4,9 @@ import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.MDC
 import org.springframework.kafka.listener.RecordInterceptor
-import java.util.UUID
-
 class BusinessContextConsumerInterceptor : RecordInterceptor<String, Any> {
 
     override fun intercept(record: ConsumerRecord<String, Any>, consumer: Consumer<String, Any>): ConsumerRecord<String, Any> {
-            ?: UUID.randomUUID().toString().replace("-", "").take(16)
         extractHeader(record, USER_ID_HEADER)?.let { MDC.put(USER_ID_KEY, it) }
         extractHeader(record, SERVICE_HEADER)?.let { MDC.put(SERVICE_KEY, it) }
         return record
