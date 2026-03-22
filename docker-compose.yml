@@ -254,6 +254,7 @@ services:
     volumes:
       - ./docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
       - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting
       - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana
     depends_on:
