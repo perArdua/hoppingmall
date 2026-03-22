@@ -17,6 +17,7 @@ class TracingGlobalFilter(
 ) : GlobalFilter {
     override fun filter(exchange: ServerWebExchange, chain: GatewayFilterChain): Mono<Void> {
         val otelTraceId = tracer.currentSpan()?.context()?.traceId()
+            ?.takeIf { it.isNotBlank() }
         val incomingTraceId = exchange.request.headers.getFirst(TRACE_ID_HEADER)
         val traceId = otelTraceId
             ?: if (isValidTraceId(incomingTraceId)) incomingTraceId!! else generateTraceId()
