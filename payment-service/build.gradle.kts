@@ -70,6 +70,10 @@ dependencies {
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.assertj:assertj-core:3.24.2")
 	testImplementation("org.springframework.security:spring-security-test")
+	testImplementation("org.springframework.kafka:spring-kafka-test")
+	testImplementation("org.testcontainers:testcontainers:1.19.7")
+	testImplementation("org.testcontainers:kafka:1.19.7")
+	testImplementation("org.testcontainers:junit-jupiter:1.19.7")
 
 	implementation("io.grpc:grpc-protobuf:$grpcVersion")
 	implementation("io.grpc:grpc-stub:$grpcVersion")
