@@ -1,6 +1,6 @@
 package com.hoppingmall.notification.config
 
-import com.hoppingmall.notification.jwt.JwtAuthenticationFilter
+import com.hoppingmall.common.config.GatewayHeaderAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -12,7 +12,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
-    private val jwtAuthenticationFilter: JwtAuthenticationFilter
+    private val gatewayHeaderAuthenticationFilter: GatewayHeaderAuthenticationFilter
 ) {
 
     @Bean
@@ -25,7 +25,7 @@ class SecurityConfig(
                     .requestMatchers("/actuator/**").permitAll()
                     .anyRequest().authenticated()
             }
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(gatewayHeaderAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
         return http.build()
     }
 }
