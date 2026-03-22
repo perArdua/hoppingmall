@@ -1,0 +1,106 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: service-alerts
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: error-rate-high
+        title: "Error Rate > 5%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "sum by (application) (rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum by (application) (rate(http_server_requests_seconds_count[5m])) * 100"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.application }} 에러율 5% 초과"
+
+      - uid: latency-p95-high
+        title: "P95 Latency > 3s"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket[5m])))"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [3]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.application }} P95 응답시간 3초 초과"
+
+      - uid: dlq-messages-detected
+        title: "DLQ Messages Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "rate(dlq_message_saved_count_total[5m]) * 300"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DLQ 메시지 발생 감지"

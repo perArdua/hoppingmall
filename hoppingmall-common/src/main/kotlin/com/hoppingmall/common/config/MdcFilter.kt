@@ -26,6 +26,7 @@ class MdcFilter(
     ) {
         try {
             val otelTraceId = tracer.currentSpan()?.context()?.traceId()
+                ?.takeIf { it.isNotBlank() }
             val rawTraceId = request.getHeader(TRACE_ID_HEADER)
             val traceId = otelTraceId
                 ?: if (isValidTraceId(rawTraceId)) rawTraceId!! else generateTraceId()
