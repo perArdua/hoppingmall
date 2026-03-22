@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.outbox.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.event.AvroEventConverter
 import com.hoppingmall.payment.config.OutboxMetrics
 import com.hoppingmall.payment.outbox.domain.OutboxEvent
 import com.hoppingmall.payment.outbox.domain.OutboxStatus
@@ -19,7 +20,8 @@ class OutboxEventPublisher(
     private val outboxEventRepository: OutboxEventRepository,
     private val kafkaTemplate: KafkaTemplate<String, Any>,
     private val objectMapper: ObjectMapper,
-    private val outboxMetrics: OutboxMetrics
+    private val outboxMetrics: OutboxMetrics,
+    private val avroEventConverter: AvroEventConverter
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
@@ -64,13 +66,13 @@ class OutboxEventPublisher(
                 return
             }
 
-            val eventData = objectMapper.readValue(event.eventData, Map::class.java)
+            val avroRecord = avroEventConverter.convertJsonToAvro(event.eventType, event.eventData)
 
             kafkaTemplate.executeInTransaction { template ->
                 val future: CompletableFuture<SendResult<String, Any>> = template.send(
                     event.topic,
                     event.partitionKey ?: "",
-                    eventData
+                    avroRecord
                 )
 
                 future.whenComplete { result, throwable ->

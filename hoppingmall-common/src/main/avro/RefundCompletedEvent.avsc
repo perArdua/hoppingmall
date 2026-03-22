@@ -1,0 +1,25 @@
+{
+  "type": "record",
+  "name": "RefundCompletedEvent",
+  "namespace": "com.hoppingmall.common.event",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "refundId", "type": "long"},
+    {"name": "orderId", "type": "long"},
+    {"name": "paymentId", "type": "long"},
+    {"name": "buyerId", "type": "long"},
+    {"name": "refundAmount", "type": "string"},
+    {"name": "pointRefundAmount", "type": "string", "default": "0"},
+    {"name": "isFullRefund", "type": "boolean", "default": false},
+    {"name": "couponId", "type": ["null", "long"], "default": null},
+    {"name": "items", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "RefundItemEvent",
+      "fields": [
+        {"name": "productId", "type": "long"},
+        {"name": "quantity", "type": "int"},
+        {"name": "refundPrice", "type": "string"}
+      ]
+    }}, "default": []}
+  ]
+}

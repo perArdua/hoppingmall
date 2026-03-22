@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "PointEarnRequestEvent",
+  "namespace": "com.hoppingmall.common.event",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "userId", "type": "long"},
+    {"name": "orderId", "type": "long"},
+    {"name": "paymentId", "type": "long"},
+    {"name": "earnAmount", "type": "string"},
+    {"name": "reason", "type": "string", "default": "결제 완료"}
+  ]
+}

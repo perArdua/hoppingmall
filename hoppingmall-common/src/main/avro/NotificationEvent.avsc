@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "NotificationEvent",
+  "namespace": "com.hoppingmall.common.event",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "userId", "type": "long"},
+    {"name": "type", "type": {"type": "enum", "name": "NotificationType", "symbols": [
+      "PAYMENT_COMPLETED", "PAYMENT_FAILED", "PAYMENT_CANCELLED",
+      "POINT_EARNED", "ORDER_STATUS_CHANGED", "REFUND_COMPLETED"
+    ]}},
+    {"name": "title", "type": "string"},
+    {"name": "content", "type": "string"},
+    {"name": "metadata", "type": ["null", "string"], "default": null}
+  ]
+}

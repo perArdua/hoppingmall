@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring") version "1.9.25"
 	kotlin("plugin.jpa") version "1.9.25"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("com.github.davidmc24.gradle.plugin.avro") version "1.9.1"
 	`java-library`
 }
 
@@ -17,6 +18,7 @@ java {
 
 repositories {
 	mavenCentral()
+	maven { url = uri("https://packages.confluent.io/maven/") }
 }
 
 dependencyManagement {
@@ -33,4 +35,6 @@ dependencies {
 	implementation("net.logstash.logback:logstash-logback-encoder:8.0")
 	api("io.micrometer:micrometer-tracing-bridge-otel")
 	api("io.opentelemetry:opentelemetry-exporter-otlp")
+	api("org.apache.avro:avro:1.11.3")
+	api("io.confluent:kafka-avro-serializer:7.6.0")
 }
