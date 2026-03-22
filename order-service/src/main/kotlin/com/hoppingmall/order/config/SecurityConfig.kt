@@ -1,7 +1,7 @@
 package com.hoppingmall.order.config
 
 import com.hoppingmall.common.config.InternalTokenFilter
-import com.hoppingmall.order.jwt.JwtAuthenticationFilter
+import com.hoppingmall.common.config.GatewayHeaderAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -13,7 +13,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
-    private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val gatewayHeaderAuthenticationFilter: GatewayHeaderAuthenticationFilter,
     private val internalTokenFilter: InternalTokenFilter
 ) {
 
@@ -30,7 +30,7 @@ class SecurityConfig(
                     .anyRequest().authenticated()
             }
             .addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter::class.java)
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(gatewayHeaderAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
         return http.build()
     }
 }
