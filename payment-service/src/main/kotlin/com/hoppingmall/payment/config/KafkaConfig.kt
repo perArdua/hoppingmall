@@ -1,9 +1,11 @@
 package com.hoppingmall.payment.config
 
+import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.payment.config.kafka.BusinessContextConsumerInterceptor
 import com.hoppingmall.payment.config.kafka.BusinessContextProducerInterceptor
 import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
 import com.hoppingmall.payment.dlq.service.DLQCommandService
+import io.confluent.kafka.serializers.KafkaAvroSerializer
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -16,7 +18,6 @@ import org.springframework.context.annotation.Profile
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
 import org.springframework.kafka.listener.DefaultErrorHandler
-import org.springframework.kafka.support.serializer.JsonSerializer
 import org.springframework.messaging.converter.MessageConversionException
 import org.apache.kafka.common.errors.SerializationException
 import org.springframework.kafka.support.serializer.DeserializationException
@@ -40,6 +41,9 @@ class KafkaConfig(
     @Value("\${spring.kafka.consumer.auto-offset-reset:earliest}")
     private lateinit var autoOffsetReset: String
 
+    @Value("\${spring.kafka.properties.schema.registry.url:http://localhost:8081}")
+    private lateinit var schemaRegistryUrl: String
+
     private val instanceId: String = UUID.randomUUID().toString()
 
     @Bean
@@ -47,7 +51,8 @@ class KafkaConfig(
         val configProps = HashMap<String, Any>()
         configProps[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
         configProps[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
-        configProps[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = JsonSerializer::class.java
+        configProps[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = KafkaAvroSerializer::class.java
+        configProps["schema.registry.url"] = schemaRegistryUrl
 
         configProps[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
         configProps[ProducerConfig.ACKS_CONFIG] = "all"
@@ -84,7 +89,8 @@ class KafkaConfig(
         configProps[ConsumerConfig.GROUP_ID_CONFIG] = groupId
         configProps[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = autoOffsetReset
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
-        configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
+        configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = AvroJsonDeserializer::class.java
+        configProps["schema.registry.url"] = schemaRegistryUrl
 
         configProps[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = false
         configProps[ConsumerConfig.ISOLATION_LEVEL_CONFIG] = "read_committed"

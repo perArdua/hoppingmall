@@ -23,6 +23,7 @@ kotlin {
 
 repositories {
 	mavenCentral()
+tmaven { url = uri("https://packages.confluent.io/maven/") }
 }
 
 dependencies {

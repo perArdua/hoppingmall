@@ -1,7 +1,9 @@
 package com.hoppingmall.order.config
 
+import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.order.config.kafka.BusinessContextConsumerInterceptor
 import com.hoppingmall.order.config.kafka.BusinessContextProducerInterceptor
+import io.confluent.kafka.serializers.KafkaAvroSerializer
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.errors.SerializationException
@@ -39,6 +41,9 @@ class KafkaConfig {
     @Value("\${spring.kafka.consumer.auto-offset-reset:earliest}")
     private lateinit var autoOffsetReset: String
 
+    @Value("\${spring.kafka.properties.schema.registry.url:http://localhost:8081}")
+    private lateinit var schemaRegistryUrl: String
+
     private val instanceId: String = UUID.randomUUID().toString()
 
     @Bean
@@ -46,7 +51,8 @@ class KafkaConfig {
         val configProps = HashMap<String, Any>()
         configProps[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG] = producerBootstrapServers
         configProps[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
-        configProps[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = JsonSerializer::class.java
+        configProps[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = KafkaAvroSerializer::class.java
+        configProps["schema.registry.url"] = schemaRegistryUrl
 
         configProps[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
         configProps[ProducerConfig.ACKS_CONFIG] = "all"
@@ -84,7 +90,8 @@ class KafkaConfig {
         configProps[ConsumerConfig.GROUP_ID_CONFIG] = groupId
         configProps[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = autoOffsetReset
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
-        configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
+        configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = AvroJsonDeserializer::class.java
+        configProps["schema.registry.url"] = schemaRegistryUrl
 
         configProps[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = false
         configProps[ConsumerConfig.ISOLATION_LEVEL_CONFIG] = "read_committed"

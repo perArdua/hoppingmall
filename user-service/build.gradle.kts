@@ -24,6 +24,7 @@ kotlin {
 
 repositories {
 	mavenCentral()
+tmaven { url = uri("https://packages.confluent.io/maven/") }
 }
 
 val grpcVersion = "1.62.2"
