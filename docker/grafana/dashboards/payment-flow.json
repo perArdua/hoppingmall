@@ -1,0 +1,119 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Payment Success / Failure Rate (per min)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(payment_completed_count_total{application=\"payment-service\"}[1m]) * 60",
+          "legendFormat": "completed"
+        },
+        {
+          "expr": "rate(payment_failed_count_total{application=\"payment-service\"}[1m]) * 60",
+          "legendFormat": "failed"
+        },
+        {
+          "expr": "rate(payment_cancelled_count_total{application=\"payment-service\"}[1m]) * 60",
+          "legendFormat": "cancelled"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqpm" }, "overrides": [] }
+    },
+    {
+      "title": "Payment Amount Over Time",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(payment_amount_total_total{application=\"payment-service\"}[5m]) * 300",
+          "legendFormat": "amount (5m window)"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyKRW" }, "overrides": [] }
+    },
+    {
+      "title": "Payment Processing Duration (p50 / p95 / p99)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(payment_processing_duration_seconds_bucket{application=\"payment-service\"}[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(payment_processing_duration_seconds_bucket{application=\"payment-service\"}[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(payment_processing_duration_seconds_bucket{application=\"payment-service\"}[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "title": "Payment Success Rate (%)",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "payment_completed_count_total / (payment_completed_count_total + payment_failed_count_total + payment_cancelled_count_total) * 100",
+          "legendFormat": "success rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 98 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "DLQ Messages",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "targets": [
+        {
+          "expr": "dlq_message_saved_count_total{application=\"payment-service\"}",
+          "legendFormat": "saved"
+        },
+        {
+          "expr": "dlq_retry_success_count_total{application=\"payment-service\"}",
+          "legendFormat": "retry success"
+        },
+        {
+          "expr": "dlq_retry_failed_count_total{application=\"payment-service\"}",
+          "legendFormat": "retry failed"
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["payment", "observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Payment Flow",
+  "uid": "payment-flow"
+}
