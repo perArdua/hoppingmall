@@ -17,6 +17,7 @@
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <includeMdcKeyName>traceId</includeMdcKeyName>
+                <includeMdcKeyName>spanId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
                 <customFields>{"service":"product-service"}</customFields>
             </encoder>
