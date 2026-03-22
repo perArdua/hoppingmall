@@ -1,5 +1,6 @@
 package com.hoppingmall.gateway.filter
 
+import io.micrometer.tracing.Tracer
 import org.springframework.cloud.gateway.filter.GatewayFilterChain
 import org.springframework.cloud.gateway.filter.GlobalFilter
 import org.springframework.core.Ordered
@@ -10,11 +11,16 @@ import reactor.core.publisher.Mono
 import java.util.UUID
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
-class TracingGlobalFilter : GlobalFilter {
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
+class TracingGlobalFilter(
+    private val tracer: Tracer
+) : GlobalFilter {
     override fun filter(exchange: ServerWebExchange, chain: GatewayFilterChain): Mono<Void> {
+        val otelTraceId = tracer.currentSpan()?.context()?.traceId()
         val incomingTraceId = exchange.request.headers.getFirst(TRACE_ID_HEADER)
-        val traceId = if (isValidTraceId(incomingTraceId)) incomingTraceId!! else generateTraceId()
+        val traceId = otelTraceId
+            ?: if (isValidTraceId(incomingTraceId)) incomingTraceId!! else generateTraceId()
+
         val modifiedRequest = exchange.request.mutate()
             .header(TRACE_ID_HEADER, traceId)
             .build()
