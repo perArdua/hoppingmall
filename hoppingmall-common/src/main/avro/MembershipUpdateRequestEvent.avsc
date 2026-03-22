@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "MembershipUpdateRequestEvent",
+  "namespace": "com.hoppingmall.common.event",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "userId", "type": "long"},
+    {"name": "orderId", "type": "long"},
+    {"name": "paymentId", "type": "long"},
+    {"name": "amount", "type": "string"}
+  ]
+}

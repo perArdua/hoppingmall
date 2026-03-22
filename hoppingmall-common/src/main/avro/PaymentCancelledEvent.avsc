@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "PaymentCancelledEvent",
+  "namespace": "com.hoppingmall.common.event",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "paymentId", "type": "long"},
+    {"name": "orderId", "type": "long"},
+    {"name": "userId", "type": "long"},
+    {"name": "amount", "type": "string"},
+    {"name": "transactionId", "type": "string", "default": ""}
+  ]
+}

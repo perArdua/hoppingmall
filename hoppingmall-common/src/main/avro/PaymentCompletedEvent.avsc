@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "PaymentCompletedEvent",
+  "namespace": "com.hoppingmall.common.event",
+  "fields": [
+    {"name": "paymentId", "type": "long"},
+    {"name": "orderId", "type": "long"},
+    {"name": "userId", "type": "long"},
+    {"name": "amount", "type": "string"},
+    {"name": "pointAmount", "type": "string", "default": "0"},
+    {"name": "method", "type": {"type": "enum", "name": "PaymentMethod", "symbols": ["CREDIT_CARD", "BANK_TRANSFER"]}},
+    {"name": "status", "type": {"type": "enum", "name": "PaymentStatus", "symbols": ["PENDING", "SUCCESS", "FAILED", "CANCELLED"]}},
+    {"name": "transactionId", "type": "string"},
+    {"name": "completedAt", "type": "string"}
+  ]
+}
