@@ -1,7 +1,7 @@
 package com.hoppingmall.order.config
 
-import com.hoppingmall.order.config.kafka.TracingConsumerInterceptor
-import com.hoppingmall.order.config.kafka.TracingProducerInterceptor
+import com.hoppingmall.order.config.kafka.BusinessContextConsumerInterceptor
+import com.hoppingmall.order.config.kafka.BusinessContextProducerInterceptor
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.errors.SerializationException
@@ -58,7 +58,7 @@ class KafkaConfig {
         configProps[ProducerConfig.LINGER_MS_CONFIG] = 10
         configProps[ProducerConfig.COMPRESSION_TYPE_CONFIG] = "lz4"
 
-        configProps[ProducerConfig.INTERCEPTOR_CLASSES_CONFIG] = listOf(TracingProducerInterceptor::class.java.name)
+        configProps[ProducerConfig.INTERCEPTOR_CLASSES_CONFIG] = listOf(BusinessContextProducerInterceptor::class.java.name)
 
         val producerFactory = DefaultKafkaProducerFactory<String, Any>(configProps)
         producerFactory.setTransactionIdPrefix("order-tx-$instanceId-")
@@ -102,7 +102,7 @@ class KafkaConfig {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
         factory.setConcurrency(4)
-        factory.setRecordInterceptor(TracingConsumerInterceptor())
+        factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
 
         val errorHandler = DefaultErrorHandler(
             { record, exception ->

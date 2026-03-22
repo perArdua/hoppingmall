@@ -1,6 +1,6 @@
 package com.hoppingmall.user.config
 
-import com.hoppingmall.user.config.kafka.TracingConsumerInterceptor
+import com.hoppingmall.user.config.kafka.BusinessContextConsumerInterceptor
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.springframework.beans.factory.annotation.Value
@@ -38,7 +38,7 @@ class KafkaConsumerConfig(
     fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
-        factory.setRecordInterceptor(TracingConsumerInterceptor())
+        factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
         return factory
     }
 }
