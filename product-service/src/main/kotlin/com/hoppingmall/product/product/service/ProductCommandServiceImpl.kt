@@ -25,7 +25,7 @@ class ProductCommandServiceImpl(
 ) : ProductCommandService {
 
     override fun createProduct(request: ProductCreateRequest): ProductResponse {
-        if (!categoryRepository.existsById(request.categoryId)) {
+        if (categoryRepository.findNullableById(request.categoryId) == null) {
             throw CategoryNotFoundException()
         }
 
@@ -54,7 +54,7 @@ class ProductCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")
     override fun updateProduct(productId: Long, request: ProductUpdateRequest): ProductResponse {
-        if (!categoryRepository.existsById(request.categoryId)) {
+        if (request.categoryId == null || categoryRepository.findNullableById(request.categoryId) == null) {
             throw CategoryNotFoundException()
         }
 

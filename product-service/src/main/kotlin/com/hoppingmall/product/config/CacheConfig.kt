@@ -36,8 +36,22 @@ class CacheConfig {
                 .expireAfterWrite(60, TimeUnit.MINUTES)
                 .build()
         )
+        val categoriesRootCache = CaffeineCache(
+            "categories:root",
+            Caffeine.newBuilder()
+                .maximumSize(1)
+                .expireAfterWrite(60, TimeUnit.MINUTES)
+                .build()
+        )
+        val categoriesSubCache = CaffeineCache(
+            "categories:sub",
+            Caffeine.newBuilder()
+                .maximumSize(100)
+                .expireAfterWrite(60, TimeUnit.MINUTES)
+                .build()
+        )
         return SimpleCacheManager().apply {
-            setCaches(listOf(productCache, inventoryCache, categoryCache))
+            setCaches(listOf(productCache, inventoryCache, categoryCache, categoriesRootCache, categoriesSubCache))
         }
     }
 }

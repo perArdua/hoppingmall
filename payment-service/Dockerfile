@@ -1,12 +1,12 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY gradlew ./
-COPY gradle ./gradle
-COPY build.gradle.kts settings.gradle.kts ./
-COPY src ./src
+COPY payment-service/gradlew ./
+COPY payment-service/gradle ./gradle
+COPY payment-service/build.gradle.kts payment-service/settings.gradle.kts ./
+COPY payment-service/src ./src
 COPY hoppingmall-common /hoppingmall-common
-RUN chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
+RUN sed -i "s/\r$//" gradlew && chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
