@@ -5,9 +5,11 @@ import com.hoppingmall.payment.dlq.domain.DLQMessage
 import com.hoppingmall.payment.dlq.domain.DLQStatus
 import com.hoppingmall.payment.dlq.service.DLQCommandService
 import com.hoppingmall.payment.dlq.service.DLQQueryService
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Page
 import org.springframework.web.bind.annotation.*
 
+@Tag(name = "DLQ 관리")
 @RestController
 @RequestMapping("/api/v1/admin/dlq")
 class DLQController(

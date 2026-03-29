@@ -1,0 +1,6 @@
+clusterServersConfig:
+  nodeAddresses:
+    - "redis://redis-node-1:7001"
+    - "redis://redis-node-2:7002"
+    - "redis://redis-node-3:7003"
+  scanInterval: 1000

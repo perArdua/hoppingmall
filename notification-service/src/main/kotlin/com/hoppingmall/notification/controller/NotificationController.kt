@@ -8,6 +8,7 @@ import com.hoppingmall.notification.enums.NotificationType
 import com.hoppingmall.notification.service.NotificationCommandService
 import com.hoppingmall.notification.service.NotificationQueryService
 import com.hoppingmall.notification.service.NotificationSseService
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.web.PageableDefault
@@ -17,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 
+@Tag(name = "알림")
 @RestController
 @RequestMapping("/api/v1/notifications")
 class NotificationController(
