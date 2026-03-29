@@ -8,31 +8,32 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
 
-  data:
-    redis:
-      redisson:
-        config: |
-          clusterServersConfig:
-            nodeAddresses:
-              - "redis://redis-node-1:7001"
-              - "redis://redis-node-2:7002"
-              - "redis://redis-node-3:7003"
-            scanInterval: 1000
-
   kafka:
     consumer:
       bootstrap-servers: kafka:29092
     producer:
       bootstrap-servers: kafka:29092
+    properties:
+      schema.registry.url: http://schema-registry:8081
 
+  data:
+    redis:
+      cluster:
+        nodes:
+          - redis-node-1:7001
+          - redis-node-2:7002
+          - redis-node-3:7003
 management:
+  metrics:
+    tags:
+      application: payment-service
   tracing:
     sampling:
       probability: 1.0
     enabled: true
-  zipkin:
+  otlp:
     tracing:
-      endpoint: http://zipkin:9411/api/v2/spans
+      endpoint: http://tempo:4318/v1/traces
 
 services:
   user-service:

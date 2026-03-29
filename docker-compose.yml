@@ -235,6 +235,8 @@ services:
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
+    depends_on:
+      - mimir
 
   loki:
     image: grafana/loki:2.9.0
@@ -244,6 +246,16 @@ services:
     volumes:
       - ./docker/loki.yml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
+
+  mimir:
+    image: grafana/mimir:2.14.0
+    container_name: mimir
+    command: ["--config.file=/etc/mimir/mimir.yml"]
+    ports:
+      - "9009:9009"
+    volumes:
+      - ./docker/mimir.yml:/etc/mimir/mimir.yml
+      - mimir-data:/data/mimir
 
   promtail:
     image: grafana/promtail:2.9.0
@@ -273,11 +285,12 @@ services:
       - prometheus
       - loki
       - tempo
+      - mimir
 
   notification-service:
     build:
-      context: ./notification-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: notification-service/Dockerfile
     container_name: notification-service
     depends_on:
       mysql:
@@ -290,12 +303,18 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
     ports:
-      - "8081:8081"
+      - "8091:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   user-service:
     build:
-      context: ./user-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: user-service/Dockerfile
     container_name: user-service
     depends_on:
       mysql:
@@ -309,11 +328,17 @@ services:
     ports:
       - "8082:8082"
       - "9082:9082"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   product-service:
     build:
-      context: ./product-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: product-service/Dockerfile
     container_name: product-service
     depends_on:
       mysql:
@@ -327,11 +352,17 @@ services:
     ports:
       - "8083:8083"
       - "9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   order-service:
     build:
-      context: ./order-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: order-service/Dockerfile
     container_name: order-service
     depends_on:
       mysql:
@@ -347,11 +378,17 @@ services:
     ports:
       - "8084:8084"
       - "9094:9094"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   payment-service:
     build:
-      context: ./payment-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: payment-service/Dockerfile
     container_name: payment-service
     depends_on:
       mysql:
@@ -367,11 +404,17 @@ services:
     ports:
       - "8085:8085"
       - "9095:9095"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   settlement-service:
     build:
-      context: ./settlement-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: settlement-service/Dockerfile
     container_name: settlement-service
     depends_on:
       mysql:
@@ -382,15 +425,21 @@ services:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
       - "8086:8086"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   api-gateway:
     build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: api-gateway
     depends_on:
       redis-cluster-init:
-        condition: service_completed_successfully
+        condition: service_started
       user-service:
         condition: service_started
       notification-service:
@@ -408,9 +457,52 @@ services:
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: kafka-exporter
+    command: --kafka.server=kafka:29092 --offset.show-all
+    depends_on:
+      - kafka
+    ports:
+      - "9308:9308"
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    environment:
+      REDIS_ADDR: redis://redis-node-1:7001
+      REDIS_EXPORTER_IS_CLUSTER: "true"
+    depends_on:
+      redis-cluster-init:
+        condition: service_started
+    ports:
+      - "9121:9121"
+
+  seed-runner:
+    image: mysql:8.0
+    container_name: seed-runner
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+    volumes:
+      - ./docker/seed-data.sql:/seed-data.sql
+    entrypoint: ["sh", "-c", "sleep 5 && mysql -h mysql -u root -proot < /seed-data.sql && echo 'Seed data inserted successfully'"]
+    restart: "no"
 
 volumes:
   mysql-data:
   prometheus-data:
   grafana-data:
   tempo-data:
+  mimir-data:

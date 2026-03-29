@@ -31,6 +31,8 @@ scrape_configs:
           expressions:
             level: level
             service: service
+            traceId: traceId
       - labels:
           level:
           service:
+          traceId:

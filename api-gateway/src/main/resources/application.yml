@@ -1,3 +1,22 @@
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    urls:
+      - name: user-service
+        url: /v3/api-docs/user-service
+      - name: product-service
+        url: /v3/api-docs/product-service
+      - name: order-service
+        url: /v3/api-docs/order-service
+      - name: payment-service
+        url: /v3/api-docs/payment-service
+      - name: settlement-service
+        url: /v3/api-docs/settlement-service
+      - name: notification-service
+        url: /v3/api-docs/notification-service
+
 spring:
   application:
     name: api-gateway
@@ -10,6 +29,48 @@ spring:
   cloud:
     gateway:
       routes:
+        - id: user-service-api-docs
+          uri: ${ROUTES_USER_SERVICE:http://localhost:8082}
+          predicates:
+            - Path=/v3/api-docs/user-service
+          filters:
+            - RewritePath=/v3/api-docs/user-service, /v3/api-docs
+
+        - id: product-service-api-docs
+          uri: ${ROUTES_PRODUCT_SERVICE:http://localhost:8083}
+          predicates:
+            - Path=/v3/api-docs/product-service
+          filters:
+            - RewritePath=/v3/api-docs/product-service, /v3/api-docs
+
+        - id: order-service-api-docs
+          uri: ${ROUTES_ORDER_SERVICE:http://localhost:8084}
+          predicates:
+            - Path=/v3/api-docs/order-service
+          filters:
+            - RewritePath=/v3/api-docs/order-service, /v3/api-docs
+
+        - id: payment-service-api-docs
+          uri: ${ROUTES_PAYMENT_SERVICE:http://localhost:8085}
+          predicates:
+            - Path=/v3/api-docs/payment-service
+          filters:
+            - RewritePath=/v3/api-docs/payment-service, /v3/api-docs
+
+        - id: settlement-service-api-docs
+          uri: ${ROUTES_SETTLEMENT_SERVICE:http://localhost:8086}
+          predicates:
+            - Path=/v3/api-docs/settlement-service
+          filters:
+            - RewritePath=/v3/api-docs/settlement-service, /v3/api-docs
+
+        - id: notification-service-api-docs
+          uri: ${ROUTES_NOTIFICATION_SERVICE:http://localhost:8081}
+          predicates:
+            - Path=/v3/api-docs/notification-service
+          filters:
+            - RewritePath=/v3/api-docs/notification-service, /v3/api-docs
+
         - id: user-service-public
           uri: ${ROUTES_USER_SERVICE:http://localhost:8082}
           predicates:
