@@ -1,6 +1,10 @@
 spring:
+  main:
+    allow-bean-definition-overriding: true
   kafka:
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: kafka:29092
+    properties:
+      schema.registry.url: http://schema-registry:8081
     consumer:
       group-id: membership-service
       auto-offset-reset: earliest
@@ -20,22 +24,21 @@ spring:
       ddl-auto: update
   data:
     redis:
-      redisson:
-        config: |
-          clusterServersConfig:
-            nodeAddresses:
-              - "redis://redis-node-1:7001"
-              - "redis://redis-node-2:7002"
-              - "redis://redis-node-3:7003"
-            scanInterval: 1000
-
+      cluster:
+        nodes:
+          - redis-node-1:7001
+          - redis-node-2:7002
+          - redis-node-3:7003
 management:
+  metrics:
+    tags:
+      application: user-service
   tracing:
     sampling:
       probability: 1.0
-  zipkin:
+  otlp:
     tracing:
-      endpoint: http://zipkin:9411/api/v2/spans
+      endpoint: http://tempo:4318/v1/traces
 
 internal:
   service:

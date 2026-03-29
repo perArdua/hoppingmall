@@ -19,6 +19,7 @@
                 <includeMdcKeyName>traceId</includeMdcKeyName>
                 <includeMdcKeyName>spanId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
+                <includeMdcKeyName>globalTraceId</includeMdcKeyName>
                 <customFields>{"service":"payment-service"}</customFields>
             </encoder>
         </appender>

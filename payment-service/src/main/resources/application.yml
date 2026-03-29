@@ -16,6 +16,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        use_sql_comments: true
         legacy_id_generator_strategy: true
         default_batch_fetch_size: 100
 
@@ -136,3 +137,9 @@ resilience4j:
         baseConfig: default
       order-query:
         baseConfig: default
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
