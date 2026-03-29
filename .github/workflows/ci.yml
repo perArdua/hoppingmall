@@ -65,14 +65,8 @@ jobs:
       - name: 소스 체크아웃
         uses: actions/checkout@v3
 
-      - name: 공통 모듈 복사
-        run: |
-          if [ -d "hoppingmall-common" ] && [ "${{ matrix.service }}" != "api-gateway" ]; then
-            cp -r hoppingmall-common ./${{ matrix.service }}/hoppingmall-common
-          fi
-
       - name: Docker 빌드 검증
-        run: docker build -t ${{ matrix.service }}:ci-test ./${{ matrix.service }}
+        run: docker build -t ${{ matrix.service }}:ci-test -f ./${{ matrix.service }}/Dockerfile .
 
   k8s-validate:
     name: K8s 매니페스트 검증
