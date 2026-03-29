@@ -1,7 +1,6 @@
 {
   "annotations": { "list": [] },
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
   "links": [],
@@ -12,14 +11,8 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
-        {
-          "expr": "rate(outbox_event_published_count_total[1m]) * 60",
-          "legendFormat": "{{application}} published"
-        },
-        {
-          "expr": "rate(outbox_event_failed_count_total[1m]) * 60",
-          "legendFormat": "{{application}} failed"
-        }
+        { "expr": "rate(outbox_event_published_count_total[1m]) * 60", "legendFormat": "{{job}} published" },
+        { "expr": "rate(outbox_event_failed_count_total[1m]) * 60", "legendFormat": "{{job}} failed" }
       ],
       "fieldConfig": { "defaults": { "unit": "reqpm" }, "overrides": [] }
     },
@@ -28,12 +21,7 @@
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "targets": [
-        {
-          "expr": "rate(outbox_event_published_by_topic_total[1m]) * 60",
-          "legendFormat": "{{application}} {{topic}}"
-        }
-      ],
+      "targets": [{ "expr": "rate(outbox_event_published_count_total[1m]) * 60", "legendFormat": "{{job}} published" }],
       "fieldConfig": { "defaults": { "unit": "reqpm" }, "overrides": [] }
     },
     {
@@ -42,14 +30,8 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
-        {
-          "expr": "rate(order_created_count_total{application=\"order-service\"}[1m]) * 60",
-          "legendFormat": "created"
-        },
-        {
-          "expr": "rate(order_cancelled_count_total{application=\"order-service\"}[1m]) * 60",
-          "legendFormat": "cancelled"
-        }
+        { "expr": "rate(order_created_count_total{job=\"order-service\"}[1m]) * 60", "legendFormat": "created" },
+        { "expr": "rate(order_cancelled_count_total{job=\"order-service\"}[1m]) * 60", "legendFormat": "cancelled" }
       ],
       "fieldConfig": { "defaults": { "unit": "reqpm" }, "overrides": [] }
     },
@@ -58,12 +40,7 @@
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "targets": [
-        {
-          "expr": "rate(order_amount_total_total{application=\"order-service\"}[5m]) * 300",
-          "legendFormat": "amount (5m window)"
-        }
-      ],
+      "targets": [{ "expr": "rate(order_amount_total{job=\"order-service\"}[5m]) * 300", "legendFormat": "amount (5m window)" }],
       "fieldConfig": { "defaults": { "unit": "currencyKRW" }, "overrides": [] }
     },
     {
@@ -72,18 +49,9 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "targets": [
-        {
-          "expr": "rate(dlq_message_saved_count_total[1m]) * 60",
-          "legendFormat": "new DLQ messages/min"
-        },
-        {
-          "expr": "rate(dlq_retry_success_count_total[1m]) * 60",
-          "legendFormat": "retry success/min"
-        },
-        {
-          "expr": "rate(dlq_retry_failed_count_total[1m]) * 60",
-          "legendFormat": "retry failed/min"
-        }
+        { "expr": "rate(dlq_message_saved_count_total[1m]) * 60", "legendFormat": "{{job}} new DLQ/min" },
+        { "expr": "rate(dlq_retry_success_count_total[1m]) * 60", "legendFormat": "{{job}} retry success/min" },
+        { "expr": "rate(dlq_retry_failed_count_total[1m]) * 60", "legendFormat": "{{job}} retry failed/min" }
       ],
       "fieldConfig": { "defaults": { "unit": "reqpm" }, "overrides": [] }
     },
@@ -92,40 +60,23 @@
       "type": "gauge",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-      "targets": [
-        {
-          "expr": "outbox_event_failed_count_total / (outbox_event_published_count_total + outbox_event_failed_count_total) * 100",
-          "legendFormat": "{{application}} failure rate"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "thresholds": {
-            "steps": [
-              { "color": "green", "value": 0 },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 5 }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    }
-  ],
+      "targets": [{ "expr": "outbox_event_failed_count_total / (outbox_event_published_count_total + outbox_event_failed_count_total) * 100", "legendFormat": "{{job}} failure rate" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": 0 }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] }
+    },
+    {
+      "title": "Kafka Consumer Lag by Group/Topic",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [{ "expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag)", "legendFormat": "{{consumergroup}} / {{topic}}" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
     {
       "title": "Event Flow Traces (Tempo)",
       "type": "table",
       "datasource": { "type": "tempo", "uid": "tempo" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
-      "targets": [
-        {
-          "queryType": "nativeSearch",
-          "limit": 20
-        }
-      ],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "targets": [{ "queryType": "nativeSearch", "limit": 20 }],
       "fieldConfig": { "defaults": {}, "overrides": [] }
     }
   ],

@@ -7,7 +7,7 @@ groups:
     interval: 1m
     rules:
       - uid: error-rate-high
-        title: "Error Rate > 5%"
+        title: "5xx Error Rate > 5%"
         condition: C
         data:
           - refId: A
@@ -16,7 +16,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: "sum by (application) (rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum by (application) (rate(http_server_requests_seconds_count[5m])) * 100"
+              expr: "sum by (job) (rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum by (job) (rate(http_server_requests_seconds_count[5m])) * 100"
               intervalMs: 60000
               maxDataPoints: 43200
           - refId: C
@@ -37,7 +37,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.application }} 에러율 5% 초과"
+          summary: "{{ $labels.job }} 5xx 에러율 5% 초과"
 
       - uid: latency-p95-high
         title: "P95 Latency > 3s"
@@ -49,7 +49,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: "histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket[5m])))"
+              expr: "histogram_quantile(0.95, sum by (job, le) (rate(http_server_requests_seconds_bucket[5m])))"
               intervalMs: 60000
               maxDataPoints: 43200
           - refId: C
@@ -70,7 +70,40 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.application }} P95 응답시간 3초 초과"
+          summary: "{{ $labels.job }} P95 응답시간 3초 초과"
+
+      - uid: latency-p99-high
+        title: "P99 Latency > 5s"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "histogram_quantile(0.99, sum by (job, le) (rate(http_server_requests_seconds_bucket[5m])))"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+        noDataState: OK
+        execErrState: Error
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} P99 응답시간 5초 초과"
 
       - uid: dlq-messages-detected
         title: "DLQ Messages Detected"
@@ -104,3 +137,399 @@ groups:
           severity: warning
         annotations:
           summary: "DLQ 메시지 발생 감지"
+
+      - uid: service-down
+        title: "Service Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "up{job=~\".*-service|api-gateway\"}"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "서비스 다운: {{ $labels.job }}"
+
+      - uid: client-error-rate-high
+        title: "4xx Error Rate > 20%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "sum by (job) (rate(http_server_requests_seconds_count{status=~\"4..\"}[5m])) / sum by (job) (rate(http_server_requests_seconds_count[5m])) * 100"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [20]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} 4xx 에러율 20% 초과"
+
+      - uid: jvm-heap-warning
+        title: "JVM Heap > 85%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "jvm_memory_used_bytes{area=\"heap\"} / jvm_memory_max_bytes{area=\"heap\"} * 100"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} JVM 힙 사용률 85% 초과"
+
+      - uid: jvm-heap-critical
+        title: "JVM Heap > 95%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "jvm_memory_used_bytes{area=\"heap\"} / jvm_memory_max_bytes{area=\"heap\"} * 100"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [95]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} JVM 힙 사용률 95% 초과 (OOM 위험)"
+
+      - uid: gc-pressure-high
+        title: "GC Pressure High"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "rate(jvm_gc_pause_seconds_sum[5m])"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} GC 오버헤드 과도"
+
+      - uid: kafka-lag-warning
+        title: "Kafka Consumer Lag > 1000"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "sum by (consumergroup, topic) (kafka_consumergroup_lag)"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1000]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka 컨슈머 지연: {{ $labels.consumergroup }}/{{ $labels.topic }}"
+
+      - uid: kafka-lag-critical
+        title: "Kafka Consumer Lag > 10000"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "sum by (consumergroup, topic) (kafka_consumergroup_lag)"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10000]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka 컨슈머 지연 심각: {{ $labels.consumergroup }}/{{ $labels.topic }}"
+
+      - uid: redis-memory-high
+        title: "Redis Memory > 80%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "redis_memory_used_bytes / redis_memory_max_bytes * 100 and redis_memory_max_bytes > 0"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis 메모리 사용률 80% 초과"
+
+      - uid: redis-eviction
+        title: "Redis Key Eviction"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "rate(redis_evicted_keys_total[5m])"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis 키 eviction 발생 (분산 락/Rate Limiting 영향 가능)"
+
+      - uid: hikaricp-exhaustion
+        title: "HikariCP Pool Exhaustion"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "hikaricp_connections_pending"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} DB 커넥션 풀 포화 (대기 스레드 존재)"
+
+      - uid: outbox-failure-rate
+        title: "Outbox Failure Rate > 10%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "outbox_event_failed_count_total / (outbox_event_published_count_total + outbox_event_failed_count_total) * 100"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} Outbox 이벤트 실패율 10% 초과 (Kafka 발행 장애)"
+
+      - uid: payment-failure-spike
+        title: "Payment Failure Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "rate(payment_failed_count_total[5m]) * 300"
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "결제 실패 발생 (5분간 {{ $values.A }} 건)"
