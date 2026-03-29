@@ -10,6 +10,7 @@ import com.hoppingmall.settlement.exception.SettlementSellerNotFoundException
 import com.hoppingmall.settlement.port.SellerQueryPort
 import com.hoppingmall.settlement.service.SettlementCommandService
 import com.hoppingmall.settlement.service.SettlementQueryService
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
@@ -18,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.*
 
+@Tag(name = "정산")
 @RestController
 class SettlementController(
     private val settlementCommandService: SettlementCommandService,

@@ -44,6 +44,9 @@ class RateLimitGlobalFilter(
     private fun isExcluded(path: String): Boolean {
         return path.startsWith("/actuator") ||
             path.startsWith("/internal") ||
+            path.startsWith("/swagger-ui") ||
+            path.startsWith("/v3/api-docs") ||
+            path.startsWith("/webjars") ||
             path == "/api/v1/users/signup" ||
             path == "/api/v1/users/login" ||
             path == "/api/v1/auth/refresh"
