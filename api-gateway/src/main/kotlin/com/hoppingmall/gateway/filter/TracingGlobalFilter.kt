@@ -22,11 +22,16 @@ class TracingGlobalFilter(
         val traceId = otelTraceId
             ?: if (isValidTraceId(incomingTraceId)) incomingTraceId!! else generateTraceId()
 
+        val incomingGlobalTraceId = exchange.request.headers.getFirst(GLOBAL_TRACE_ID_HEADER)
+        val globalTraceId = if (isValidTraceId(incomingGlobalTraceId)) incomingGlobalTraceId!! else generateTraceId()
+
         val modifiedRequest = exchange.request.mutate()
             .header(TRACE_ID_HEADER, traceId)
+            .header(GLOBAL_TRACE_ID_HEADER, globalTraceId)
             .build()
         val modifiedExchange = exchange.mutate().request(modifiedRequest).build()
         modifiedExchange.response.headers.set(TRACE_ID_HEADER, traceId)
+        modifiedExchange.response.headers.set(GLOBAL_TRACE_ID_HEADER, globalTraceId)
         return chain.filter(modifiedExchange)
     }
 
@@ -37,6 +42,7 @@ class TracingGlobalFilter(
 
     companion object {
         const val TRACE_ID_HEADER = "X-Trace-Id"
+        const val GLOBAL_TRACE_ID_HEADER = "X-Global-Trace-Id"
         private val TRACE_ID_PATTERN = Regex("[a-zA-Z0-9\\-]+")
     }
 }

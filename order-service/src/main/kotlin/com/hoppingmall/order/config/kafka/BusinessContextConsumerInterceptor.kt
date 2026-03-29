@@ -9,12 +9,14 @@ class BusinessContextConsumerInterceptor : RecordInterceptor<String, Any> {
     override fun intercept(record: ConsumerRecord<String, Any>, consumer: Consumer<String, Any>): ConsumerRecord<String, Any> {
         extractHeader(record, USER_ID_HEADER)?.let { MDC.put(USER_ID_KEY, it) }
         extractHeader(record, SERVICE_HEADER)?.let { MDC.put(SERVICE_KEY, it) }
+        extractHeader(record, GLOBAL_TRACE_ID_HEADER)?.let { MDC.put(GLOBAL_TRACE_ID_KEY, it) }
         return record
     }
 
     override fun afterRecord(record: ConsumerRecord<String, Any>, consumer: Consumer<String, Any>) {
         MDC.remove(USER_ID_KEY)
         MDC.remove(SERVICE_KEY)
+        MDC.remove(GLOBAL_TRACE_ID_KEY)
     }
 
     private fun extractHeader(record: ConsumerRecord<String, Any>, headerName: String): String? {
@@ -27,5 +29,7 @@ class BusinessContextConsumerInterceptor : RecordInterceptor<String, Any> {
         const val USER_ID_HEADER = "X-User-Id"
         const val SERVICE_KEY = "service"
         const val SERVICE_HEADER = "X-Service-Name"
+        const val GLOBAL_TRACE_ID_HEADER = "X-Global-Trace-Id"
+        const val GLOBAL_TRACE_ID_KEY = "globalTraceId"
     }
 }
