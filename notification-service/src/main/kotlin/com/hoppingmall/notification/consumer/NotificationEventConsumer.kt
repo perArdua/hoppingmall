@@ -12,8 +12,8 @@ import org.springframework.cache.CacheManager
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.redis.core.RedisTemplate
 import com.hoppingmall.common.KafkaTopics
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -29,9 +29,17 @@ class NotificationEventConsumer(
     private val log = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(topics = [KafkaTopics.NOTIFICATION], groupId = "notification-service")
+    @Suppress("UNCHECKED_CAST")
     fun handleNotificationEvent(
-        @Payload event: Map<String, Any>
+        record: ConsumerRecord<String, Any>
     ) {
+        val value = record.value()
+        val event: Map<String, Any> = when (value) {
+            is Map<*, *> -> value as Map<String, Any>
+            is String -> objectMapper.readValue(value, Map::class.java) as Map<String, Any>
+            else -> objectMapper.readValue(value.toString(), Map::class.java) as Map<String, Any>
+        }
+
         val eventId = event["event_id"]?.toString() ?: event["eventId"]?.toString() ?: return
         val userId = (event["user_id"] ?: event["userId"])?.toString()?.toLongOrNull() ?: return
         val typeStr = event["type"]?.toString() ?: return

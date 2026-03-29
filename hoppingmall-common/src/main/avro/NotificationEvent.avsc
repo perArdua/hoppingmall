@@ -7,7 +7,8 @@
     {"name": "userId", "type": "long"},
     {"name": "type", "type": {"type": "enum", "name": "NotificationType", "symbols": [
       "PAYMENT_COMPLETED", "PAYMENT_FAILED", "PAYMENT_CANCELLED",
-      "POINT_EARNED", "ORDER_STATUS_CHANGED", "REFUND_COMPLETED"
+      "POINT_EARNED", "ORDER_STATUS_CHANGED", "REFUND_COMPLETED",
+      "SHIPPING_STARTED", "SHIPPING_DELIVERED"
     ]}},
     {"name": "title", "type": "string"},
     {"name": "content", "type": "string"},

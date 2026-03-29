@@ -16,12 +16,23 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
         "PointEarnRequestEvent" to PointEarnRequestEvent.getClassSchema(),
         "MembershipUpdateRequestEvent" to MembershipUpdateRequestEvent.getClassSchema(),
         "NotificationEvent" to NotificationEvent.getClassSchema(),
-        "RefundCompletedEvent" to RefundCompletedEvent.getClassSchema()
+        "RefundCompletedEvent" to RefundCompletedEvent.getClassSchema(),
+        "PaymentCompleted" to PaymentCompletedEvent.getClassSchema(),
+        "PaymentFailed" to PaymentFailedEvent.getClassSchema(),
+        "PaymentCancelled" to PaymentCancelledEvent.getClassSchema(),
+        "PointEarnRequested" to PointEarnRequestEvent.getClassSchema(),
+        "MembershipUpdateRequested" to MembershipUpdateRequestEvent.getClassSchema(),
+        "RefundCompleted" to RefundCompletedEvent.getClassSchema(),
+        "PaymentReversalRequested" to PaymentCancelledEvent.getClassSchema()
     )
 
     fun convertJsonToAvro(eventType: String, jsonData: String): GenericRecord {
         val schema = schemaMap[eventType]
-            ?: throw IllegalArgumentException("Unknown event type: $eventType")
+            ?: if (eventType.endsWith("NotificationRequested")) {
+                NotificationEvent.getClassSchema()
+            } else {
+                throw IllegalArgumentException("Unknown event type: $eventType")
+            }
         val jsonMap = objectMapper.readValue(jsonData, Map::class.java)
         return buildGenericRecord(schema, jsonMap)
     }
