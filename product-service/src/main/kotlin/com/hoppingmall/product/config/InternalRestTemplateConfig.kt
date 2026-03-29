@@ -33,6 +33,7 @@ class InternalRestTemplateConfig(
             execution: ClientHttpRequestExecution
         ): ClientHttpResponse {
             MDC.get("traceId")?.let { request.headers.set("X-Trace-Id", it) }
+            MDC.get("globalTraceId")?.let { request.headers.set("X-Global-Trace-Id", it) }
             MDC.get("userId")?.let { request.headers.set("X-User-Id", it) }
             if (request.uri.path.startsWith("/internal/")) {
                 request.headers.set("X-Internal-Token", token)

@@ -36,6 +36,9 @@ dependencies {
 	api("io.micrometer:micrometer-tracing-bridge-otel")
 	api("io.opentelemetry:opentelemetry-exporter-otlp")
 	api("org.apache.avro:avro:1.11.3")
-	api("io.confluent:kafka-avro-serializer:7.6.0")
+	api("io.confluent:kafka-avro-serializer:7.6.0") {
+		exclude(group = "io.swagger.core.v3", module = "swagger-annotations")
+	}
 	compileOnly("org.redisson:redisson-spring-boot-starter:4.3.0")
+	compileOnly("io.micrometer:micrometer-core")
 }

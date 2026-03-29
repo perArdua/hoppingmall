@@ -10,6 +10,7 @@ class BusinessContextProducerInterceptor : ProducerInterceptor<String, Any> {
     override fun onSend(record: ProducerRecord<String, Any>): ProducerRecord<String, Any> {
         addHeaderFromMdc(record, USER_ID_KEY, USER_ID_HEADER)
         addHeaderFromMdc(record, SERVICE_KEY, SERVICE_HEADER)
+        addHeaderFromMdc(record, GLOBAL_TRACE_ID_KEY, GLOBAL_TRACE_ID_HEADER)
         return record
     }
 
@@ -31,5 +32,7 @@ class BusinessContextProducerInterceptor : ProducerInterceptor<String, Any> {
         const val USER_ID_HEADER = "X-User-Id"
         const val SERVICE_KEY = "service"
         const val SERVICE_HEADER = "X-Service-Name"
+        const val GLOBAL_TRACE_ID_KEY = "globalTraceId"
+        const val GLOBAL_TRACE_ID_HEADER = "X-Global-Trace-Id"
     }
 }
