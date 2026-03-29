@@ -1,0 +1,99 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Kafka Consumer Lag by Group/Topic",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag)", "legendFormat": "{{consumergroup}} / {{topic}}" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "title": "Kafka Topic Message Rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum by (topic) (rate(kafka_topic_partition_current_offset[5m]))", "legendFormat": "{{topic}}" }],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "title": "Under-Replicated Partitions",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 8 },
+      "targets": [{ "expr": "sum(kafka_topic_partition_under_replicated_partition)", "legendFormat": "" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "title": "Kafka Brokers",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 8 },
+      "targets": [{ "expr": "count(kafka_brokers)", "legendFormat": "" }],
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+    {
+      "title": "Redis Memory Usage",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "targets": [{ "expr": "redis_memory_used_bytes", "legendFormat": "{{addr}} used" }],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+    },
+    {
+      "title": "Redis Cache Hit Ratio (%)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100", "legendFormat": "{{addr}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 }, "overrides": [] }
+    },
+    {
+      "title": "Redis Eviction Rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "targets": [{ "expr": "rate(redis_evicted_keys_total[5m])", "legendFormat": "{{addr}}" }],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "title": "Redis Connected Clients",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [{ "expr": "redis_connected_clients", "legendFormat": "{{addr}}" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "title": "Redis Cluster Slots",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        { "expr": "redis_cluster_slots_ok", "legendFormat": "OK" },
+        { "expr": "redis_cluster_slots_fail", "legendFormat": "FAIL" },
+        { "expr": "redis_cluster_slots_pfail", "legendFormat": "PFAIL" }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+    {
+      "title": "JVM Heap Usage % (All Services)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "targets": [{ "expr": "jvm_memory_used_bytes{area=\"heap\"} / jvm_memory_max_bytes{area=\"heap\"} * 100", "legendFormat": "{{job}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 85 }] } }, "overrides": [] }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["infrastructure", "kafka", "redis"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Infrastructure (Kafka + Redis + JVM)",
+  "uid": "infrastructure"
+}

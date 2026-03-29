@@ -13,15 +13,15 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "rate(payment_completed_count_total{application=\"payment-service\"}[1m]) * 60",
+          "expr": "rate(payment_completed_count_total{job=\"payment-service\"}[5m]) * 60",
           "legendFormat": "completed"
         },
         {
-          "expr": "rate(payment_failed_count_total{application=\"payment-service\"}[1m]) * 60",
+          "expr": "rate(payment_failed_count_total{job=\"payment-service\"}[5m]) * 60",
           "legendFormat": "failed"
         },
         {
-          "expr": "rate(payment_cancelled_count_total{application=\"payment-service\"}[1m]) * 60",
+          "expr": "rate(payment_cancelled_count_total{job=\"payment-service\"}[5m]) * 60",
           "legendFormat": "cancelled"
         }
       ],
@@ -34,29 +34,25 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
-          "expr": "rate(payment_amount_total_total{application=\"payment-service\"}[5m]) * 300",
+          "expr": "rate(payment_amount_total{job=\"payment-service\"}[5m]) * 300",
           "legendFormat": "amount (5m window)"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "currencyKRW" }, "overrides": [] }
     },
     {
-      "title": "Payment Processing Duration (p50 / p95 / p99)",
+      "title": "Payment Processing Duration (avg / max)",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(payment_processing_duration_seconds_bucket{application=\"payment-service\"}[5m]))",
-          "legendFormat": "p50"
+          "expr": "rate(payment_processing_duration_seconds_sum{job=\"payment-service\"}[5m]) / rate(payment_processing_duration_seconds_count{job=\"payment-service\"}[5m])",
+          "legendFormat": "avg"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(payment_processing_duration_seconds_bucket{application=\"payment-service\"}[5m]))",
-          "legendFormat": "p95"
-        },
-        {
-          "expr": "histogram_quantile(0.99, rate(payment_processing_duration_seconds_bucket{application=\"payment-service\"}[5m]))",
-          "legendFormat": "p99"
+          "expr": "payment_processing_duration_seconds_max{job=\"payment-service\"}",
+          "legendFormat": "max"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
@@ -95,21 +91,20 @@
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
       "targets": [
         {
-          "expr": "dlq_message_saved_count_total{application=\"payment-service\"}",
+          "expr": "dlq_message_saved_count_total{job=\"payment-service\"}",
           "legendFormat": "saved"
         },
         {
-          "expr": "dlq_retry_success_count_total{application=\"payment-service\"}",
+          "expr": "dlq_retry_success_count_total{job=\"payment-service\"}",
           "legendFormat": "retry success"
         },
         {
-          "expr": "dlq_retry_failed_count_total{application=\"payment-service\"}",
+          "expr": "dlq_retry_failed_count_total{job=\"payment-service\"}",
           "legendFormat": "retry failed"
         }
       ],
       "fieldConfig": { "defaults": {}, "overrides": [] }
-    }
-  ],
+    },
     {
       "title": "Payment Traces (Tempo)",
       "type": "table",
