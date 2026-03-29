@@ -27,7 +27,7 @@ import java.util.UUID
 @Configuration
 @Profile("!test")
 class KafkaConfig(
-    private val dlqCommandService: DLQCommandService
+    @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -80,6 +80,17 @@ class KafkaConfig(
     @Bean("kafkaTransactionManager")
     fun kafkaTransactionManager(): org.springframework.kafka.transaction.KafkaTransactionManager<String, Any> {
         return org.springframework.kafka.transaction.KafkaTransactionManager(producerFactory())
+    }
+
+    @org.springframework.context.annotation.Primary
+    @Bean("transactionManager")
+    fun jpaTransactionManager(entityManagerFactory: jakarta.persistence.EntityManagerFactory): org.springframework.orm.jpa.JpaTransactionManager {
+        return org.springframework.orm.jpa.JpaTransactionManager(entityManagerFactory)
+    }
+
+    @Bean
+    fun transactionTemplate(@org.springframework.beans.factory.annotation.Qualifier("transactionManager") txManager: org.springframework.transaction.PlatformTransactionManager): org.springframework.transaction.support.TransactionTemplate {
+        return org.springframework.transaction.support.TransactionTemplate(txManager)
     }
 
     @Bean

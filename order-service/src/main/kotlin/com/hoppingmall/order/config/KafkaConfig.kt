@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.springframework.context.annotation.Profile
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
@@ -81,6 +82,17 @@ class KafkaConfig {
     @Bean("kafkaTransactionManager")
     fun kafkaTransactionManager(): org.springframework.kafka.transaction.KafkaTransactionManager<String, Any> {
         return org.springframework.kafka.transaction.KafkaTransactionManager(producerFactory())
+    }
+
+    @Primary
+    @Bean("transactionManager")
+    fun jpaTransactionManager(entityManagerFactory: jakarta.persistence.EntityManagerFactory): org.springframework.orm.jpa.JpaTransactionManager {
+        return org.springframework.orm.jpa.JpaTransactionManager(entityManagerFactory)
+    }
+
+    @Bean
+    fun transactionTemplate(@org.springframework.beans.factory.annotation.Qualifier("transactionManager") txManager: org.springframework.transaction.PlatformTransactionManager): org.springframework.transaction.support.TransactionTemplate {
+        return org.springframework.transaction.support.TransactionTemplate(txManager)
     }
 
     @Bean

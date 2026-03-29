@@ -1,11 +1,11 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /app
-COPY gradlew ./
-COPY gradle ./gradle
-COPY build.gradle.kts settings.gradle.kts ./
-COPY src ./src
+COPY settlement-service/gradlew ./
+COPY settlement-service/gradle ./gradle
+COPY settlement-service/build.gradle.kts settlement-service/settings.gradle.kts ./
+COPY settlement-service/src ./src
 COPY hoppingmall-common /hoppingmall-common
-RUN chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
+RUN sed -i "s/\r$//" gradlew && chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
