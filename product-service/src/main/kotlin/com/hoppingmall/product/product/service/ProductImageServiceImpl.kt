@@ -1,6 +1,6 @@
 package com.hoppingmall.product.product.service
 
-import com.hoppingmall.product.common.file.FileUploadRequest
+import com.hoppingmall.product.common.file.dto.FileUploadRequest
 import com.hoppingmall.product.common.file.FileUploadService
 import com.hoppingmall.product.product.dto.response.ProductImageResponse
 import org.springframework.stereotype.Service
