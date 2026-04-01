@@ -3,7 +3,7 @@ package com.hoppingmall.notification
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
-@SpringBootApplication(scanBasePackages = ["com.hoppingmall.notification", "com.hoppingmall.common"])
+@SpringBootApplication(scanBasePackages = ["com.hoppingmall.notification", "com.hoppingmall.common", "com.hoppingmall.dlq"])
 class NotificationServiceApplication
 
 fun main(args: Array<String>) {
