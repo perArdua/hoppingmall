@@ -245,6 +245,7 @@ services:
       - "3100:3100"
     volumes:
       - ./docker/loki.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
 
   mimir:
@@ -506,3 +507,4 @@ volumes:
   grafana-data:
   tempo-data:
   mimir-data:
+  loki-data:
