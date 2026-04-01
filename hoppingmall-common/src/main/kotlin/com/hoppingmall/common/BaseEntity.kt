@@ -2,7 +2,6 @@ package com.hoppingmall.common
 
 import jakarta.persistence.*
 import org.hibernate.annotations.FilterDef
-import org.hibernate.annotations.ParamDef
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.jpa.domain.support.AuditingEntityListener
@@ -10,7 +9,8 @@ import java.time.LocalDateTime
 
 @FilterDef(
     name = "softDeleteFilter",
-    parameters = [ParamDef(name = "isDeleted", type = Boolean::class)]
+    autoEnabled = true,
+    defaultCondition = "deleted_at IS NULL"
 )
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener::class)
