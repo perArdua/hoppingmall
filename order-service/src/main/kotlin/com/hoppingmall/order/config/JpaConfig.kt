@@ -7,6 +7,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 @Configuration
 @EnableJpaAuditing
-@EntityScan(basePackages = ["com.hoppingmall.order"])
-@EnableJpaRepositories(basePackages = ["com.hoppingmall.order"])
+@EntityScan(basePackages = ["com.hoppingmall.order", "com.hoppingmall.idempotency", "com.hoppingmall.dlq"])
+@EnableJpaRepositories(basePackages = ["com.hoppingmall.order", "com.hoppingmall.idempotency", "com.hoppingmall.dlq"])
 class JpaConfig

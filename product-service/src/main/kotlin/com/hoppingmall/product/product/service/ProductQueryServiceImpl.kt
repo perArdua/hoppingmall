@@ -1,6 +1,6 @@
 package com.hoppingmall.product.product.service
 
-import com.hoppingmall.product.common.cache.NotFoundMarker
+import com.hoppingmall.cache.NotFoundMarker
 import com.hoppingmall.product.product.domain.Product
 import com.hoppingmall.product.product.domain.repository.ProductImageRepository
 import com.hoppingmall.product.product.domain.repository.ProductRepository

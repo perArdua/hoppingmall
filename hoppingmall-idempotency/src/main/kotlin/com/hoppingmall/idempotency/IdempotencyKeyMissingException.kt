@@ -1,0 +1,5 @@
+package com.hoppingmall.idempotency
+
+import com.hoppingmall.common.BusinessException
+
+class IdempotencyKeyMissingException : BusinessException(IdempotencyErrorCode.IDEMPOTENCY_KEY_MISSING)

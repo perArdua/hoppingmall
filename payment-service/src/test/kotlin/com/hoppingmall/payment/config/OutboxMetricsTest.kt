@@ -36,27 +36,6 @@ class OutboxMetricsTest {
     }
 
     @Test
-    fun DLQ_저장_시_카운터가_증가한다() {
-        outboxMetrics.recordDlqSaved("payment-completed")
-
-        assertThat(registry.counter("dlq.message.saved.count").count()).isEqualTo(1.0)
-    }
-
-    @Test
-    fun DLQ_재시도_성공_시_카운터가_증가한다() {
-        outboxMetrics.recordDlqRetrySuccess()
-
-        assertThat(registry.counter("dlq.retry.success.count").count()).isEqualTo(1.0)
-    }
-
-    @Test
-    fun DLQ_재시도_실패_시_카운터가_증가한다() {
-        outboxMetrics.recordDlqRetryFailed()
-
-        assertThat(registry.counter("dlq.retry.failed.count").count()).isEqualTo(1.0)
-    }
-
-    @Test
     fun 토픽별_카운터가_태그와_함께_증가한다() {
         outboxMetrics.recordOutboxPublished("payment-completed")
         outboxMetrics.recordOutboxPublished("point-earn-request")

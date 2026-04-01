@@ -7,6 +7,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 @Configuration
 @EnableJpaAuditing
-@EntityScan(basePackages = ["com.hoppingmall.notification.domain"])
-@EnableJpaRepositories(basePackages = ["com.hoppingmall.notification.domain"])
+@EntityScan(basePackages = ["com.hoppingmall.notification.domain", "com.hoppingmall.dlq"])
+@EnableJpaRepositories(basePackages = ["com.hoppingmall.notification.domain", "com.hoppingmall.dlq"])
 class JpaConfig
