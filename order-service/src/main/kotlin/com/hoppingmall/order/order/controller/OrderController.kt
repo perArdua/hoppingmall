@@ -2,7 +2,7 @@ package com.hoppingmall.order.order.controller
 
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
-import com.hoppingmall.order.common.idempotency.Idempotent
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.dto.response.OrderResponse

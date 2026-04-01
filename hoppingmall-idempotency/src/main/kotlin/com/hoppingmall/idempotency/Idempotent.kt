@@ -1,4 +1,4 @@
-package com.hoppingmall.product.common.idempotency
+package com.hoppingmall.idempotency
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)

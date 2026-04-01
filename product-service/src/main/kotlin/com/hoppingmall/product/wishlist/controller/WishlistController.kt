@@ -2,7 +2,7 @@ package com.hoppingmall.product.wishlist.controller
 
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.common.ApiResponse
-import com.hoppingmall.product.common.idempotency.Idempotent
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import com.hoppingmall.product.wishlist.service.WishlistCommandService

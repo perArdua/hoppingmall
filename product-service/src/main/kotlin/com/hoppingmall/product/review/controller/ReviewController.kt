@@ -2,7 +2,7 @@ package com.hoppingmall.product.review.controller
 
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.common.ApiResponse
-import com.hoppingmall.product.common.idempotency.Idempotent
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.product.review.dto.request.ReviewCreateRequest
 import com.hoppingmall.product.review.dto.request.ReviewUpdateRequest
 import com.hoppingmall.product.review.dto.response.ReviewResponse

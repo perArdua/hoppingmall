@@ -1,7 +1,7 @@
 package com.hoppingmall.order.refund.controller
 
 import com.hoppingmall.common.UserPrincipal
-import com.hoppingmall.order.common.idempotency.Idempotent
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.order.refund.dto.response.RefundResponse

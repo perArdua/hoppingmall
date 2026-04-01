@@ -1,7 +1,7 @@
 package com.hoppingmall.product.inventory.controller
 
 import com.hoppingmall.common.ApiResponse
-import com.hoppingmall.product.common.idempotency.Idempotent
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
