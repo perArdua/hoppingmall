@@ -1,17 +1,17 @@
-package com.hoppingmall.payment.dlq.controller
+package com.hoppingmall.dlq.controller
 
 import com.hoppingmall.common.ApiResponse
-import com.hoppingmall.payment.dlq.domain.DLQMessage
-import com.hoppingmall.payment.dlq.domain.DLQStatus
-import com.hoppingmall.payment.dlq.service.DLQCommandService
-import com.hoppingmall.payment.dlq.service.DLQQueryService
-import io.swagger.v3.oas.annotations.tags.Tag
+import com.hoppingmall.dlq.domain.DLQMessage
+import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.service.DLQCommandService
+import com.hoppingmall.dlq.service.DLQQueryService
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.domain.Page
 import org.springframework.web.bind.annotation.*
 
-@Tag(name = "DLQ 관리")
 @RestController
 @RequestMapping("/api/v1/admin/dlq")
+@ConditionalOnProperty(name = ["dlq.admin.enabled"], havingValue = "true", matchIfMissing = true)
 class DLQController(
     private val dlqCommandService: DLQCommandService,
     private val dlqQueryService: DLQQueryService

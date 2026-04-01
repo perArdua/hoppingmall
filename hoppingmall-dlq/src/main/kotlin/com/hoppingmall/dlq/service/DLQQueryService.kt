@@ -1,8 +1,8 @@
-package com.hoppingmall.payment.dlq.service
+package com.hoppingmall.dlq.service
 
-import com.hoppingmall.payment.dlq.domain.DLQMessage
-import com.hoppingmall.payment.dlq.domain.DLQStatus
-import com.hoppingmall.payment.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.domain.DLQMessage
+import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service

@@ -1,13 +1,13 @@
-package com.hoppingmall.payment.dlq.service
+package com.hoppingmall.dlq.service
 
-import com.hoppingmall.payment.config.OutboxMetrics
-import com.hoppingmall.payment.dlq.domain.DLQMessage
-import com.hoppingmall.payment.dlq.domain.DLQStatus
-import com.hoppingmall.payment.dlq.domain.DeadLetterMessage
-import com.hoppingmall.payment.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.domain.DLQMessage
+import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.domain.DeadLetterMessage
+import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.metrics.DLQMetrics
+import com.hoppingmall.dlq.publisher.DLQMessagePublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
-import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.ConcurrentHashMap
@@ -16,8 +16,8 @@ import java.util.concurrent.ConcurrentHashMap
 @Transactional
 class DLQCommandService(
     private val dlqMessageRepository: DLQMessageRepository,
-    private val kafkaTemplate: KafkaTemplate<String, Any>,
-    private val outboxMetrics: OutboxMetrics
+    private val dlqMessagePublisher: DLQMessagePublisher,
+    private val dlqMetrics: DLQMetrics
 ) {
 
     private val logger = LoggerFactory.getLogger(DLQCommandService::class.java)
@@ -62,7 +62,7 @@ class DLQCommandService(
 
             dlqMessage.nextRetryAt = DLQMessage.calculateNextRetryAt(0)
             dlqMessageRepository.save(dlqMessage)
-            outboxMetrics.recordDlqSaved(deadLetterMessage.originalTopic)
+            dlqMetrics.recordDlqSaved(deadLetterMessage.originalTopic)
             logger.info("DLQ 메시지 저장 완료: topic={}, partition={}, offset={}",
                 deadLetterMessage.originalTopic, deadLetterMessage.originalPartition, deadLetterMessage.originalOffset)
 
@@ -105,18 +105,28 @@ class DLQCommandService(
             dlqMessageRepository.save(dlqMessage)
 
             val originalValue = reconstructOriginalMessage(dlqMessage)
-            kafkaTemplate.send(dlqMessage.originalTopic, dlqMessage.originalKey ?: "", originalValue)
+            val published = dlqMessagePublisher.publish(
+                dlqMessage.originalTopic,
+                dlqMessage.originalKey ?: "",
+                originalValue
+            )
 
-            dlqMessage.markAsProcessed("수동 재처리 성공")
-            dlqMessageRepository.save(dlqMessage)
+            if (published) {
+                dlqMessage.markAsProcessed("재처리 성공")
+                dlqMessageRepository.save(dlqMessage)
+                dlqMetrics.recordDlqRetrySuccess()
+                logger.info("DLQ 메시지 재처리 성공: id={}, topic={}", dlqMessageId, dlqMessage.originalTopic)
+            } else {
+                dlqMessage.scheduleNextRetry()
+                dlqMessageRepository.save(dlqMessage)
+                logger.warn("DLQ 메시지 재발행 불가 (Publisher 미설정): id={}", dlqMessageId)
+            }
 
-            outboxMetrics.recordDlqRetrySuccess()
-            logger.info("DLQ 메시지 재처리 성공: id={}, topic={}", dlqMessageId, dlqMessage.originalTopic)
-            true
+            published
 
         } catch (e: Exception) {
             logger.error("DLQ 메시지 재처리 실패: id={}, error={}", dlqMessageId, e.message, e)
-            outboxMetrics.recordDlqRetryFailed()
+            dlqMetrics.recordDlqRetryFailed()
 
             try {
                 val dlqMessage = dlqMessageRepository.findById(dlqMessageId).orElse(null)

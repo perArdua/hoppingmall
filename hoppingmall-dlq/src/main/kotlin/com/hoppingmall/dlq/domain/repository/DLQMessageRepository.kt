@@ -1,7 +1,7 @@
-package com.hoppingmall.payment.dlq.domain.repository
+package com.hoppingmall.dlq.domain.repository
 
-import com.hoppingmall.payment.dlq.domain.DLQMessage
-import com.hoppingmall.payment.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.domain.DLQMessage
+import com.hoppingmall.dlq.domain.DLQStatus
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository

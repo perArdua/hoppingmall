@@ -1,4 +1,4 @@
-package com.hoppingmall.payment.dlq.domain
+package com.hoppingmall.dlq.domain
 
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
@@ -111,11 +111,4 @@ class DLQMessage(
             return System.currentTimeMillis() + BACKOFF_INTERVALS[index]
         }
     }
-}
-
-enum class DLQStatus {
-    PENDING,
-    RETRYING,
-    PROCESSED,
-    FAILED
 }

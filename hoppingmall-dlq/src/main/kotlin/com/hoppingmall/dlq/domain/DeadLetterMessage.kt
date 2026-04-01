@@ -1,4 +1,4 @@
-package com.hoppingmall.payment.dlq.domain
+package com.hoppingmall.dlq.domain
 
 data class DeadLetterMessage(
     val originalTopic: String,

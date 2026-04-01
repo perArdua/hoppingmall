@@ -1,13 +1,15 @@
-package com.hoppingmall.payment.dlq.service
+package com.hoppingmall.dlq.service
 
-import com.hoppingmall.payment.dlq.domain.DLQStatus
-import com.hoppingmall.payment.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.domain.PageRequest
 import org.springframework.scheduling.annotation.Scheduled
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 
-@Service
+@Component
+@ConditionalOnProperty(name = ["dlq.scheduler.enabled"], havingValue = "true", matchIfMissing = true)
 class DLQScheduler(
     private val dlqMessageRepository: DLQMessageRepository,
     private val dlqCommandService: DLQCommandService
