@@ -2,7 +2,7 @@ package com.hoppingmall.product.category.service
 
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.category.dto.response.CategoryResponse
-import com.hoppingmall.product.common.cache.NotFoundMarker
+import com.hoppingmall.cache.NotFoundMarker
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service

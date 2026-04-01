@@ -1,4 +1,4 @@
-package com.hoppingmall.product.common.cache
+package com.hoppingmall.cache
 
 import java.io.Serializable
 
