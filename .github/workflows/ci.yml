@@ -6,21 +6,143 @@ on:
   pull_request:
     branches: [develop]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  detect-changes:
+    name: 변경 범위 감지
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.matrices.outputs.run_tests }}
+      run_docker: ${{ steps.matrices.outputs.run_docker }}
+      run_k8s: ${{ steps.matrices.outputs.run_k8s }}
+      test_matrix: ${{ steps.matrices.outputs.test_matrix }}
+      docker_matrix: ${{ steps.matrices.outputs.docker_matrix }}
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: 변경 파일 필터링
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api_gateway:
+              - 'api-gateway/**'
+              - '.github/workflows/**'
+            notification_service:
+              - 'notification-service/**'
+              - 'hoppingmall-common/**'
+              - 'hoppingmall-dlq/**'
+              - '.github/workflows/**'
+            order_service:
+              - 'order-service/**'
+              - 'hoppingmall-common/**'
+              - 'hoppingmall-idempotency/**'
+              - 'hoppingmall-dlq/**'
+              - '.github/workflows/**'
+            payment_service:
+              - 'payment-service/**'
+              - 'hoppingmall-common/**'
+              - 'hoppingmall-dlq/**'
+              - '.github/workflows/**'
+            product_service:
+              - 'product-service/**'
+              - 'hoppingmall-common/**'
+              - 'hoppingmall-idempotency/**'
+              - 'hoppingmall-cache/**'
+              - 'hoppingmall-dlq/**'
+              - '.github/workflows/**'
+            settlement_service:
+              - 'settlement-service/**'
+              - 'hoppingmall-common/**'
+              - '.github/workflows/**'
+            user_service:
+              - 'user-service/**'
+              - 'hoppingmall-common/**'
+              - 'hoppingmall-dlq/**'
+              - '.github/workflows/**'
+            k8s:
+              - 'k8s/**'
+              - 'k8s-cd/**'
+
+      - name: 실행 매트릭스 생성
+        id: matrices
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          API_GATEWAY: ${{ steps.changes.outputs.api_gateway }}
+          NOTIFICATION_SERVICE: ${{ steps.changes.outputs.notification_service }}
+          ORDER_SERVICE: ${{ steps.changes.outputs.order_service }}
+          PAYMENT_SERVICE: ${{ steps.changes.outputs.payment_service }}
+          PRODUCT_SERVICE: ${{ steps.changes.outputs.product_service }}
+          SETTLEMENT_SERVICE: ${{ steps.changes.outputs.settlement_service }}
+          USER_SERVICE: ${{ steps.changes.outputs.user_service }}
+          K8S_CHANGED: ${{ steps.changes.outputs.k8s }}
+        run: |
+          impacted_services=()
+
+          if [[ "$API_GATEWAY" == "true" ]]; then
+            impacted_services+=('"api-gateway"')
+          fi
+          if [[ "$NOTIFICATION_SERVICE" == "true" ]]; then
+            impacted_services+=('"notification-service"')
+          fi
+          if [[ "$ORDER_SERVICE" == "true" ]]; then
+            impacted_services+=('"order-service"')
+          fi
+          if [[ "$PAYMENT_SERVICE" == "true" ]]; then
+            impacted_services+=('"payment-service"')
+          fi
+          if [[ "$PRODUCT_SERVICE" == "true" ]]; then
+            impacted_services+=('"product-service"')
+          fi
+          if [[ "$SETTLEMENT_SERVICE" == "true" ]]; then
+            impacted_services+=('"settlement-service"')
+          fi
+          if [[ "$USER_SERVICE" == "true" ]]; then
+            impacted_services+=('"user-service"')
+          fi
+
+          if ((${#impacted_services[@]} > 0)); then
+            impacted_joined=$(IFS=,; echo "${impacted_services[*]}")
+            echo "run_tests=true" >> "$GITHUB_OUTPUT"
+            echo "test_matrix={\"service\":[${impacted_joined}]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_tests=false" >> "$GITHUB_OUTPUT"
+            echo 'test_matrix={"service":[]}' >> "$GITHUB_OUTPUT"
+          fi
+
+          all_services='"api-gateway","notification-service","order-service","payment-service","product-service","settlement-service","user-service"'
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            echo "run_docker=true" >> "$GITHUB_OUTPUT"
+            echo "docker_matrix={\"service\":[${all_services}]}" >> "$GITHUB_OUTPUT"
+          elif ((${#impacted_services[@]} > 0)); then
+            echo "run_docker=true" >> "$GITHUB_OUTPUT"
+            echo "docker_matrix={\"service\":[${impacted_joined}]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_docker=false" >> "$GITHUB_OUTPUT"
+            echo 'docker_matrix={"service":[]}' >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "$K8S_CHANGED" == "true" ]]; then
+            echo "run_k8s=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_k8s=false" >> "$GITHUB_OUTPUT"
+          fi
+
   services-test:
     name: ${{ matrix.service }} 테스트
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run_tests == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        service:
-          - api-gateway
-          - notification-service
-          - order-service
-          - payment-service
-          - product-service
-          - settlement-service
-          - user-service
+      matrix: ${{ fromJson(needs.detect-changes.outputs.test_matrix) }}
 
     steps:
       - name: 소스 체크아웃
@@ -49,28 +171,33 @@ jobs:
   services-docker-build:
     name: ${{ matrix.service }} Docker 빌드
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run_docker == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        service:
-          - api-gateway
-          - notification-service
-          - order-service
-          - payment-service
-          - product-service
-          - settlement-service
-          - user-service
+      matrix: ${{ fromJson(needs.detect-changes.outputs.docker_matrix) }}
 
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v3
 
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
       - name: Docker 빌드 검증
-        run: docker build -t ${{ matrix.service }}:ci-test -f ./${{ matrix.service }}/Dockerfile .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./${{ matrix.service }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
   k8s-validate:
     name: K8s 매니페스트 검증
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run_k8s == 'true'
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v3
@@ -87,7 +214,7 @@ jobs:
 
       - name: K8s 매니페스트 검증
         run: |
-          find k8s -name '*.yml' -o -name '*.yaml' | while read f; do
+          find k8s k8s-cd \( -name '*.yml' -o -name '*.yaml' \) | while read f; do
             echo "Validating $f..."
             kubeconform -strict -summary "$f" || exit 1
           done
@@ -96,6 +223,7 @@ jobs:
     name: CI 최종 검증
     runs-on: ubuntu-latest
     needs:
+      - detect-changes
       - services-test
       - services-docker-build
       - k8s-validate
@@ -103,18 +231,18 @@ jobs:
     steps:
       - name: 모든 선행 job 결과 확인
         run: |
-          echo "services-test=${{ needs.services-test.result }}"
-          echo "services-docker-build=${{ needs.services-docker-build.result }}"
-          echo "k8s-validate=${{ needs.k8s-validate.result }}"
+          check_result() {
+            local name="$1"
+            local result="$2"
 
-          if [ "${{ needs.services-test.result }}" != "success" ]; then
-            exit 1
-          fi
+            echo "${name}=${result}"
 
-          if [ "${{ needs.services-docker-build.result }}" != "success" ]; then
-            exit 1
-          fi
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              exit 1
+            fi
+          }
 
-          if [ "${{ needs.k8s-validate.result }}" != "success" ]; then
-            exit 1
-          fi
+          check_result "detect-changes" "${{ needs.detect-changes.result }}"
+          check_result "services-test" "${{ needs.services-test.result }}"
+          check_result "services-docker-build" "${{ needs.services-docker-build.result }}"
+          check_result "k8s-validate" "${{ needs.k8s-validate.result }}"
