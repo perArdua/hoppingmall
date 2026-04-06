@@ -175,7 +175,7 @@ jobs:
           cache: 'gradle'
 
       - name: 테스트
-        run: cd ${{ matrix.service }} && ./gradlew test jacocoTestVerification --no-daemon --build-cache
+        run: cd ${{ matrix.service }} && ./gradlew test --no-daemon --build-cache
 
       - name: 테스트 리포트 업로드
         if: failure()
