@@ -3,6 +3,8 @@ package com.hoppingmall.order.config
 import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.order.config.kafka.BusinessContextConsumerInterceptor
 import com.hoppingmall.order.config.kafka.BusinessContextProducerInterceptor
+import com.hoppingmall.dlq.domain.DeadLetterMessage
+import com.hoppingmall.dlq.service.DLQCommandService
 import io.confluent.kafka.serializers.KafkaAvroSerializer
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -26,7 +28,9 @@ import java.util.UUID
 
 @Configuration
 @Profile("!test")
-class KafkaConfig {
+class KafkaConfig(
+    @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -127,6 +131,16 @@ class KafkaConfig {
             { record, exception ->
                 log.error("Kafka 메시지 처리 실패 (DLQ): topic={}, offset={}, error={}",
                     record.topic(), record.offset(), exception.message)
+                val deadLetterMessage = DeadLetterMessage(
+                    originalTopic = record.topic(),
+                    originalPartition = record.partition(),
+                    originalOffset = record.offset(),
+                    originalKey = record.key()?.toString(),
+                    originalValue = record.value()?.toString(),
+                    exception = exception.message,
+                    timestamp = System.currentTimeMillis()
+                )
+                dlqCommandService.saveDLQMessage(deadLetterMessage)
             },
             FixedBackOff(1000L, 3)
         )
