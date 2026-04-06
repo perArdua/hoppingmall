@@ -253,6 +253,7 @@ jobs:
 
       - name: 공유 모듈 테스트
         run: |
+          chmod +x ./gradlew
           for module in hoppingmall-common hoppingmall-cache hoppingmall-dlq hoppingmall-idempotency hoppingmall-outbox; do
             if [ -d "$module" ] && [ -f "$module/build.gradle.kts" ]; then
               echo "Testing $module..."
