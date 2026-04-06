@@ -19,6 +19,7 @@ class LocalFileUploadService(
 
         val originalFilename = request.file.originalFilename
             ?: throw InvalidFileNameException()
+        if (originalFilename.isBlank()) throw InvalidFileNameException()
 
         val extension = originalFilename.substringAfterLast(".", "")
 
