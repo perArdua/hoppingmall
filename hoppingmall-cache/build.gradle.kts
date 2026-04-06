@@ -30,6 +30,7 @@ dependencies {
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("com.github.ben-manes.caffeine:caffeine")
+	implementation("io.micrometer:micrometer-core")
 	compileOnly("org.springframework.boot:spring-boot-starter-data-redis")
 	compileOnly("org.redisson:redisson-spring-boot-starter:4.3.0")
 

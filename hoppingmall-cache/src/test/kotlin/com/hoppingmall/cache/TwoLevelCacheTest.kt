@@ -1,6 +1,7 @@
 package com.hoppingmall.cache
 
 import com.github.benmanes.caffeine.cache.Caffeine
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -26,6 +27,7 @@ class TwoLevelCacheTest {
 
     private val redisCache: Cache = mock()
     private val lockProvider = FakeLockProvider()
+    private lateinit var meterRegistry: SimpleMeterRegistry
 
     private val hotKeyPolicy = CachePolicy(
         cacheName = "product",
@@ -48,6 +50,7 @@ class TwoLevelCacheTest {
     @BeforeEach
     fun setUp() {
         lockProvider.reset()
+        meterRegistry = SimpleMeterRegistry()
     }
 
     private fun createCache(policy: CachePolicy): TwoLevelCache {
@@ -55,7 +58,7 @@ class TwoLevelCacheTest {
             .maximumSize(policy.l1MaxSize)
             .expireAfterWrite(policy.l1Ttl)
             .build<Any, Any>()
-        return TwoLevelCache(policy.cacheName, caffeineCache, redisCache, policy, lockProvider)
+        return TwoLevelCache(policy.cacheName, caffeineCache, redisCache, policy, lockProvider, meterRegistry = meterRegistry)
     }
 
     @Nested
@@ -74,7 +77,7 @@ class TwoLevelCacheTest {
 
             val cache = TwoLevelCache(
                 hotKeyPolicy.cacheName, caffeineCache, redisCache, hotKeyPolicy,
-                lockProvider, shardedCache, fakeDetector
+                lockProvider, shardedCache, fakeDetector, meterRegistry
             )
 
             whenever(shardedCache.get(1L)).thenReturn(null)
@@ -111,7 +114,7 @@ class TwoLevelCacheTest {
 
             val cache = TwoLevelCache(
                 hotKeyPolicy.cacheName, caffeineCache, redisCache, hotKeyPolicy,
-                lockProvider, shardedCache, fakeDetector
+                lockProvider, shardedCache, fakeDetector, meterRegistry
             )
 
             val dbCallCount = AtomicInteger(0)
@@ -169,6 +172,19 @@ class TwoLevelCacheTest {
 
             assertEquals("cached-value", result)
             verify(redisCache, never()).get(1L)
+            assertEquals(1.0, meterRegistry.counter("cache.l1.hit", "cache", "category").count())
+        }
+
+        @Test
+        fun valueLoader_경로에서도_L1_히트_메트릭이_증가한다() {
+            val cache = createCache(normalPolicy)
+
+            cache.put(1L, "cached-value")
+
+            val result = cache.get(1L, Callable { "should-not-call" })
+
+            assertEquals("cached-value", result)
+            assertEquals(1.0, meterRegistry.counter("cache.l1.hit", "cache", "category").count())
         }
     }
 
@@ -186,7 +202,7 @@ class TwoLevelCacheTest {
                 .build<Any, Any>()
             return TwoLevelCache(
                 hotKeyPolicy.cacheName, caffeineCache, redisCache, hotKeyPolicy,
-                lockProvider, shardedCache, fakeDetector
+                lockProvider, shardedCache, fakeDetector, meterRegistry
             )
         }
 
@@ -207,6 +223,7 @@ class TwoLevelCacheTest {
             val result = cache.get(1L, Callable { "should-not-call" })
 
             assertEquals("shard-value", result)
+            assertEquals(1.0, meterRegistry.counter("cache.l2.hit", "cache", "product").count())
         }
 
         @Test
@@ -222,6 +239,7 @@ class TwoLevelCacheTest {
 
             assertEquals("redis-value", result)
             verify(shardedCache, never()).get(any())
+            assertEquals(1.0, meterRegistry.counter("cache.l2.hit", "cache", "product").count())
         }
 
         @Test
@@ -234,6 +252,35 @@ class TwoLevelCacheTest {
             cache.get(1L, Callable { "loaded" })
 
             assertEquals(1, fakeDetector.recordCount)
+            assertEquals(1.0, meterRegistry.counter("cache.miss", "cache", "product").count())
+        }
+
+        @Test
+        fun valueLoader_경로에서_L2_히트_메트릭이_증가한다() {
+            fakeDetector.overrideIsHot = false
+            val cache = createHotKeyCache()
+
+            val valueWrapper: Cache.ValueWrapper = mock()
+            whenever(valueWrapper.get()).thenReturn("redis-value")
+            whenever(redisCache.get(1L)).thenReturn(valueWrapper)
+
+            val result = cache.get(1L, Callable { "should-not-call" })
+
+            assertEquals("redis-value", result)
+            assertEquals(1.0, meterRegistry.counter("cache.l2.hit", "cache", "product").count())
+        }
+
+        @Test
+        fun valueLoader_경로에서_미스_메트릭이_증가한다() {
+            fakeDetector.overrideIsHot = false
+            val cache = createHotKeyCache()
+
+            whenever(redisCache.get(1L)).thenReturn(null)
+
+            val result = cache.get(1L, Callable { "loaded" })
+
+            assertEquals("loaded", result)
+            assertEquals(1.0, meterRegistry.counter("cache.miss", "cache", "product").count())
         }
 
         @Test
