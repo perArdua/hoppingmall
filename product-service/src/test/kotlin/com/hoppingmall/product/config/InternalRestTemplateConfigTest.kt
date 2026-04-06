@@ -1,5 +1,6 @@
 package com.hoppingmall.product.config
 
+import com.hoppingmall.common.config.InternalRestTemplateConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName

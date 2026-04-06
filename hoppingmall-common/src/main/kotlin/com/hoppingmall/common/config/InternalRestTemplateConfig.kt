@@ -1,6 +1,8 @@
-package com.hoppingmall.order.config
+package com.hoppingmall.common.config
 
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.web.client.RestTemplateCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -8,9 +10,9 @@ import org.springframework.http.HttpRequest
 import org.springframework.http.client.ClientHttpRequestExecution
 import org.springframework.http.client.ClientHttpRequestInterceptor
 import org.springframework.http.client.ClientHttpResponse
-import org.slf4j.MDC
 
 @Configuration
+@ConditionalOnProperty(name = ["internal.service.token"])
 class InternalRestTemplateConfig(
     @Value("\${internal.service.token}") private val serviceToken: String
 ) {
