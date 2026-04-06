@@ -27,11 +27,14 @@ class Order private constructor(
 
     companion object {
         private val allowedTransitions: Map<OrderStatus, Set<OrderStatus>> = mapOf(
-            OrderStatus.CREATED to setOf(OrderStatus.PAID, OrderStatus.CANCELLED),
-            OrderStatus.PAID to setOf(OrderStatus.SHIPPED, OrderStatus.CANCELLED),
+            OrderStatus.CREATED to setOf(OrderStatus.PAYING, OrderStatus.CANCELLED),
+            OrderStatus.PAYING to setOf(OrderStatus.PAID, OrderStatus.CANCELLED),
+            OrderStatus.PAID to setOf(OrderStatus.SHIPPED, OrderStatus.CANCEL_REQUESTED),
+            OrderStatus.CANCEL_REQUESTED to setOf(OrderStatus.CANCELLED, OrderStatus.CANCEL_FAILED),
             OrderStatus.SHIPPED to setOf(OrderStatus.DELIVERED),
             OrderStatus.DELIVERED to emptySet(),
-            OrderStatus.CANCELLED to emptySet()
+            OrderStatus.CANCELLED to emptySet(),
+            OrderStatus.CANCEL_FAILED to setOf(OrderStatus.CANCEL_REQUESTED)
         )
 
         fun create(
@@ -55,7 +58,7 @@ class Order private constructor(
 
     fun isCancellable(): Boolean {
         val allowed = allowedTransitions[this.status] ?: emptySet()
-        return OrderStatus.CANCELLED in allowed
+        return OrderStatus.CANCELLED in allowed || OrderStatus.CANCEL_REQUESTED in allowed
     }
 
     fun isCancelled(): Boolean {

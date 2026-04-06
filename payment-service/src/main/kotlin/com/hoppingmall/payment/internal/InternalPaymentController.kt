@@ -1,6 +1,8 @@
 package com.hoppingmall.payment.internal
 
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
+import com.hoppingmall.payment.payment.dto.response.PaymentResponse
+import com.hoppingmall.payment.payment.service.PaymentCommandService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.math.BigDecimal
@@ -8,7 +10,8 @@ import java.math.BigDecimal
 @RestController
 @RequestMapping("/internal/api/v1/payments")
 class InternalPaymentController(
-    private val paymentRepository: PaymentRepository
+    private val paymentRepository: PaymentRepository,
+    private val paymentCommandService: PaymentCommandService
 ) {
 
     @GetMapping("/by-order/{orderId}")
@@ -23,6 +26,13 @@ class InternalPaymentController(
         val payment = paymentRepository.findById(id).orElse(null)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(toResponse(payment))
+    }
+
+    @PostMapping("/by-order/{orderId}/cancel")
+    fun cancelPaymentByOrderId(@PathVariable orderId: Long): ResponseEntity<PaymentResponse> {
+        val payment = paymentRepository.findByOrderId(orderId)
+            ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(paymentCommandService.cancelPaymentInternal(payment.id!!))
     }
 
     private fun toResponse(payment: com.hoppingmall.payment.payment.domain.Payment): PaymentInfoResponse {

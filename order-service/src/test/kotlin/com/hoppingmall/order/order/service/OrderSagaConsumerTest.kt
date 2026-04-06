@@ -92,6 +92,7 @@ class OrderSagaConsumerTest {
     @Test
     fun 결제_완료_시_예약_확정하고_주문_상태를_PAID로_변경한다() {
         val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        order.updateStatus(OrderStatus.PAYING)
         val orderItem = OrderItem.create(
             orderId = 1L, sellerId = 2L, productId = 3L,
             productName = "상품A", productPrice = BigDecimal("50000"),
@@ -144,6 +145,7 @@ class OrderSagaConsumerTest {
     @Test
     fun 예약_확정_실패_시_주문_취소하고_결제_역보상을_요청한다() {
         val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        order.updateStatus(OrderStatus.PAYING)
         val orderItem = OrderItem.create(
             orderId = 1L, sellerId = 2L, productId = 3L,
             productName = "상품A", productPrice = BigDecimal("50000"),
@@ -181,6 +183,7 @@ class OrderSagaConsumerTest {
     @Test
     fun 예약ID가_없는_주문은_바로_PAID로_전환한다() {
         val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        order.updateStatus(OrderStatus.PAYING)
         val orderItem = OrderItem.create(
             orderId = 1L, sellerId = 2L, productId = 3L,
             productName = "상품A", productPrice = BigDecimal("50000"),
@@ -208,8 +211,9 @@ class OrderSagaConsumerTest {
     }
 
     @Test
-    fun 주문이_CREATED가_아닌_경우_상태_변경_없이_멱등_로그만_저장한다() {
+    fun 주문이_CREATED_또는_PAYING이_아닌_경우_상태_변경_없이_멱등_로그만_저장한다() {
         val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        order.updateStatus(OrderStatus.PAYING)
         order.updateStatus(OrderStatus.PAID)
 
         whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
@@ -241,6 +245,7 @@ class OrderSagaConsumerTest {
 
         val node = mock<com.fasterxml.jackson.databind.JsonNode>()
         whenever(objectMapper.readTree(any<String>())).thenReturn(node)
+        whenever(node.get("eventType")).thenReturn(TextNode("PaymentFailed"))
         whenever(node.get("eventId")).thenReturn(TextNode("evt-comp-1"))
         whenever(node.get("orderId")).thenReturn(LongNode(1L))
         whenever(sagaEventLogRepository.findByEventId("evt-comp-1"))
@@ -269,6 +274,7 @@ class OrderSagaConsumerTest {
 
         val node = mock<com.fasterxml.jackson.databind.JsonNode>()
         whenever(objectMapper.readTree(any<String>())).thenReturn(node)
+        whenever(node.get("eventType")).thenReturn(TextNode("PaymentFailed"))
         whenever(node.get("eventId")).thenReturn(TextNode("evt-comp-1"))
         whenever(sagaEventLogRepository.findByEventId("evt-comp-1")).thenReturn(fullyCompleted)
 

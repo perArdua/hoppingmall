@@ -45,9 +45,11 @@ class Shipping private constructor(
 
     companion object {
         private val allowedTransitions: Map<ShippingStatus, Set<ShippingStatus>> = mapOf(
-            ShippingStatus.PREPARING to setOf(ShippingStatus.IN_TRANSIT),
-            ShippingStatus.IN_TRANSIT to setOf(ShippingStatus.DELIVERED),
-            ShippingStatus.DELIVERED to emptySet()
+            ShippingStatus.PREPARING to setOf(ShippingStatus.IN_TRANSIT, ShippingStatus.CANCELLED),
+            ShippingStatus.IN_TRANSIT to setOf(ShippingStatus.DELIVERED, ShippingStatus.FAILED),
+            ShippingStatus.DELIVERED to emptySet(),
+            ShippingStatus.FAILED to emptySet(),
+            ShippingStatus.CANCELLED to emptySet()
         )
 
         fun create(

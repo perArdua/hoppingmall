@@ -13,7 +13,6 @@ import com.hoppingmall.order.port.TransactionalEventPublisherPort
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 
 @Service
@@ -58,8 +57,8 @@ class OrderSagaConsumer(
                 return@execute null
             }
 
-            if (order.status != OrderStatus.CREATED) {
-                logger.warn("주문 상태가 CREATED가 아님: orderId=${event.orderId}, status=${order.status}")
+            if (order.status !in setOf(OrderStatus.CREATED, OrderStatus.PAYING)) {
+                logger.warn("주문 상태가 CREATED/PAYING이 아님: orderId=${event.orderId}, status=${order.status}")
                 val log = sagaEventLogRepository.findByEventId(eventId)
                     ?: SagaEventLog(eventId = eventId, eventType = "PAYMENT_COMPLETED", orderId = event.orderId)
                 log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
@@ -68,6 +67,9 @@ class OrderSagaConsumer(
                 return@execute null
             }
 
+            if (order.status == OrderStatus.CREATED) {
+                order.updateStatus(OrderStatus.PAYING)
+            }
             order.updateStatus(OrderStatus.PAID)
             orderRepository.save(order)
 
@@ -103,35 +105,40 @@ class OrderSagaConsumer(
         }
     }
 
-    @Transactional
     fun compensateFailedConfirmation(eventId: String, event: PaymentCompletedEvent) {
-        val order = orderRepository.findById(event.orderId).orElse(null) ?: return
-        if (order.status == OrderStatus.PAID && order.isCancellable()) {
-            order.updateStatus(OrderStatus.CANCELLED)
-            orderRepository.save(order)
+        val compensated = transactionTemplate.execute {
+            val order = orderRepository.findById(event.orderId).orElse(null) ?: return@execute false
+            if (order.status == OrderStatus.PAID && order.isCancellable()) {
+                order.updateStatus(OrderStatus.CANCEL_REQUESTED)
+                order.updateStatus(OrderStatus.CANCELLED)
+                orderRepository.save(order)
+            }
+
+            transactionalEventPublisherPort.publishEvent(
+                aggregateType = "Order",
+                aggregateId = event.orderId.toString(),
+                eventType = "PaymentReversalRequested",
+                eventData = mapOf(
+                    "eventType" to "PaymentReversalRequested",
+                    "eventId" to "reversal-${event.transactionId}",
+                    "orderId" to event.orderId,
+                    "paymentId" to event.paymentId,
+                    "userId" to event.userId,
+                    "reason" to "RESERVATION_EXPIRED"
+                ),
+                topic = KafkaTopics.PAYMENT_REVERSAL,
+                partitionKey = event.orderId.toString()
+            )
+
+            val log = sagaEventLogRepository.findByEventId(eventId)
+            log?.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+            log?.let { sagaEventLogRepository.save(it) }
+            true
+        } ?: false
+
+        if (compensated) {
+            logger.warn("예약 만료로 주문 취소 + 결제 역보상 요청: orderId=${event.orderId}")
         }
-
-        transactionalEventPublisherPort.publishEvent(
-            aggregateType = "Order",
-            aggregateId = event.orderId.toString(),
-            eventType = "PaymentReversalRequested",
-            eventData = mapOf(
-                "eventType" to "PaymentReversalRequested",
-                "eventId" to "reversal-${event.transactionId}",
-                "orderId" to event.orderId,
-                "paymentId" to event.paymentId,
-                "userId" to event.userId,
-                "reason" to "RESERVATION_EXPIRED"
-            ),
-            topic = KafkaTopics.PAYMENT_REVERSAL,
-            partitionKey = event.orderId.toString()
-        )
-
-        val log = sagaEventLogRepository.findByEventId(eventId)
-        log?.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
-        log?.let { sagaEventLogRepository.save(it) }
-
-        logger.warn("예약 만료로 주문 취소 + 결제 역보상 요청: orderId=${event.orderId}")
     }
 
     private fun reconstructReservationIds(orderId: Long): List<String>? {
@@ -143,6 +150,10 @@ class OrderSagaConsumer(
     @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "order-saga-service")
     fun handlePaymentCompensation(message: String) {
         val node = objectMapper.readTree(message)
+        val eventType = node.get("eventType")?.asText()
+        if (eventType != null && eventType.startsWith("PaymentCancellation")) {
+            return
+        }
         val eventId = node.get("eventId")?.asText() ?: return
 
         val existingLog = sagaEventLogRepository.findByEventId(eventId)
