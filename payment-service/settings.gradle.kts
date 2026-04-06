@@ -11,3 +11,9 @@ val dlqPath = if (file("../hoppingmall-dlq").exists()) "../hoppingmall-dlq"
     else null
 
 dlqPath?.let { includeBuild(it) }
+
+val outboxPath = if (file("../hoppingmall-outbox").exists()) "../hoppingmall-outbox"
+    else if (file("/hoppingmall-outbox").exists()) "/hoppingmall-outbox"
+    else null
+
+outboxPath?.let { includeBuild(it) }

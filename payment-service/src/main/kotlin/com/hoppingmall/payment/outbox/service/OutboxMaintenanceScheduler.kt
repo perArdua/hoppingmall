@@ -1,7 +1,7 @@
 package com.hoppingmall.payment.outbox.service
 
-import com.hoppingmall.payment.outbox.domain.OutboxStatus
-import com.hoppingmall.payment.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.domain.OutboxStatus
+import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
