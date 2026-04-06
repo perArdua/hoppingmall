@@ -1,6 +1,8 @@
 package com.hoppingmall.cache
 
 import com.github.benmanes.caffeine.cache.Cache
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.cache.support.AbstractValueAdaptingCache
 import java.time.Duration
@@ -13,10 +15,20 @@ class TwoLevelCache(
     private val policy: CachePolicy,
     private val lockProvider: LockProvider,
     private val shardedRedisCache: org.springframework.cache.Cache? = null,
-    private val hotKeyDetector: HotKeyDetector? = null
+    private val hotKeyDetector: HotKeyDetector? = null,
+    meterRegistry: MeterRegistry? = null
 ) : AbstractValueAdaptingCache(true) {
 
     private val log = LoggerFactory.getLogger(TwoLevelCache::class.java)
+    private val l1HitCounter = meterRegistry?.let {
+        Counter.builder("cache.l1.hit").tag("cache", name).register(it)
+    }
+    private val l2HitCounter = meterRegistry?.let {
+        Counter.builder("cache.l2.hit").tag("cache", name).register(it)
+    }
+    private val missCounter = meterRegistry?.let {
+        Counter.builder("cache.miss").tag("cache", name).register(it)
+    }
 
     companion object {
         private const val LOCK_KEY_PREFIX = "lock:"
@@ -31,7 +43,10 @@ class TwoLevelCache(
 
     override fun lookup(key: Any): Any? {
         val l1Value = caffeineCache.getIfPresent(key)
-        if (l1Value != null) return l1Value
+        if (l1Value != null) {
+            l1HitCounter?.increment()
+            return l1Value
+        }
 
         hotKeyDetector?.recordAccess(key.toString())
         val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
@@ -39,7 +54,10 @@ class TwoLevelCache(
         val l2Cache = if (isHot && shardedRedisCache != null) shardedRedisCache else redisCache
         val l2Value = l2Cache.get(key)?.get()
         if (l2Value != null) {
+            l2HitCounter?.increment()
             caffeineCache.put(key, l2Value)
+        } else {
+            missCounter?.increment()
         }
         return l2Value
     }
@@ -47,7 +65,10 @@ class TwoLevelCache(
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any?> get(key: Any, valueLoader: Callable<T>): T? {
         val l1Value = caffeineCache.getIfPresent(key)
-        if (l1Value != null) return fromStoreValue(l1Value) as T?
+        if (l1Value != null) {
+            l1HitCounter?.increment()
+            return fromStoreValue(l1Value) as T?
+        }
 
         hotKeyDetector?.recordAccess(key.toString())
         val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
@@ -55,6 +76,7 @@ class TwoLevelCache(
         if (isHot && shardedRedisCache != null) {
             val shardValue = shardedRedisCache.get(key)?.get()
             if (shardValue != null) {
+                l2HitCounter?.increment()
                 caffeineCache.put(key, shardValue)
                 return fromStoreValue(shardValue) as T?
             }
@@ -63,10 +85,12 @@ class TwoLevelCache(
 
         val l2Value = redisCache.get(key)?.get()
         if (l2Value != null) {
+            l2HitCounter?.increment()
             caffeineCache.put(key, l2Value)
             return fromStoreValue(l2Value) as T?
         }
 
+        missCounter?.increment()
         return loadAndCache(key, valueLoader)
     }
 
@@ -79,9 +103,11 @@ class TwoLevelCache(
             try {
                 val l2Recheck = redisCache.get(key)?.get()
                 if (l2Recheck != null) {
+                    l2HitCounter?.increment()
                     caffeineCache.put(key, l2Recheck)
                     return fromStoreValue(l2Recheck) as T?
                 }
+                missCounter?.increment()
                 return loadAndCache(key, valueLoader)
             } finally {
                 lockProvider.unlock(lockKey)
@@ -100,12 +126,14 @@ class TwoLevelCache(
 
             val l2Value = redisCache.get(key)?.get()
             if (l2Value != null) {
+                l2HitCounter?.increment()
                 caffeineCache.put(key, l2Value)
                 return fromStoreValue(l2Value) as T?
             }
         }
 
         log.warn("Lock 대기 초과 [cache={}, key={}], DB 로더 직접 호출", name, key)
+        missCounter?.increment()
         return loadAndCache(key, valueLoader)
     }
 
