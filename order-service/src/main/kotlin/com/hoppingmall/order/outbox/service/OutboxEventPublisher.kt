@@ -2,14 +2,13 @@ package com.hoppingmall.order.outbox.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.event.AvroEventConverter
-import com.hoppingmall.order.config.OutboxMetrics
-import com.hoppingmall.order.outbox.domain.OutboxEvent
-import com.hoppingmall.order.outbox.domain.OutboxStatus
-import com.hoppingmall.order.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.domain.OutboxEvent
+import com.hoppingmall.outbox.domain.OutboxStatus
+import com.hoppingmall.outbox.metrics.OutboxMetrics
+import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
-import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -57,7 +56,6 @@ class OutboxEventPublisher(
         }
     }
 
-    @Async
     @Transactional
     fun publishEvent(eventId: Long) {
         var event: OutboxEvent? = null
@@ -77,9 +75,7 @@ class OutboxEventPublisher(
                 ).get(10, java.util.concurrent.TimeUnit.SECONDS)
             }
 
-            if (result != null) {
-                handlePublishSuccess(event, result)
-            }
+            handlePublishSuccess(event, result)
 
         } catch (e: Exception) {
             val failedEvent = event
@@ -96,6 +92,7 @@ class OutboxEventPublisher(
         event.markAsProcessed()
         outboxEventRepository.save(event)
         outboxMetrics.recordOutboxPublished(event.topic)
+        outboxMetrics.recordPublishLatency(event.createdAt)
 
         logger.info("Outbox event published successfully: " +
             "eventId=${event.id}, topic=${event.topic}, " +

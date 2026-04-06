@@ -1,6 +1,7 @@
 package com.hoppingmall.order.outbox.service
 
 import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.OutboxEventWriter
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 

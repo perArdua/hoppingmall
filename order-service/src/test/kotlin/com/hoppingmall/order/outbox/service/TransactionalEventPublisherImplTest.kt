@@ -1,5 +1,6 @@
 package com.hoppingmall.order.outbox.service
 
+import com.hoppingmall.outbox.service.OutboxEventWriter
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator

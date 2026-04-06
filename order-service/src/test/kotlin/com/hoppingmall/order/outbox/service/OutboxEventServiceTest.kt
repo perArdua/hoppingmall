@@ -1,9 +1,11 @@
 package com.hoppingmall.order.outbox.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.hoppingmall.order.outbox.domain.OutboxEvent
-import com.hoppingmall.order.outbox.domain.OutboxStatus
-import com.hoppingmall.order.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.domain.OutboxEvent
+import com.hoppingmall.outbox.domain.OutboxStatus
+import com.hoppingmall.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.service.OutboxEventService
+import com.hoppingmall.outbox.service.OutboxEventWriter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration

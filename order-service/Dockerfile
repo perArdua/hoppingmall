@@ -8,6 +8,7 @@ COPY order-service/src ./src
 COPY hoppingmall-common /hoppingmall-common
 COPY hoppingmall-idempotency /hoppingmall-idempotency
 COPY hoppingmall-dlq /hoppingmall-dlq
+COPY hoppingmall-outbox /hoppingmall-outbox
 RUN sed -i "s/\r$//" gradlew && chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
 FROM eclipse-temurin:21-jre-alpine AS runtime

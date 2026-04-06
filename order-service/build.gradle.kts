@@ -35,6 +35,7 @@ dependencies {
 	implementation("com.hoppingmall:hoppingmall-common:0.0.1-SNAPSHOT")
 	implementation("com.hoppingmall:hoppingmall-idempotency:0.0.1-SNAPSHOT")
 	implementation("com.hoppingmall:hoppingmall-dlq:0.0.1-SNAPSHOT")
+	implementation("com.hoppingmall:hoppingmall-outbox:0.0.1-SNAPSHOT")
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
