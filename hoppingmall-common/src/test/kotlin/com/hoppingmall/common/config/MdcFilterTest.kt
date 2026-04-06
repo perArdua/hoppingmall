@@ -54,7 +54,7 @@ class MdcFilterTest {
         whenever(traceContext.traceId()).thenReturn("abc123def456")
 
         var capturedTraceId: String? = null
-        mdcFilter.doFilterInternal(request, response, FilterChain { _, _ ->
+        mdcFilter.doFilter(request, response, FilterChain { _, _ ->
             capturedTraceId = MDC.get("traceId")
         })
 
@@ -68,7 +68,7 @@ class MdcFilterTest {
         request.addHeader("X-Trace-Id", "header-trace-123")
 
         var capturedTraceId: String? = null
-        mdcFilter.doFilterInternal(request, response, FilterChain { _, _ ->
+        mdcFilter.doFilter(request, response, FilterChain { _, _ ->
             capturedTraceId = MDC.get("traceId")
         })
 
@@ -80,7 +80,7 @@ class MdcFilterTest {
         whenever(tracer.currentSpan()).thenReturn(null)
 
         var capturedTraceId: String? = null
-        mdcFilter.doFilterInternal(request, response, FilterChain { _, _ ->
+        mdcFilter.doFilter(request, response, FilterChain { _, _ ->
             capturedTraceId = MDC.get("traceId")
         })
 
@@ -93,7 +93,7 @@ class MdcFilterTest {
         whenever(tracer.currentSpan()).thenReturn(null)
 
         var capturedService: String? = null
-        mdcFilter.doFilterInternal(request, response, FilterChain { _, _ ->
+        mdcFilter.doFilter(request, response, FilterChain { _, _ ->
             capturedService = MDC.get("service")
         })
 
@@ -106,7 +106,7 @@ class MdcFilterTest {
         request.addHeader("x-user-id", "42")
 
         var capturedUserId: String? = null
-        mdcFilter.doFilterInternal(request, response, FilterChain { _, _ ->
+        mdcFilter.doFilter(request, response, FilterChain { _, _ ->
             capturedUserId = MDC.get("userId")
         })
 
@@ -119,7 +119,7 @@ class MdcFilterTest {
 
         MDC.put("externalKey", "should-survive")
 
-        mdcFilter.doFilterInternal(request, response, FilterChain { _, _ -> })
+        mdcFilter.doFilter(request, response, FilterChain { _, _ -> })
 
         assertThat(MDC.get("traceId")).isNull()
         assertThat(MDC.get("service")).isNull()

@@ -1,8 +1,8 @@
 package com.hoppingmall.payment.config
 
 import com.hoppingmall.common.event.AvroJsonDeserializer
-import com.hoppingmall.payment.config.kafka.BusinessContextConsumerInterceptor
-import com.hoppingmall.payment.config.kafka.BusinessContextProducerInterceptor
+import com.hoppingmall.common.config.kafka.BusinessContextConsumerInterceptor
+import com.hoppingmall.common.config.kafka.BusinessContextProducerInterceptor
 import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.service.DLQCommandService
 import io.confluent.kafka.serializers.KafkaAvroSerializer

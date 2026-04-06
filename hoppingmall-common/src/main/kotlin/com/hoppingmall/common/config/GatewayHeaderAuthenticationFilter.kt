@@ -32,7 +32,7 @@ class GatewayHeaderAuthenticationFilter : OncePerRequestFilter() {
     }
 
     companion object {
-        const val USER_ID_HEADER = "x-user-id"
+        const val USER_ID_HEADER = MdcFilter.USER_ID_HEADER
         const val USER_ROLE_HEADER = "x-user-role"
         private const val DEFAULT_ROLE = "BUYER"
     }

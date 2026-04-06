@@ -1,5 +1,6 @@
-package com.hoppingmall.payment.config.kafka
+package com.hoppingmall.common.config.kafka
 
+import com.hoppingmall.common.config.MdcFilter
 import org.apache.kafka.clients.producer.ProducerInterceptor
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
@@ -8,9 +9,9 @@ import org.slf4j.MDC
 class BusinessContextProducerInterceptor : ProducerInterceptor<String, Any> {
 
     override fun onSend(record: ProducerRecord<String, Any>): ProducerRecord<String, Any> {
-        addHeaderFromMdc(record, USER_ID_KEY, USER_ID_HEADER)
-        addHeaderFromMdc(record, SERVICE_KEY, SERVICE_HEADER)
-        addHeaderFromMdc(record, GLOBAL_TRACE_ID_KEY, GLOBAL_TRACE_ID_HEADER)
+        addHeaderFromMdc(record, MdcFilter.USER_ID_KEY, MdcFilter.USER_ID_HEADER)
+        addHeaderFromMdc(record, MdcFilter.SERVICE_KEY, MdcFilter.SERVICE_HEADER)
+        addHeaderFromMdc(record, MdcFilter.GLOBAL_TRACE_ID_KEY, MdcFilter.GLOBAL_TRACE_ID_HEADER)
         return record
     }
 
@@ -26,13 +27,4 @@ class BusinessContextProducerInterceptor : ProducerInterceptor<String, Any> {
     override fun close() {}
 
     override fun configure(configs: MutableMap<String, *>?) {}
-
-    companion object {
-        const val USER_ID_KEY = "userId"
-        const val USER_ID_HEADER = "X-User-Id"
-        const val SERVICE_KEY = "service"
-        const val SERVICE_HEADER = "X-Service-Name"
-        const val GLOBAL_TRACE_ID_KEY = "globalTraceId"
-        const val GLOBAL_TRACE_ID_HEADER = "X-Global-Trace-Id"
-    }
 }
