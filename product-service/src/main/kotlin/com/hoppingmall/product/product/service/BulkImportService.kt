@@ -160,7 +160,6 @@ class BulkImportService(
     private fun evictProductCaches() {
         try {
             cacheManager.getCache("product")?.clear()
-            cacheManager.getCache("product:notfound")?.clear()
             log.info("대량 등록 후 product 캐시 초기화 완료")
         } catch (e: Exception) {
             log.warn("캐시 초기화 실패: {}", e.message)

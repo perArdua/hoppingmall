@@ -1,16 +1,14 @@
 package com.hoppingmall.product.product.service
 
-import com.hoppingmall.cache.NotFoundMarker
 import com.hoppingmall.product.product.domain.Product
 import com.hoppingmall.product.product.domain.repository.ProductImageRepository
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.dto.request.ProductSearchCondition
 import com.hoppingmall.product.product.dto.response.ProductResponse
-import org.springframework.cache.CacheManager
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.domain.SliceImpl
-import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,8 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class ProductQueryServiceImpl(
     private val productRepository: ProductRepository,
-    private val productImageRepository: ProductImageRepository,
-    private val cacheManager: CacheManager
+    private val productImageRepository: ProductImageRepository
 ) : ProductQueryService {
 
     override fun getProducts(pageable: Pageable): Slice<ProductResponse> {
@@ -29,20 +26,8 @@ class ProductQueryServiceImpl(
 
     @Cacheable(cacheNames = ["product"], key = "#productId", sync = true)
     override fun getProductById(productId: Long): ProductResponse? {
-        val notFoundCache = cacheManager.getCache("product:notfound")
-        val cached = notFoundCache?.get(productId)
-        if (cached != null && NotFoundMarker.isNotFound(cached.get())) {
-            return null
-        }
-
-        val product = productRepository.findNullableById(productId)
-        if (product == null) {
-            notFoundCache?.put(productId, NotFoundMarker.INSTANCE)
-            return null
-        }
-
+        val product = productRepository.findNullableById(productId) ?: return null
         val images = productImageRepository.findByProductIdOrderBySortOrder(productId)
-
         return ProductResponse.from(product, images)
     }
 
