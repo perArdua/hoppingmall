@@ -98,7 +98,19 @@ class PaymentCommandServiceImpl(
             throw PaymentAccessDeniedException()
         }
 
-        if (payment.status != PaymentStatus.SUCCESS) {
+        return executeCancelPayment(payment)
+    }
+
+    @Transactional
+    override fun cancelPaymentInternal(paymentId: Long): PaymentResponse {
+        val payment = paymentRepository.findByIdForUpdate(paymentId)
+            ?: throw PaymentNotFoundException()
+
+        return executeCancelPayment(payment)
+    }
+
+    private fun executeCancelPayment(payment: Payment): PaymentResponse {
+        if (payment.status != PaymentStatus.SUCCESS && payment.status != PaymentStatus.PENDING) {
             throw PaymentInvalidStateException()
         }
 
@@ -109,7 +121,7 @@ class PaymentCommandServiceImpl(
         paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
         paymentNotificationService.publishPaymentCancelledNotification(cancelledPayment)
 
-        log.info("결제 취소: paymentId={}, orderId={}, userId={}", paymentId, payment.orderId, userId)
+        log.info("결제 취소: paymentId={}, orderId={}, userId={}", payment.id, payment.orderId, payment.userId)
         return PaymentResponse.from(cancelledPayment)
     }
 

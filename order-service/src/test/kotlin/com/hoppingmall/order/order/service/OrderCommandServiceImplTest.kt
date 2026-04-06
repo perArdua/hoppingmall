@@ -13,8 +13,10 @@ import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
+import com.hoppingmall.order.port.TransactionalEventPublisherPort
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -55,6 +57,12 @@ class OrderCommandServiceImplTest {
     private lateinit var inventoryCommandPort: InventoryCommandPort
 
     @Mock
+    private lateinit var paymentCommandPort: PaymentCommandPort
+
+    @Mock
+    private lateinit var transactionalEventPublisherPort: TransactionalEventPublisherPort
+
+    @Mock
     private lateinit var orderMetrics: OrderMetrics
 
     @InjectMocks
@@ -84,6 +92,7 @@ class OrderCommandServiceImplTest {
 
         verify(inventoryCommandPort).batchReserveStock(listOf(100L to 2))
         assertThat(result).isNotNull
+        assertThat(result.status).isEqualTo(OrderStatus.PAYING)
     }
 
     @Test
@@ -138,6 +147,29 @@ class OrderCommandServiceImplTest {
         assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
         verify(inventoryCommandPort).cancelReservations(listOf("rsv-1"))
         verify(inventoryCommandPort, never()).increaseStock(any(), any())
+    }
+
+    @Test
+    fun PAYING_상태_주문_취소_시_결제_취소를_요청한다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        setEntityId(order, 1L)
+        order.updateStatus(OrderStatus.PAYING)
+
+        val orderItem = OrderItem.create(
+            orderId = 1L, sellerId = 5L, productId = 100L,
+            productName = "상품A", productPrice = BigDecimal("50000"),
+            quantity = 1, reservationId = "rsv-1"
+        )
+        setEntityId(orderItem, 10L)
+
+        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+        whenever(paymentCommandPort.cancelPayment(1L)).thenReturn(true)
+
+        service.cancelOrder(10L, 1L)
+
+        assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
+        verify(paymentCommandPort).cancelPayment(1L)
     }
 
     @Test

@@ -11,11 +11,16 @@ import com.hoppingmall.order.order.dto.response.OrderResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
+import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.config.OrderMetrics
+import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
+import com.hoppingmall.order.port.TransactionalEventPublisherPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -29,6 +34,8 @@ class OrderCommandServiceImpl(
     private val cartItemRepository: CartItemRepository,
     private val productQueryPort: ProductQueryPort,
     private val inventoryCommandPort: InventoryCommandPort,
+    private val paymentCommandPort: PaymentCommandPort,
+    private val transactionalEventPublisherPort: TransactionalEventPublisherPort,
     private val orderMetrics: OrderMetrics
 ) : OrderCommandService {
 
@@ -71,6 +78,7 @@ class OrderCommandServiceImpl(
             )
         }
         val savedOrderItems = orderItemRepository.saveAll(orderItems)
+        order.updateStatus(OrderStatus.PAYING)
 
         cartItemRepository.deleteAllById(request.cartItemIds)
 
@@ -88,12 +96,47 @@ class OrderCommandServiceImpl(
         }
 
         if (!order.isCancellable()) {
-            throw com.hoppingmall.order.order.exception.OrderInvalidStatusException()
+            throw OrderInvalidStatusException()
         }
 
-        order.updateStatus(OrderStatus.CANCELLED)
-
         val orderItems = orderItemRepository.findByOrderId(orderId)
+
+        when (order.status) {
+            OrderStatus.PAYING -> {
+                order.updateStatus(OrderStatus.CANCELLED)
+                if (!paymentCommandPort.cancelPayment(orderId)) {
+                    throw OrderPaymentCancellationFailedException()
+                }
+                restoreInventory(orderItems)
+            }
+            OrderStatus.CREATED -> {
+                order.updateStatus(OrderStatus.CANCELLED)
+                restoreInventory(orderItems)
+            }
+            OrderStatus.PAID -> {
+                order.updateStatus(OrderStatus.CANCEL_REQUESTED)
+                transactionalEventPublisherPort.publishEvent(
+                    aggregateType = "Order",
+                    aggregateId = orderId.toString(),
+                    eventType = "PaymentCancellationRequested",
+                    eventData = mapOf(
+                        "eventType" to "PaymentCancellationRequested",
+                        "eventId" to "cancel-$orderId-${System.currentTimeMillis()}",
+                        "orderId" to orderId
+                    ),
+                    topic = KafkaTopics.PAYMENT_COMPENSATION,
+                    partitionKey = orderId.toString()
+                )
+            }
+            else -> throw OrderInvalidStatusException()
+        }
+
+        orderMetrics.recordOrderCancelled()
+        log.info("주문 취소: orderId={}, buyerId={}, status={}", orderId, buyerId, order.status)
+        return OrderResponse.from(order, orderItems)
+    }
+
+    private fun restoreInventory(orderItems: List<OrderItem>) {
         val reservationIds = orderItems.mapNotNull { it.reservationId }
         if (reservationIds.isNotEmpty()) {
             inventoryCommandPort.cancelReservations(reservationIds)
@@ -102,10 +145,6 @@ class OrderCommandServiceImpl(
                 inventoryCommandPort.increaseStock(orderItem.productId, orderItem.quantity)
             }
         }
-
-        orderMetrics.recordOrderCancelled()
-        log.info("주문 취소: orderId={}, buyerId={}", orderId, buyerId)
-        return OrderResponse.from(order, orderItems)
     }
 
     override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
