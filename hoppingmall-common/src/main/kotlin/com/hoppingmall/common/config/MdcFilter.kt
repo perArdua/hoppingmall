@@ -33,7 +33,7 @@ class MdcFilter(
 
             MDC.put(TRACE_ID_KEY, traceId)
             MDC.put(SERVICE_KEY, serviceName)
-            request.getHeader("x-user-id")?.let { MDC.put(USER_ID_KEY, it) }
+            request.getHeader(USER_ID_HEADER)?.let { MDC.put(USER_ID_KEY, it) }
             request.getHeader(GLOBAL_TRACE_ID_HEADER)?.let { MDC.put(GLOBAL_TRACE_ID_KEY, it) }
             response.setHeader(TRACE_ID_HEADER, traceId)
             filterChain.doFilter(request, response)
@@ -54,9 +54,11 @@ class MdcFilter(
         const val TRACE_ID_KEY = "traceId"
         const val TRACE_ID_HEADER = "X-Trace-Id"
         const val USER_ID_KEY = "userId"
+        const val USER_ID_HEADER = "X-User-Id"
         const val SERVICE_KEY = "service"
-        const val GLOBAL_TRACE_ID_HEADER = "X-Global-Trace-Id"
+        const val SERVICE_HEADER = "X-Service-Name"
         const val GLOBAL_TRACE_ID_KEY = "globalTraceId"
+        const val GLOBAL_TRACE_ID_HEADER = "X-Global-Trace-Id"
         private val TRACE_ID_PATTERN = Regex("[a-zA-Z0-9\\-]+")
     }
 }

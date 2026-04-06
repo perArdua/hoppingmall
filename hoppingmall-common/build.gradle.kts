@@ -41,4 +41,14 @@ dependencies {
 	}
 	compileOnly("org.redisson:redisson-spring-boot-starter:4.3.0")
 	compileOnly("io.micrometer:micrometer-core")
+	compileOnly("org.springframework.kafka:spring-kafka")
+
+	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+	testImplementation("org.springframework.kafka:spring-kafka")
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.withType<Test> {
+	useJUnitPlatform()
 }
