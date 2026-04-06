@@ -2,10 +2,10 @@ package com.hoppingmall.payment.outbox.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.event.AvroEventConverter
-import com.hoppingmall.payment.config.OutboxMetrics
-import com.hoppingmall.payment.outbox.domain.OutboxEvent
-import com.hoppingmall.payment.outbox.domain.OutboxStatus
-import com.hoppingmall.payment.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.domain.OutboxEvent
+import com.hoppingmall.outbox.domain.OutboxStatus
+import com.hoppingmall.outbox.metrics.OutboxMetrics
+import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 @Service
 class OutboxEventPublisher(
@@ -68,23 +68,15 @@ class OutboxEventPublisher(
 
             val avroRecord = avroEventConverter.convertJsonToAvro(event.eventType, event.eventData)
 
-            kafkaTemplate.executeInTransaction { template ->
-                val future: CompletableFuture<SendResult<String, Any>> = template.send(
+            val result = kafkaTemplate.executeInTransaction { template ->
+                template.send(
                     event.topic,
                     event.partitionKey ?: "",
                     avroRecord
-                )
-
-                future.whenComplete { result, throwable ->
-                    if (throwable == null) {
-                        handlePublishSuccess(event, result)
-                    } else {
-                        handlePublishFailure(event, throwable)
-                    }
-                }
-
-                return@executeInTransaction future
+                ).get(10, TimeUnit.SECONDS)
             }
+
+            handlePublishSuccess(event, result)
 
         } catch (e: Exception) {
             val failedEvent = event
@@ -101,6 +93,7 @@ class OutboxEventPublisher(
         event.markAsProcessed()
         outboxEventRepository.save(event)
         outboxMetrics.recordOutboxPublished(event.topic)
+        outboxMetrics.recordPublishLatency(event.createdAt)
 
         logger.info("Outbox event published successfully: " +
             "eventId=${event.id}, topic=${event.topic}, " +

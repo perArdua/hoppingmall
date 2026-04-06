@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.outbox.service
 
+import com.hoppingmall.outbox.service.OutboxEventWriter
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
