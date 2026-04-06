@@ -23,7 +23,10 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
         "PointEarnRequested" to PointEarnRequestEvent.getClassSchema(),
         "MembershipUpdateRequested" to MembershipUpdateRequestEvent.getClassSchema(),
         "RefundCompleted" to RefundCompletedEvent.getClassSchema(),
-        "PaymentReversalRequested" to PaymentCancelledEvent.getClassSchema()
+        "PaymentReversalRequested" to PaymentCancelledEvent.getClassSchema(),
+        "PaymentCancellationRequested" to PaymentCancellationRequestedEvent.getClassSchema(),
+        "PaymentCancellationCompleted" to PaymentCancellationCompletedEvent.getClassSchema(),
+        "PaymentCancellationFailed" to PaymentCancellationFailedEvent.getClassSchema()
     )
 
     fun convertJsonToAvro(eventType: String, jsonData: String): GenericRecord {
