@@ -3,7 +3,7 @@ package com.hoppingmall.notification.config
 import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.service.DLQCommandService
-import com.hoppingmall.notification.config.kafka.BusinessContextConsumerInterceptor
+import com.hoppingmall.common.config.kafka.BusinessContextConsumerInterceptor
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.errors.SerializationException
 import org.apache.kafka.common.serialization.StringDeserializer
