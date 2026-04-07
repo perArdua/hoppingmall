@@ -1,89 +1,76 @@
 package com.hoppingmall.user.auth.service
 
+import com.hoppingmall.user.auth.domain.RefreshToken
 import com.hoppingmall.user.auth.domain.repository.RefreshTokenRepository
 import com.hoppingmall.user.auth.exception.RefreshTokenMismatchException
 import com.hoppingmall.user.auth.exception.RefreshTokenNotFoundException
-import org.junit.jupiter.api.BeforeEach
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.InjectMocks
 import org.mockito.Mock
-import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.argThat
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.data.redis.core.ValueOperations
-import java.util.concurrent.TimeUnit
-import kotlin.test.assertEquals
 
 @ExtendWith(MockitoExtension::class)
-@DisplayName("RefreshTokenServiceImpl 단위 테스트")
+@DisplayName("RefreshTokenServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class RefreshTokenServiceImplTest {
 
     @Mock
-    private lateinit var redisTemplate: RedisTemplate<String, String>
+    private lateinit var refreshTokenRepository: RefreshTokenRepository
 
-    @Mock
-    private lateinit var valueOperations: ValueOperations<String, String>
-
+    @InjectMocks
     private lateinit var refreshTokenService: RefreshTokenServiceImpl
 
-    @BeforeEach
-    fun setUp() {
-        lenient().whenever(redisTemplate.opsForValue()).thenReturn(valueOperations)
-
-        refreshTokenService = RefreshTokenServiceImpl(
-            RefreshTokenRepository(redisTemplate)
-        )
-    }
-
     @Test
-    fun rotateRefreshToken은_기존_토큰을_삭제하고_새_토큰을_저장한다() {
+    fun 토큰_회전_시_기존_토큰_삭제_후_새_토큰_저장() {
         val result = refreshTokenService.rotateRefreshToken(userId = 1L, newToken = "new-token", ttl = 3600L)
 
-        assertEquals(1L, result.userId)
-        assertEquals("new-token", result.token)
-        assertEquals(3600L, result.ttl)
-        verify(redisTemplate).delete("refreshToken:1")
-        verify(valueOperations).set("refreshToken:1", "new-token", 3600L, TimeUnit.MILLISECONDS)
+        assertThat(result.userId).isEqualTo(1L)
+        assertThat(result.token).isEqualTo("new-token")
+        assertThat(result.ttl).isEqualTo(3600L)
+        verify(refreshTokenRepository).deleteByUserId(1L)
+        verify(refreshTokenRepository).save(argThat<RefreshToken> {
+            userId == 1L && token == "new-token" && ttl == 3600L
+        })
     }
 
     @Test
-    fun validate는_저장된_토큰과_일치하면_성공한다() {
-        whenever(valueOperations.get("refreshToken:2")).thenReturn("refresh-token")
+    fun 저장된_토큰과_일치하면_검증_성공() {
+        whenever(refreshTokenRepository.findByUserId(2L)).thenReturn("refresh-token")
 
         refreshTokenService.validate(2L, "refresh-token")
 
-        verify(valueOperations).get("refreshToken:2")
+        verify(refreshTokenRepository).findByUserId(2L)
     }
 
     @Test
-    fun validate는_저장된_토큰이_없으면_예외가_발생한다() {
-        whenever(valueOperations.get("refreshToken:3")).thenReturn(null)
+    fun 저장된_토큰이_없으면_예외_발생() {
+        whenever(refreshTokenRepository.findByUserId(3L)).thenReturn(null)
 
-        assertThrows<RefreshTokenNotFoundException> {
-            refreshTokenService.validate(3L, "missing")
-        }
+        assertThatThrownBy { refreshTokenService.validate(3L, "missing") }
+            .isInstanceOf(RefreshTokenNotFoundException::class.java)
     }
 
     @Test
-    fun validate는_저장된_토큰과_다르면_예외가_발생한다() {
-        whenever(valueOperations.get("refreshToken:4")).thenReturn("stored-token")
+    fun 저장된_토큰과_다르면_예외_발생() {
+        whenever(refreshTokenRepository.findByUserId(4L)).thenReturn("stored-token")
 
-        assertThrows<RefreshTokenMismatchException> {
-            refreshTokenService.validate(4L, "different-token")
-        }
+        assertThatThrownBy { refreshTokenService.validate(4L, "different-token") }
+            .isInstanceOf(RefreshTokenMismatchException::class.java)
     }
 
     @Test
-    fun delete는_userId_기준으로_refreshToken을_삭제한다() {
+    fun 삭제_시_리프레시_토큰_제거() {
         refreshTokenService.delete(5L)
 
-        verify(redisTemplate).delete("refreshToken:5")
+        verify(refreshTokenRepository).deleteByUserId(5L)
     }
 }

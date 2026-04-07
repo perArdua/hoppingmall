@@ -8,6 +8,7 @@ import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.support.withId
 
 fun Seller.Companion.fixture(
+    userId: Long = 1L,
     businessNumber: String = "123-45-67890"
 ): Seller {
     val user = User.fixture(
@@ -15,6 +16,6 @@ fun Seller.Companion.fixture(
         password = Password("encoded-password"),
         name = "판매자",
         role = Role.SELLER
-    ).withId(1L)
+    ).withId(userId)
     return Seller.create(user, businessNumber)
 }

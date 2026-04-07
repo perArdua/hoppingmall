@@ -7,12 +7,14 @@ import com.hoppingmall.user.domain.Buyer
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.support.withId
 
-fun Buyer.Companion.fixture(): Buyer {
+fun Buyer.Companion.fixture(
+    userId: Long = 1L
+): Buyer {
     val user = User.fixture(
         email = Email("buyer@example.com"),
         password = Password("encoded-password"),
         name = "구매자",
         role = Role.BUYER
-    ).withId(1L)
+    ).withId(userId)
     return Buyer.create(user)
 }

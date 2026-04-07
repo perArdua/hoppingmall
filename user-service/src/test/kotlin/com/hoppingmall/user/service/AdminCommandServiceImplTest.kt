@@ -9,21 +9,21 @@ import com.hoppingmall.user.service.strategy.ApproveSellerCommand
 import com.hoppingmall.user.service.strategy.RejectSellerCommand
 import com.hoppingmall.user.service.strategy.SellerApprovalCommandMapper
 import com.hoppingmall.user.support.fixture.fixture
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.whenever
 import java.util.Optional
-import kotlin.test.assertEquals
 
 @ExtendWith(MockitoExtension::class)
-@DisplayName("AdminCommandServiceImpl 단위 테스트")
+@DisplayName("AdminCommandServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class AdminCommandServiceImplTest {
 
@@ -47,7 +47,7 @@ class AdminCommandServiceImplTest {
 
         adminCommandService.updateSellerApprovalStatus(1L, SellerApprovalRequest("APPROVED"))
 
-        assertEquals(Seller.ApprovalStatus.APPROVED, seller.getApprovalStatus())
+        assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.APPROVED)
     }
 
     @Test
@@ -57,24 +57,22 @@ class AdminCommandServiceImplTest {
 
         adminCommandService.updateSellerApprovalStatus(2L, SellerApprovalRequest("REJECTED"))
 
-        assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
+        assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.REJECTED)
     }
 
     @Test
     fun 존재하지_않는_판매자면_예외가_발생한다() {
         whenever(sellerRepository.findById(404L)).thenReturn(Optional.empty())
 
-        assertThrows<SellerNotFoundException> {
-            adminCommandService.updateSellerApprovalStatus(404L, SellerApprovalRequest("APPROVED"))
-        }
+        assertThatThrownBy { adminCommandService.updateSellerApprovalStatus(404L, SellerApprovalRequest("APPROVED")) }
+            .isInstanceOf(SellerNotFoundException::class.java)
     }
 
     @Test
     fun PENDING_승인_상태는_예외가_발생한다() {
         whenever(sellerRepository.findById(3L)).thenReturn(Optional.of(Seller.fixture()))
 
-        assertThrows<SellerInvalidApprovalCommandException> {
-            adminCommandService.updateSellerApprovalStatus(3L, SellerApprovalRequest("PENDING"))
-        }
+        assertThatThrownBy { adminCommandService.updateSellerApprovalStatus(3L, SellerApprovalRequest("PENDING")) }
+            .isInstanceOf(SellerInvalidApprovalCommandException::class.java)
     }
 }

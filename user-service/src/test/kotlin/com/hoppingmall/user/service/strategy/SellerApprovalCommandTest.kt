@@ -3,15 +3,15 @@ package com.hoppingmall.user.service.strategy
 import com.hoppingmall.user.domain.Seller
 import com.hoppingmall.user.exception.seller.SellerInvalidApprovalCommandException
 import com.hoppingmall.user.support.fixture.fixture
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
-import kotlin.test.assertEquals
 
-@DisplayName("SellerApprovalCommand 단위 테스트")
+@DisplayName("SellerApprovalCommand")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class SellerApprovalCommandTest {
 
@@ -28,7 +28,7 @@ class SellerApprovalCommandTest {
 
         mapper.getCommand(Seller.ApprovalStatus.APPROVED).execute(seller)
 
-        assertEquals(Seller.ApprovalStatus.APPROVED, seller.getApprovalStatus())
+        assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.APPROVED)
     }
 
     @Test
@@ -37,13 +37,12 @@ class SellerApprovalCommandTest {
 
         mapper.getCommand(Seller.ApprovalStatus.REJECTED).execute(seller)
 
-        assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
+        assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.REJECTED)
     }
 
     @Test
     fun PENDING은_유효한_커맨드가_아니라_예외가_발생한다() {
-        assertThrows<SellerInvalidApprovalCommandException> {
-            mapper.getCommand(Seller.ApprovalStatus.PENDING)
-        }
+        assertThatThrownBy { mapper.getCommand(Seller.ApprovalStatus.PENDING) }
+            .isInstanceOf(SellerInvalidApprovalCommandException::class.java)
     }
 }

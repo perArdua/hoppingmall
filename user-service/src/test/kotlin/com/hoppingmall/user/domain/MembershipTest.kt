@@ -1,44 +1,43 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.user.domain.enums.MembershipGrade
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
-import kotlin.test.assertEquals
 
-@DisplayName("Membership 단위 테스트")
+@DisplayName("Membership")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class MembershipTest {
 
     @Test
-    fun create는_기본_BRONZE_멤버십을_생성한다() {
+    fun 기본_BRONZE_멤버십을_생성한다() {
         val membership = Membership.create(1L)
 
-        assertEquals(1L, membership.userId)
-        assertEquals(MembershipGrade.BRONZE, membership.grade)
-        assertEquals(BigDecimal.ZERO, membership.totalSpent)
+        assertThat(membership.userId).isEqualTo(1L)
+        assertThat(membership.grade).isEqualTo(MembershipGrade.BRONZE)
+        assertThat(membership.totalSpent).isEqualTo(BigDecimal.ZERO)
     }
 
     @Test
-    fun addPurchaseAmount는_양수_금액을_누적한다() {
+    fun 양수_금액을_누적한다() {
         val membership = Membership.create(2L)
 
         membership.addPurchaseAmount(BigDecimal("50000"))
 
-        assertEquals(BigDecimal("50000"), membership.totalSpent)
-        assertEquals(MembershipGrade.BRONZE, membership.grade)
+        assertThat(membership.totalSpent).isEqualTo(BigDecimal("50000"))
+        assertThat(membership.grade).isEqualTo(MembershipGrade.BRONZE)
     }
 
     @Test
-    fun addPurchaseAmount는_0_이하_금액이면_예외가_발생한다() {
+    fun 금액이_0_이하이면_예외가_발생한다() {
         val membership = Membership.create(3L)
 
-        assertThrows<IllegalArgumentException> {
-            membership.addPurchaseAmount(BigDecimal.ZERO)
-        }
+        assertThatThrownBy { membership.addPurchaseAmount(BigDecimal.ZERO) }
+            .isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -55,7 +54,7 @@ class MembershipTest {
 
             membership.addPurchaseAmount(amount)
 
-            assertEquals(expectedGrade, membership.grade)
+            assertThat(membership.grade).isEqualTo(expectedGrade)
         }
     }
 
@@ -69,6 +68,6 @@ class MembershipTest {
 
         membership.addPurchaseAmount(BigDecimal("1"))
 
-        assertEquals(MembershipGrade.GOLD, membership.grade)
+        assertThat(membership.grade).isEqualTo(MembershipGrade.GOLD)
     }
 }

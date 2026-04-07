@@ -11,26 +11,22 @@ import com.hoppingmall.user.exception.user.UserNotFoundException
 import com.hoppingmall.user.service.UserQueryService
 import com.hoppingmall.user.support.fixture.fixture
 import com.hoppingmall.user.support.withId
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
-import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.data.redis.core.ValueOperations
 import java.util.Optional
-import java.util.concurrent.TimeUnit
-import kotlin.test.assertEquals
 
 @ExtendWith(MockitoExtension::class)
-@DisplayName("AuthServiceImpl 단위 테스트")
+@DisplayName("AuthServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class AuthServiceImplTest {
 
@@ -47,17 +43,12 @@ class AuthServiceImplTest {
     private lateinit var userRepository: UserRepository
 
     @Mock
-    private lateinit var redisTemplate: RedisTemplate<String, String>
-
-    @Mock
-    private lateinit var valueOperations: ValueOperations<String, String>
+    private lateinit var accessTokenBlacklistRepository: AccessTokenBlacklistRepository
 
     private lateinit var authService: AuthServiceImpl
 
     @BeforeEach
     fun setUp() {
-        lenient().whenever(redisTemplate.opsForValue()).thenReturn(valueOperations)
-
         authService = AuthServiceImpl(
             userQueryService = userQueryService,
             tokenProvider = tokenProvider,
@@ -68,12 +59,12 @@ class AuthServiceImplTest {
                 refreshExpirationMs = 86400000
             },
             userRepository = userRepository,
-            accessTokenBlacklistRepository = AccessTokenBlacklistRepository(redisTemplate)
+            accessTokenBlacklistRepository = accessTokenBlacklistRepository
         )
     }
 
     @Test
-    fun 로그인_성공_시_accessToken과_refreshToken을_발급하고_refreshToken을_회전한다() {
+    fun 로그인_성공_시_토큰을_발급하고_리프레시_토큰을_회전한다() {
         val request = SignInRequest(email = "seller@example.com", password = "Password1234")
         val user = com.hoppingmall.user.domain.User.fixture(role = Role.SELLER).withId(1L)
         whenever(userQueryService.authenticate(request)).thenReturn(user)
@@ -82,13 +73,13 @@ class AuthServiceImplTest {
 
         val response = authService.login(request)
 
-        assertEquals("access-token", response.accessToken)
-        assertEquals("refresh-token", response.refreshToken)
+        assertThat(response.accessToken).isEqualTo("access-token")
+        assertThat(response.refreshToken).isEqualTo("refresh-token")
         verify(refreshTokenService).rotateRefreshToken(1L, "refresh-token", 86400000)
     }
 
     @Test
-    fun 리프레시_토큰_재발급_성공_시_새로운_accessToken과_refreshToken을_반환한다() {
+    fun 리프레시_토큰_재발급_시_새로운_토큰을_반환한다() {
         val user = com.hoppingmall.user.domain.User.fixture(role = Role.BUYER).withId(10L)
         whenever(tokenProvider.parseRefreshToken("refresh-token")).thenReturn(10L)
         whenever(userRepository.findById(10L)).thenReturn(Optional.of(user))
@@ -97,8 +88,8 @@ class AuthServiceImplTest {
 
         val response: TokenRefreshResponse = authService.refreshAccessToken("refresh-token")
 
-        assertEquals("new-access-token", response.accessToken)
-        assertEquals("new-refresh-token", response.refreshToken)
+        assertThat(response.accessToken).isEqualTo("new-access-token")
+        assertThat(response.refreshToken).isEqualTo("new-refresh-token")
         verify(refreshTokenService).validate(10L, "refresh-token")
         verify(refreshTokenService).rotateRefreshToken(10L, "new-refresh-token", 86400000)
     }
@@ -108,19 +99,18 @@ class AuthServiceImplTest {
         whenever(tokenProvider.parseRefreshToken("missing-user-token")).thenReturn(999L)
         whenever(userRepository.findById(999L)).thenReturn(Optional.empty())
 
-        assertThrows<UserNotFoundException> {
-            authService.refreshAccessToken("missing-user-token")
-        }
+        assertThatThrownBy { authService.refreshAccessToken("missing-user-token") }
+            .isInstanceOf(UserNotFoundException::class.java)
     }
 
     @Test
-    fun 로그아웃_시_accessToken을_blacklist에_등록하고_refreshToken을_삭제한다() {
+    fun 로그아웃_시_블랙리스트_등록_및_리프레시_토큰_삭제() {
         whenever(tokenProvider.parseAccessToken("access-token")).thenReturn(7L)
         whenever(tokenProvider.getRemainingExpirationMs("access-token")).thenReturn(1000L)
 
         authService.logout("access-token")
 
-        verify(valueOperations).set("blacklist:access-token", "blacklisted", 1000L, TimeUnit.MILLISECONDS)
+        verify(accessTokenBlacklistRepository).add("access-token", 1000L)
         verify(refreshTokenService).delete(7L)
     }
 }

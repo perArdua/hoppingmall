@@ -6,35 +6,32 @@ import com.hoppingmall.user.common.vo.Password
 import com.hoppingmall.user.common.vo.PasswordCreator
 import com.hoppingmall.user.common.vo.PasswordPolicy
 import com.hoppingmall.user.domain.User
-import com.hoppingmall.user.domain.enums.MembershipGrade
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignUpRequest
 import com.hoppingmall.user.dto.request.UpdateUserRequest
-import com.hoppingmall.user.dto.response.MembershipResponse
 import com.hoppingmall.user.exception.user.UserAlreadyExistsException
 import com.hoppingmall.user.exception.user.UserNotFoundException
 import com.hoppingmall.user.support.fixture.fixture
 import com.hoppingmall.user.support.withId
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.security.crypto.password.PasswordEncoder
-import java.math.BigDecimal
-import java.time.LocalDateTime
-import kotlin.test.assertEquals
 
 @ExtendWith(MockitoExtension::class)
-@DisplayName("UserCommandServiceImpl 단위 테스트")
+@DisplayName("UserCommandServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class UserCommandServiceImplTest {
 
@@ -79,32 +76,18 @@ class UserCommandServiceImplTest {
         whenever(userRepository.save(userCaptor.capture())).thenAnswer {
             userCaptor.firstValue.withId(1L)
         }
-        whenever(membershipCommandService.createMembership(1L)).thenReturn(
-            MembershipResponse(
-                id = 1L,
-                userId = 1L,
-                grade = MembershipGrade.BRONZE,
-                gradeName = MembershipGrade.BRONZE.gradeName,
-                totalSpent = BigDecimal.ZERO,
-                pointEarningRate = MembershipGrade.BRONZE.pointEarningRate,
-                discountRate = MembershipGrade.BRONZE.discountRate,
-                nextGrade = MembershipGrade.SILVER,
-                amountToNextGrade = MembershipGrade.SILVER.requiredAmount,
-                createdAt = LocalDateTime.now(),
-                updatedAt = null
-            )
-        )
+        whenever(membershipCommandService.createMembership(1L)).thenReturn(mock())
 
         val response = userCommandService.signUp(request)
 
-        assertEquals(1L, response.id)
-        assertEquals("signup@example.com", response.email)
-        assertEquals("홍길동", response.name)
-        assertEquals(Role.SELLER, response.role)
+        assertThat(response.id).isEqualTo(1L)
+        assertThat(response.email).isEqualTo("signup@example.com")
+        assertThat(response.name).isEqualTo("홍길동")
+        assertThat(response.role).isEqualTo(Role.SELLER)
         verify(userDomainService).validateNewUser(Email(request.email), request.password)
         verify(membershipCommandService).createMembership(1L)
-        assertEquals(Email("signup@example.com"), userCaptor.firstValue.email)
-        assertEquals("홍길동", userCaptor.firstValue.getName())
+        assertThat(userCaptor.firstValue.email).isEqualTo(Email("signup@example.com"))
+        assertThat(userCaptor.firstValue.getName()).isEqualTo("홍길동")
     }
 
     @Test
@@ -118,9 +101,8 @@ class UserCommandServiceImplTest {
         doThrow(UserAlreadyExistsException()).whenever(userDomainService)
             .validateNewUser(Email(request.email), request.password)
 
-        assertThrows<UserAlreadyExistsException> {
-            userCommandService.signUp(request)
-        }
+        assertThatThrownBy { userCommandService.signUp(request) }
+            .isInstanceOf(UserAlreadyExistsException::class.java)
     }
 
     @Test
@@ -131,8 +113,8 @@ class UserCommandServiceImplTest {
 
         userCommandService.updateUserProfile(1L, UpdateUserRequest(name = "새이름", password = "NewPassword1234"))
 
-        assertEquals("새이름", user.getName())
-        assertEquals(Password("encoded-new-password"), user.getPassword())
+        assertThat(user.getName()).isEqualTo("새이름")
+        assertThat(user.getPassword()).isEqualTo(Password("encoded-new-password"))
     }
 
     @Test
@@ -143,16 +125,15 @@ class UserCommandServiceImplTest {
 
         userCommandService.updateUserProfile(2L, UpdateUserRequest(name = "이름만변경", password = null))
 
-        assertEquals("이름만변경", user.getName())
-        assertEquals(originalPassword, user.getPassword())
+        assertThat(user.getName()).isEqualTo("이름만변경")
+        assertThat(user.getPassword()).isEqualTo(originalPassword)
     }
 
     @Test
     fun 프로필_수정_대상_사용자가_없으면_예외가_발생한다() {
         whenever(userRepository.findNullableById(999L)).thenReturn(null)
 
-        assertThrows<UserNotFoundException> {
-            userCommandService.updateUserProfile(999L, UpdateUserRequest(name = "없음", password = "Password1234"))
-        }
+        assertThatThrownBy { userCommandService.updateUserProfile(999L, UpdateUserRequest(name = "없음", password = "Password1234")) }
+            .isInstanceOf(UserNotFoundException::class.java)
     }
 }

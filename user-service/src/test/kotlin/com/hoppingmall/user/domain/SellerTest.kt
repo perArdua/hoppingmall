@@ -1,40 +1,40 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.user.support.fixture.fixture
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
 
-@DisplayName("Seller 단위 테스트")
+@DisplayName("Seller")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class SellerTest {
 
     @Test
-    fun fixture는_기본_승인_상태가_PENDING이다() {
+    fun 기본_승인_상태가_PENDING이다() {
         val seller = Seller.fixture()
 
-        assertEquals(Seller.ApprovalStatus.PENDING, seller.getApprovalStatus())
-        assertEquals("123-45-67890", seller.businessNumber)
-        assertEquals(1L, seller.userId)
+        assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.PENDING)
+        assertThat(seller.businessNumber).isEqualTo("123-45-67890")
+        assertThat(seller.userId).isEqualTo(1L)
     }
 
     @Test
-    fun approve는_상태를_APPROVED로_변경한다() {
+    fun 승인_시_상태를_APPROVED로_변경한다() {
         val seller = Seller.fixture()
 
         seller.approve()
 
-        assertEquals(Seller.ApprovalStatus.APPROVED, seller.getApprovalStatus())
+        assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.APPROVED)
     }
 
     @Test
-    fun reject는_상태를_REJECTED로_변경한다() {
+    fun 거절_시_상태를_REJECTED로_변경한다() {
         val seller = Seller.fixture()
 
         seller.reject()
 
-        assertEquals(Seller.ApprovalStatus.REJECTED, seller.getApprovalStatus())
+        assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.REJECTED)
     }
 }

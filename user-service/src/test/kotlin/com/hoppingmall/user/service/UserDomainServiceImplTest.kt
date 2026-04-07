@@ -4,11 +4,11 @@ import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.PasswordPolicy
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.exception.user.UserAlreadyExistsException
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
@@ -17,7 +17,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 @ExtendWith(MockitoExtension::class)
-@DisplayName("UserDomainServiceImpl 단위 테스트")
+@DisplayName("UserDomainServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class UserDomainServiceImplTest {
 
@@ -35,9 +35,8 @@ class UserDomainServiceImplTest {
         val email = Email("duplicate@example.com")
         whenever(userRepository.existsByEmail(email)).thenReturn(true)
 
-        assertThrows<UserAlreadyExistsException> {
-            userDomainService.validateNewUser(email, "Password1234")
-        }
+        assertThatThrownBy { userDomainService.validateNewUser(email, "Password1234") }
+            .isInstanceOf(UserAlreadyExistsException::class.java)
     }
 
     @Test

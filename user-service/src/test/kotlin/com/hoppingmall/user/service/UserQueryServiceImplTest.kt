@@ -11,22 +11,22 @@ import com.hoppingmall.user.exception.user.UserLoginFailedException
 import com.hoppingmall.user.exception.user.UserNotFoundException
 import com.hoppingmall.user.support.fixture.fixture
 import com.hoppingmall.user.support.withId
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.security.crypto.password.PasswordEncoder
-import kotlin.test.assertEquals
 
 @ExtendWith(MockitoExtension::class)
-@DisplayName("UserQueryServiceImpl 단위 테스트")
+@DisplayName("UserQueryServiceImpl")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class UserQueryServiceImplTest {
 
@@ -47,7 +47,7 @@ class UserQueryServiceImplTest {
     }
 
     @Test
-    fun authenticate는_이메일과_비밀번호가_정상이면_사용자를_반환한다() {
+    fun 이메일과_비밀번호가_정상이면_사용자를_반환한다() {
         val user = com.hoppingmall.user.domain.User.fixture(
             email = Email("login@example.com"),
             password = Password("encoded-password"),
@@ -58,22 +58,21 @@ class UserQueryServiceImplTest {
 
         val result = userQueryService.authenticate(SignInRequest(user.email.value, "Password1234"))
 
-        assertEquals(1L, result.id)
-        assertEquals(user.email, result.email)
-        assertEquals(Role.BUYER, result.getRole())
+        assertThat(result.id).isEqualTo(1L)
+        assertThat(result.email).isEqualTo(user.email)
+        assertThat(result.getRole()).isEqualTo(Role.BUYER)
     }
 
     @Test
-    fun authenticate는_사용자가_없으면_예외가_발생한다() {
+    fun 사용자가_없으면_로그인_예외가_발생한다() {
         whenever(userRepository.findByEmail(Email("missing@example.com"))).thenReturn(null)
 
-        assertThrows<UserLoginFailedException> {
-            userQueryService.authenticate(SignInRequest("missing@example.com", "Password1234"))
-        }
+        assertThatThrownBy { userQueryService.authenticate(SignInRequest("missing@example.com", "Password1234")) }
+            .isInstanceOf(UserLoginFailedException::class.java)
     }
 
     @Test
-    fun authenticate는_비밀번호가_다르면_예외가_발생한다() {
+    fun 비밀번호가_다르면_예외가_발생한다() {
         val user = com.hoppingmall.user.domain.User.fixture(
             email = Email("wrong-password@example.com"),
             password = Password("encoded-password")
@@ -81,31 +80,29 @@ class UserQueryServiceImplTest {
         whenever(userRepository.findByEmail(user.email)).thenReturn(user)
         whenever(passwordEncoder.matches("WrongPassword1234", "encoded-password")).thenReturn(false)
 
-        assertThrows<PasswordNotMatchedException> {
-            userQueryService.authenticate(SignInRequest(user.email.value, "WrongPassword1234"))
-        }
+        assertThatThrownBy { userQueryService.authenticate(SignInRequest(user.email.value, "WrongPassword1234")) }
+            .isInstanceOf(PasswordNotMatchedException::class.java)
     }
 
     @Test
-    fun getUserProfile은_사용자가_있으면_프로필을_반환한다() {
+    fun 사용자가_있으면_프로필을_반환한다() {
         val user = com.hoppingmall.user.domain.User.fixture(role = Role.SELLER).withId(3L)
         whenever(userRepository.findNullableById(3L)).thenReturn(user)
 
         val result = userQueryService.getUserProfile(3L)
 
-        assertEquals(3L, result.id)
-        assertEquals(user.email.value, result.email)
-        assertEquals(user.getName(), result.name)
-        assertEquals(Role.SELLER.name, result.role)
+        assertThat(result.id).isEqualTo(3L)
+        assertThat(result.email).isEqualTo(user.email.value)
+        assertThat(result.name).isEqualTo(user.getName())
+        assertThat(result.role).isEqualTo(Role.SELLER.name)
     }
 
     @Test
-    fun getUserProfile은_사용자가_없으면_예외가_발생한다() {
+    fun 사용자가_없으면_프로필_조회_예외가_발생한다() {
         whenever(userRepository.findNullableById(404L)).thenReturn(null)
 
-        assertThrows<UserNotFoundException> {
-            userQueryService.getUserProfile(404L)
-        }
+        assertThatThrownBy { userQueryService.getUserProfile(404L) }
+            .isInstanceOf(UserNotFoundException::class.java)
 
         verify(userRepository).findNullableById(404L)
     }
