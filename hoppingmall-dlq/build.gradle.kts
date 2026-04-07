@@ -34,4 +34,12 @@ dependencies {
 	compileOnly("org.springframework.kafka:spring-kafka")
 	compileOnly("io.micrometer:micrometer-core")
 	compileOnly("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
+
+	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.withType<Test> {
+	useJUnitPlatform()
 }
