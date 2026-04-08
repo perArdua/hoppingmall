@@ -26,7 +26,7 @@ class ShippingCommandServiceImpl(
     private val shippingRepository: ShippingRepository,
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
-    private val transactionalEventPublisher: TransactionalEventPublisherPort,
+    private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper
 ) : ShippingCommandService {
 

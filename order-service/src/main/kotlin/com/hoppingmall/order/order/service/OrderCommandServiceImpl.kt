@@ -35,7 +35,7 @@ class OrderCommandServiceImpl(
     private val productQueryPort: ProductQueryPort,
     private val inventoryCommandPort: InventoryCommandPort,
     private val paymentCommandPort: PaymentCommandPort,
-    private val transactionalEventPublisher: TransactionalEventPublisherPort,
+    private val transactionalEventPublisher: TransactionalEventPublisher,
     private val orderMetrics: OrderMetrics
 ) : OrderCommandService {
 

@@ -20,7 +20,7 @@ class OrderCancellationResultConsumer(
     private val orderItemRepository: OrderItemRepository,
     private val sagaEventLogRepository: SagaEventLogRepository,
     private val inventoryCommandPort: InventoryCommandPort,
-    private val transactionalEventPublisher: TransactionalEventPublisherPort,
+    private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper,
     private val transactionTemplate: TransactionTemplate
 ) {

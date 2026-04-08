@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class KafkaRefundEventPublisher(
-    private val transactionalEventPublisher: TransactionalEventPublisherPort
+    private val transactionalEventPublisher: TransactionalEventPublisher
 ) : RefundEventPublisher {
 
     override fun publishRefundCompletedEvent(event: RefundCompletedEvent) {
