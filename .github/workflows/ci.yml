@@ -177,6 +177,18 @@ jobs:
       - name: 테스트
         run: cd ${{ matrix.service }} && ./gradlew test --no-daemon --build-cache
 
+      - name: Jacoco 리포트 생성
+        if: success()
+        run: cd ${{ matrix.service }} && ./gradlew jacocoTestReport --no-daemon --build-cache
+
+      - name: Codecov 업로드
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ${{ matrix.service }}/build/reports/jacoco/test/jacocoTestReport.xml
+          flags: ${{ matrix.service }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: 테스트 리포트 업로드
         if: failure()
         uses: actions/upload-artifact@v4
