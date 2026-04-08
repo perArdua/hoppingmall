@@ -2,7 +2,7 @@ package com.hoppingmall.payment.payment.service.strategy
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.hoppingmall.common.KafkaTopics
-import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException

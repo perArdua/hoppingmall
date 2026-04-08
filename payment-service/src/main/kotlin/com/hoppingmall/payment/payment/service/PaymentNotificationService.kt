@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.common.NotificationType
-import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
 
 @Service

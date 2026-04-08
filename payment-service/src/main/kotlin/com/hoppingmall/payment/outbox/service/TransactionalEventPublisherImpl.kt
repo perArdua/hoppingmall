@@ -1,21 +1,23 @@
 package com.hoppingmall.payment.outbox.service
 
 import com.hoppingmall.outbox.service.OutboxEventWriter
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class TransactionalEventPublisher(
+class TransactionalEventPublisherImpl(
     private val outboxEventWriter: OutboxEventWriter
-) {
+) : TransactionalEventPublisher {
+
     @Transactional(rollbackFor = [Exception::class])
-    fun publishEvent(
+    override fun publishEvent(
         aggregateType: String,
         aggregateId: String,
         eventType: String,
         eventData: Any,
         topic: String,
-        partitionKey: String? = null
+        partitionKey: String?
     ) {
         outboxEventWriter.saveEvent(
             aggregateType = aggregateType,

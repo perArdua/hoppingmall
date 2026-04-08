@@ -3,7 +3,7 @@ package com.hoppingmall.payment.point.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.common.NotificationType
-import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.payment.point.domain.PointHistory
 import com.hoppingmall.payment.point.domain.PointHistoryRepository

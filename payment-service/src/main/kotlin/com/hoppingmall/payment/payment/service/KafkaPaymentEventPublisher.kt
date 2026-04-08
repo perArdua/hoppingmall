@@ -6,7 +6,7 @@ import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
 
 @Service
