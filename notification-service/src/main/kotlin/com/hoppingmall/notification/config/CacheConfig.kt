@@ -12,7 +12,6 @@ import org.springframework.cache.annotation.EnableCaching
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
-import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import java.time.Duration
@@ -43,12 +42,13 @@ class CacheConfig {
     }
 
     @Bean
-    fun redisCacheManager(connectionFactory: RedisConnectionFactory): RedisCacheManager {
-        val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-            .entryTtl(Duration.ofMinutes(5))
-        return RedisCacheManager.builder(connectionFactory)
-            .cacheDefaults(defaultConfig)
-            .build()
+    fun redisCacheManager(
+        connectionFactory: RedisConnectionFactory,
+        cachePolicies: Map<String, CachePolicy>
+    ): RedisCacheManager {
+        return TwoLevelCacheManager.buildRedisCacheManager(
+            connectionFactory, cachePolicies, defaultTtl = Duration.ofMinutes(5)
+        )
     }
 
     @Bean

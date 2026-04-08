@@ -4,6 +4,10 @@ import com.github.benmanes.caffeine.cache.Caffeine
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
+import org.springframework.data.redis.cache.RedisCacheConfiguration
+import org.springframework.data.redis.cache.RedisCacheManager
+import org.springframework.data.redis.connection.RedisConnectionFactory
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 class TwoLevelCacheManager(
@@ -66,6 +70,23 @@ class TwoLevelCacheManager(
 
     companion object {
         private const val MISSING_CACHE_TTL_MS = 30_000L
+
+        fun buildRedisCacheManager(
+            connectionFactory: RedisConnectionFactory,
+            policies: Map<String, CachePolicy>,
+            defaultTtl: Duration = Duration.ofMinutes(30)
+        ): RedisCacheManager {
+            val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(defaultTtl)
+            val perCacheConfigs = policies.mapValues { (_, policy) ->
+                RedisCacheConfiguration.defaultCacheConfig()
+                    .entryTtl(policy.l2Ttl)
+            }
+            return RedisCacheManager.builder(connectionFactory)
+                .cacheDefaults(defaultConfig)
+                .withInitialCacheConfigurations(perCacheConfigs)
+                .build()
+        }
     }
 
     override fun getCacheNames(): Collection<String> {
