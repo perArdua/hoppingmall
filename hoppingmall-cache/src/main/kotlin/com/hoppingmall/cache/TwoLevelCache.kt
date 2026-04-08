@@ -29,6 +29,9 @@ class TwoLevelCache(
     private val missCounter = meterRegistry?.let {
         Counter.builder("cache.miss").tag("cache", name).register(it)
     }
+    private val l2FailureCounter = meterRegistry?.let {
+        Counter.builder("cache.l2.failure").tag("cache", name).register(it)
+    }
 
     companion object {
         private const val LOCK_KEY_PREFIX = "lock:"
@@ -51,8 +54,7 @@ class TwoLevelCache(
         hotKeyDetector?.recordAccess(key.toString())
         val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
 
-        val l2Cache = if (isHot && shardedRedisCache != null) shardedRedisCache else redisCache
-        val l2Value = l2Cache.get(key)?.get()
+        val l2Value = safeL2Get(key, isHot)
         if (l2Value != null) {
             l2HitCounter?.increment()
             caffeineCache.put(key, l2Value)
@@ -74,7 +76,7 @@ class TwoLevelCache(
         val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
 
         if (isHot && shardedRedisCache != null) {
-            val shardValue = shardedRedisCache.get(key)?.get()
+            val shardValue = safeL2Get(key, true)
             if (shardValue != null) {
                 l2HitCounter?.increment()
                 caffeineCache.put(key, shardValue)
@@ -83,7 +85,7 @@ class TwoLevelCache(
             return loadWithLock(key, valueLoader)
         }
 
-        val l2Value = redisCache.get(key)?.get()
+        val l2Value = safeL2Get(key, false)
         if (l2Value != null) {
             l2HitCounter?.increment()
             caffeineCache.put(key, l2Value)
@@ -97,11 +99,17 @@ class TwoLevelCache(
     @Suppress("UNCHECKED_CAST")
     private fun <T : Any?> loadWithLock(key: Any, valueLoader: Callable<T>): T? {
         val lockKey = "$LOCK_KEY_PREFIX$name:$key"
-        val locked = lockProvider.tryLock(lockKey, LOCK_LEASE_TIME)
+        val locked = try {
+            lockProvider.tryLock(lockKey, LOCK_LEASE_TIME)
+        } catch (e: Exception) {
+            log.warn("L2 lock 획득 실패 [cache={}, key={}]: {}", name, key, e.message)
+            l2FailureCounter?.increment()
+            false
+        }
 
         if (locked) {
             try {
-                val l2Recheck = redisCache.get(key)?.get()
+                val l2Recheck = safeL2Get(key, false)
                 if (l2Recheck != null) {
                     l2HitCounter?.increment()
                     caffeineCache.put(key, l2Recheck)
@@ -110,7 +118,11 @@ class TwoLevelCache(
                 missCounter?.increment()
                 return loadAndCache(key, valueLoader)
             } finally {
-                lockProvider.unlock(lockKey)
+                try {
+                    lockProvider.unlock(lockKey)
+                } catch (e: Exception) {
+                    log.warn("L2 lock 해제 실패 [cache={}, key={}]: {}", name, key, e.message)
+                }
             }
         }
 
@@ -124,7 +136,7 @@ class TwoLevelCache(
             Thread.sleep(LOCK_RETRY_INTERVAL_MS)
             waited += LOCK_RETRY_INTERVAL_MS
 
-            val l2Value = redisCache.get(key)?.get()
+            val l2Value = safeL2Get(key, false)
             if (l2Value != null) {
                 l2HitCounter?.increment()
                 caffeineCache.put(key, l2Value)
@@ -147,18 +159,10 @@ class TwoLevelCache(
         val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
 
         if (value != null) {
-            if (isHot && shardedRedisCache != null) {
-                shardedRedisCache.put(key, value)
-            } else {
-                redisCache.put(key, value)
-            }
+            safeL2Put(key, value, isHot)
             caffeineCache.put(key, toStoreValue(value))
         } else {
-            if (isHot && shardedRedisCache != null) {
-                shardedRedisCache.put(key, value)
-            } else {
-                redisCache.put(key, value)
-            }
+            safeL2Put(key, value, isHot)
             caffeineCache.invalidate(key)
         }
     }
@@ -166,16 +170,50 @@ class TwoLevelCache(
     override fun evict(key: Any) {
         val isHot = hotKeyDetector?.isHot(key.toString()) ?: false
 
-        if (isHot && shardedRedisCache != null) {
-            shardedRedisCache.evict(key)
-        } else {
-            redisCache.evict(key)
+        try {
+            if (isHot && shardedRedisCache != null) {
+                shardedRedisCache.evict(key)
+            } else {
+                redisCache.evict(key)
+            }
+        } catch (e: Exception) {
+            log.warn("L2 evict 실패 [cache={}, key={}]: {}", name, key, e.message)
+            l2FailureCounter?.increment()
         }
         caffeineCache.invalidate(key)
     }
 
     override fun clear() {
-        redisCache.clear()
+        try {
+            redisCache.clear()
+        } catch (e: Exception) {
+            log.warn("L2 clear 실패 [cache={}]: {}", name, e.message)
+            l2FailureCounter?.increment()
+        }
         caffeineCache.invalidateAll()
+    }
+
+    private fun safeL2Get(key: Any, isHot: Boolean): Any? {
+        return try {
+            val l2Cache = if (isHot && shardedRedisCache != null) shardedRedisCache else redisCache
+            l2Cache.get(key)?.get()
+        } catch (e: Exception) {
+            log.warn("L2 조회 실패 [cache={}, key={}]: {}", name, key, e.message)
+            l2FailureCounter?.increment()
+            null
+        }
+    }
+
+    private fun safeL2Put(key: Any, value: Any?, isHot: Boolean) {
+        try {
+            if (isHot && shardedRedisCache != null) {
+                shardedRedisCache.put(key, value)
+            } else {
+                redisCache.put(key, value)
+            }
+        } catch (e: Exception) {
+            log.warn("L2 저장 실패 [cache={}, key={}]: {}", name, key, e.message)
+            l2FailureCounter?.increment()
+        }
     }
 }
