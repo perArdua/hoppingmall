@@ -16,7 +16,7 @@ import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -60,7 +60,7 @@ class OrderCommandServiceImplTest {
     private lateinit var paymentCommandPort: PaymentCommandPort
 
     @Mock
-    private lateinit var transactionalEventPublisherPort: TransactionalEventPublisherPort
+    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @Mock
     private lateinit var orderMetrics: OrderMetrics

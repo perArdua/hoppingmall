@@ -9,7 +9,7 @@ import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -21,7 +21,7 @@ class OrderSagaConsumer(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val inventoryCommandPort: InventoryCommandPort,
-    private val transactionalEventPublisherPort: TransactionalEventPublisherPort,
+    private val transactionalEventPublisher: TransactionalEventPublisherPort,
     private val objectMapper: ObjectMapper,
     private val transactionTemplate: TransactionTemplate
 ) {
@@ -114,7 +114,7 @@ class OrderSagaConsumer(
                 orderRepository.save(order)
             }
 
-            transactionalEventPublisherPort.publishEvent(
+            transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",
                 aggregateId = event.orderId.toString(),
                 eventType = "PaymentReversalRequested",

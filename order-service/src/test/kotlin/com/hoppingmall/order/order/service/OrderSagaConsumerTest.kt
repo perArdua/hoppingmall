@@ -12,7 +12,7 @@ import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -52,7 +52,7 @@ class OrderSagaConsumerTest {
     private lateinit var inventoryCommandPort: InventoryCommandPort
 
     @Mock
-    private lateinit var transactionalEventPublisherPort: TransactionalEventPublisherPort
+    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @Mock
     private lateinit var objectMapper: ObjectMapper
@@ -74,7 +74,7 @@ class OrderSagaConsumerTest {
             orderRepository,
             orderItemRepository,
             inventoryCommandPort,
-            transactionalEventPublisherPort,
+            transactionalEventPublisher,
             objectMapper,
             transactionTemplate
         )
@@ -170,7 +170,7 @@ class OrderSagaConsumerTest {
         consumer.handlePaymentCompleted("{}")
 
         assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
-        verify(transactionalEventPublisherPort).publishEvent(
+        verify(transactionalEventPublisher).publishEvent(
             aggregateType = eq("Order"),
             aggregateId = eq("1"),
             eventType = eq("PaymentReversalRequested"),

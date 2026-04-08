@@ -8,7 +8,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.dto.request.ShippingCreateRequest
@@ -26,7 +26,7 @@ class ShippingCommandServiceImpl(
     private val shippingRepository: ShippingRepository,
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
-    private val transactionalEventPublisherPort: TransactionalEventPublisherPort,
+    private val transactionalEventPublisher: TransactionalEventPublisherPort,
     private val objectMapper: ObjectMapper
 ) : ShippingCommandService {
 
@@ -116,7 +116,7 @@ class ShippingCommandServiceImpl(
             )
         )
 
-        transactionalEventPublisherPort.publishEvent(
+        transactionalEventPublisher.publishEvent(
             aggregateType = "Shipping",
             aggregateId = shipping.id!!.toString(),
             eventType = "${notificationType.name}NotificationRequested",

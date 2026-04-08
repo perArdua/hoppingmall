@@ -8,7 +8,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -20,7 +20,7 @@ class OrderCancellationResultConsumer(
     private val orderItemRepository: OrderItemRepository,
     private val sagaEventLogRepository: SagaEventLogRepository,
     private val inventoryCommandPort: InventoryCommandPort,
-    private val transactionalEventPublisherPort: TransactionalEventPublisherPort,
+    private val transactionalEventPublisher: TransactionalEventPublisherPort,
     private val objectMapper: ObjectMapper,
     private val transactionTemplate: TransactionTemplate
 ) {
@@ -86,7 +86,7 @@ class OrderCancellationResultConsumer(
                 }
             }
 
-            transactionalEventPublisherPort.publishEvent(
+            transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",
                 aggregateId = orderId.toString(),
                 eventType = "OrderCancellationNotificationRequested",
@@ -141,7 +141,7 @@ class OrderCancellationResultConsumer(
             log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
             sagaEventLogRepository.save(log)
 
-            transactionalEventPublisherPort.publishEvent(
+            transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",
                 aggregateId = orderId.toString(),
                 eventType = "OrderCancellationFailedNotificationRequested",
