@@ -1,6 +1,5 @@
-package com.hoppingmall.order.outbox.service
+package com.hoppingmall.outbox.scheduler
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.event.AvroEventConverter
 import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.domain.OutboxStatus
@@ -13,12 +12,12 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import java.util.concurrent.TimeUnit
 
 @Service
 class OutboxEventPublisher(
     private val outboxEventRepository: OutboxEventRepository,
     private val kafkaTemplate: KafkaTemplate<String, Any>,
-    private val objectMapper: ObjectMapper,
     private val outboxMetrics: OutboxMetrics,
     private val avroEventConverter: AvroEventConverter
 ) {
@@ -26,7 +25,7 @@ class OutboxEventPublisher(
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
     private val maxRetries = 3
 
-    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedDelayString = "\${outbox.publish.interval-ms:5000}")
     @Transactional
     fun publishPendingEvents() {
         val pendingEvents = outboxEventRepository.findUnprocessedEvents(
@@ -72,7 +71,7 @@ class OutboxEventPublisher(
                     event.topic,
                     event.partitionKey ?: "",
                     avroRecord
-                ).get(10, java.util.concurrent.TimeUnit.SECONDS)
+                ).get(10, TimeUnit.SECONDS)
             }
 
             handlePublishSuccess(event, result)
@@ -111,8 +110,8 @@ class OutboxEventPublisher(
             logger.warn("Outbox event failed, will retry: eventId=${event.id}, " +
                 "retryCount=${event.retryCount}, error=$errorMessage")
         }
-
         outboxMetrics.recordOutboxFailed(event.topic)
+
         outboxEventRepository.save(event)
     }
 }

@@ -1,4 +1,4 @@
-package com.hoppingmall.payment.outbox.service
+package com.hoppingmall.outbox.scheduler
 
 import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.repository.OutboxEventRepository
@@ -18,7 +18,7 @@ class OutboxMaintenanceScheduler(
     private val maxRetries = 3
     private val cleanupDays = 7L
 
-    @Scheduled(cron = "0 0 2 * * ?")
+    @Scheduled(cron = "\${outbox.maintenance.cleanup-cron:0 0 2 * * ?}")
     @Transactional
     fun cleanupProcessedEvents() {
         val cutoffDate = LocalDateTime.now().minusDays(cleanupDays)
@@ -29,7 +29,7 @@ class OutboxMaintenanceScheduler(
         }
     }
 
-    @Scheduled(fixedDelay = 300000)
+    @Scheduled(fixedDelayString = "\${outbox.maintenance.stale-check-ms:300000}")
     @Transactional
     fun handleStaleEvents() {
         val cutoffDate = LocalDateTime.now().minusMinutes(10)
