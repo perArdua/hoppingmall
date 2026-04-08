@@ -1,6 +1,8 @@
 package com.hoppingmall.notification.consumer
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.common.consumer.executeIdempotently
 import com.hoppingmall.notification.domain.Notification
 import com.hoppingmall.notification.domain.NotificationRepository
 import com.hoppingmall.notification.dto.response.NotificationResponse
@@ -9,9 +11,7 @@ import com.hoppingmall.notification.service.NotificationSseService
 import com.hoppingmall.notification.service.SseNotificationMessage
 import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.redis.core.RedisTemplate
-import com.hoppingmall.common.KafkaTopics
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -47,42 +47,33 @@ class NotificationEventConsumer(
         val content = event["content"]?.toString() ?: return
         val metadata = event["metadata"]?.toString()
 
-        try {
-            if (notificationRepository.existsByEventId(eventId)) {
-                log.info("이미 처리된 알림 이벤트: eventId={}", eventId)
-                return
-            }
-
+        executeIdempotently(
+            eventId = eventId,
+            eventDescription = "알림",
+            logger = log,
+            existsCheck = { notificationRepository.existsByEventId(eventId) }
+        ) {
             val type = try {
                 NotificationType.valueOf(typeStr)
             } catch (e: IllegalArgumentException) {
                 log.warn("알 수 없는 알림 타입: type={}", typeStr)
-                return
+                return@executeIdempotently
             }
 
-            val notification = Notification(
-                eventId = eventId,
-                userId = userId,
-                type = type,
-                title = title,
-                content = content,
-                metadata = metadata
+            val saved = notificationRepository.save(
+                Notification(
+                    eventId = eventId,
+                    userId = userId,
+                    type = type,
+                    title = title,
+                    content = content,
+                    metadata = metadata
+                )
             )
-
-            val saved: Notification
-            try {
-                saved = notificationRepository.save(notification)
-            } catch (e: DataIntegrityViolationException) {
-                log.info("이미 처리된 알림 이벤트: eventId={}", eventId)
-                return
-            }
 
             cacheManager.getCache("unread-count")?.evict(userId)
             publishSseEvent(saved)
             log.info("알림 처리 완료: userId={}, type={}, title={}", userId, type, title)
-        } catch (e: Exception) {
-            log.error("알림 처리 실패: eventId={}, userId={}, 오류={}", eventId, userId, e.message)
-            throw e
         }
     }
 
