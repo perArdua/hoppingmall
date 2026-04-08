@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring") version "1.9.25"
 	id("org.springframework.boot") version "3.4.3"
 	id("io.spring.dependency-management") version "1.1.7"
+	jacoco
 }
 
 group = "com.hoppingmall"
@@ -59,4 +60,53 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+val jacocoExcludedDirs = listOf(
+	"**/config/**",
+	"**/dto/**",
+	"**/entity/**",
+	"**/response/**",
+	"**/error/**",
+	"**/enum/**",
+	"**/enums/**",
+	"**/vo/**",
+	"**/exception/**",
+	"**/*Application*"
+)
+
+tasks.jacocoTestReport {
+	dependsOn(tasks.test)
+	classDirectories.setFrom(
+		files(classDirectories.files.map {
+			fileTree(it) { exclude(jacocoExcludedDirs) }
+		})
+	)
+	reports {
+		xml.required.set(true)
+		html.required.set(true)
+	}
+}
+
+tasks.jacocoTestCoverageVerification {
+	dependsOn(tasks.jacocoTestReport)
+	classDirectories.setFrom(
+		files(classDirectories.files.map {
+			fileTree(it) { exclude(jacocoExcludedDirs) }
+		})
+	)
+	violationRules {
+		rule {
+			element = "CLASS"
+			limit {
+				counter = "LINE"
+				value = "COVEREDRATIO"
+				minimum = "0.80".toBigDecimal()
+			}
+		}
+	}
+}
+
+tasks.register("jacocoTestVerification") {
+	dependsOn(tasks.jacocoTestCoverageVerification)
 }
