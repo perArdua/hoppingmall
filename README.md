@@ -6,42 +6,8 @@
 
 ## 서비스 구조
 
-```mermaid
-graph TB
-    Client([Client]) --> GW[API Gateway<br/>:8000]
+<img width="1241" height="775" alt="system_architecture" src="https://github.com/user-attachments/assets/81ae35c0-40fd-42eb-80ed-87d39415ebbd" />
 
-    GW --> US[User Service<br/>:8082]
-    GW --> PS[Product Service<br/>:8083]
-    GW --> OS[Order Service<br/>:8084]
-    GW --> PMS[Payment Service<br/>:8085]
-    GW --> NS[Notification Service<br/>:8081]
-    GW --> SS[Settlement Service<br/>:8086]
-
-    OS <-.->|gRPC| PS
-    OS <-.->|gRPC| PMS
-    PMS <-.->|gRPC| US
-    PMS <-.->|gRPC| OS
-    SS -->|HTTP| OS
-    SS -->|HTTP| US
-
-    OS --> Kafka[(Kafka)]
-    PMS --> Kafka
-    Kafka --> NS
-    Kafka --> PMS
-    Kafka --> OS
-
-    US --> MySQL[(MySQL)]
-    PS --> MySQL
-    OS --> MySQL
-    PMS --> MySQL
-    NS --> MySQL
-    SS --> MySQL
-
-    US --> Redis[(Redis)]
-    PS --> Redis
-    OS --> Redis
-    PMS --> Redis
-```
 
 ## 기술 스택
 
