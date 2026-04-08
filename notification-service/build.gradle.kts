@@ -29,6 +29,9 @@ repositories {
 dependencies {
 	implementation("com.hoppingmall:hoppingmall-common:0.0.1-SNAPSHOT")
 	implementation("com.hoppingmall:hoppingmall-dlq:0.0.1-SNAPSHOT")
+	implementation("com.hoppingmall:hoppingmall-cache:0.0.1-SNAPSHOT")
+	implementation("org.springframework.boot:spring-boot-starter-cache")
+	implementation("com.github.ben-manes.caffeine:caffeine")
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")

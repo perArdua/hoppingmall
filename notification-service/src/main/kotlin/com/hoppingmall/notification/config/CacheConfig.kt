@@ -1,25 +1,70 @@
 package com.hoppingmall.notification.config
 
+import com.hoppingmall.cache.CachePolicy
+import com.hoppingmall.cache.HotKeyDetectorRegistry
+import com.hoppingmall.cache.LockProvider
+import com.hoppingmall.cache.RedissonLockProvider
+import com.hoppingmall.cache.TwoLevelCacheManager
+import io.micrometer.core.instrument.MeterRegistry
+import org.redisson.api.RedissonClient
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.EnableCaching
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.data.redis.cache.RedisCacheConfiguration
+import org.springframework.context.annotation.Profile
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import java.time.Duration
 
 @Configuration
 @EnableCaching
+@Profile("!test")
 class CacheConfig {
 
     @Bean
-    fun cacheManager(redisConnectionFactory: RedisConnectionFactory): CacheManager {
-        val unreadCountConfig = RedisCacheConfiguration.defaultCacheConfig()
-            .entryTtl(Duration.ofSeconds(300))
+    fun cachePolicies(): Map<String, CachePolicy> = mapOf(
+        "unread-count" to CachePolicy(
+            cacheName = "unread-count",
+            l1MaxSize = 500,
+            l1Ttl = Duration.ofSeconds(60),
+            l2Ttl = Duration.ofMinutes(5)
+        )
+    )
 
-        return RedisCacheManager.builder(redisConnectionFactory)
-            .withCacheConfiguration("unread-count", unreadCountConfig)
-            .build()
+    @Bean
+    fun hotKeyDetectorRegistry(cachePolicies: Map<String, CachePolicy>): HotKeyDetectorRegistry {
+        return HotKeyDetectorRegistry(cachePolicies.values)
+    }
+
+    @Bean
+    fun lockProvider(redissonClient: RedissonClient): LockProvider {
+        return RedissonLockProvider(redissonClient)
+    }
+
+    @Bean
+    fun redisCacheManager(
+        connectionFactory: RedisConnectionFactory,
+        cachePolicies: Map<String, CachePolicy>
+    ): RedisCacheManager {
+        return TwoLevelCacheManager.buildRedisCacheManager(
+            connectionFactory, cachePolicies, defaultTtl = Duration.ofMinutes(5)
+        )
+    }
+
+    @Bean
+    fun cacheManager(
+        redisCacheManager: RedisCacheManager,
+        cachePolicies: Map<String, CachePolicy>,
+        lockProvider: LockProvider,
+        hotKeyDetectorRegistry: HotKeyDetectorRegistry,
+        meterRegistry: MeterRegistry
+    ): CacheManager {
+        return TwoLevelCacheManager(
+            redisCacheManager = redisCacheManager,
+            policies = cachePolicies,
+            lockProvider = lockProvider,
+            hotKeyDetectorRegistry = hotKeyDetectorRegistry,
+            meterRegistry = meterRegistry
+        )
     }
 }

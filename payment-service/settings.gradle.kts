@@ -17,3 +17,9 @@ val outboxPath = if (file("../hoppingmall-outbox").exists()) "../hoppingmall-out
     else null
 
 outboxPath?.let { includeBuild(it) }
+
+val cachePath = if (file("../hoppingmall-cache").exists()) "../hoppingmall-cache"
+    else if (file("/hoppingmall-cache").exists()) "/hoppingmall-cache"
+    else null
+
+cachePath?.let { includeBuild(it) }
