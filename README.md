@@ -28,54 +28,14 @@
 ## 이벤트 흐름
 
 주문부터 알림까지의 전체 이벤트 흐름입니다.
+<img width="1341" height="1032" alt="order_flow" src="https://github.com/user-attachments/assets/60d48b71-3c15-4476-bf5d-b38f1e7b67c6" />
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant O as Order Service
-    participant P as Payment Service
-    participant K as Kafka
-    participant N as Notification Service
-
-    C->>O: 주문 생성 (POST /orders)
-    O->>O: 재고 예약 (batchReserveStock)
-    O-->>C: 주문 응답 (CREATED)
-
-    C->>P: 결제 요청 (POST /payments)
-    P->>P: 결제 처리 + Outbox 저장
-    P->>K: payment-completed (Outbox Scheduler)
-
-    K->>O: payment-completed
-    O->>O: 주문 상태 → PAID
-    O->>O: 재고 예약 확정 (confirmReservations)
-
-    K->>P: point-earn-request
-    P->>P: 포인트 적립 + Outbox 저장
-    P->>K: notification
-
-    K->>N: 알림 저장 + 전송
-```
 
 ## 결제 보상 흐름
 
 결제 실패 시 보상 트랜잭션 처리 흐름입니다.
 
-```mermaid
-flowchart LR
-    A[결제 실패/취소] --> B[payment-compensation 발행]
-    B --> C[Order Service]
-    C --> D[주문 취소]
-    C --> E[재고 복구]
-    C --> F[예약 취소]
-
-    G[환불 완료] --> H[refund-completion 발행]
-    H --> I[Payment Service]
-    I --> J[결제 상태 REFUNDED]
-    I --> K[포인트 반환]
-    I --> L[쿠폰 복구]
-    I --> M[재고 복구]
-    I --> N[주문 취소]
-```
+<img width="952" height="832" alt="payment_compensation_flow" src="https://github.com/user-attachments/assets/5e49a862-fbb3-40a4-b1fb-17da4bcc6cb3" />
 
 ## 도메인
 
@@ -104,33 +64,6 @@ graph LR
     E -->|abort| G
 ```
 
-```bash
-# 로컬 환경 셋업
-./scripts/setup.sh
-
-# 이미지 빌드 + 배포
-./scripts/build-push.sh
-./scripts/deploy-all.sh
-
-# Canary 데모
-./scripts/canary-demo.sh api-gateway
-```
-
-## 실행 방법
-
-```bash
-# 인프라 (Kafka, Redis, MySQL)
-docker-compose up -d
-
-# 개별 서비스 실행
-cd user-service && ./gradlew bootRun
-
-# 테스트
-./gradlew test
-
-# 커버리지 검증 (80% 이상)
-./gradlew jacocoTestVerification
-```
 
 ## 주요 패턴
 
