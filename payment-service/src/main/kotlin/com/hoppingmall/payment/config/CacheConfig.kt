@@ -1,50 +1,88 @@
 package com.hoppingmall.payment.config
 
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.hoppingmall.cache.CachePolicy
+import com.hoppingmall.cache.HotKeyDetectorRegistry
+import com.hoppingmall.cache.LockProvider
+import com.hoppingmall.cache.RedissonLockProvider
+import com.hoppingmall.cache.TwoLevelCacheManager
+import io.micrometer.core.instrument.MeterRegistry
+import org.redisson.api.RedissonClient
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.EnableCaching
-import org.springframework.cache.caffeine.CaffeineCache
-import org.springframework.cache.support.SimpleCacheManager
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import java.util.concurrent.TimeUnit
+import org.springframework.context.annotation.Profile
+import org.springframework.data.redis.cache.RedisCacheConfiguration
+import org.springframework.data.redis.cache.RedisCacheManager
+import org.springframework.data.redis.connection.RedisConnectionFactory
+import java.time.Duration
 
 @Configuration
 @EnableCaching
+@Profile("!test")
 class CacheConfig {
 
     @Bean
-    fun cacheManager(): CacheManager {
-        val pointBalanceCache = CaffeineCache(
-            "point-balance",
-            Caffeine.newBuilder()
-                .maximumSize(1000)
-                .expireAfterWrite(30, TimeUnit.SECONDS)
-                .build()
+    fun cachePolicies(): Map<String, CachePolicy> = mapOf(
+        "point-balance" to CachePolicy(
+            cacheName = "point-balance",
+            l1MaxSize = 1000,
+            l1Ttl = Duration.ofSeconds(30),
+            l2Ttl = Duration.ofMinutes(30)
+        ),
+        "coupon:available" to CachePolicy(
+            cacheName = "coupon:available",
+            l1MaxSize = 100,
+            l1Ttl = Duration.ofMinutes(5),
+            l2Ttl = Duration.ofMinutes(30)
+        ),
+        "coupon:all" to CachePolicy(
+            cacheName = "coupon:all",
+            l1MaxSize = 100,
+            l1Ttl = Duration.ofMinutes(5),
+            l2Ttl = Duration.ofMinutes(30)
+        ),
+        "point-policy" to CachePolicy(
+            cacheName = "point-policy",
+            l1MaxSize = 10,
+            l1Ttl = Duration.ofMinutes(30),
+            l2Ttl = Duration.ofMinutes(30)
         )
-        val couponAvailableCache = CaffeineCache(
-            "coupon:available",
-            Caffeine.newBuilder()
-                .maximumSize(100)
-                .expireAfterWrite(5, TimeUnit.MINUTES)
-                .build()
+    )
+
+    @Bean
+    fun hotKeyDetectorRegistry(cachePolicies: Map<String, CachePolicy>): HotKeyDetectorRegistry {
+        return HotKeyDetectorRegistry(cachePolicies.values)
+    }
+
+    @Bean
+    fun lockProvider(redissonClient: RedissonClient): LockProvider {
+        return RedissonLockProvider(redissonClient)
+    }
+
+    @Bean
+    fun redisCacheManager(connectionFactory: RedisConnectionFactory): RedisCacheManager {
+        val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofMinutes(30))
+        return RedisCacheManager.builder(connectionFactory)
+            .cacheDefaults(defaultConfig)
+            .build()
+    }
+
+    @Bean
+    fun cacheManager(
+        redisCacheManager: RedisCacheManager,
+        cachePolicies: Map<String, CachePolicy>,
+        lockProvider: LockProvider,
+        hotKeyDetectorRegistry: HotKeyDetectorRegistry,
+        meterRegistry: MeterRegistry
+    ): CacheManager {
+        return TwoLevelCacheManager(
+            redisCacheManager = redisCacheManager,
+            policies = cachePolicies,
+            lockProvider = lockProvider,
+            hotKeyDetectorRegistry = hotKeyDetectorRegistry,
+            meterRegistry = meterRegistry
         )
-        val couponAllCache = CaffeineCache(
-            "coupon:all",
-            Caffeine.newBuilder()
-                .maximumSize(100)
-                .expireAfterWrite(5, TimeUnit.MINUTES)
-                .build()
-        )
-        val pointPolicyCache = CaffeineCache(
-            "point-policy",
-            Caffeine.newBuilder()
-                .maximumSize(10)
-                .expireAfterWrite(30, TimeUnit.MINUTES)
-                .build()
-        )
-        return SimpleCacheManager().apply {
-            setCaches(listOf(pointBalanceCache, couponAvailableCache, couponAllCache, pointPolicyCache))
-        }
     }
 }
