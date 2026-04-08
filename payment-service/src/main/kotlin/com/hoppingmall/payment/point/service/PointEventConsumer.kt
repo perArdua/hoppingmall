@@ -2,6 +2,7 @@ package com.hoppingmall.payment.point.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.common.consumer.executeIdempotently
 import com.hoppingmall.payment.common.NotificationType
 import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
@@ -31,12 +32,12 @@ class PointEventConsumer(
     @KafkaListener(topics = [KafkaTopics.POINT_EARN_REQUEST], groupId = "point-service")
     fun handlePointEarnRequest(message: String) {
         val event = objectMapper.readValue(message, PointEarnRequestEvent::class.java)
-        try {
-            if (pointHistoryRepository.existsByEventId(event.eventId)) {
-                log.info("이미 처리된 포인트 이벤트: eventId={}", event.eventId)
-                return
-            }
-
+        executeIdempotently(
+            eventId = event.eventId,
+            eventDescription = "포인트",
+            logger = log,
+            existsCheck = { pointHistoryRepository.existsByEventId(event.eventId) }
+        ) {
             val point = pointDomainService.findOrCreatePoint(event.userId)
             point.balance += event.earnAmount
             val savedPoint = pointRepository.save(point)
@@ -79,9 +80,6 @@ class PointEventConsumer(
                 topic = KafkaTopics.NOTIFICATION,
                 partitionKey = event.userId.toString()
             )
-        } catch (e: Exception) {
-            log.error("포인트 적립 처리 실패: userId={}, orderId={}, 오류={}", event.userId, event.orderId, e.message)
-            throw e
         }
     }
 }
