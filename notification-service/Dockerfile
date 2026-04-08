@@ -6,6 +6,7 @@ COPY notification-service/build.gradle.kts notification-service/settings.gradle.
 COPY notification-service/src ./src
 COPY hoppingmall-common /hoppingmall-common
 COPY hoppingmall-dlq /hoppingmall-dlq
+COPY hoppingmall-cache /hoppingmall-cache
 RUN sed -i "s/\r$//" gradlew && chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
