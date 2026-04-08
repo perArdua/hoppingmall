@@ -9,7 +9,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -43,7 +43,7 @@ class OrderCancellationResultConsumerTest {
     private lateinit var inventoryCommandPort: InventoryCommandPort
 
     @Mock
-    private lateinit var transactionalEventPublisherPort: TransactionalEventPublisherPort
+    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @Mock
     private lateinit var transactionTemplate: TransactionTemplate
@@ -52,7 +52,7 @@ class OrderCancellationResultConsumerTest {
 
     private fun createConsumer() = OrderCancellationResultConsumer(
         orderRepository, orderItemRepository, sagaEventLogRepository,
-        inventoryCommandPort, transactionalEventPublisherPort,
+        inventoryCommandPort, transactionalEventPublisher,
         objectMapper, transactionTemplate
     )
 
@@ -123,7 +123,7 @@ class OrderCancellationResultConsumerTest {
 
         assertThat(order.status).isEqualTo(OrderStatus.CANCEL_FAILED)
         verify(inventoryCommandPort, never()).cancelReservations(any())
-        verify(transactionalEventPublisherPort).publishEvent(any(), any(), eq("OrderCancellationFailedNotificationRequested"), any(), any(), any())
+        verify(transactionalEventPublisher).publishEvent(any(), any(), eq("OrderCancellationFailedNotificationRequested"), any(), any(), any())
     }
 
     @Test

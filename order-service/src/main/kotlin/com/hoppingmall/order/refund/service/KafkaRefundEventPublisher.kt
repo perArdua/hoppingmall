@@ -1,17 +1,17 @@
 package com.hoppingmall.order.refund.service
 
 import com.hoppingmall.common.KafkaTopics
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.order.refund.dto.event.RefundCompletedEvent
 import org.springframework.stereotype.Component
 
 @Component
 class KafkaRefundEventPublisher(
-    private val transactionalEventPublisherPort: TransactionalEventPublisherPort
+    private val transactionalEventPublisher: TransactionalEventPublisher
 ) : RefundEventPublisher {
 
     override fun publishRefundCompletedEvent(event: RefundCompletedEvent) {
-        transactionalEventPublisherPort.publishEvent(
+        transactionalEventPublisher.publishEvent(
             aggregateType = "Refund",
             aggregateId = event.refundId.toString(),
             eventType = "RefundCompleted",

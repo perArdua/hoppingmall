@@ -1,7 +1,7 @@
 package com.hoppingmall.payment.payment.service.strategy
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.hoppingmall.payment.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.payment.domain.CompensationEventLog
 import com.hoppingmall.payment.payment.domain.CompensationEventLogStatus

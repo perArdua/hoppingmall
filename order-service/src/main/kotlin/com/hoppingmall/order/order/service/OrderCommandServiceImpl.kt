@@ -20,7 +20,7 @@ import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -35,7 +35,7 @@ class OrderCommandServiceImpl(
     private val productQueryPort: ProductQueryPort,
     private val inventoryCommandPort: InventoryCommandPort,
     private val paymentCommandPort: PaymentCommandPort,
-    private val transactionalEventPublisherPort: TransactionalEventPublisherPort,
+    private val transactionalEventPublisher: TransactionalEventPublisher,
     private val orderMetrics: OrderMetrics
 ) : OrderCommandService {
 
@@ -115,7 +115,7 @@ class OrderCommandServiceImpl(
             }
             OrderStatus.PAID -> {
                 order.updateStatus(OrderStatus.CANCEL_REQUESTED)
-                transactionalEventPublisherPort.publishEvent(
+                transactionalEventPublisher.publishEvent(
                     aggregateType = "Order",
                     aggregateId = orderId.toString(),
                     eventType = "PaymentCancellationRequested",

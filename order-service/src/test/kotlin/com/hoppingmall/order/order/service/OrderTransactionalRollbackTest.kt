@@ -15,7 +15,7 @@ import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedExcep
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
-import com.hoppingmall.order.port.TransactionalEventPublisherPort
+import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.Assertions.catchThrowable
@@ -84,7 +84,7 @@ class OrderTransactionalRollbackTest {
     private lateinit var orderMetrics: OrderMetrics
 
     @MockitoBean
-    private lateinit var transactionalEventPublisherPort: TransactionalEventPublisherPort
+    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @MockitoBean
     private lateinit var objectMapper: ObjectMapper
@@ -101,7 +101,7 @@ class OrderTransactionalRollbackTest {
         }
         sagaEventLogRepository.saveAndFlush(sagaLog)
 
-        doThrow(RuntimeException("outbox publish failed")).whenever(transactionalEventPublisherPort).publishEvent(
+        doThrow(RuntimeException("outbox publish failed")).whenever(transactionalEventPublisher).publishEvent(
                 any(),
                 any(),
                 any(),
