@@ -17,6 +17,12 @@ interface ProductHourlyStatisticsRepository : JpaRepository<ProductHourlyStatist
         hour: Int
     ): ProductHourlyStatistics?
 
+    fun findByStatisticsDateAndHourAndProductIdIn(
+        statisticsDate: LocalDate,
+        hour: Int,
+        productIds: Collection<Long>
+    ): List<ProductHourlyStatistics>
+
     fun findByProductIdAndStatisticsDateOrderByHourAsc(
         productId: Long,
         statisticsDate: LocalDate
