@@ -5,10 +5,8 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
-import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 @Entity
 @Table(
     name = "cart_items",

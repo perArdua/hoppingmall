@@ -4,7 +4,6 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -16,7 +15,6 @@ import java.time.LocalDateTime
         Index(name = "idx_payments_user_id", columnList = "userId")
     ]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Payment private constructor(
     @Column(nullable = false)
     val orderId: Long,

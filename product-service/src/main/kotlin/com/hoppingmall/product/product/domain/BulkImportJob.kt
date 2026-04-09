@@ -3,7 +3,6 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.product.product.enum.BulkImportStatus
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 import java.time.LocalDateTime
 
 @Entity
@@ -11,7 +10,6 @@ import java.time.LocalDateTime
     name = "bulk_import_jobs",
     indexes = [Index(name = "idx_bulk_import_jobs_seller_id", columnList = "sellerId")]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class BulkImportJob private constructor(
     @Column(nullable = false)
     val sellerId: Long,
