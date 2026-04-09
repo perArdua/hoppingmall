@@ -67,7 +67,7 @@ class ProductSearchRepositoryImpl(
         maxPrice: BigDecimal?,
         pageable: Pageable
     ): Slice<Product> {
-        val sb = StringBuilder("SELECT p FROM Product p WHERE p.deletedAt IS NULL")
+        val sb = StringBuilder("SELECT p FROM Product p WHERE 1=1")
 
         if (!keyword.isNullOrBlank()) {
             sb.append(" AND (p.name LIKE :keyword OR p.description LIKE :keyword)")

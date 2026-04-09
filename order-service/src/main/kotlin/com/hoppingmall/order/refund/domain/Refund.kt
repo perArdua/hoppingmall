@@ -5,7 +5,6 @@ import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.refund.exception.RefundInvalidStatusException
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -19,7 +18,6 @@ import java.time.LocalDateTime
         Index(name = "idx_refunds_seller_id", columnList = "sellerId")
     ]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Refund private constructor(
     @Column(nullable = false)
     val orderId: Long,

@@ -3,7 +3,6 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.product.common.enums.ProductStatus
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
 @Entity
@@ -14,7 +13,6 @@ import java.math.BigDecimal
         Index(name = "idx_products_category_id", columnList = "categoryId")
     ]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Product private constructor(
 
     @Column(nullable = false)

@@ -2,7 +2,6 @@ package com.hoppingmall.product.review.domain
 
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 
 @Entity
 @Table(
@@ -13,7 +12,6 @@ import org.hibernate.annotations.Filter
         Index(name = "idx_reviews_buyer_id", columnList = "buyerId")
     ]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Review private constructor(
     @Column(nullable = false)
     val buyerId: Long,

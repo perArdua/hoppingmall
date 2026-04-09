@@ -5,7 +5,6 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
-import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
 @Entity
@@ -13,7 +12,6 @@ import java.math.BigDecimal
     name = "refund_items",
     indexes = [Index(name = "idx_refund_items_refund_id", columnList = "refundId")]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class RefundItem private constructor(
     @Column(nullable = false)
     val refundId: Long,

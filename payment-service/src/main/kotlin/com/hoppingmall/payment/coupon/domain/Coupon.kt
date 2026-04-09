@@ -4,14 +4,12 @@ import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.DiscountType
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
 
 @Entity
 @Table(name = "coupons")
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Coupon private constructor(
     @Column(nullable = false)
     val name: String,

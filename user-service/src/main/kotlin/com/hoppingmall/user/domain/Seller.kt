@@ -2,9 +2,7 @@ package com.hoppingmall.user.domain
 
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 @Entity
 @Table(name = "sellers")
 class Seller private constructor(

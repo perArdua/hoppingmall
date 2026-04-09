@@ -4,7 +4,6 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 import java.math.BigDecimal
 
 @Entity
@@ -12,7 +11,6 @@ import java.math.BigDecimal
     name = "orders",
     indexes = [Index(name = "idx_orders_buyer_id", columnList = "buyerId")]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Order private constructor(
     @Column(nullable = false)
     val buyerId: Long,

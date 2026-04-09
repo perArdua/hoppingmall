@@ -5,11 +5,9 @@ import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 
 @Entity
 @Table(name = "users")
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class User private constructor(
     @Embedded
     val email: Email,

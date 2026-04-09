@@ -4,7 +4,6 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import com.hoppingmall.order.shipping.exception.ShippingInvalidStatusException
 import jakarta.persistence.*
-import org.hibernate.annotations.Filter
 
 @Entity
 @Table(
@@ -15,7 +14,6 @@ import org.hibernate.annotations.Filter
         Index(name = "idx_shippings_tracking_number", columnList = "trackingNumber")
     ]
 )
-@Filter(name = "softDeleteFilter", condition = "deleted_at IS NULL")
 class Shipping private constructor(
     @Column(nullable = false)
     val orderId: Long,

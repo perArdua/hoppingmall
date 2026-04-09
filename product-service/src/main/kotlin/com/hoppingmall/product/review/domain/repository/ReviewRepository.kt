@@ -15,9 +15,9 @@ interface ReviewRepository : JpaRepository<Review, Long> {
     fun existsByOrderItemId(orderItemId: Long): Boolean
     fun findNullableById(id: Long): Review?
 
-    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.productId = :productId AND r.deletedAt IS NULL")
+    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.productId = :productId")
     fun averageRatingByProductId(@Param("productId") productId: Long): Double?
 
-    @Query("SELECT COUNT(r) FROM Review r WHERE r.productId = :productId AND r.deletedAt IS NULL")
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.productId = :productId")
     fun countByProductId(@Param("productId") productId: Long): Long
 }
