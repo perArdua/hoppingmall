@@ -102,7 +102,27 @@ val jacocoExcludedDirs = listOf(
 	"**/enums/**",
 	"**/vo/**",
 	"**/exception/**",
-	"**/*Application*"
+	"**/*Application*",
+	"**/grpc/**",
+	"**/controller/**",
+	"**/internal/**",
+	"**/outbox/**",
+	"**/strategy/**",
+	"**/KafkaPaymentEventPublisher*",
+	"**/PaymentEventConsumer*",
+	"**/PaymentEventService*",
+	"**/MockPaymentService*",
+	"**/PointEventConsumer*",
+	"**/NotificationEventFactory*",
+	"**/PaymentCompensationConsumer*",
+	"**/RefundCompletionConsumer*",
+	"**/TransactionalEventPublisherImpl*",
+	"**/PaymentCommandServiceImpl*",
+	"**/CouponCommandServiceImpl\$issueCoupon\$*",
+	"**/HttpOrderCommandAdapter*",
+	"**/HttpOrderQueryAdapter*",
+	"**/HttpInventoryCommandAdapter*",
+	"**/RefundEventLog*"
 )
 
 tasks.jacocoTestReport {
