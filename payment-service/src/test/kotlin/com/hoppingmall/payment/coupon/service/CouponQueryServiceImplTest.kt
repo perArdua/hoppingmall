@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
@@ -60,7 +61,7 @@ class CouponQueryServiceImplTest {
     @Test
     fun 사용_가능한_쿠폰_목록을_조회한다() {
         val coupon = createCoupon()
-        whenever(couponRepository.findAvailableCoupons()).thenReturn(listOf(coupon))
+        whenever(couponRepository.findAvailableCoupons(any(), any())).thenReturn(listOf(coupon))
 
         val result = couponQueryService.getAvailableCoupons()
 
