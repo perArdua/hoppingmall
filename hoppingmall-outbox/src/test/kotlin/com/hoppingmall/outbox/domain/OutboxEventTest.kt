@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.time.LocalDateTime
 
 @DisplayName("OutboxEvent")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -115,6 +116,52 @@ class OutboxEventTest {
 
             assertEquals(OutboxStatus.RETRYING, event.status)
             assertFalse(event.processed)
+        }
+    }
+
+    @Nested
+    @DisplayName("updatedAt 갱신")
+    inner class UpdatedAtRefresh {
+
+        @Test
+        fun markAsProcessed_호출_시_updatedAt이_갱신된다() {
+            val event = createOutboxEvent()
+            val before = LocalDateTime.now().minusSeconds(1)
+
+            event.markAsProcessed()
+
+            assertTrue(event.updatedAt.isAfter(before))
+        }
+
+        @Test
+        fun markAsFailed_호출_시_updatedAt이_갱신된다() {
+            val event = createOutboxEvent()
+            val before = LocalDateTime.now().minusSeconds(1)
+
+            event.markAsFailed("error")
+
+            assertTrue(event.updatedAt.isAfter(before))
+        }
+
+        @Test
+        fun markAsRetrying_호출_시_updatedAt이_갱신된다() {
+            val event = createOutboxEvent()
+            val before = LocalDateTime.now().minusSeconds(1)
+
+            event.markAsRetrying()
+
+            assertTrue(event.updatedAt.isAfter(before))
+        }
+
+        @Test
+        fun markAsFailedPermanently_호출_시_processedAt이_설정된다() {
+            val event = createOutboxEvent()
+            val before = LocalDateTime.now().minusSeconds(1)
+
+            event.markAsFailedPermanently("permanent error")
+
+            assertNotNull(event.processedAt)
+            assertTrue(event.processedAt!!.isAfter(before))
         }
     }
 

@@ -104,4 +104,103 @@ class HttpInventoryCommandAdapterTest {
         assertThatThrownBy { adapter.cancelReservations(listOf("rsv-1", "rsv-2")) }
             .isInstanceOf(RuntimeException::class.java)
     }
+
+    @Test
+    fun 재고_감소를_수행한다() {
+        whenever(restTemplate.postForEntity(
+            any<String>(), eq(null), eq(Void::class.java)
+        )).thenReturn(ResponseEntity.ok().build())
+
+        adapter.decreaseStock(1L, 5)
+
+        org.mockito.kotlin.verify(restTemplate).postForEntity(
+            any<String>(), eq(null), eq(Void::class.java)
+        )
+    }
+
+    @Test
+    fun 재고_증가를_수행한다() {
+        whenever(restTemplate.postForEntity(
+            any<String>(), eq(null), eq(Void::class.java)
+        )).thenReturn(ResponseEntity.ok().build())
+
+        adapter.increaseStock(1L, 5)
+
+        org.mockito.kotlin.verify(restTemplate).postForEntity(
+            any<String>(), eq(null), eq(Void::class.java)
+        )
+    }
+
+    @Test
+    fun 배치_재고_예약을_수행한다() {
+        val responseBody = mapOf(100L to "rsv-100", 200L to "rsv-200")
+        val responseEntity = ResponseEntity.ok(responseBody)
+
+        whenever(restTemplate.exchange(
+            any<String>(),
+            any<org.springframework.http.HttpMethod>(),
+            any<org.springframework.http.HttpEntity<*>>(),
+            any<org.springframework.core.ParameterizedTypeReference<Map<Long, String>>>()
+        )).thenReturn(responseEntity)
+
+        val result = adapter.batchReserveStock(listOf(100L to 1, 200L to 2))
+
+        assertThat(result).hasSize(2)
+        assertThat(result[100L]).isEqualTo("rsv-100")
+        assertThat(result[200L]).isEqualTo("rsv-200")
+    }
+
+    @Test
+    fun 배치_재고_예약_응답이_null이면_예외를_발생시킨다() {
+        val responseEntity = ResponseEntity.ok<Map<Long, String>>(null)
+
+        whenever(restTemplate.exchange(
+            any<String>(),
+            any<org.springframework.http.HttpMethod>(),
+            any<org.springframework.http.HttpEntity<*>>(),
+            any<org.springframework.core.ParameterizedTypeReference<Map<Long, String>>>()
+        )).thenReturn(responseEntity)
+
+        assertThatThrownBy { adapter.batchReserveStock(listOf(100L to 1)) }
+            .isInstanceOf(RuntimeException::class.java)
+            .hasMessageContaining("배치 재고 예약 응답 없음")
+    }
+
+    @Test
+    fun 예약_취소를_수행한다() {
+        whenever(restTemplate.postForEntity(
+            any<String>(), eq(null), eq(Void::class.java)
+        )).thenReturn(ResponseEntity.ok().build())
+
+        adapter.cancelReservation("rsv-1")
+
+        org.mockito.kotlin.verify(restTemplate).postForEntity(
+            any<String>(), eq(null), eq(Void::class.java)
+        )
+    }
+
+    @Test
+    fun 일괄_예약_취소를_수행한다() {
+        whenever(restTemplate.postForEntity(
+            any<String>(), any(), eq(Void::class.java)
+        )).thenReturn(ResponseEntity.ok().build())
+
+        adapter.cancelReservations(listOf("rsv-1", "rsv-2"))
+
+        org.mockito.kotlin.verify(restTemplate).postForEntity(
+            any<String>(), any(), eq(Void::class.java)
+        )
+    }
+
+    @Test
+    fun 배치_확정_응답이_null이면_false를_반환한다() {
+        val response = ResponseEntity.ok<HttpInventoryCommandAdapter.ConfirmationResponse>(null)
+        whenever(restTemplate.postForEntity(
+            any<String>(), any(), eq(HttpInventoryCommandAdapter.ConfirmationResponse::class.java)
+        )).thenReturn(response)
+
+        val result = adapter.confirmReservations(listOf("rsv-1"))
+
+        assertThat(result).isFalse()
+    }
 }

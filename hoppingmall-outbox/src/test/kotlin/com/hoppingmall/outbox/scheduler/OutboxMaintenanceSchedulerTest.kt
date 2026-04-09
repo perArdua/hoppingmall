@@ -123,6 +123,27 @@ class OutboxMaintenanceSchedulerTest {
     }
 
     @Test
+    fun null_id를_가진_지연_이벤트는_건너뛴다() {
+        val eventWithNullId = OutboxEvent(
+            aggregateType = "Payment",
+            aggregateId = "1",
+            eventType = "PaymentCompleted",
+            eventData = """{"paymentId":1}""",
+            topic = "payment",
+            partitionKey = "1",
+            status = OutboxStatus.PENDING
+        )
+
+        whenever(outboxEventRepository.findStaleEvents(any<LocalDateTime>(), eq(50)))
+            .thenReturn(listOf(eventWithNullId))
+
+        outboxMaintenanceScheduler.handleStaleEvents()
+
+        verify(outboxEventPublisher, never()).publishEvent(any())
+        verify(outboxEventRepository, never()).claimStaleEvent(any(), any(), any(), any(), any(), any())
+    }
+
+    @Test
     fun 클레임_실패한_지연_이벤트는_발행하지_않는다() {
         val staleEvent = createStaleEvent(id = 1L, retryCount = 0)
 
