@@ -102,7 +102,8 @@ val jacocoExcludedDirs = listOf(
 	"**/enums/**",
 	"**/vo/**",
 	"**/exception/**",
-	"**/*Application*"
+	"**/*Application*",
+	"**/grpc/**"
 )
 
 tasks.jacocoTestReport {
