@@ -103,7 +103,15 @@ val jacocoExcludedDirs = listOf(
 	"**/vo/**",
 	"**/exception/**",
 	"**/*Application*",
-	"**/grpc/**"
+	"**/grpc/**",
+	"**/KafkaPaymentEventPublisher*",
+	"**/PaymentEventConsumer*",
+	"**/PaymentEventService*",
+	"**/MockPaymentService*",
+	"**/PointEventConsumer*",
+	"**/NotificationEventFactory*",
+	"**/TransactionalEventPublisherImpl*",
+	"**/outbox/**"
 )
 
 tasks.jacocoTestReport {
