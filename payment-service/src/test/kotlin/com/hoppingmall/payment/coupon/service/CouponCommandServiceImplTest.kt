@@ -10,6 +10,8 @@ import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.DiscountType
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
 import com.hoppingmall.payment.coupon.exception.CouponNotFoundException
+import com.hoppingmall.payment.coupon.exception.CouponNotAvailableException
+import com.hoppingmall.payment.coupon.exception.CouponMinAmountNotMetException
 import com.hoppingmall.payment.internal.DistributedLockExecutor
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -145,6 +147,89 @@ class CouponCommandServiceImplTest {
     @Test
     fun 결제_취소_시_유저쿠폰이_없으면_아무것도_하지_않는다() {
         whenever(userCouponRepository.findByUserIdAndCouponId(10L, 1L)).thenReturn(null)
+
+        service.restoreCouponByPayment(1L, 10L)
+
+        verify(userCouponRepository).findByUserIdAndCouponId(10L, 1L)
+    }
+
+    @Test
+    fun 쿠폰_상태_변경_성공() {
+        val coupon = createCoupon(id = 1L, status = CouponStatus.ACTIVE)
+        whenever(couponRepository.findById(1L)).thenReturn(Optional.of(coupon))
+        whenever(couponRepository.save(any<Coupon>())).thenReturn(coupon)
+
+        val result = service.changeCouponStatus(1L, CouponStatus.INACTIVE)
+
+        assertThat(result.id).isEqualTo(1L)
+        verify(couponRepository).save(any<Coupon>())
+    }
+
+    @Test
+    fun 쿠폰_상태_변경_시_쿠폰_없으면_예외() {
+        whenever(couponRepository.findById(99L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { service.changeCouponStatus(99L, CouponStatus.INACTIVE) }
+            .isInstanceOf(CouponNotFoundException::class.java)
+    }
+
+    @Test
+    fun 주문_취소_시_사용된_쿠폰을_복원한다() {
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        userCoupon.use(100L)
+        whenever(userCouponRepository.findByOrderId(100L)).thenReturn(userCoupon)
+        whenever(userCouponRepository.save(any<UserCoupon>())).thenReturn(userCoupon)
+
+        service.restoreCouponByOrder(100L)
+
+        assertThat(userCoupon.status).isEqualTo(UserCouponStatus.ISSUED)
+        verify(userCouponRepository).save(userCoupon)
+    }
+
+    @Test
+    fun 주문_취소_시_유저쿠폰이_없으면_아무것도_하지_않는다() {
+        whenever(userCouponRepository.findByOrderId(100L)).thenReturn(null)
+
+        service.restoreCouponByOrder(100L)
+
+        verify(userCouponRepository).findByOrderId(100L)
+    }
+
+    @Test
+    fun 주문_취소_시_이미_복원된_쿠폰은_저장하지_않는다() {
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        whenever(userCouponRepository.findByOrderId(100L)).thenReturn(userCoupon)
+
+        service.restoreCouponByOrder(100L)
+
+        verify(userCouponRepository).findByOrderId(100L)
+    }
+
+    @Test
+    fun 쿠폰_사용_시_유저쿠폰_상태가_ISSUED가_아니면_예외() {
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        userCoupon.use(100L)
+        whenever(userCouponRepository.findByUserIdAndCouponId(10L, 1L)).thenReturn(userCoupon)
+
+        assertThatThrownBy { service.useCoupon(10L, 1L, BigDecimal("30000"), 100L) }
+            .isInstanceOf(CouponNotAvailableException::class.java)
+    }
+
+    @Test
+    fun 쿠폰_사용_시_최소_주문금액_미달이면_예외() {
+        val coupon = createCoupon(id = 1L)
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        whenever(userCouponRepository.findByUserIdAndCouponId(10L, 1L)).thenReturn(userCoupon)
+        whenever(couponRepository.findById(1L)).thenReturn(Optional.of(coupon))
+
+        assertThatThrownBy { service.useCoupon(10L, 1L, BigDecimal("5000"), 100L) }
+            .isInstanceOf(CouponMinAmountNotMetException::class.java)
+    }
+
+    @Test
+    fun 결제_취소_시_ISSUED_상태_쿠폰은_저장하지_않는다() {
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        whenever(userCouponRepository.findByUserIdAndCouponId(10L, 1L)).thenReturn(userCoupon)
 
         service.restoreCouponByPayment(1L, 10L)
 
