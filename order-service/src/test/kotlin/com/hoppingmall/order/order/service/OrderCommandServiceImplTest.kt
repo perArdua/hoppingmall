@@ -229,6 +229,147 @@ class OrderCommandServiceImplTest {
         return ProductInfo(id = id, name = "상품-$id", price = BigDecimal("25000"), sellerId = sellerId)
     }
 
+    @Test
+    fun PAID_상태_주문_취소_시_CANCEL_REQUESTED로_전환하고_이벤트를_발행한다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        setEntityId(order, 1L)
+        order.updateStatus(OrderStatus.PAYING)
+        order.updateStatus(OrderStatus.PAID)
+
+        val orderItem = OrderItem.create(
+            orderId = 1L, sellerId = 5L, productId = 100L,
+            productName = "상품A", productPrice = BigDecimal("50000"),
+            quantity = 1, reservationId = "rsv-1"
+        )
+        setEntityId(orderItem, 10L)
+
+        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+
+        service.cancelOrder(10L, 1L)
+
+        assertThat(order.status).isEqualTo(OrderStatus.CANCEL_REQUESTED)
+        verify(transactionalEventPublisher).publishEvent(
+            aggregateType = eq("Order"),
+            aggregateId = eq("1"),
+            eventType = eq("PaymentCancellationRequested"),
+            eventData = any(),
+            topic = any(),
+            partitionKey = eq("1")
+        )
+    }
+
+    @Test
+    fun 취소_불가능한_상태의_주문_취소_시_예외가_발생한다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        setEntityId(order, 1L)
+        order.updateStatus(OrderStatus.PAYING)
+        order.updateStatus(OrderStatus.PAID)
+        order.updateStatus(OrderStatus.SHIPPED)
+        order.updateStatus(OrderStatus.DELIVERED)
+
+        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+
+        assertThatThrownBy { service.cancelOrder(10L, 1L) }
+            .isInstanceOf(com.hoppingmall.order.order.exception.OrderInvalidStatusException::class.java)
+    }
+
+    @Test
+    fun 주문_상태를_변경한다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        setEntityId(order, 1L)
+        order.updateStatus(OrderStatus.PAYING)
+        order.updateStatus(OrderStatus.PAID)
+
+        val orderItem = OrderItem.create(
+            orderId = 1L, sellerId = 5L, productId = 100L,
+            productName = "상품A", productPrice = BigDecimal("50000"),
+            quantity = 1
+        )
+        setEntityId(orderItem, 10L)
+
+        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+
+        val result = service.updateOrderStatus(
+            1L,
+            com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.SHIPPED),
+            10L,
+            false
+        )
+
+        assertThat(result.status).isEqualTo(OrderStatus.SHIPPED)
+    }
+
+    @Test
+    fun 관리자가_다른_사용자의_주문_상태를_변경한다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        setEntityId(order, 1L)
+        order.updateStatus(OrderStatus.PAYING)
+        order.updateStatus(OrderStatus.PAID)
+
+        val orderItem = OrderItem.create(
+            orderId = 1L, sellerId = 5L, productId = 100L,
+            productName = "상품A", productPrice = BigDecimal("50000"),
+            quantity = 1
+        )
+        setEntityId(orderItem, 10L)
+
+        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+
+        val result = service.updateOrderStatus(
+            1L,
+            com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.SHIPPED),
+            99L,
+            true
+        )
+
+        assertThat(result.status).isEqualTo(OrderStatus.SHIPPED)
+    }
+
+    @Test
+    fun 관리자가_아닌_다른_사용자가_주문_상태변경_시_예외가_발생한다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        setEntityId(order, 1L)
+
+        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+
+        assertThatThrownBy {
+            service.updateOrderStatus(
+                1L,
+                com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.CANCELLED),
+                99L,
+                false
+            )
+        }.isInstanceOf(OrderAccessDeniedException::class.java)
+    }
+
+    @Test
+    fun 존재하지_않는_주문의_상태변경_시_예외가_발생한다() {
+        whenever(orderRepository.findById(999L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy {
+            service.updateOrderStatus(
+                999L,
+                com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.CANCELLED),
+                10L,
+                false
+            )
+        }.isInstanceOf(OrderNotFoundException::class.java)
+    }
+
+    @Test
+    fun 존재하지_않는_상품으로_주문_시_예외가_발생한다() {
+        val cartItem = createCartItem(id = 1L, buyerId = 10L, productId = 100L, quantity = 1)
+
+        whenever(cartItemRepository.findAllById(listOf(1L))).thenReturn(listOf(cartItem))
+        whenever(productQueryPort.findProductsByIds(listOf(100L))).thenReturn(emptyList())
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
+            .isInstanceOf(com.hoppingmall.order.order.exception.OrderProductNotFoundException::class.java)
+    }
+
     private fun setEntityId(entity: Any, id: Long) {
         ReflectionTestUtils.setField(entity, "id", id)
     }

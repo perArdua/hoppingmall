@@ -97,6 +97,19 @@ class DLQControllerTest {
             val response = controller.retryDLQMessage(messageId)
 
             assertEquals("SUCCESS", response.code)
+            assertEquals("DLQ 메시지 재처리 성공: ID 123", response.data)
+            verify(dlqCommandService).retryDLQMessage(messageId)
+        }
+
+        @Test
+        fun 개별_DLQ_메시지_재처리_실패() {
+            val messageId = 456L
+            whenever(dlqCommandService.retryDLQMessage(messageId)).thenReturn(false)
+
+            val response = controller.retryDLQMessage(messageId)
+
+            assertEquals("SUCCESS", response.code)
+            assertEquals("DLQ 메시지 재처리 실패: ID 456", response.data)
             verify(dlqCommandService).retryDLQMessage(messageId)
         }
     }
