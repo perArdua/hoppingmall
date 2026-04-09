@@ -54,6 +54,7 @@ dependencies {
 	implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.8")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

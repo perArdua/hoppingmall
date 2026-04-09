@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring") version "1.9.25"
 	id("io.spring.dependency-management") version "1.1.7"
 	`java-library`
+	jacoco
 }
 
 group = "com.hoppingmall"
@@ -38,8 +39,59 @@ dependencies {
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+	testImplementation("org.springframework.boot:spring-boot-starter-data-redis")
+	testImplementation("org.redisson:redisson-spring-boot-starter:4.3.0")
 }
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+val jacocoExcludedDirs = listOf(
+	"**/config/**",
+	"**/dto/**",
+	"**/entity/**",
+	"**/response/**",
+	"**/error/**",
+	"**/enum/**",
+	"**/enums/**",
+	"**/vo/**",
+	"**/exception/**",
+	"**/*Application*"
+)
+
+tasks.jacocoTestReport {
+	dependsOn(tasks.test)
+	classDirectories.setFrom(
+		files(classDirectories.files.map {
+			fileTree(it) { exclude(jacocoExcludedDirs) }
+		})
+	)
+	reports {
+		xml.required.set(true)
+		html.required.set(true)
+	}
+}
+
+tasks.jacocoTestCoverageVerification {
+	dependsOn(tasks.jacocoTestReport)
+	classDirectories.setFrom(
+		files(classDirectories.files.map {
+			fileTree(it) { exclude(jacocoExcludedDirs) }
+		})
+	)
+	violationRules {
+		rule {
+			element = "CLASS"
+			limit {
+				counter = "LINE"
+				value = "COVEREDRATIO"
+				minimum = "0.80".toBigDecimal()
+			}
+		}
+	}
+}
+
+tasks.register("jacocoTestVerification") {
+	dependsOn(tasks.jacocoTestCoverageVerification)
 }

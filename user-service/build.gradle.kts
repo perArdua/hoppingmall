@@ -98,7 +98,14 @@ val jacocoExcludedDirs = listOf(
 	"**/enums/**",
 	"**/vo/**",
 	"**/exception/**",
-	"**/*Application*"
+	"**/*Application*",
+	"**/grpc/MembershipQueryServiceGrpc*",
+	"**/grpc/MembershipQueryServiceGrpcKt*",
+	"**/grpc/MembershipQuery*",
+	"**/grpc/UserIdRequest*",
+	"**/grpc/EarningRateResponse*",
+	"**/grpc/UserIdRequestKt*",
+	"**/grpc/EarningRateResponseKt*"
 )
 
 tasks.jacocoTestReport {

@@ -99,7 +99,9 @@ val jacocoExcludedDirs = listOf(
 	"**/enums/**",
 	"**/vo/**",
 	"**/exception/**",
-	"**/*Application*"
+	"**/*Application*",
+	"**/grpc/**",
+	"**/BulkImportService\$startImport\$*"
 )
 
 tasks.jacocoTestReport {
