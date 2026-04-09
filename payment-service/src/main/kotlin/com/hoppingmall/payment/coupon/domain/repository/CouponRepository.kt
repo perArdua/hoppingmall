@@ -11,18 +11,18 @@ import java.time.LocalDateTime
 @Repository
 interface CouponRepository : JpaRepository<Coupon, Long> {
 
-    @Query("SELECT c FROM Coupon c WHERE c.id = :id AND c.deletedAt IS NULL")
+    @Query("SELECT c FROM Coupon c WHERE c.id = :id")
     fun findActiveById(@Param("id") id: Long): Coupon?
 
     @Query(
         "SELECT c FROM Coupon c WHERE c.status = :status AND c.validFrom <= :now AND c.validTo > :now " +
-            "AND c.issuedQuantity < c.totalQuantity AND c.deletedAt IS NULL"
+            "AND c.issuedQuantity < c.totalQuantity"
     )
     fun findAvailableCoupons(
         @Param("status") status: CouponStatus = CouponStatus.ACTIVE,
         @Param("now") now: LocalDateTime = LocalDateTime.now()
     ): List<Coupon>
 
-    @Query("SELECT c FROM Coupon c WHERE c.deletedAt IS NULL")
+    @Query("SELECT c FROM Coupon c")
     fun findAllActive(): List<Coupon>
 }
