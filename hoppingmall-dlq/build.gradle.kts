@@ -36,6 +36,8 @@ dependencies {
 	compileOnly("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("io.micrometer:micrometer-core")
+	testImplementation("org.springframework.kafka:spring-kafka")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

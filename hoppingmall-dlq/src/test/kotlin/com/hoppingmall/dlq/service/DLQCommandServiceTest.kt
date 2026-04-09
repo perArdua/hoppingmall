@@ -95,6 +95,20 @@ class DLQCommandServiceTest {
 
             verify(dlqMessageRepository, never()).save(any<DLQMessage>())
         }
+
+        @Test
+        fun 저장_중_예외_발생_시_예외를_전파한다() {
+            val deadLetterMessage = createDeadLetterMessage()
+            whenever(dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
+                deadLetterMessage.originalTopic,
+                deadLetterMessage.originalPartition,
+                deadLetterMessage.originalOffset
+            )).thenThrow(RuntimeException("DB 연결 실패"))
+
+            assertThrows(RuntimeException::class.java) {
+                dlqCommandService.saveDLQMessage(deadLetterMessage)
+            }
+        }
     }
 
     @Nested
@@ -237,6 +251,52 @@ class DLQCommandServiceTest {
             assertFalse(result)
             verify(dlqMetrics).recordDlqRetryFailed()
         }
+
+        @Test
+        fun originalKey가_null이면_빈_문자열로_발행한다() {
+            val dlqMessageId = 1L
+            val dlqMessage = createDLQMessage(
+                id = dlqMessageId,
+                status = DLQStatus.PENDING,
+                retryCount = 0,
+                key = null
+            )
+
+            whenever(dlqMessageRepository.findById(dlqMessageId))
+                .thenReturn(Optional.of(dlqMessage))
+            whenever(dlqMessagePublisher.publish(any(), any(), any()))
+                .thenReturn(true)
+
+            val result = dlqCommandService.retryDLQMessage(dlqMessageId)
+
+            assertTrue(result)
+            verify(dlqMessagePublisher).publish(
+                eq(dlqMessage.originalTopic),
+                eq(""),
+                any()
+            )
+        }
+
+        @Test
+        fun 예외_발생_후_상태_업데이트도_실패하면_로그만_남긴다() {
+            val dlqMessageId = 1L
+            val dlqMessage = createDLQMessage(
+                id = dlqMessageId,
+                status = DLQStatus.PENDING,
+                retryCount = 0
+            )
+
+            whenever(dlqMessageRepository.findById(dlqMessageId))
+                .thenReturn(Optional.of(dlqMessage))
+                .thenThrow(RuntimeException("DB 연결 실패"))
+            whenever(dlqMessagePublisher.publish(any(), any(), any()))
+                .thenThrow(RuntimeException("Kafka 전송 실패"))
+
+            val result = dlqCommandService.retryDLQMessage(dlqMessageId)
+
+            assertFalse(result)
+            verify(dlqMetrics).recordDlqRetryFailed()
+        }
     }
 
     @Nested
@@ -288,6 +348,21 @@ class DLQCommandServiceTest {
             assertEquals(2, deletedCount)
             verify(dlqMessageRepository).deleteAll(processedMessages.content)
         }
+
+        @Test
+        fun 삭제할_메시지가_없으면_0을_반환하고_deleteAll을_호출하지_않는다() {
+            val topic = "payment"
+            val emptyPage = PageImpl<DLQMessage>(emptyList())
+
+            whenever(dlqMessageRepository.findByOriginalTopicAndStatusOrderByCreatedAtDesc(
+                eq(topic), eq(DLQStatus.PROCESSED), any()
+            )).thenReturn(emptyPage)
+
+            val deletedCount = dlqCommandService.clearProcessedDLQMessages(topic)
+
+            assertEquals(0, deletedCount)
+            verify(dlqMessageRepository, never()).deleteAll(any<List<DLQMessage>>())
+        }
     }
 
     @Nested
@@ -319,6 +394,15 @@ class DLQCommandServiceTest {
             val result = dlqCommandService.reconstructOriginalMessage(dlqMessage)
 
             assertNull(result)
+        }
+
+        @Test
+        fun 일반_문자열_값은_그대로_반환한다() {
+            val dlqMessage = createDLQMessage(value = "plain text message")
+
+            val result = dlqCommandService.reconstructOriginalMessage(dlqMessage)
+
+            assertEquals("plain text message", result)
         }
     }
 

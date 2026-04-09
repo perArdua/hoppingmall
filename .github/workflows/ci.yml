@@ -181,6 +181,10 @@ jobs:
         if: success()
         run: cd ${{ matrix.service }} && ./gradlew jacocoTestReport --no-daemon --build-cache
 
+      - name: Jacoco 커버리지 검증 (80%)
+        if: success()
+        run: cd ${{ matrix.service }} && ./gradlew jacocoTestVerification --no-daemon --build-cache
+
       - name: Codecov 업로드
         if: success()
         uses: codecov/codecov-action@v4

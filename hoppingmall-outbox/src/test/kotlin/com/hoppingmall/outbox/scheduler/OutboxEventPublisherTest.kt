@@ -198,6 +198,76 @@ class OutboxEventPublisherTest {
     }
 
     @Test
+    fun null_id를_가진_이벤트는_클레임하지_않는다() {
+        val eventWithNullId = OutboxEvent(
+            aggregateType = "Payment",
+            aggregateId = "1",
+            eventType = "PaymentCompleted",
+            eventData = """{"paymentId":1}""",
+            topic = "payment",
+            partitionKey = "1",
+            status = OutboxStatus.PENDING
+        )
+
+        whenever(
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = 3,
+                limit = 100
+            )
+        ).thenReturn(listOf(eventWithNullId))
+
+        outboxEventPublisher.publishPendingEvents()
+
+        verify(outboxEventRepository, never()).claimEventForPublish(any(), any(), any(), any(), any(), any())
+    }
+
+    @Test
+    fun 클레임_실패한_이벤트는_발행하지_않는다() {
+        val event = createOutboxEvent(status = OutboxStatus.PENDING)
+
+        whenever(
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = 3,
+                limit = 100
+            )
+        ).thenReturn(listOf(event))
+        whenever(
+            outboxEventRepository.claimEventForPublish(
+                id = eq(1L),
+                nextStatus = eq(OutboxStatus.RETRYING),
+                updatedAt = any(),
+                pendingStatus = eq(OutboxStatus.PENDING),
+                failedStatus = eq(OutboxStatus.FAILED),
+                maxRetries = eq(3)
+            )
+        ).thenReturn(0)
+
+        outboxEventPublisher.publishPendingEvents()
+
+        verify(outboxEventRepository, never()).findById(any())
+    }
+
+    @Test
+    fun 발행_실패_시_에러_메시지가_null이면_Unknown_error를_사용한다() {
+        val event = createOutboxEvent(retryCount = 0)
+
+        whenever(outboxEventRepository.findById(1L)).thenReturn(Optional.of(event))
+        whenever(avroEventConverter.convertJsonToAvro(event.eventType, event.eventData))
+            .thenThrow(RuntimeException())
+        whenever(outboxEventRepository.save(any<OutboxEvent>())).thenAnswer { it.arguments[0] as OutboxEvent }
+
+        outboxEventPublisher.publishEvent(1L)
+
+        assertThat(event.errorMessage).isEqualTo("Unknown error")
+        assertThat(event.status).isEqualTo(OutboxStatus.FAILED)
+        verify(outboxMetrics).recordOutboxFailed("payment")
+    }
+
+    @Test
     fun 대기중인_이벤트를_클레임_후_발행한다() {
         val event = createOutboxEvent(status = OutboxStatus.PENDING)
         val avroRecord = mock<GenericRecord>()

@@ -51,4 +51,43 @@ class OutboxMetricsTest {
 
         assertThat(registry.get("outbox.event.publish.latency").timer().count()).isEqualTo(1L)
     }
+
+    @Test
+    fun outbox_발행_실패_시_카운터가_증가한다() {
+        outboxMetrics.recordOutboxFailed("payment")
+
+        assertThat(registry.counter("outbox.event.failed.count").count()).isEqualTo(1.0)
+    }
+
+    @Test
+    fun 토픽별_발행_성공_카운터가_증가한다() {
+        outboxMetrics.recordOutboxPublished("payment")
+        outboxMetrics.recordOutboxPublished("payment")
+        outboxMetrics.recordOutboxPublished("order-events")
+
+        assertThat(
+            registry.counter("outbox.event.published.by_topic", "topic", "payment").count()
+        ).isEqualTo(2.0)
+        assertThat(
+            registry.counter("outbox.event.published.by_topic", "topic", "order-events").count()
+        ).isEqualTo(1.0)
+    }
+
+    @Test
+    fun 토픽별_발행_실패_카운터가_증가한다() {
+        outboxMetrics.recordOutboxFailed("payment")
+        outboxMetrics.recordOutboxFailed("payment")
+
+        assertThat(
+            registry.counter("outbox.event.failed.by_topic", "topic", "payment").count()
+        ).isEqualTo(2.0)
+    }
+
+    @Test
+    fun 전체_발행_성공_카운터가_누적된다() {
+        outboxMetrics.recordOutboxPublished("payment")
+        outboxMetrics.recordOutboxPublished("order-events")
+
+        assertThat(registry.counter("outbox.event.published.count").count()).isEqualTo(2.0)
+    }
 }
