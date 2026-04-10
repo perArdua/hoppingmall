@@ -145,7 +145,30 @@ class InventoryCommandServiceImpl(
     }
 
     override fun cancelReservations(reservationIds: List<String>) {
-        reservationIds.forEach { cancelReservation(it) }
+        if (reservationIds.isEmpty()) return
+
+        val reservations = inventoryReservationRepository.findByReservationIdIn(reservationIds)
+            .filter { it.status == ReservationStatus.RESERVED }
+        if (reservations.isEmpty()) return
+
+        inventoryReservationRepository.batchUpdateStatusByCas(
+            reservationIds = reservations.map { it.reservationId },
+            expectedStatus = ReservationStatus.RESERVED,
+            targetStatus = ReservationStatus.CANCELLED,
+            updatedAt = LocalDateTime.now()
+        )
+
+        val stockToRestore = reservations
+            .groupBy { it.productId }
+            .mapValues { (_, rsv) -> rsv.sumOf { it.quantity } }
+            .toSortedMap()
+
+        val inventories = inventoryRepository.findByProductIdInForUpdate(stockToRestore.keys.toList())
+            .associateBy { it.productId }
+
+        stockToRestore.forEach { (productId, quantity) ->
+            inventories[productId]?.increaseStock(quantity)
+        }
     }
 
     override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
