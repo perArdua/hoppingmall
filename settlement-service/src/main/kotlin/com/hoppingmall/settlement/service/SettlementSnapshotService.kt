@@ -22,19 +22,27 @@ class SettlementSnapshotService(
         log.info("Settlement snapshot job started")
 
         val settlements = settlementRepository.findAll()
-        var created = 0
-        var updated = 0
+        val summaryMap = settlementSummaryRepository
+            .findBySettlementIdIn(settlements.map { it.id!! })
+            .associateBy { it.settlementId }
+
+        val newSummaries = mutableListOf<SettlementSummary>()
 
         settlements.forEach { settlement ->
-            val existing = settlementSummaryRepository.findBySettlementId(settlement.id!!)
+            val existing = summaryMap[settlement.id!!]
             if (existing != null) {
                 existing.updateFrom(settlement)
-                updated++
             } else {
-                settlementSummaryRepository.save(SettlementSummary.from(settlement))
-                created++
+                newSummaries.add(SettlementSummary.from(settlement))
             }
         }
+
+        if (newSummaries.isNotEmpty()) {
+            settlementSummaryRepository.saveAll(newSummaries)
+        }
+
+        val created = newSummaries.size
+        val updated = settlements.size - created
 
         log.info("Settlement snapshot job completed: created=$created, updated=$updated")
     }
