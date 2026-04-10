@@ -24,10 +24,10 @@ import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 
 @Service
-@Transactional
 class OrderCommandServiceImpl(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
@@ -36,7 +36,8 @@ class OrderCommandServiceImpl(
     private val inventoryCommandPort: InventoryCommandPort,
     private val paymentCommandPort: PaymentCommandPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
-    private val orderMetrics: OrderMetrics
+    private val orderMetrics: OrderMetrics,
+    private val transactionTemplate: TransactionTemplate
 ) : OrderCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -64,27 +65,29 @@ class OrderCommandServiceImpl(
 
         val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
 
-        val order = orderRepository.save(Order.create(buyerId = buyerId, totalAmount = totalAmount))
+        return transactionTemplate.execute {
+            val order = orderRepository.save(Order.create(buyerId = buyerId, totalAmount = totalAmount))
 
-        val orderItems = cartItems.map { cartItem ->
-            OrderItem.create(
-                orderId = order.id!!,
-                sellerId = productMap[cartItem.productId]!!.sellerId,
-                productId = cartItem.productId,
-                productName = cartItem.productName,
-                productPrice = cartItem.productPrice,
-                quantity = cartItem.quantity,
-                reservationId = reservationMap[cartItem.productId]
-            )
-        }
-        val savedOrderItems = orderItemRepository.saveAll(orderItems)
-        order.updateStatus(OrderStatus.PAYING)
+            val orderItems = cartItems.map { cartItem ->
+                OrderItem.create(
+                    orderId = order.id!!,
+                    sellerId = productMap[cartItem.productId]!!.sellerId,
+                    productId = cartItem.productId,
+                    productName = cartItem.productName,
+                    productPrice = cartItem.productPrice,
+                    quantity = cartItem.quantity,
+                    reservationId = reservationMap[cartItem.productId]
+                )
+            }
+            val savedOrderItems = orderItemRepository.saveAll(orderItems)
+            order.updateStatus(OrderStatus.PAYING)
 
-        cartItemRepository.deleteAllById(request.cartItemIds)
+            cartItemRepository.deleteAllById(request.cartItemIds)
 
-        orderMetrics.recordOrderCreated(totalAmount)
-        log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
-        return OrderResponse.from(order, savedOrderItems)
+            orderMetrics.recordOrderCreated(totalAmount)
+            log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
+            OrderResponse.from(order, savedOrderItems)
+        }!!
     }
 
     override fun cancelOrder(buyerId: Long, orderId: Long): OrderResponse {
@@ -103,37 +106,51 @@ class OrderCommandServiceImpl(
 
         when (order.status) {
             OrderStatus.PAYING -> {
-                order.updateStatus(OrderStatus.CANCELLED)
                 if (!paymentCommandPort.cancelPayment(orderId)) {
                     throw OrderPaymentCancellationFailedException()
+                }
+                transactionTemplate.execute {
+                    val target = orderRepository.findById(orderId)
+                        .orElseThrow { OrderNotFoundException() }
+                    target.updateStatus(OrderStatus.CANCELLED)
                 }
                 restoreInventory(orderItems)
             }
             OrderStatus.CREATED -> {
-                order.updateStatus(OrderStatus.CANCELLED)
+                transactionTemplate.execute {
+                    val target = orderRepository.findById(orderId)
+                        .orElseThrow { OrderNotFoundException() }
+                    target.updateStatus(OrderStatus.CANCELLED)
+                }
                 restoreInventory(orderItems)
             }
             OrderStatus.PAID -> {
-                order.updateStatus(OrderStatus.CANCEL_REQUESTED)
-                transactionalEventPublisher.publishEvent(
-                    aggregateType = "Order",
-                    aggregateId = orderId.toString(),
-                    eventType = "PaymentCancellationRequested",
-                    eventData = mapOf(
-                        "eventType" to "PaymentCancellationRequested",
-                        "eventId" to "cancel-$orderId-${System.currentTimeMillis()}",
-                        "orderId" to orderId
-                    ),
-                    topic = KafkaTopics.PAYMENT_COMPENSATION,
-                    partitionKey = orderId.toString()
-                )
+                transactionTemplate.execute {
+                    val target = orderRepository.findById(orderId)
+                        .orElseThrow { OrderNotFoundException() }
+                    target.updateStatus(OrderStatus.CANCEL_REQUESTED)
+                    transactionalEventPublisher.publishEvent(
+                        aggregateType = "Order",
+                        aggregateId = orderId.toString(),
+                        eventType = "PaymentCancellationRequested",
+                        eventData = mapOf(
+                            "eventType" to "PaymentCancellationRequested",
+                            "eventId" to "cancel-$orderId-${System.currentTimeMillis()}",
+                            "orderId" to orderId
+                        ),
+                        topic = KafkaTopics.PAYMENT_COMPENSATION,
+                        partitionKey = orderId.toString()
+                    )
+                }
             }
             else -> throw OrderInvalidStatusException()
         }
 
+        val updatedOrder = orderRepository.findById(orderId)
+            .orElseThrow { OrderNotFoundException() }
         orderMetrics.recordOrderCancelled()
-        log.info("주문 취소: orderId={}, buyerId={}, status={}", orderId, buyerId, order.status)
-        return OrderResponse.from(order, orderItems)
+        log.info("주문 취소: orderId={}, buyerId={}, status={}", orderId, buyerId, updatedOrder.status)
+        return OrderResponse.from(updatedOrder, orderItems)
     }
 
     private fun restoreInventory(orderItems: List<OrderItem>) {
@@ -147,6 +164,7 @@ class OrderCommandServiceImpl(
         }
     }
 
+    @Transactional
     override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
         val order = orderRepository.findById(orderId)
             .orElseThrow { OrderNotFoundException() }
