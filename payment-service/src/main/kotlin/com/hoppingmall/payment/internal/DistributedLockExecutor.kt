@@ -3,6 +3,7 @@ package com.hoppingmall.payment.internal
 import org.redisson.api.RedissonClient
 import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Duration
 import java.util.concurrent.TimeUnit
@@ -12,6 +13,12 @@ class DistributedLockExecutor(
     private val redissonClient: RedissonClient,
     private val transactionManager: PlatformTransactionManager
 ) {
+
+    private fun newTransactionTemplate(): TransactionTemplate {
+        return TransactionTemplate(transactionManager).apply {
+            propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
+        }
+    }
 
     fun <T : Any> withLock(
         key: String,
@@ -24,7 +31,7 @@ class DistributedLockExecutor(
             throw DistributedLockException()
         }
         try {
-            return TransactionTemplate(transactionManager).execute { action() }
+            return newTransactionTemplate().execute { action() }
                 ?: throw IllegalStateException("Transaction returned null for lock key: $key")
         } finally {
             if (lock.isHeldByCurrentThread) {
@@ -44,7 +51,7 @@ class DistributedLockExecutor(
             throw DistributedLockException()
         }
         try {
-            TransactionTemplate(transactionManager).executeWithoutResult { action() }
+            newTransactionTemplate().executeWithoutResult { action() }
         } finally {
             if (lock.isHeldByCurrentThread) {
                 lock.unlock()

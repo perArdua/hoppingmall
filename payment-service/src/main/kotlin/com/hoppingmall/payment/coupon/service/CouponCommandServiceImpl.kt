@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
@@ -62,7 +61,6 @@ class CouponCommandServiceImpl(
     }
 
     @CacheEvict(cacheNames = ["coupon:available"], allEntries = true)
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun issueCoupon(userId: Long, couponId: Long): UserCouponResponse {
         return distributedLockExecutor.withLock("coupon:issue:$couponId") {
             try {
