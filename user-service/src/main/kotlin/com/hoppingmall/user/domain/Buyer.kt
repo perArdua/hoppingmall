@@ -4,7 +4,10 @@ import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 
 @Entity
-@Table(name = "buyers")
+@Table(
+    name = "buyers",
+    indexes = [Index(name = "idx_buyers_user_id", columnList = "user_id")]
+)
 class Buyer private constructor(
 
     @Column(name = "user_id", nullable = false)
