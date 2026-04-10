@@ -10,32 +10,36 @@ import com.hoppingmall.product.product.domain.repository.ProductStatisticsReposi
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.LocalDate
 
 @Service
-@Transactional
 class ProductStatisticsCommandServiceImpl(
     private val productStatisticsRepository: ProductStatisticsRepository,
     private val productDailyStatisticsRepository: ProductDailyStatisticsRepository,
     private val productHourlyStatisticsRepository: ProductHourlyStatisticsRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val transactionTemplate: TransactionTemplate
 ) : ProductStatisticsCommandService {
 
     private val logger = LoggerFactory.getLogger(ProductStatisticsCommandServiceImpl::class.java)
 
+    @Transactional
     override fun incrementSalesStats(productId: Long, quantity: Long, amount: BigDecimal) {
         val stats = getOrCreateStatistics(productId)
         stats.incrementSales(quantity, amount)
         productStatisticsRepository.save(stats)
     }
 
+    @Transactional
     override fun decrementSalesStats(productId: Long, quantity: Long, amount: BigDecimal) {
         val stats = productStatisticsRepository.findByProductId(productId) ?: return
         stats.decrementSales(quantity, amount)
         productStatisticsRepository.save(stats)
     }
 
+    @Transactional
     override fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal) {
         val stats = getOrCreateStatistics(productId)
         stats.incrementRefund(quantity, amount)
@@ -50,45 +54,50 @@ class ProductStatisticsCommandServiceImpl(
             return
         }
 
-        val productIds = allStats.map { it.productId }
+        allStats.chunked(BATCH_SIZE).forEach { chunk ->
+            transactionTemplate.executeWithoutResult {
+                val productIds = chunk.map { it.productId }
 
-        val existingDailyMap = productDailyStatisticsRepository
-            .findByStatisticsDateAndProductIdIn(today, productIds)
-            .associateBy { it.productId }
+                val existingDailyMap = productDailyStatisticsRepository
+                    .findByStatisticsDateAndProductIdIn(today, productIds)
+                    .associateBy { it.productId }
 
-        val last7DaysMap = toSalesAmountMap(
-            productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(6), today)
-        )
-        val last30DaysMap = toSalesAmountMap(
-            productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(29), today)
-        )
-        val previousWeekMap = toSalesAmountMap(
-            productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(13), today.minusDays(7))
-        )
+                val last7DaysMap = toSalesAmountMap(
+                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(6), today)
+                )
+                val last30DaysMap = toSalesAmountMap(
+                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(29), today)
+                )
+                val previousWeekMap = toSalesAmountMap(
+                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(13), today.minusDays(7))
+                )
 
-        val dailyToSave = mutableListOf<ProductDailyStatistics>()
-        for (stats in allStats) {
-            val daily = existingDailyMap[stats.productId] ?: ProductDailyStatistics.create(
-                productId = stats.productId,
-                statisticsDate = today
-            )
-            daily.updateFromStatistics(stats)
-            dailyToSave.add(daily)
+                val dailyToSave = mutableListOf<ProductDailyStatistics>()
+                for (stats in chunk) {
+                    val daily = existingDailyMap[stats.productId] ?: ProductDailyStatistics.create(
+                        productId = stats.productId,
+                        statisticsDate = today
+                    )
+                    daily.updateFromStatistics(stats)
+                    dailyToSave.add(daily)
 
-            stats.updatePeriodMetrics(
-                last7DaysMap[stats.productId] ?: BigDecimal.ZERO,
-                last30DaysMap[stats.productId] ?: BigDecimal.ZERO,
-                previousWeekMap[stats.productId] ?: BigDecimal.ZERO
-            )
-            stats.resetToday()
+                    stats.updatePeriodMetrics(
+                        last7DaysMap[stats.productId] ?: BigDecimal.ZERO,
+                        last30DaysMap[stats.productId] ?: BigDecimal.ZERO,
+                        previousWeekMap[stats.productId] ?: BigDecimal.ZERO
+                    )
+                    stats.resetToday()
+                }
+
+                productDailyStatisticsRepository.saveAll(dailyToSave)
+                productStatisticsRepository.saveAll(chunk)
+            }
         }
-
-        productDailyStatisticsRepository.saveAll(dailyToSave)
-        productStatisticsRepository.saveAll(allStats)
 
         logger.info("일별 통계 스냅샷 완료: ${allStats.size}건")
     }
 
+    @Transactional
     override fun flushHourlySnapshot() {
         val now = java.time.LocalDateTime.now()
         val today = now.toLocalDate()
@@ -124,6 +133,10 @@ class ProductStatisticsCommandServiceImpl(
 
     private fun toSalesAmountMap(rows: List<Array<Any>>): Map<Long, BigDecimal> {
         return rows.associate { (it[0] as Long) to (it[1] as BigDecimal) }
+    }
+
+    companion object {
+        private const val BATCH_SIZE = 100
     }
 
     private fun getOrCreateStatistics(productId: Long): ProductStatistics {

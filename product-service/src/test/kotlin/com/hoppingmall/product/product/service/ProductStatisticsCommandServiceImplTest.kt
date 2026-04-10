@@ -12,6 +12,7 @@ import com.hoppingmall.product.product.domain.repository.ProductStatisticsReposi
 import com.hoppingmall.product.support.withId
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -21,11 +22,15 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.transaction.TransactionStatus
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.Optional
+import java.util.function.Consumer
 
 @DisplayName("ProductStatisticsCommandServiceImpl")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -44,8 +49,20 @@ class ProductStatisticsCommandServiceImplTest {
     @Mock
     private lateinit var productRepository: ProductRepository
 
+    @Mock
+    private lateinit var transactionTemplate: TransactionTemplate
+
     @InjectMocks
     private lateinit var service: ProductStatisticsCommandServiceImpl
+
+    @BeforeEach
+    fun setUp() {
+        org.mockito.Mockito.lenient().doAnswer { invocation ->
+            val callback = invocation.getArgument<Consumer<TransactionStatus>>(0)
+            callback.accept(org.mockito.kotlin.mock())
+            null
+        }.`when`(transactionTemplate).executeWithoutResult(any())
+    }
 
     private fun createStats(productId: Long = 1L) = ProductStatistics.create(
         productId = productId, productName = "테스트", sellerId = 1L, categoryId = 1L
