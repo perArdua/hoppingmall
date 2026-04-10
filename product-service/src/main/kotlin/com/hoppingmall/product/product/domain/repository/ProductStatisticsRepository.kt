@@ -42,16 +42,14 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     @Query("SELECT COALESCE(SUM(ps.todayRefundAmount), 0) FROM ProductStatistics ps")
     fun sumTodayRefundAmount(): BigDecimal
 
-    fun countBySellerId(sellerId: Long): Long
-
-    @Query("SELECT COALESCE(SUM(ps.todaySalesAmount), 0) FROM ProductStatistics ps WHERE ps.sellerId = :sellerId")
-    fun sumTodaySalesAmountBySellerId(@Param("sellerId") sellerId: Long): BigDecimal
-
-    @Query("SELECT COALESCE(SUM(ps.todayOrderCount), 0) FROM ProductStatistics ps WHERE ps.sellerId = :sellerId")
-    fun sumTodayOrderCountBySellerId(@Param("sellerId") sellerId: Long): Long
-
-    @Query("SELECT COALESCE(SUM(ps.todayRefundAmount), 0) FROM ProductStatistics ps WHERE ps.sellerId = :sellerId")
-    fun sumTodayRefundAmountBySellerId(@Param("sellerId") sellerId: Long): BigDecimal
+    @Query("""
+        SELECT COUNT(ps) AS totalProducts,
+               COALESCE(SUM(ps.todaySalesAmount), 0) AS todaySalesAmount,
+               COALESCE(SUM(ps.todayOrderCount), 0) AS todayOrderCount,
+               COALESCE(SUM(ps.todayRefundAmount), 0) AS todayRefundAmount
+        FROM ProductStatistics ps WHERE ps.sellerId = :sellerId
+    """)
+    fun findSellerTodaySummary(@Param("sellerId") sellerId: Long): SellerTodaySummaryProjection
 
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.sellerId = :sellerId ORDER BY ps.todaySalesAmount DESC LIMIT 1")
     fun findTopSellingBySellerId(@Param("sellerId") sellerId: Long): ProductStatistics?
