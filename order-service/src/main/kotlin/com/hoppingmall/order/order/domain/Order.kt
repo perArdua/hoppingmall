@@ -9,7 +9,10 @@ import java.math.BigDecimal
 @Entity
 @Table(
     name = "orders",
-    indexes = [Index(name = "idx_orders_buyer_id", columnList = "buyerId")]
+    indexes = [
+        Index(name = "idx_orders_buyer_id", columnList = "buyerId"),
+        Index(name = "idx_orders_status_updated_at", columnList = "status, updatedAt")
+    ]
 )
 class Order private constructor(
     @Column(nullable = false)

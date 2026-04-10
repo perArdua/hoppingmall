@@ -3,6 +3,7 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.math.BigDecimal
@@ -11,7 +12,8 @@ import java.time.LocalDate
 @Entity
 @Table(
     name = "product_daily_statistics",
-    uniqueConstraints = [UniqueConstraint(columnNames = ["product_id", "statistics_date"])]
+    uniqueConstraints = [UniqueConstraint(columnNames = ["product_id", "statistics_date"])],
+    indexes = [Index(name = "idx_daily_stats_date", columnList = "statistics_date")]
 )
 class ProductDailyStatistics private constructor(
     @Column(name = "product_id", nullable = false)

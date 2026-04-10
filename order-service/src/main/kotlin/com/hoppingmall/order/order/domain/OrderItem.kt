@@ -12,7 +12,8 @@ import java.math.BigDecimal
     name = "order_items",
     indexes = [
         Index(name = "idx_order_items_order_id", columnList = "orderId"),
-        Index(name = "idx_order_items_product_id", columnList = "productId")
+        Index(name = "idx_order_items_product_id", columnList = "productId"),
+        Index(name = "idx_order_items_seller_id", columnList = "sellerId")
     ]
 )
 class OrderItem private constructor(
