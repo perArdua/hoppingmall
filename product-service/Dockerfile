@@ -14,7 +14,7 @@ RUN sed -i "s/\r$//" gradlew && chmod +x gradlew && ./gradlew bootJar --no-daemo
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
-ENV JAVA_OPTS="-Xms128m -Xmx256m"
+ENV JAVA_OPTS="-Xms256m -Xmx512m"
 ENV SPRING_PROFILES_ACTIVE="docker"
 EXPOSE 8083
 HEALTHCHECK --interval=30s --timeout=3s \
