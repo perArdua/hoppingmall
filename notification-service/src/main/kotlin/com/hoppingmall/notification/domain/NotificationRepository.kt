@@ -14,8 +14,6 @@ interface NotificationRepository : JpaRepository<Notification, Long> {
 
     fun existsByEventId(eventId: String): Boolean
 
-    fun findByUserId(userId: Long): List<Notification>
-
     fun findByUserId(userId: Long, pageable: Pageable): Slice<Notification>
 
     fun findByUserIdAndType(userId: Long, type: NotificationType, pageable: Pageable): Slice<Notification>

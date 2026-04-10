@@ -19,8 +19,6 @@ interface PaymentRepository : JpaRepository<Payment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findByIdForUpdate(@Param("id") id: Long): Payment?
 
-    fun findByUserId(userId: Long): List<Payment>
-
     fun findByUserId(userId: Long, pageable: Pageable): Slice<Payment>
 
     fun findByTransactionId(transactionId: String): Payment?
