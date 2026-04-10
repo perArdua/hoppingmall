@@ -11,6 +11,7 @@ import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
+import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -26,6 +27,7 @@ class PaymentCommandServiceImpl(
     private val paymentNotificationService: PaymentNotificationService,
     private val couponCommandService: CouponCommandService,
     private val paymentMetrics: PaymentMetrics,
+    private val pointEarnRateStrategy: PointEarnRateStrategy,
     transactionManager: PlatformTransactionManager
 ) : PaymentCommandService {
 
@@ -63,6 +65,10 @@ class PaymentCommandServiceImpl(
 
         val paymentResult = paymentService.processPayment(savedPayment)
 
+        val earnRate = if (savedPayment.amount > BigDecimal.ZERO) {
+            pointEarnRateStrategy.getEarnRate(savedPayment.userId)
+        } else null
+
         val finalPayment = transactionTemplate.execute {
             val updatedPayment = updatePaymentWithResult(savedPayment, paymentResult)
             val saved = paymentRepository.save(updatedPayment)
@@ -70,7 +76,7 @@ class PaymentCommandServiceImpl(
             if (saved.status == PaymentStatus.SUCCESS) {
                 log.info("결제 성공: paymentId={}, orderId={}, userId={}, amount={}", saved.id, saved.orderId, userId, saved.amount)
                 paymentMetrics.recordPaymentCompleted(saved.amount, saved.method.name)
-                publishPaymentEvents(saved)
+                publishPaymentEvents(saved, earnRate)
             }
 
             if (saved.status == PaymentStatus.FAILED) {
@@ -138,11 +144,11 @@ class PaymentCommandServiceImpl(
         }
     }
 
-    private fun publishPaymentEvents(payment: Payment) {
+    private fun publishPaymentEvents(payment: Payment, earnRate: BigDecimal? = null) {
         paymentEventService.publishPaymentCompletedEvent(payment)
 
-        if (payment.amount > BigDecimal.ZERO) {
-            paymentEventService.publishPointEarnRequestEvent(payment)
+        if (payment.amount > BigDecimal.ZERO && earnRate != null) {
+            paymentEventService.publishPointEarnRequestEvent(payment, earnRate)
             paymentEventService.publishMembershipUpdateEvent(payment)
         }
         paymentNotificationService.publishPaymentCompletedNotification(payment)

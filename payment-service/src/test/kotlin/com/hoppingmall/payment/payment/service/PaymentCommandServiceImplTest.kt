@@ -9,6 +9,7 @@ import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
+import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
 import com.hoppingmall.common.BaseEntity
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -50,6 +51,9 @@ class PaymentCommandServiceImplTest {
     private lateinit var paymentMetrics: PaymentMetrics
 
     @Mock
+    private lateinit var pointEarnRateStrategy: PointEarnRateStrategy
+
+    @Mock
     private lateinit var transactionManager: PlatformTransactionManager
 
     private fun createService() = PaymentCommandServiceImpl(
@@ -59,6 +63,7 @@ class PaymentCommandServiceImplTest {
         paymentNotificationService,
         couponCommandService,
         paymentMetrics,
+        pointEarnRateStrategy,
         transactionManager
     )
 
