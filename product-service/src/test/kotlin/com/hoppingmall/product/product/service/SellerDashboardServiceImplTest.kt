@@ -6,6 +6,7 @@ import com.hoppingmall.product.product.domain.ProductStatistics
 import com.hoppingmall.product.product.domain.repository.ProductDailyStatisticsRepository
 import com.hoppingmall.product.product.domain.repository.ProductHourlyStatisticsRepository
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
+import com.hoppingmall.product.product.domain.repository.SellerTodaySummaryProjection
 import com.hoppingmall.product.product.exception.ProductException
 import com.hoppingmall.product.product.exception.ProductStatisticsNotFoundException
 import com.hoppingmall.product.support.withId
@@ -92,11 +93,9 @@ class SellerDashboardServiceImplTest {
     @Test
     fun 오늘_요약을_조회한다() {
         val topSelling = createStats()
+        val summary = mockSummaryProjection(5L, BigDecimal("500000"), 10L, BigDecimal("10000"))
 
-        whenever(productStatisticsRepository.countBySellerId(1L)).thenReturn(5)
-        whenever(productStatisticsRepository.sumTodaySalesAmountBySellerId(1L)).thenReturn(BigDecimal("500000"))
-        whenever(productStatisticsRepository.sumTodayOrderCountBySellerId(1L)).thenReturn(10)
-        whenever(productStatisticsRepository.sumTodayRefundAmountBySellerId(1L)).thenReturn(BigDecimal("10000"))
+        whenever(productStatisticsRepository.findSellerTodaySummary(1L)).thenReturn(summary)
         whenever(productStatisticsRepository.findTopSellingBySellerId(1L)).thenReturn(topSelling)
 
         val result = service.getTodaySummary(1L)
@@ -108,16 +107,29 @@ class SellerDashboardServiceImplTest {
 
     @Test
     fun 상위_판매_상품이_없을_때_오늘_요약을_조회한다() {
-        whenever(productStatisticsRepository.countBySellerId(1L)).thenReturn(0)
-        whenever(productStatisticsRepository.sumTodaySalesAmountBySellerId(1L)).thenReturn(BigDecimal.ZERO)
-        whenever(productStatisticsRepository.sumTodayOrderCountBySellerId(1L)).thenReturn(0)
-        whenever(productStatisticsRepository.sumTodayRefundAmountBySellerId(1L)).thenReturn(BigDecimal.ZERO)
+        val summary = mockSummaryProjection(0L, BigDecimal.ZERO, 0L, BigDecimal.ZERO)
+
+        whenever(productStatisticsRepository.findSellerTodaySummary(1L)).thenReturn(summary)
         whenever(productStatisticsRepository.findTopSellingBySellerId(1L)).thenReturn(null)
 
         val result = service.getTodaySummary(1L)
 
         assertThat(result.topSellingProductId).isNull()
         assertThat(result.topSellingProductName).isNull()
+    }
+
+    private fun mockSummaryProjection(
+        totalProducts: Long,
+        todaySalesAmount: BigDecimal,
+        todayOrderCount: Long,
+        todayRefundAmount: BigDecimal
+    ): SellerTodaySummaryProjection {
+        val projection = org.mockito.Mockito.mock(SellerTodaySummaryProjection::class.java)
+        whenever(projection.getTotalProducts()).thenReturn(totalProducts)
+        whenever(projection.getTodaySalesAmount()).thenReturn(todaySalesAmount)
+        whenever(projection.getTodayOrderCount()).thenReturn(todayOrderCount)
+        whenever(projection.getTodayRefundAmount()).thenReturn(todayRefundAmount)
+        return projection
     }
 
     @Test
