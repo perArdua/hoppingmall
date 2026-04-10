@@ -54,12 +54,12 @@ class SettlementSnapshotServiceTest {
         val settlement = createSettlement(1L)
 
         whenever(settlementRepository.findAll()).thenReturn(listOf(settlement))
-        whenever(settlementSummaryRepository.findBySettlementId(1L)).thenReturn(null)
-        whenever(settlementSummaryRepository.save(any<SettlementSummary>())).thenAnswer { it.arguments[0] }
+        whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(emptyList())
+        whenever(settlementSummaryRepository.saveAll(any<List<SettlementSummary>>())).thenAnswer { it.arguments[0] }
 
         settlementSnapshotService.createSnapshot()
 
-        verify(settlementSummaryRepository).save(any<SettlementSummary>())
+        verify(settlementSummaryRepository).saveAll(any<List<SettlementSummary>>())
     }
 
     @Test
@@ -68,10 +68,10 @@ class SettlementSnapshotServiceTest {
         val existingSummary = SettlementSummary.from(settlement)
 
         whenever(settlementRepository.findAll()).thenReturn(listOf(settlement))
-        whenever(settlementSummaryRepository.findBySettlementId(1L)).thenReturn(existingSummary)
+        whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(listOf(existingSummary))
 
         settlementSnapshotService.createSnapshot()
 
-        verify(settlementSummaryRepository, never()).save(any<SettlementSummary>())
+        verify(settlementSummaryRepository, never()).saveAll(any<List<SettlementSummary>>())
     }
 }
