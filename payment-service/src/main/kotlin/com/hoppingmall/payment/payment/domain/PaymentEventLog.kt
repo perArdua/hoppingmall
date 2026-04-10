@@ -12,7 +12,7 @@ import jakarta.persistence.UniqueConstraint
     uniqueConstraints = [UniqueConstraint(columnNames = ["transaction_id"])]
 )
 class PaymentEventLog(
-    @Column(name = "transaction_id", nullable = false, unique = true)
+    @Column(name = "transaction_id", nullable = false)
     val transactionId: String,
 
     @Column(nullable = false)
