@@ -4,7 +4,10 @@ import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 
 @Entity
-@Table(name = "sellers")
+@Table(
+    name = "sellers",
+    indexes = [Index(name = "idx_sellers_user_id", columnList = "user_id")]
+)
 class Seller private constructor(
     @Column(name = "user_id", nullable = false)
     val userId: Long,
