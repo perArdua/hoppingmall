@@ -10,8 +10,6 @@ import org.springframework.stereotype.Repository
 interface PointHistoryRepository : JpaRepository<PointHistory, Long> {
     fun existsByEventId(eventId: String): Boolean
 
-    fun findByUserIdOrderByCreatedAtDesc(userId: Long): List<PointHistory>
-
     fun findByUserId(userId: Long, pageable: Pageable): Slice<PointHistory>
 
     fun findByPaymentIdAndType(paymentId: Long, type: PointType): PointHistory?
