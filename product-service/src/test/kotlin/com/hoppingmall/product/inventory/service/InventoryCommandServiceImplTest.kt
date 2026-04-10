@@ -180,13 +180,42 @@ class InventoryCommandServiceImplTest {
 
     @Test
     fun 여러_예약을_한번에_취소한다() {
-        whenever(inventoryReservationRepository.findByReservationId("rsv-1")).thenReturn(null)
-        whenever(inventoryReservationRepository.findByReservationId("rsv-2")).thenReturn(null)
+        val r1 = InventoryReservation(
+            reservationId = "rsv-1", productId = 1L, quantity = 3,
+            status = ReservationStatus.RESERVED, expiresAt = LocalDateTime.now().plusMinutes(10)
+        )
+        val r2 = InventoryReservation(
+            reservationId = "rsv-2", productId = 2L, quantity = 5,
+            status = ReservationStatus.RESERVED, expiresAt = LocalDateTime.now().plusMinutes(10)
+        )
+        val inv1 = Inventory.create(productId = 1L, stockQuantity = 0)
+        val inv2 = Inventory.create(productId = 2L, stockQuantity = 0)
+
+        whenever(inventoryReservationRepository.findByReservationIdIn(listOf("rsv-1", "rsv-2")))
+            .thenReturn(listOf(r1, r2))
+        whenever(inventoryReservationRepository.batchUpdateStatusByCas(
+            reservationIds = eq(listOf("rsv-1", "rsv-2")),
+            expectedStatus = eq(ReservationStatus.RESERVED),
+            targetStatus = eq(ReservationStatus.CANCELLED),
+            updatedAt = any()
+        )).thenReturn(2)
+        whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L, 2L)))
+            .thenReturn(listOf(inv1, inv2))
 
         service.cancelReservations(listOf("rsv-1", "rsv-2"))
 
-        verify(inventoryReservationRepository).findByReservationId("rsv-1")
-        verify(inventoryReservationRepository).findByReservationId("rsv-2")
+        assertThat(inv1.stockQuantity).isEqualTo(3)
+        assertThat(inv2.stockQuantity).isEqualTo(5)
+    }
+
+    @Test
+    fun 예약이_없으면_취소를_건너뛴다() {
+        whenever(inventoryReservationRepository.findByReservationIdIn(listOf("rsv-1", "rsv-2")))
+            .thenReturn(emptyList())
+
+        service.cancelReservations(listOf("rsv-1", "rsv-2"))
+
+        verify(inventoryReservationRepository, never()).batchUpdateStatusByCas(any(), any(), any(), any())
     }
 
     @Test

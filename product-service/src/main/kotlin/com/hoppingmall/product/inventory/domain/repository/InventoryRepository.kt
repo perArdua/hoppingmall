@@ -19,4 +19,8 @@ interface InventoryRepository : JpaRepository<Inventory, Long> {
     fun existsByProductId(productId: Long): Boolean
 
     fun findAllByProductIdIn(productIds: List<Long>): List<Inventory>
+
+    @Query("SELECT i FROM Inventory i WHERE i.productId IN :productIds ORDER BY i.productId")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    fun findByProductIdInForUpdate(@Param("productIds") productIds: List<Long>): List<Inventory>
 }
