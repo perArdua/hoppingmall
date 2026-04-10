@@ -130,11 +130,14 @@ class ProductStatisticsCommandServiceImplTest {
         val daily = ProductDailyStatistics.create(productId = 1L, statisticsDate = LocalDate.now())
 
         whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
-        whenever(productDailyStatisticsRepository.findByProductIdAndStatisticsDate(any(), any())).thenReturn(daily)
-        whenever(productDailyStatisticsRepository.save(any<ProductDailyStatistics>())).thenReturn(daily)
-        whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdAndDateRange(any(), any(), any()))
-            .thenReturn(BigDecimal("100000"))
-        whenever(productStatisticsRepository.save(any<ProductStatistics>())).thenReturn(stats)
+        whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
+            .thenReturn(listOf(daily))
+        whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
+            .thenReturn(listOf(arrayOf<Any>(1L, BigDecimal("100000"))))
+        whenever(productDailyStatisticsRepository.saveAll(any<List<ProductDailyStatistics>>()))
+            .thenAnswer { it.arguments[0] }
+        whenever(productStatisticsRepository.saveAll(any<List<ProductStatistics>>()))
+            .thenAnswer { it.arguments[0] }
 
         service.flushDailySnapshot()
 
@@ -147,15 +150,18 @@ class ProductStatisticsCommandServiceImplTest {
         stats.incrementSales(10, BigDecimal("100000"))
 
         whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
-        whenever(productDailyStatisticsRepository.findByProductIdAndStatisticsDate(any(), any())).thenReturn(null)
-        whenever(productDailyStatisticsRepository.save(any<ProductDailyStatistics>())).thenAnswer { it.arguments[0] }
-        whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdAndDateRange(any(), any(), any()))
-            .thenReturn(BigDecimal.ZERO)
-        whenever(productStatisticsRepository.save(any<ProductStatistics>())).thenReturn(stats)
+        whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
+            .thenReturn(emptyList())
+        whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
+            .thenReturn(emptyList())
+        whenever(productDailyStatisticsRepository.saveAll(any<List<ProductDailyStatistics>>()))
+            .thenAnswer { it.arguments[0] }
+        whenever(productStatisticsRepository.saveAll(any<List<ProductStatistics>>()))
+            .thenAnswer { it.arguments[0] }
 
         service.flushDailySnapshot()
 
-        verify(productDailyStatisticsRepository).save(any<ProductDailyStatistics>())
+        verify(productDailyStatisticsRepository).saveAll(any<List<ProductDailyStatistics>>())
     }
 
     @Test
@@ -164,13 +170,14 @@ class ProductStatisticsCommandServiceImplTest {
         stats.incrementSales(10, BigDecimal("100000"))
 
         whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
-        whenever(productHourlyStatisticsRepository.findByProductIdAndStatisticsDateAndHour(any(), any(), any()))
-            .thenReturn(null)
-        whenever(productHourlyStatisticsRepository.save(any<ProductHourlyStatistics>())).thenAnswer { it.arguments[0] }
+        whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
+            .thenReturn(emptyList())
+        whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
+            .thenAnswer { it.arguments[0] }
 
         service.flushHourlySnapshot()
 
-        verify(productHourlyStatisticsRepository).save(any<ProductHourlyStatistics>())
+        verify(productHourlyStatisticsRepository).saveAll(any<List<ProductHourlyStatistics>>())
     }
 
     @Test
@@ -181,7 +188,8 @@ class ProductStatisticsCommandServiceImplTest {
 
         service.flushHourlySnapshot()
 
-        verify(productHourlyStatisticsRepository, org.mockito.kotlin.never()).save(any<ProductHourlyStatistics>())
+        verify(productHourlyStatisticsRepository, org.mockito.kotlin.never())
+            .saveAll(any<List<ProductHourlyStatistics>>())
     }
 
     @Test
@@ -193,9 +201,10 @@ class ProductStatisticsCommandServiceImplTest {
         )
 
         whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
-        whenever(productHourlyStatisticsRepository.findByProductIdAndStatisticsDateAndHour(any(), any(), any()))
-            .thenReturn(hourly)
-        whenever(productHourlyStatisticsRepository.save(any<ProductHourlyStatistics>())).thenReturn(hourly)
+        whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
+            .thenReturn(listOf(hourly))
+        whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
+            .thenAnswer { it.arguments[0] }
 
         service.flushHourlySnapshot()
 

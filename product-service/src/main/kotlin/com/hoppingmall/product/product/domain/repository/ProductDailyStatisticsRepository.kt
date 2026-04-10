@@ -14,6 +14,11 @@ interface ProductDailyStatisticsRepository : JpaRepository<ProductDailyStatistic
 
     fun findByProductIdAndStatisticsDate(productId: Long, statisticsDate: LocalDate): ProductDailyStatistics?
 
+    fun findByStatisticsDateAndProductIdIn(
+        statisticsDate: LocalDate,
+        productIds: Collection<Long>
+    ): List<ProductDailyStatistics>
+
     fun findByProductIdAndStatisticsDateBetweenOrderByStatisticsDateAsc(
         productId: Long,
         startDate: LocalDate,
@@ -33,6 +38,21 @@ interface ProductDailyStatisticsRepository : JpaRepository<ProductDailyStatistic
         @Param("startDate") startDate: LocalDate,
         @Param("endDate") endDate: LocalDate
     ): BigDecimal
+
+    @Query(
+        """
+        SELECT d.productId, COALESCE(SUM(d.dailySalesAmount), 0)
+        FROM ProductDailyStatistics d
+        WHERE d.productId IN :productIds
+          AND d.statisticsDate BETWEEN :startDate AND :endDate
+        GROUP BY d.productId
+        """
+    )
+    fun sumSalesAmountByProductIdsAndDateRange(
+        @Param("productIds") productIds: Collection<Long>,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate
+    ): List<Array<Any>>
 
     @Query(
         """

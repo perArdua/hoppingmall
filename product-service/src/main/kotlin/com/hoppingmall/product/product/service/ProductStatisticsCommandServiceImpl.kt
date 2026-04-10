@@ -45,32 +45,46 @@ class ProductStatisticsCommandServiceImpl(
     override fun flushDailySnapshot() {
         val today = LocalDate.now()
         val allStats = productStatisticsRepository.findAll()
+        if (allStats.isEmpty()) {
+            logger.info("일별 통계 스냅샷 완료: 0건")
+            return
+        }
 
+        val productIds = allStats.map { it.productId }
+
+        val existingDailyMap = productDailyStatisticsRepository
+            .findByStatisticsDateAndProductIdIn(today, productIds)
+            .associateBy { it.productId }
+
+        val last7DaysMap = toSalesAmountMap(
+            productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(6), today)
+        )
+        val last30DaysMap = toSalesAmountMap(
+            productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(29), today)
+        )
+        val previousWeekMap = toSalesAmountMap(
+            productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(13), today.minusDays(7))
+        )
+
+        val dailyToSave = mutableListOf<ProductDailyStatistics>()
         for (stats in allStats) {
-            val existing = productDailyStatisticsRepository
-                .findByProductIdAndStatisticsDate(stats.productId, today)
-
-            val daily = existing ?: ProductDailyStatistics.create(
+            val daily = existingDailyMap[stats.productId] ?: ProductDailyStatistics.create(
                 productId = stats.productId,
                 statisticsDate = today
             )
             daily.updateFromStatistics(stats)
-            productDailyStatisticsRepository.save(daily)
+            dailyToSave.add(daily)
 
-            val last7Days = productDailyStatisticsRepository.sumSalesAmountByProductIdAndDateRange(
-                stats.productId, today.minusDays(6), today
+            stats.updatePeriodMetrics(
+                last7DaysMap[stats.productId] ?: BigDecimal.ZERO,
+                last30DaysMap[stats.productId] ?: BigDecimal.ZERO,
+                previousWeekMap[stats.productId] ?: BigDecimal.ZERO
             )
-            val last30Days = productDailyStatisticsRepository.sumSalesAmountByProductIdAndDateRange(
-                stats.productId, today.minusDays(29), today
-            )
-            val previousWeek = productDailyStatisticsRepository.sumSalesAmountByProductIdAndDateRange(
-                stats.productId, today.minusDays(13), today.minusDays(7)
-            )
-
-            stats.updatePeriodMetrics(last7Days, last30Days, previousWeek)
             stats.resetToday()
-            productStatisticsRepository.save(stats)
         }
+
+        productDailyStatisticsRepository.saveAll(dailyToSave)
+        productStatisticsRepository.saveAll(allStats)
 
         logger.info("일별 통계 스냅샷 완료: ${allStats.size}건")
     }
@@ -81,24 +95,35 @@ class ProductStatisticsCommandServiceImpl(
         val currentHour = now.hour
         val allStats = productStatisticsRepository.findAll()
 
-        var flushedCount = 0
-        for (stats in allStats) {
-            if (stats.todaySalesQuantity == 0L && stats.todayRefundQuantity == 0L) continue
+        val activeStats = allStats.filter { it.todaySalesQuantity > 0L || it.todayRefundQuantity > 0L }
+        if (activeStats.isEmpty()) {
+            logger.info("시간별 통계 스냅샷 완료: 0건 (${currentHour}시)")
+            return
+        }
 
-            val existing = productHourlyStatisticsRepository
-                .findByProductIdAndStatisticsDateAndHour(stats.productId, today, currentHour)
+        val productIds = activeStats.map { it.productId }
+        val existingHourlyMap = productHourlyStatisticsRepository
+            .findByStatisticsDateAndHourAndProductIdIn(today, currentHour, productIds)
+            .associateBy { it.productId }
 
-            val hourly = existing ?: ProductHourlyStatistics.create(
+        val hourlyToSave = mutableListOf<ProductHourlyStatistics>()
+        for (stats in activeStats) {
+            val hourly = existingHourlyMap[stats.productId] ?: ProductHourlyStatistics.create(
                 productId = stats.productId,
                 statisticsDate = today,
                 hour = currentHour
             )
             hourly.updateFromStatistics(stats)
-            productHourlyStatisticsRepository.save(hourly)
-            flushedCount++
+            hourlyToSave.add(hourly)
         }
 
-        logger.info("시간별 통계 스냅샷 완료: ${flushedCount}건 (${currentHour}시)")
+        productHourlyStatisticsRepository.saveAll(hourlyToSave)
+
+        logger.info("시간별 통계 스냅샷 완료: ${hourlyToSave.size}건 (${currentHour}시)")
+    }
+
+    private fun toSalesAmountMap(rows: List<Array<Any>>): Map<Long, BigDecimal> {
+        return rows.associate { (it[0] as Long) to (it[1] as BigDecimal) }
     }
 
     private fun getOrCreateStatistics(productId: Long): ProductStatistics {
