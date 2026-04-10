@@ -219,6 +219,28 @@ class InventoryCommandServiceImplTest {
     }
 
     @Test
+    fun 빈_예약_목록이면_취소를_건너뛴다() {
+        service.cancelReservations(emptyList())
+
+        verify(inventoryReservationRepository, never()).findByReservationIdIn(any())
+    }
+
+    @Test
+    fun RESERVED_상태가_아닌_예약만_있으면_취소를_건너뛴다() {
+        val confirmed = InventoryReservation(
+            reservationId = "rsv-1", productId = 1L, quantity = 3,
+            status = ReservationStatus.CONFIRMED, expiresAt = LocalDateTime.now().plusMinutes(10)
+        )
+
+        whenever(inventoryReservationRepository.findByReservationIdIn(listOf("rsv-1")))
+            .thenReturn(listOf(confirmed))
+
+        service.cancelReservations(listOf("rsv-1"))
+
+        verify(inventoryReservationRepository, never()).batchUpdateStatusByCas(any(), any(), any(), any())
+    }
+
+    @Test
     fun 확정_시_일부_이미_확정된_예약이_있으면_성공으로_간주한다() {
         val reservationIds = listOf("rsv-1", "rsv-2")
         val r1 = InventoryReservation(
