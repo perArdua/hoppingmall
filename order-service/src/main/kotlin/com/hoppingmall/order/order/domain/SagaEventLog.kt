@@ -23,7 +23,7 @@ class SagaEventLog(
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "saga_event_log_steps", joinColumns = [JoinColumn(name = "saga_event_log_id")])
     @Column(name = "step")
     val completedSteps: MutableSet<String> = mutableSetOf()
