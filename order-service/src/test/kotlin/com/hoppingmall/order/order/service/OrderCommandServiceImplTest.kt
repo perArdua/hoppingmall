@@ -22,17 +22,21 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.test.util.ReflectionTestUtils
+import org.springframework.transaction.support.TransactionCallback
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.util.Optional
 
@@ -65,8 +69,24 @@ class OrderCommandServiceImplTest {
     @Mock
     private lateinit var orderMetrics: OrderMetrics
 
-    @InjectMocks
+    @Mock
+    private lateinit var transactionTemplate: TransactionTemplate
+
     private lateinit var service: OrderCommandServiceImpl
+
+    @BeforeEach
+    fun setUp() {
+        Mockito.lenient().`when`(transactionTemplate.execute(any<TransactionCallback<Any>>())).thenAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val callback = invocation.arguments[0] as TransactionCallback<Any?>
+            callback.doInTransaction(mock())
+        }
+        service = OrderCommandServiceImpl(
+            orderRepository, orderItemRepository, cartItemRepository,
+            productQueryPort, inventoryCommandPort, paymentCommandPort,
+            transactionalEventPublisher, orderMetrics, transactionTemplate
+        )
+    }
 
     @Test
     fun 주문_생성_시_재고_예약을_수행한다() {
