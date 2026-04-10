@@ -15,7 +15,8 @@ import java.time.LocalDateTime
         Index(name = "idx_refunds_order_id", columnList = "orderId"),
         Index(name = "idx_refunds_payment_id", columnList = "paymentId"),
         Index(name = "idx_refunds_buyer_id", columnList = "buyerId"),
-        Index(name = "idx_refunds_seller_id", columnList = "sellerId")
+        Index(name = "idx_refunds_seller_id", columnList = "sellerId"),
+        Index(name = "idx_refunds_seller_status_completed", columnList = "sellerId, status, completedAt")
     ]
 )
 class Refund private constructor(

@@ -9,7 +9,10 @@ import java.time.LocalDateTime
 @Table(
     name = "user_coupons",
     uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "coupon_id"])],
-    indexes = [Index(name = "idx_user_coupons_user_id", columnList = "userId")]
+    indexes = [
+        Index(name = "idx_user_coupons_user_id", columnList = "userId"),
+        Index(name = "idx_user_coupons_order_id", columnList = "orderId")
+    ]
 )
 class UserCoupon private constructor(
     @Column(nullable = false)
