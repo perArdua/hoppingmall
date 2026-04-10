@@ -10,12 +10,12 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
@@ -28,6 +28,8 @@ import org.springframework.kafka.core.KafkaOperations
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
 import org.springframework.test.util.ReflectionTestUtils
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.SimpleTransactionStatus
 import java.time.LocalDateTime
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
@@ -49,8 +51,18 @@ class OutboxEventPublisherTest {
     @Mock
     private lateinit var avroEventConverter: AvroEventConverter
 
-    @InjectMocks
+    @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
+
     private lateinit var outboxEventPublisher: OutboxEventPublisher
+
+    @BeforeEach
+    fun setUp() {
+        whenever(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
+        outboxEventPublisher = OutboxEventPublisher(
+            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager
+        )
+    }
 
     private fun createOutboxEvent(
         id: Long = 1L,
