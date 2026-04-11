@@ -10,7 +10,8 @@ import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
@@ -19,35 +20,40 @@ class OutboxEventPublisher(
     private val outboxEventRepository: OutboxEventRepository,
     private val kafkaTemplate: KafkaTemplate<String, Any>,
     private val outboxMetrics: OutboxMetrics,
-    private val avroEventConverter: AvroEventConverter
+    private val avroEventConverter: AvroEventConverter,
+    transactionManager: PlatformTransactionManager
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
     private val maxRetries = 3
+    private val transactionTemplate = TransactionTemplate(transactionManager)
 
     @Scheduled(fixedDelayString = "\${outbox.publish.interval-ms:5000}")
-    @Transactional
     fun publishPendingEvents() {
-        val pendingEvents = outboxEventRepository.findUnprocessedEvents(
-            status = OutboxStatus.PENDING,
-            retryStatus = OutboxStatus.FAILED,
-            maxRetries = maxRetries,
-            limit = 100
-        )
+        val pendingEvents = transactionTemplate.execute {
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = maxRetries,
+                limit = 100
+            )
+        } ?: return
 
         if (pendingEvents.isNotEmpty()) {
             logger.info("Processing ${pendingEvents.size} pending outbox events")
 
             pendingEvents.forEach { event ->
                 val eventId = event.id ?: return@forEach
-                val claimed = outboxEventRepository.claimEventForPublish(
-                    id = eventId,
-                    nextStatus = OutboxStatus.RETRYING,
-                    updatedAt = LocalDateTime.now(),
-                    pendingStatus = OutboxStatus.PENDING,
-                    failedStatus = OutboxStatus.FAILED,
-                    maxRetries = maxRetries
-                )
+                val claimed = transactionTemplate.execute {
+                    outboxEventRepository.claimEventForPublish(
+                        id = eventId,
+                        nextStatus = OutboxStatus.RETRYING,
+                        updatedAt = LocalDateTime.now(),
+                        pendingStatus = OutboxStatus.PENDING,
+                        failedStatus = OutboxStatus.FAILED,
+                        maxRetries = maxRetries
+                    )
+                } ?: 0
                 if (claimed > 0) {
                     publishEvent(eventId)
                 }
@@ -55,15 +61,16 @@ class OutboxEventPublisher(
         }
     }
 
-    @Transactional
     fun publishEvent(eventId: Long) {
-        var event: OutboxEvent? = null
-        try {
-            event = outboxEventRepository.findById(eventId).orElse(null) ?: return
-            if (event.processed || event.status != OutboxStatus.RETRYING) {
-                return
-            }
+        val event = transactionTemplate.execute {
+            outboxEventRepository.findById(eventId).orElse(null)
+        } ?: return
 
+        if (event.processed || event.status != OutboxStatus.RETRYING) {
+            return
+        }
+
+        try {
             val avroRecord = avroEventConverter.convertJsonToAvro(event.eventType, event.eventData)
 
             val result = kafkaTemplate.executeInTransaction { template ->
@@ -74,15 +81,14 @@ class OutboxEventPublisher(
                 ).get(10, TimeUnit.SECONDS)
             }
 
-            handlePublishSuccess(event, result)
+            transactionTemplate.executeWithoutResult {
+                handlePublishSuccess(event, result)
+            }
 
         } catch (e: Exception) {
-            val failedEvent = event
-            if (failedEvent != null) {
-                logger.error("Failed to publish outbox event: ${failedEvent.id}", e)
-                handlePublishFailure(failedEvent, e)
-            } else {
-                logger.error("Failed to publish outbox event: $eventId", e)
+            logger.error("Failed to publish outbox event: ${event.id}", e)
+            transactionTemplate.executeWithoutResult {
+                handlePublishFailure(event, e)
             }
         }
     }

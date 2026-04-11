@@ -13,29 +13,25 @@ import com.hoppingmall.settlement.exception.SettlementNotFoundException
 import com.hoppingmall.settlement.port.OrderItemQueryPort
 import com.hoppingmall.settlement.port.RefundQueryPort
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.RoundingMode
 
 @Service
-@Transactional
 class SettlementCommandServiceImpl(
     private val settlementRepository: SettlementRepository,
     private val settlementItemRepository: SettlementItemRepository,
     private val orderItemQueryPort: OrderItemQueryPort,
-    private val refundQueryPort: RefundQueryPort
+    private val refundQueryPort: RefundQueryPort,
+    transactionManager: PlatformTransactionManager
 ) : SettlementCommandService {
+
+    private val transactionTemplate = TransactionTemplate(transactionManager)
 
     override fun createSettlement(request: CreateSettlementRequest): SettlementResponse {
         if (request.periodEnd.isBefore(request.periodStart)) {
             throw SettlementInvalidPeriodException()
-        }
-
-        if (settlementRepository.existsBySellerIdAndPeriodStartAndPeriodEnd(
-                request.sellerId, request.periodStart, request.periodEnd
-            )
-        ) {
-            throw SettlementAlreadyExistsException()
         }
 
         val startDateTime = request.periodStart.atStartOfDay()
@@ -60,34 +56,44 @@ class SettlementCommandServiceImpl(
             .setScale(2, RoundingMode.HALF_UP)
         val settlementAmount = totalSalesAmount.subtract(totalRefundAmount).subtract(commissionAmount)
 
-        val settlement = settlementRepository.save(
-            Settlement.create(
-                sellerId = request.sellerId,
-                periodStart = request.periodStart,
-                periodEnd = request.periodEnd,
-                totalSalesAmount = totalSalesAmount,
-                totalRefundAmount = totalRefundAmount,
-                commissionRate = request.commissionRate,
-                commissionAmount = commissionAmount,
-                settlementAmount = settlementAmount
-            )
-        )
+        return transactionTemplate.execute {
+            if (settlementRepository.existsBySellerIdAndPeriodStartAndPeriodEnd(
+                    request.sellerId, request.periodStart, request.periodEnd
+                )
+            ) {
+                throw SettlementAlreadyExistsException()
+            }
 
-        val settlementItems = orderItems.map { orderItem ->
-            SettlementItem.create(
-                settlementId = settlement.id!!,
-                orderId = orderItem.orderId,
-                orderItemId = orderItem.id,
-                productName = orderItem.productName,
-                quantity = orderItem.quantity,
-                salesAmount = orderItem.totalPrice
+            val settlement = settlementRepository.save(
+                Settlement.create(
+                    sellerId = request.sellerId,
+                    periodStart = request.periodStart,
+                    periodEnd = request.periodEnd,
+                    totalSalesAmount = totalSalesAmount,
+                    totalRefundAmount = totalRefundAmount,
+                    commissionRate = request.commissionRate,
+                    commissionAmount = commissionAmount,
+                    settlementAmount = settlementAmount
+                )
             )
-        }
-        settlementItemRepository.saveAll(settlementItems)
 
-        return SettlementResponse.from(settlement)
+            val settlementItems = orderItems.map { orderItem ->
+                SettlementItem.create(
+                    settlementId = settlement.id!!,
+                    orderId = orderItem.orderId,
+                    orderItemId = orderItem.id,
+                    productName = orderItem.productName,
+                    quantity = orderItem.quantity,
+                    salesAmount = orderItem.totalPrice
+                )
+            }
+            settlementItemRepository.saveAll(settlementItems)
+
+            SettlementResponse.from(settlement)
+        }!!
     }
 
+    @Transactional
     override fun confirmSettlement(settlementId: Long): SettlementResponse {
         val settlement = settlementRepository.findById(settlementId)
             .orElseThrow { SettlementNotFoundException() }
@@ -95,6 +101,7 @@ class SettlementCommandServiceImpl(
         return SettlementResponse.from(settlement)
     }
 
+    @Transactional
     override fun paySettlement(settlementId: Long): SettlementResponse {
         val settlement = settlementRepository.findById(settlementId)
             .orElseThrow { SettlementNotFoundException() }

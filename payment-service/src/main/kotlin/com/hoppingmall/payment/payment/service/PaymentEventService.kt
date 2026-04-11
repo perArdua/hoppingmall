@@ -6,14 +6,13 @@ import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
-import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
 import org.springframework.stereotype.Service
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Service
 class PaymentEventService(
-    private val paymentEventPublisher: PaymentEventPublisher,
-    private val pointEarnRateStrategy: PointEarnRateStrategy
+    private val paymentEventPublisher: PaymentEventPublisher
 ) {
 
     fun publishPaymentCompletedEvent(payment: Payment) {
@@ -31,8 +30,7 @@ class PaymentEventService(
         paymentEventPublisher.publishPaymentCompletedEvent(event)
     }
 
-    fun publishPointEarnRequestEvent(payment: Payment) {
-        val earnRate = pointEarnRateStrategy.getEarnRate(payment.userId)
+    fun publishPointEarnRequestEvent(payment: Payment, earnRate: BigDecimal) {
         val earnAmount = payment.amount.multiply(earnRate)
         val eventId = payment.transactionId ?: "payment-${payment.id}"
 
