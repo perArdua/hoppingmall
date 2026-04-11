@@ -8,6 +8,8 @@ import com.hoppingmall.product.product.domain.repository.ProductHourlyStatistics
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
@@ -48,13 +50,16 @@ class ProductStatisticsCommandServiceImpl(
 
     override fun flushDailySnapshot() {
         val today = LocalDate.now()
-        val allStats = productStatisticsRepository.findAll()
-        if (allStats.isEmpty()) {
-            logger.info("일별 통계 스냅샷 완료: 0건")
-            return
-        }
+        var page = 0
+        var totalProcessed = 0
 
-        allStats.chunked(BATCH_SIZE).forEach { chunk ->
+        while (true) {
+            val slice = productStatisticsRepository.findAll(
+                PageRequest.of(page, BATCH_SIZE, Sort.by("id"))
+            )
+            if (slice.isEmpty) break
+
+            val chunk = slice.content
             transactionTemplate.executeWithoutResult {
                 val productIds = chunk.map { it.productId }
 
@@ -92,9 +97,13 @@ class ProductStatisticsCommandServiceImpl(
                 productDailyStatisticsRepository.saveAll(dailyToSave)
                 productStatisticsRepository.saveAll(chunk)
             }
+
+            totalProcessed += chunk.size
+            if (!slice.hasNext()) break
+            page++
         }
 
-        logger.info("일별 통계 스냅샷 완료: ${allStats.size}건")
+        logger.info("일별 통계 스냅샷 완료: ${totalProcessed}건")
     }
 
     @Transactional
@@ -102,9 +111,7 @@ class ProductStatisticsCommandServiceImpl(
         val now = java.time.LocalDateTime.now()
         val today = now.toLocalDate()
         val currentHour = now.hour
-        val allStats = productStatisticsRepository.findAll()
-
-        val activeStats = allStats.filter { it.todaySalesQuantity > 0L || it.todayRefundQuantity > 0L }
+        val activeStats = productStatisticsRepository.findAllActive()
         if (activeStats.isEmpty()) {
             logger.info("시간별 통계 스냅샷 완료: 0건 (${currentHour}시)")
             return
