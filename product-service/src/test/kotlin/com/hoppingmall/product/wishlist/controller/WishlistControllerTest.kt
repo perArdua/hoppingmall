@@ -18,9 +18,11 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import com.hoppingmall.product.common.enums.ProductStatus
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
 import org.springframework.http.HttpStatus
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @DisplayName("WishlistController")
@@ -40,7 +42,9 @@ class WishlistControllerTest {
     private val principal = UserPrincipal(1L, "BUYER")
 
     private fun wishlistResponse() = WishlistResponse(
-        id = 1L, productId = 10L, createdAt = LocalDateTime.now()
+        id = 1L, productId = 10L,
+        productName = "테스트 상품", productPrice = BigDecimal("10000"),
+        productStatus = ProductStatus.AVAILABLE, createdAt = LocalDateTime.now()
     )
 
     @Test

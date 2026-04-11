@@ -19,7 +19,7 @@ class WishlistCommandServiceImpl(
 ) : WishlistCommandService {
 
     override fun addWishlist(buyerId: Long, request: WishlistCreateRequest): WishlistResponse {
-        productRepository.findById(request.productId)
+        val product = productRepository.findById(request.productId)
             .orElseThrow { ProductNotFoundException() }
 
         if (wishlistRepository.existsByBuyerIdAndProductId(buyerId, request.productId)) {
@@ -29,7 +29,7 @@ class WishlistCommandServiceImpl(
         val wishlist = Wishlist.create(buyerId, request.productId)
         val savedWishlist = wishlistRepository.save(wishlist)
 
-        return WishlistResponse.from(savedWishlist)
+        return WishlistResponse.from(savedWishlist, product)
     }
 
     override fun removeWishlist(buyerId: Long, wishlistId: Long) {
