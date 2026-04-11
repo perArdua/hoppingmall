@@ -1,5 +1,6 @@
 package com.hoppingmall.order.shipping.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.dto.response.ShippingResponse
 import com.hoppingmall.order.shipping.exception.ShippingNotFoundException
@@ -19,8 +20,7 @@ class ShippingQueryServiceImpl(
     }
 
     override fun getShipping(shippingId: Long): ShippingResponse {
-        val shipping = shippingRepository.findById(shippingId)
-            .orElseThrow { ShippingNotFoundException() }
+        val shipping = shippingRepository.findByIdOrNull(shippingId) ?: throw ShippingNotFoundException() 
         return ShippingResponse.from(shipping)
     }
 }

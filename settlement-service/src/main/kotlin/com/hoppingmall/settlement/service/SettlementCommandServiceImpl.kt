@@ -1,5 +1,6 @@
 package com.hoppingmall.settlement.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.settlement.domain.Settlement
 import com.hoppingmall.settlement.domain.SettlementItem
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
@@ -95,16 +96,14 @@ class SettlementCommandServiceImpl(
 
     @Transactional
     override fun confirmSettlement(settlementId: Long): SettlementResponse {
-        val settlement = settlementRepository.findById(settlementId)
-            .orElseThrow { SettlementNotFoundException() }
+        val settlement = settlementRepository.findByIdOrNull(settlementId) ?: throw SettlementNotFoundException() 
         settlement.confirm()
         return SettlementResponse.from(settlement)
     }
 
     @Transactional
     override fun paySettlement(settlementId: Long): SettlementResponse {
-        val settlement = settlementRepository.findById(settlementId)
-            .orElseThrow { SettlementNotFoundException() }
+        val settlement = settlementRepository.findByIdOrNull(settlementId) ?: throw SettlementNotFoundException() 
         settlement.pay()
         return SettlementResponse.from(settlement)
     }

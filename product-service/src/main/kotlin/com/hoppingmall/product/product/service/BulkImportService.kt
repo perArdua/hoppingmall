@@ -1,6 +1,7 @@
 package com.hoppingmall.product.product.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.common.enums.ProductStatus
 import com.hoppingmall.product.common.file.FileUploadConfig
@@ -89,9 +90,8 @@ class BulkImportService(
 
     @Transactional
     fun processImport(jobId: Long, sellerId: Long, rows: List<BulkProductRow>, parseErrors: List<BulkRowError>) {
-        val job = bulkImportJobRepository.findById(jobId).orElseThrow {
-            ProductException(ProductErrorCode.BULK_IMPORT_JOB_NOT_FOUND)
-        }
+        val job = bulkImportJobRepository.findByIdOrNull(jobId)
+            ?: throw ProductException(ProductErrorCode.BULK_IMPORT_JOB_NOT_FOUND)
 
         val allErrors = parseErrors.toMutableList()
         val categoryIds = rows.map { it.categoryId }.distinct()
@@ -168,9 +168,8 @@ class BulkImportService(
 
     @Transactional(readOnly = true)
     fun getJobProgress(jobId: Long, sellerId: Long): BulkImportProgressResponse {
-        val job = bulkImportJobRepository.findById(jobId).orElseThrow {
-            ProductException(ProductErrorCode.BULK_IMPORT_JOB_NOT_FOUND)
-        }
+        val job = bulkImportJobRepository.findByIdOrNull(jobId)
+            ?: throw ProductException(ProductErrorCode.BULK_IMPORT_JOB_NOT_FOUND)
         if (job.sellerId != sellerId) {
             throw ProductException(ProductErrorCode.BULK_IMPORT_ACCESS_DENIED)
         }
@@ -179,9 +178,8 @@ class BulkImportService(
 
     @Transactional(readOnly = true)
     fun getJobErrors(jobId: Long, sellerId: Long): List<BulkRowError> {
-        val job = bulkImportJobRepository.findById(jobId).orElseThrow {
-            ProductException(ProductErrorCode.BULK_IMPORT_JOB_NOT_FOUND)
-        }
+        val job = bulkImportJobRepository.findByIdOrNull(jobId)
+            ?: throw ProductException(ProductErrorCode.BULK_IMPORT_JOB_NOT_FOUND)
         if (job.sellerId != sellerId) {
             throw ProductException(ProductErrorCode.BULK_IMPORT_ACCESS_DENIED)
         }

@@ -1,5 +1,6 @@
 package com.hoppingmall.user.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.user.domain.Seller
 import com.hoppingmall.user.domain.repository.SellerRepository
 import com.hoppingmall.user.dto.request.SellerApprovalRequest
@@ -23,5 +24,5 @@ class AdminCommandServiceImpl(
     }
 
     private fun findSellerById(sellerId: Long): Seller =
-        sellerRepository.findById(sellerId).orElseThrow { SellerNotFoundException() }
+        sellerRepository.findByIdOrNull(sellerId) ?: throw SellerNotFoundException() 
 }

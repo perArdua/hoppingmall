@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.payment.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
@@ -16,8 +17,7 @@ class PaymentQueryServiceImpl(
 ) : PaymentQueryService {
 
     override fun getPaymentById(paymentId: Long, userId: Long): PaymentResponse {
-        val payment = paymentRepository.findById(paymentId)
-            .orElseThrow { PaymentNotFoundException() }
+        val payment = paymentRepository.findByIdOrNull(paymentId) ?: throw PaymentNotFoundException() 
         if (payment.userId != userId) {
             throw PaymentAccessDeniedException()
         }

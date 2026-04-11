@@ -1,5 +1,6 @@
 package com.hoppingmall.settlement.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
@@ -35,8 +36,7 @@ class SettlementQueryServiceImpl(
     }
 
     override fun getSettlementDetail(settlementId: Long, sellerId: Long?): SettlementDetailResponse {
-        val settlement = settlementRepository.findById(settlementId)
-            .orElseThrow { SettlementNotFoundException() }
+        val settlement = settlementRepository.findByIdOrNull(settlementId) ?: throw SettlementNotFoundException() 
 
         if (sellerId != null && settlement.sellerId != sellerId) {
             throw SettlementAccessDeniedException()

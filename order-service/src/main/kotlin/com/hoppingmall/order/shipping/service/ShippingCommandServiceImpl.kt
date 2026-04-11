@@ -1,5 +1,6 @@
 package com.hoppingmall.order.shipping.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.order.common.NotificationType
 import com.hoppingmall.common.KafkaTopics
@@ -31,8 +32,7 @@ class ShippingCommandServiceImpl(
 ) : ShippingCommandService {
 
     override fun createShipping(sellerId: Long, request: ShippingCreateRequest): ShippingResponse {
-        val order = orderRepository.findById(request.orderId)
-            .orElseThrow { OrderNotFoundException() }
+        val order = orderRepository.findByIdOrNull(request.orderId) ?: throw OrderNotFoundException() 
 
         if (order.status != OrderStatus.PAID) {
             throw OrderInvalidStatusException()
@@ -67,13 +67,11 @@ class ShippingCommandServiceImpl(
         shippingId: Long,
         request: ShippingStatusUpdateRequest
     ): ShippingResponse {
-        val shipping = shippingRepository.findById(shippingId)
-            .orElseThrow { ShippingNotFoundException() }
+        val shipping = shippingRepository.findByIdOrNull(shippingId) ?: throw ShippingNotFoundException() 
 
         shipping.updateStatus(request.status)
 
-        val order = orderRepository.findById(shipping.orderId)
-            .orElseThrow { OrderNotFoundException() }
+        val order = orderRepository.findByIdOrNull(shipping.orderId) ?: throw OrderNotFoundException() 
 
         when (request.status) {
             ShippingStatus.IN_TRANSIT -> {
