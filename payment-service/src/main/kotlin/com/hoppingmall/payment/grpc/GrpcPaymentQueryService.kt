@@ -4,6 +4,7 @@ import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import io.grpc.Status
 import io.grpc.StatusException
 import net.devh.boot.grpc.server.service.GrpcService
+import org.springframework.data.repository.findByIdOrNull
 
 @GrpcService
 class GrpcPaymentQueryService(
@@ -24,7 +25,7 @@ class GrpcPaymentQueryService(
     }
 
     override suspend fun findPaymentById(request: PaymentIdRequest): PaymentResponse {
-        val payment = paymentRepository.findById(request.paymentId).orElse(null)
+        val payment = paymentRepository.findByIdOrNull(request.paymentId)
             ?: throw StatusException(Status.NOT_FOUND.withDescription("Payment not found for id=${request.paymentId}"))
         return paymentResponse {
             id = payment.id!!

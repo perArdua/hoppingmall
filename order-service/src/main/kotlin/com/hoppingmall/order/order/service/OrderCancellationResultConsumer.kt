@@ -10,6 +10,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -49,7 +50,7 @@ class OrderCancellationResultConsumer(
         }
 
         val cancelled = transactionTemplate.execute {
-            val order = orderRepository.findById(orderId).orElse(null)
+            val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=$orderId")
                 return@execute false
@@ -93,7 +94,7 @@ class OrderCancellationResultConsumer(
                 eventData = mapOf(
                     "eventType" to "OrderCancellationNotificationRequested",
                     "eventId" to "notif-cancel-$eventId",
-                    "userId" to (orderRepository.findById(orderId).orElse(null)?.buyerId ?: 0L),
+                    "userId" to (orderRepository.findByIdOrNull(orderId)?.buyerId ?: 0L),
                     "type" to "PAYMENT_CANCELLED",
                     "title" to "주문이 취소되었습니다",
                     "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다."
@@ -118,7 +119,7 @@ class OrderCancellationResultConsumer(
         }
 
         transactionTemplate.execute {
-            val order = orderRepository.findById(orderId).orElse(null)
+            val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=$orderId")
                 return@execute

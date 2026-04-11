@@ -10,6 +10,7 @@ import com.hoppingmall.product.product.domain.repository.ProductStatisticsReposi
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
@@ -150,7 +151,7 @@ class ProductStatisticsCommandServiceImpl(
         val existing = productStatisticsRepository.findByProductId(productId)
         if (existing != null) return existing
 
-        val product = productRepository.findById(productId).orElse(null)
+        val product = productRepository.findByIdOrNull(productId)
             ?: throw IllegalArgumentException("상품을 찾을 수 없습니다: $productId")
 
         return productStatisticsRepository.save(

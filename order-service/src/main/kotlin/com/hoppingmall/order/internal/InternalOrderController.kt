@@ -6,6 +6,7 @@ import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
 import org.springframework.transaction.annotation.Transactional
@@ -41,7 +42,7 @@ class InternalOrderController(
 
     @GetMapping("/order-items/{orderItemId}")
     fun getOrderItem(@PathVariable orderItemId: Long): ResponseEntity<OrderItemResponse> {
-        val item = orderItemRepository.findById(orderItemId).orElse(null)
+        val item = orderItemRepository.findByIdOrNull(orderItemId)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(OrderItemResponse(
             id = item.id!!,
@@ -58,7 +59,7 @@ class InternalOrderController(
     @PostMapping("/orders/{orderId}/cancel")
     @Transactional
     fun cancelOrder(@PathVariable orderId: Long): ResponseEntity<Void> {
-        val order = orderRepository.findById(orderId).orElse(null)
+        val order = orderRepository.findByIdOrNull(orderId)
             ?: return ResponseEntity.notFound().build()
         if (order.isCancelled()) {
             return ResponseEntity.ok().build()
@@ -70,7 +71,7 @@ class InternalOrderController(
 
     @GetMapping("/orders/{orderId}/delivered")
     fun isDelivered(@PathVariable orderId: Long, @RequestParam buyerId: Long): ResponseEntity<Boolean> {
-        val order = orderRepository.findById(orderId).orElse(null)
+        val order = orderRepository.findByIdOrNull(orderId)
             ?: return ResponseEntity.ok(false)
         if (order.buyerId != buyerId) return ResponseEntity.ok(false)
         val shipping = shippingRepository.findByOrderId(orderId)

@@ -11,6 +11,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -51,7 +52,7 @@ class OrderSagaConsumer(
 
     private fun executeLocalPhase(event: PaymentCompletedEvent, eventId: String): List<String>? {
         return transactionTemplate.execute {
-            val order = orderRepository.findById(event.orderId).orElse(null)
+            val order = orderRepository.findByIdOrNull(event.orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=${event.orderId}")
                 return@execute null
@@ -107,7 +108,7 @@ class OrderSagaConsumer(
 
     fun compensateFailedConfirmation(eventId: String, event: PaymentCompletedEvent) {
         val compensated = transactionTemplate.execute {
-            val order = orderRepository.findById(event.orderId).orElse(null) ?: return@execute false
+            val order = orderRepository.findByIdOrNull(event.orderId) ?: return@execute false
             if (order.status == OrderStatus.PAID && order.isCancellable()) {
                 order.updateStatus(OrderStatus.CANCEL_REQUESTED)
                 order.updateStatus(OrderStatus.CANCELLED)
@@ -177,7 +178,7 @@ class OrderSagaConsumer(
 
     private fun executeCompensationLocalPhase(eventId: String, orderId: Long): List<String>? {
         return transactionTemplate.execute {
-            val order = orderRepository.findById(orderId).orElse(null)
+            val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=$orderId")
                 return@execute null

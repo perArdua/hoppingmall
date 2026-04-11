@@ -7,6 +7,7 @@ import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
+import org.springframework.data.repository.findByIdOrNull
 
 @GrpcService
 class GrpcOrderQueryService(
@@ -34,7 +35,7 @@ class GrpcOrderQueryService(
     }
 
     override suspend fun isDelivered(request: DeliveredCheckRequest): DeliveredResponse {
-        val order = orderRepository.findById(request.orderId).orElse(null)
+        val order = orderRepository.findByIdOrNull(request.orderId)
         if (order == null || order.buyerId != request.buyerId) {
             return deliveredResponse { delivered = false }
         }
@@ -43,7 +44,7 @@ class GrpcOrderQueryService(
     }
 
     override suspend fun findOrderItemById(request: OrderItemIdRequest): OrderItemResponse {
-        val item = orderItemRepository.findById(request.orderItemId).orElse(null)
+        val item = orderItemRepository.findByIdOrNull(request.orderItemId)
             ?: throw StatusException(Status.NOT_FOUND.withDescription("OrderItem not found: ${request.orderItemId}"))
         return orderItemResponse {
             id = item.id!!

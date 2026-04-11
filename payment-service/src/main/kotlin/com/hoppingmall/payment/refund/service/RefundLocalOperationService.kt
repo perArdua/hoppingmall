@@ -7,6 +7,7 @@ import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.refund.domain.RefundEventLog
 import com.hoppingmall.payment.refund.domain.repository.RefundEventLogRepository
 import com.hoppingmall.payment.refund.dto.event.RefundCompletedEvent
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -22,7 +23,7 @@ class RefundLocalOperationService(
     fun execute(event: RefundCompletedEvent, eventLog: RefundEventLog) {
         if (event.isFullRefund) {
             if (!eventLog.isStepCompleted(RefundEventLog.PAYMENT_UPDATED)) {
-                val payment = paymentRepository.findById(event.paymentId).orElse(null)
+                val payment = paymentRepository.findByIdOrNull(event.paymentId)
                 if (payment != null) {
                     payment.updateStatus(PaymentStatus.REFUNDED)
                     paymentRepository.save(payment)
