@@ -143,6 +143,17 @@ class ProductStatisticsCommandServiceImplTest {
     }
 
     @Test
+    fun 통계가_없으면_일별_스냅샷을_건너뛴다() {
+        whenever(productStatisticsRepository.findAll(any<Pageable>()))
+            .thenReturn(PageImpl(emptyList()))
+
+        service.flushDailySnapshot()
+
+        verify(productDailyStatisticsRepository, org.mockito.kotlin.never())
+            .saveAll(any<List<ProductDailyStatistics>>())
+    }
+
+    @Test
     fun 일별_스냅샷을_저장한다() {
         val stats = createStats()
         stats.incrementSales(10, BigDecimal("100000"))
