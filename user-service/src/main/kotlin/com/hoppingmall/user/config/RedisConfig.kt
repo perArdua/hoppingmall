@@ -20,14 +20,4 @@ class RedisConfig {
         return template
     }
 
-    @Bean
-    fun customStringRedisTemplate(redisConnectionFactory: RedisConnectionFactory): RedisTemplate<String, String> {
-        val template = RedisTemplate<String, String>()
-        template.connectionFactory = redisConnectionFactory
-        template.keySerializer = StringRedisSerializer()
-        template.valueSerializer = StringRedisSerializer()
-        template.hashKeySerializer = StringRedisSerializer()
-        template.hashValueSerializer = StringRedisSerializer()
-        return template
-    }
 }
