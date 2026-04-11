@@ -49,7 +49,7 @@ class DistributedLockExecutorTest {
     fun 락_획득_성공_시_트랜잭션_내에서_액션을_실행한다() {
         stubTransaction()
         whenever(redissonClient.getLock("test-key")).thenReturn(rLock)
-        whenever(rLock.tryLock(3000L, -1, TimeUnit.MILLISECONDS)).thenReturn(true)
+        whenever(rLock.tryLock(3000L, 30_000L, TimeUnit.MILLISECONDS)).thenReturn(true)
         whenever(rLock.isHeldByCurrentThread).thenReturn(true)
 
         val result = lockExecutor.withLock("test-key") { "success" }
@@ -62,7 +62,7 @@ class DistributedLockExecutorTest {
     @Test
     fun 락_획득_실패_시_예외를_던진다() {
         whenever(redissonClient.getLock("test-key")).thenReturn(rLock)
-        whenever(rLock.tryLock(3000L, -1, TimeUnit.MILLISECONDS)).thenReturn(false)
+        whenever(rLock.tryLock(3000L, 30_000L, TimeUnit.MILLISECONDS)).thenReturn(false)
 
         assertThatThrownBy { lockExecutor.withLock("test-key") { "should-not-run" } }
             .isInstanceOf(DistributedLockException::class.java)
@@ -72,7 +72,7 @@ class DistributedLockExecutorTest {
     fun 액션_예외_발생_시_롤백_후_락을_해제한다() {
         stubTransaction()
         whenever(redissonClient.getLock("test-key")).thenReturn(rLock)
-        whenever(rLock.tryLock(3000L, -1, TimeUnit.MILLISECONDS)).thenReturn(true)
+        whenever(rLock.tryLock(3000L, 30_000L, TimeUnit.MILLISECONDS)).thenReturn(true)
         whenever(rLock.isHeldByCurrentThread).thenReturn(true)
 
         assertThatThrownBy {
@@ -87,7 +87,7 @@ class DistributedLockExecutorTest {
     fun withLockVoid는_반환값_없이_실행한다() {
         stubTransaction()
         whenever(redissonClient.getLock("void-key")).thenReturn(rLock)
-        whenever(rLock.tryLock(3000L, -1, TimeUnit.MILLISECONDS)).thenReturn(true)
+        whenever(rLock.tryLock(3000L, 30_000L, TimeUnit.MILLISECONDS)).thenReturn(true)
         whenever(rLock.isHeldByCurrentThread).thenReturn(true)
 
         var executed = false
@@ -104,12 +104,12 @@ class DistributedLockExecutorTest {
         stubTransaction()
         val waitTime = Duration.ofSeconds(5)
         whenever(redissonClient.getLock("custom-key")).thenReturn(rLock)
-        whenever(rLock.tryLock(5000L, -1, TimeUnit.MILLISECONDS)).thenReturn(true)
+        whenever(rLock.tryLock(5000L, 30_000L, TimeUnit.MILLISECONDS)).thenReturn(true)
         whenever(rLock.isHeldByCurrentThread).thenReturn(true)
 
         val result = lockExecutor.withLock("custom-key", waitTime) { 42 }
 
         assertThat(result).isEqualTo(42)
-        verify(rLock).tryLock(5000L, -1, TimeUnit.MILLISECONDS)
+        verify(rLock).tryLock(5000L, 30_000L, TimeUnit.MILLISECONDS)
     }
 }
