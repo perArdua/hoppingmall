@@ -110,6 +110,8 @@ class KafkaConfig(
         configProps[ConsumerConfig.MAX_POLL_RECORDS_CONFIG] = 100
         configProps[ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG] = 30_000
         configProps[ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG] = 10_000
+        configProps[ConsumerConfig.FETCH_MIN_BYTES_CONFIG] = 1024
+        configProps[ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG] = 500
 
         return DefaultKafkaConsumerFactory(configProps)
     }

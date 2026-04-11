@@ -45,6 +45,8 @@ class KafkaConsumerConfig(
             ConsumerConfig.MAX_POLL_RECORDS_CONFIG to 100,
             ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG to 30_000,
             ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG to 10_000,
+            ConsumerConfig.FETCH_MIN_BYTES_CONFIG to 1024,
+            ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG to 500,
             "schema.registry.url" to schemaRegistryUrl
         )
         return DefaultKafkaConsumerFactory(props)
@@ -54,6 +56,7 @@ class KafkaConsumerConfig(
     fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
+        factory.setConcurrency(4)
         factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
 
         val errorHandler = DefaultErrorHandler(
