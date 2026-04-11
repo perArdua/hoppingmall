@@ -248,6 +248,19 @@ class RefundCommandServiceImplTest {
     }
 
     @Test
+    fun 환불_승인_시_트랜잭션_내부_조회_실패하면_예외가_발생한다() {
+        val refund = createRefund()
+
+        Mockito.`when`(refundRepository.findById(1L))
+            .thenReturn(Optional.of(refund))
+            .thenReturn(Optional.empty())
+        whenever(paymentQueryPort.findById(20L)).thenReturn(payment)
+
+        assertThatThrownBy { service.approveRefund(1L, 5L) }
+            .isInstanceOf(RefundNotFoundException::class.java)
+    }
+
+    @Test
     fun 환불을_거절한다() {
         val refund = createRefund()
         val refundItem = RefundItem.create(
