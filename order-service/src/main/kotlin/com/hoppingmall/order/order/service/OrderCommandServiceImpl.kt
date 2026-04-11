@@ -1,5 +1,6 @@
 package com.hoppingmall.order.order.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.OrderItem
@@ -91,8 +92,7 @@ class OrderCommandServiceImpl(
     }
 
     override fun cancelOrder(buyerId: Long, orderId: Long): OrderResponse {
-        val order = orderRepository.findById(orderId)
-            .orElseThrow { OrderNotFoundException() }
+        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
         if (order.buyerId != buyerId) {
             throw OrderAccessDeniedException()
@@ -110,24 +110,21 @@ class OrderCommandServiceImpl(
                     throw OrderPaymentCancellationFailedException()
                 }
                 transactionTemplate.execute {
-                    val target = orderRepository.findById(orderId)
-                        .orElseThrow { OrderNotFoundException() }
+                    val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
                     target.updateStatus(OrderStatus.CANCELLED)
                 }
                 restoreInventory(orderItems)
             }
             OrderStatus.CREATED -> {
                 transactionTemplate.execute {
-                    val target = orderRepository.findById(orderId)
-                        .orElseThrow { OrderNotFoundException() }
+                    val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
                     target.updateStatus(OrderStatus.CANCELLED)
                 }
                 restoreInventory(orderItems)
             }
             OrderStatus.PAID -> {
                 transactionTemplate.execute {
-                    val target = orderRepository.findById(orderId)
-                        .orElseThrow { OrderNotFoundException() }
+                    val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
                     target.updateStatus(OrderStatus.CANCEL_REQUESTED)
                     transactionalEventPublisher.publishEvent(
                         aggregateType = "Order",
@@ -146,8 +143,7 @@ class OrderCommandServiceImpl(
             else -> throw OrderInvalidStatusException()
         }
 
-        val updatedOrder = orderRepository.findById(orderId)
-            .orElseThrow { OrderNotFoundException() }
+        val updatedOrder = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
         orderMetrics.recordOrderCancelled()
         log.info("주문 취소: orderId={}, buyerId={}, status={}", orderId, buyerId, updatedOrder.status)
         return OrderResponse.from(updatedOrder, orderItems)
@@ -166,8 +162,7 @@ class OrderCommandServiceImpl(
 
     @Transactional
     override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
-        val order = orderRepository.findById(orderId)
-            .orElseThrow { OrderNotFoundException() }
+        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
         if (order.buyerId != userId && !isAdmin) {
             throw OrderAccessDeniedException()

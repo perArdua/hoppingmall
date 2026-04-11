@@ -1,5 +1,6 @@
 package com.hoppingmall.order.order.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.response.OrderResponse
@@ -18,8 +19,7 @@ class OrderQueryServiceImpl(
 ) : OrderQueryService {
 
     override fun getOrder(orderId: Long, buyerId: Long): OrderResponse {
-        val order = orderRepository.findById(orderId)
-            .orElseThrow { OrderNotFoundException() }
+        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
         if (order.buyerId != buyerId) {
             throw OrderAccessDeniedException()

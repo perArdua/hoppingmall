@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.point.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.payment.point.domain.PointPolicy
 import com.hoppingmall.payment.point.domain.PointPolicyRepository
 import com.hoppingmall.payment.point.dto.request.PointPolicyRequest
@@ -40,8 +41,7 @@ class PointPolicyServiceImpl(
     override fun updatePolicy(policyId: Long, request: PointPolicyRequest): PointPolicyResponse {
         validatePolicyRequest(request)
 
-        val policy = pointPolicyRepository.findById(policyId)
-            .orElseThrow { PointPolicyNotFoundException() }
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
 
         val updatedPolicy = policy.update(
             policyName = request.policyName,
@@ -58,8 +58,7 @@ class PointPolicyServiceImpl(
 
     @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun activatePolicy(policyId: Long): PointPolicyResponse {
-        val policy = pointPolicyRepository.findById(policyId)
-            .orElseThrow { PointPolicyNotFoundException() }
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
 
         deactivateAllPolicies()
 
@@ -70,8 +69,7 @@ class PointPolicyServiceImpl(
 
     @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun deactivatePolicy(policyId: Long): PointPolicyResponse {
-        val policy = pointPolicyRepository.findById(policyId)
-            .orElseThrow { PointPolicyNotFoundException() }
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
 
         val deactivatedPolicy = policy.deactivate()
         val savedPolicy = pointPolicyRepository.save(deactivatedPolicy)
@@ -85,8 +83,7 @@ class PointPolicyServiceImpl(
     }
 
     override fun getPolicyById(policyId: Long): PointPolicyResponse {
-        val policy = pointPolicyRepository.findById(policyId)
-            .orElseThrow { PointPolicyNotFoundException() }
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
         return PointPolicyResponse.from(policy)
     }
 

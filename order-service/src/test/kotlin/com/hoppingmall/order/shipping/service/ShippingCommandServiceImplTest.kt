@@ -191,4 +191,16 @@ class ShippingCommandServiceImplTest {
         assertThatThrownBy { service.updateShippingStatus(5L, 999L, request) }
             .isInstanceOf(ShippingNotFoundException::class.java)
     }
+
+    @Test
+    fun 배송_상태변경_시_주문이_존재하지_않으면_예외가_발생한다() {
+        val request = ShippingStatusUpdateRequest(status = ShippingStatus.IN_TRANSIT)
+        val shipping = createShipping()
+
+        whenever(shippingRepository.findById(1L)).thenReturn(Optional.of(shipping))
+        whenever(orderRepository.findById(10L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { service.updateShippingStatus(5L, 1L, request) }
+            .isInstanceOf(OrderNotFoundException::class.java)
+    }
 }

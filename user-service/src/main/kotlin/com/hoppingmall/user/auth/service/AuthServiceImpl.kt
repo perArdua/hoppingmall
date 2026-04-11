@@ -1,5 +1,6 @@
 package com.hoppingmall.user.auth.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
@@ -48,8 +49,7 @@ class AuthServiceImpl(
 
         refreshTokenService.validate(userId, refreshToken)
 
-        val user = userRepository.findById(userId)
-            .orElseThrow { UserNotFoundException() }
+        val user = userRepository.findByIdOrNull(userId) ?: throw UserNotFoundException()
         val uid = user.id!!
 
         val newAccessToken = tokenProvider.generateAccessToken(uid, user.getRole())

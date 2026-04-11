@@ -7,6 +7,7 @@ import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
 import com.hoppingmall.settlement.enums.SettlementStatus
 import com.hoppingmall.settlement.exception.SettlementAccessDeniedException
+import com.hoppingmall.settlement.exception.SettlementNotFoundException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -129,5 +130,13 @@ class SettlementQueryServiceImplTest {
 
         assertThatThrownBy { settlementQueryServiceImpl.getSettlementDetail(1L, 99L) }
             .isInstanceOf(SettlementAccessDeniedException::class.java)
+    }
+
+    @Test
+    fun 존재하지_않는_정산_상세_조회_시_예외가_발생한다() {
+        whenever(settlementRepository.findById(999L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { settlementQueryServiceImpl.getSettlementDetail(999L, 1L) }
+            .isInstanceOf(SettlementNotFoundException::class.java)
     }
 }

@@ -1,5 +1,6 @@
 package com.hoppingmall.order.cartItem.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.order.cartItem.domain.CartItem
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.cartItem.dto.request.CartItemCreateRequest
@@ -58,8 +59,7 @@ class CartItemCommandServiceImpl(
     }
 
     override fun updateCartItemQuantity(buyerId: Long, cartItemId: Long, request: CartItemUpdateRequest): CartItemResponse {
-        val cartItem = cartItemRepository.findById(cartItemId)
-            .orElseThrow { CartItemNotFoundException() }
+        val cartItem = cartItemRepository.findByIdOrNull(cartItemId) ?: throw CartItemNotFoundException() 
 
         if (cartItem.buyerId != buyerId) {
             throw CartItemAccessDeniedException()
@@ -71,8 +71,7 @@ class CartItemCommandServiceImpl(
     }
 
     override fun removeCartItem(buyerId: Long, cartItemId: Long) {
-        val cartItem = cartItemRepository.findById(cartItemId)
-            .orElseThrow { CartItemNotFoundException() }
+        val cartItem = cartItemRepository.findByIdOrNull(cartItemId) ?: throw CartItemNotFoundException() 
 
         if (cartItem.buyerId != buyerId) {
             throw CartItemAccessDeniedException()

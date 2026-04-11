@@ -1,5 +1,6 @@
 package com.hoppingmall.order.refund.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
@@ -52,8 +53,7 @@ class RefundCommandServiceImpl(
         }
 
         return transactionTemplate.execute { _ ->
-            val order = orderRepository.findById(request.orderId)
-                .orElseThrow { OrderNotFoundException() }
+            val order = orderRepository.findByIdOrNull(request.orderId) ?: throw OrderNotFoundException() 
 
             if (order.buyerId != buyerId) {
                 throw RefundAccessDeniedException()
@@ -135,13 +135,11 @@ class RefundCommandServiceImpl(
 
     override fun approveRefund(refundId: Long, approverId: Long): RefundResponse {
         val payment = paymentQueryPort.findById(
-            refundRepository.findById(refundId)
-                .orElseThrow { RefundNotFoundException() }.paymentId
+            (refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException()).paymentId
         ) ?: throw RefundPaymentNotFoundException()
 
         return transactionTemplate.execute { _ ->
-            val refund = refundRepository.findById(refundId)
-                .orElseThrow { RefundNotFoundException() }
+            val refund = refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException() 
 
             if (refund.sellerId != approverId) {
                 throw RefundAccessDeniedException()
@@ -161,8 +159,7 @@ class RefundCommandServiceImpl(
 
     @Transactional
     override fun rejectRefund(refundId: Long, approverId: Long, request: RefundApprovalRequest): RefundResponse {
-        val refund = refundRepository.findById(refundId)
-            .orElseThrow { RefundNotFoundException() }
+        val refund = refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException() 
 
         if (refund.sellerId != approverId) {
             throw RefundAccessDeniedException()

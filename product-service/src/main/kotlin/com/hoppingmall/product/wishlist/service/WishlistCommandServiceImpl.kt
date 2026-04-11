@@ -1,5 +1,6 @@
 package com.hoppingmall.product.wishlist.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import com.hoppingmall.product.wishlist.domain.Wishlist
@@ -19,8 +20,7 @@ class WishlistCommandServiceImpl(
 ) : WishlistCommandService {
 
     override fun addWishlist(buyerId: Long, request: WishlistCreateRequest): WishlistResponse {
-        val product = productRepository.findById(request.productId)
-            .orElseThrow { ProductNotFoundException() }
+        val product = productRepository.findByIdOrNull(request.productId) ?: throw ProductNotFoundException()
 
         if (wishlistRepository.existsByBuyerIdAndProductId(buyerId, request.productId)) {
             throw WishlistAlreadyExistsException()
@@ -33,8 +33,7 @@ class WishlistCommandServiceImpl(
     }
 
     override fun removeWishlist(buyerId: Long, wishlistId: Long) {
-        val wishlist = wishlistRepository.findById(wishlistId)
-            .orElseThrow { WishlistNotFoundException() }
+        val wishlist = wishlistRepository.findByIdOrNull(wishlistId) ?: throw WishlistNotFoundException() 
 
         if (wishlist.buyerId != buyerId) {
             throw WishlistNotFoundException()

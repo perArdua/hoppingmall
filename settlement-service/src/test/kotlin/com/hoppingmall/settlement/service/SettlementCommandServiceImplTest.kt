@@ -228,4 +228,12 @@ class SettlementCommandServiceImplTest {
         assertThatThrownBy { settlementCommandServiceImpl.confirmSettlement(999L) }
             .isInstanceOf(SettlementNotFoundException::class.java)
     }
+
+    @Test
+    fun 존재하지_않는_정산_지급_시_예외가_발생한다() {
+        whenever(settlementRepository.findById(any())).thenReturn(Optional.empty())
+
+        assertThatThrownBy { settlementCommandServiceImpl.paySettlement(999L) }
+            .isInstanceOf(SettlementNotFoundException::class.java)
+    }
 }

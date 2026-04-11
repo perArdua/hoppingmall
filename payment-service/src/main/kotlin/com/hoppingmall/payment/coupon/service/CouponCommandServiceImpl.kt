@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.coupon.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.payment.coupon.domain.Coupon
 import com.hoppingmall.payment.coupon.domain.UserCoupon
 import com.hoppingmall.payment.coupon.domain.repository.CouponRepository
@@ -54,8 +55,7 @@ class CouponCommandServiceImpl(
         CacheEvict(cacheNames = ["coupon:all"], allEntries = true)
     ])
     override fun changeCouponStatus(couponId: Long, status: CouponStatus): CouponResponse {
-        val coupon = couponRepository.findById(couponId)
-            .orElseThrow { CouponNotFoundException() }
+        val coupon = couponRepository.findByIdOrNull(couponId) ?: throw CouponNotFoundException() 
         coupon.changeStatus(status)
         return CouponResponse.from(couponRepository.save(coupon))
     }
@@ -106,8 +106,7 @@ class CouponCommandServiceImpl(
             throw CouponNotAvailableException()
         }
 
-        val coupon = couponRepository.findById(couponId)
-            .orElseThrow { CouponNotFoundException() }
+        val coupon = couponRepository.findByIdOrNull(couponId) ?: throw CouponNotFoundException() 
 
         if (!coupon.isValid()) {
             throw CouponExpiredException()

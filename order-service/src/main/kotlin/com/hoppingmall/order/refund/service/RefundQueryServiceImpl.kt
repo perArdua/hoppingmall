@@ -1,5 +1,6 @@
 package com.hoppingmall.order.refund.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.dto.response.RefundResponse
@@ -18,8 +19,7 @@ class RefundQueryServiceImpl(
 ) : RefundQueryService {
 
     override fun getRefund(refundId: Long, userId: Long): RefundResponse {
-        val refund = refundRepository.findById(refundId)
-            .orElseThrow { RefundNotFoundException() }
+        val refund = refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException() 
         if (refund.buyerId != userId && refund.sellerId != userId) {
             throw RefundAccessDeniedException()
         }

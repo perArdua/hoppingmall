@@ -1,5 +1,6 @@
 package com.hoppingmall.product.product.service
 
+import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import com.hoppingmall.product.common.file.FileUploadConfig
@@ -58,8 +59,7 @@ class ProductCommandServiceImpl(
             throw CategoryNotFoundException()
         }
 
-        val product = productRepository.findById(productId)
-            .orElseThrow { ProductNotFoundException() }
+        val product = productRepository.findByIdOrNull(productId) ?: throw ProductNotFoundException() 
 
         product.update(
             name = request.name,
@@ -89,8 +89,7 @@ class ProductCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")
     override fun deleteProduct(productId: Long) {
-        val product = productRepository.findById(productId)
-            .orElseThrow { ProductNotFoundException() }
+        val product = productRepository.findByIdOrNull(productId) ?: throw ProductNotFoundException() 
 
         val productImages = productImageRepository.findByProductIdOrderBySortOrder(productId)
         productImages.forEach { it.softDelete() }
