@@ -1,5 +1,6 @@
 package com.hoppingmall.order.refund.controller
 
+import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
@@ -10,7 +11,6 @@ import com.hoppingmall.order.refund.service.RefundQueryService
 import jakarta.validation.Valid
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Slice
-import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
@@ -28,20 +28,18 @@ class RefundController(
     fun requestRefund(
         @Valid @RequestBody request: RefundCreateRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ResponseEntity<RefundResponse> {
+    ): ApiResponse<RefundResponse> {
         val buyerId = principal.getUserId()
-        val response = refundCommandService.requestRefund(buyerId, request)
-        return ResponseEntity.ok(response)
+        return ApiResponse.success(refundCommandService.requestRefund(buyerId, request))
     }
 
     @GetMapping("/{refundId}")
     fun getRefund(
         @PathVariable refundId: Long,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ResponseEntity<RefundResponse> {
+    ): ApiResponse<RefundResponse> {
         val userId = principal.getUserId()
-        val response = refundQueryService.getRefund(refundId, userId)
-        return ResponseEntity.ok(response)
+        return ApiResponse.success(refundQueryService.getRefund(refundId, userId))
     }
 
     @GetMapping("/my")
@@ -49,11 +47,10 @@ class RefundController(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<Slice<RefundResponse>> {
+    ): ApiResponse<Slice<RefundResponse>> {
         val buyerId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
-        val refunds = refundQueryService.getMyRefunds(buyerId, pageable)
-        return ResponseEntity.ok(refunds)
+        return ApiResponse.success(refundQueryService.getMyRefunds(buyerId, pageable))
     }
 
     @GetMapping("/seller")
@@ -61,11 +58,10 @@ class RefundController(
         @AuthenticationPrincipal principal: UserPrincipal,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<Slice<RefundResponse>> {
+    ): ApiResponse<Slice<RefundResponse>> {
         val sellerId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
-        val refunds = refundQueryService.getSellerRefunds(sellerId, pageable)
-        return ResponseEntity.ok(refunds)
+        return ApiResponse.success(refundQueryService.getSellerRefunds(sellerId, pageable))
     }
 
     @Idempotent(ttlHours = 24)
@@ -73,10 +69,9 @@ class RefundController(
     fun approveRefund(
         @PathVariable refundId: Long,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ResponseEntity<RefundResponse> {
+    ): ApiResponse<RefundResponse> {
         val approverId = principal.getUserId()
-        val response = refundCommandService.approveRefund(refundId, approverId)
-        return ResponseEntity.ok(response)
+        return ApiResponse.success(refundCommandService.approveRefund(refundId, approverId))
     }
 
     @Idempotent(ttlHours = 24)
@@ -85,9 +80,8 @@ class RefundController(
         @PathVariable refundId: Long,
         @RequestBody request: RefundApprovalRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ResponseEntity<RefundResponse> {
+    ): ApiResponse<RefundResponse> {
         val approverId = principal.getUserId()
-        val response = refundCommandService.rejectRefund(refundId, approverId, request)
-        return ResponseEntity.ok(response)
+        return ApiResponse.success(refundCommandService.rejectRefund(refundId, approverId, request))
     }
 }
