@@ -10,6 +10,7 @@ import org.springframework.format.annotation.DateTimeFormat
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 @RestController
 @RequestMapping("/api/v1/admin/product-statistics")
@@ -59,6 +60,12 @@ class ProductStatisticsController(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate
     ): ApiResponse<List<ProductDailyStatisticsResponse>> {
+        require(ChronoUnit.DAYS.between(startDate, endDate) <= 90) {
+            "조회 기간은 최대 90일까지 가능합니다."
+        }
+        require(!startDate.isAfter(endDate)) {
+            "시작일은 종료일보다 이전이어야 합니다."
+        }
         return ApiResponse.success(productStatisticsQueryService.getDailyStatistics(productId, startDate, endDate))
     }
 

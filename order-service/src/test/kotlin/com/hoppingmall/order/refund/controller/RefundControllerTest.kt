@@ -21,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
-import org.springframework.http.HttpStatus
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -80,8 +79,7 @@ class RefundControllerTest {
 
         val result = controller.requestRefund(request, buyerPrincipal)
 
-        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(result.body!!.id).isEqualTo(1L)
+        assertThat(result.data!!.id).isEqualTo(1L)
     }
 
     @Test
@@ -92,8 +90,7 @@ class RefundControllerTest {
 
         val result = controller.getRefund(1L, buyerPrincipal)
 
-        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(result.body!!.id).isEqualTo(1L)
+        assertThat(result.data!!.id).isEqualTo(1L)
     }
 
     @Test
@@ -106,8 +103,7 @@ class RefundControllerTest {
 
         val result = controller.getMyRefunds(buyerPrincipal, 0, 10)
 
-        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(result.body!!.content).hasSize(1)
+        assertThat(result.data!!.content).hasSize(1)
     }
 
     @Test
@@ -120,8 +116,7 @@ class RefundControllerTest {
 
         val result = controller.getSellerRefunds(sellerPrincipal, 0, 10)
 
-        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(result.body!!.content).hasSize(1)
+        assertThat(result.data!!.content).hasSize(1)
     }
 
     @Test
@@ -132,8 +127,7 @@ class RefundControllerTest {
 
         val result = controller.approveRefund(1L, sellerPrincipal)
 
-        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(result.body!!.status).isEqualTo(RefundStatus.COMPLETED)
+        assertThat(result.data!!.status).isEqualTo(RefundStatus.COMPLETED)
     }
 
     @Test
@@ -145,7 +139,6 @@ class RefundControllerTest {
 
         val result = controller.rejectRefund(1L, request, sellerPrincipal)
 
-        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(result.body!!.status).isEqualTo(RefundStatus.REJECTED)
+        assertThat(result.data!!.status).isEqualTo(RefundStatus.REJECTED)
     }
 }
