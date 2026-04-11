@@ -1,6 +1,5 @@
 package com.hoppingmall.product.wishlist.service
 
-import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.wishlist.domain.repository.WishlistRepository
 import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import org.springframework.data.domain.Pageable
@@ -11,16 +10,11 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class WishlistQueryServiceImpl(
-    private val wishlistRepository: WishlistRepository,
-    private val productRepository: ProductRepository
+    private val wishlistRepository: WishlistRepository
 ) : WishlistQueryService {
 
     override fun getWishlists(buyerId: Long, pageable: Pageable): Slice<WishlistResponse> {
-        val wishlists = wishlistRepository.findByBuyerId(buyerId, pageable)
-        val productIds = wishlists.content.map { it.productId }
-        val productMap = productRepository.findAllById(productIds).associateBy { it.id!! }
-
-        return wishlists.map { WishlistResponse.from(it, productMap[it.productId]) }
+        return wishlistRepository.findByBuyerIdWithProduct(buyerId, pageable)
     }
 
     override fun isWishlisted(buyerId: Long, productId: Long): Boolean {
