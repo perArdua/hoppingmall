@@ -19,8 +19,6 @@ class Wishlist private constructor(
     val productId: Long,
 ) : BaseEntity() {
     companion object {
-        fun create(buyerId: Long, productId: Long): Wishlist {
-            return Wishlist(buyerId, productId)
-        }
+        fun create(buyerId: Long, productId: Long): Wishlist = Wishlist(buyerId, productId)
     }
 }

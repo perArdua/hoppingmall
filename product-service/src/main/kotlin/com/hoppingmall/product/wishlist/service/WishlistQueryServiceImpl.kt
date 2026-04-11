@@ -13,11 +13,9 @@ class WishlistQueryServiceImpl(
     private val wishlistRepository: WishlistRepository
 ) : WishlistQueryService {
 
-    override fun getWishlists(buyerId: Long, pageable: Pageable): Slice<WishlistResponse> {
-        return wishlistRepository.findByBuyerIdWithProduct(buyerId, pageable)
-    }
+    override fun getWishlists(buyerId: Long, pageable: Pageable): Slice<WishlistResponse> =
+        wishlistRepository.findByBuyerIdWithProduct(buyerId, pageable)
 
-    override fun isWishlisted(buyerId: Long, productId: Long): Boolean {
-        return wishlistRepository.existsByBuyerIdAndProductId(buyerId, productId)
-    }
+    override fun isWishlisted(buyerId: Long, productId: Long): Boolean =
+        wishlistRepository.existsByBuyerIdAndProductId(buyerId, productId)
 }

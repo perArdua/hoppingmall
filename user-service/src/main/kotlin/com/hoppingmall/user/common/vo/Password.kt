@@ -14,7 +14,7 @@ data class Password(
 
     override fun toString(): String = maskingStrategy.mask()
 
-    fun isSameHashedValueWith(hashed: String): Boolean = this.value == hashed
+    fun isSameHashedValueWith(hashed: String): Boolean = value == hashed
 }
 
 fun interface PasswordMaskingStrategy {

@@ -8,7 +8,6 @@ class CompensationEventHandlerRegistry(
 ) {
     private val handlerList: List<CompensationEventHandler> = handlers
 
-    fun getHandler(eventType: String): CompensationEventHandler? {
-        return handlerList.find { it.supports(eventType) }
-    }
+    fun getHandler(eventType: String): CompensationEventHandler? =
+        handlerList.find { it.supports(eventType) }
 }

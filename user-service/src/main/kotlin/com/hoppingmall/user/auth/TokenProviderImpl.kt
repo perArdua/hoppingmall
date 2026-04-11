@@ -55,13 +55,11 @@ class TokenProviderImpl(
         return true
     }
 
-    override fun getUserIdFromToken(token: String): Long {
-        return parseClaims(token).subject.toLong()
-    }
+    override fun getUserIdFromToken(token: String): Long =
+        parseClaims(token).subject.toLong()
 
-    override fun getUserRoleFromToken(token: String): Role {
-        return Role.valueOf(parseClaims(token)["role"] as String)
-    }
+    override fun getUserRoleFromToken(token: String): Role =
+        Role.valueOf(parseClaims(token)["role"] as String)
 
     override fun getUserPrincipal(token: String): UserPrincipal {
         val userId = getUserIdFromToken(token)

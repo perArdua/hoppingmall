@@ -89,7 +89,5 @@ class TwoLevelCacheManager(
         }
     }
 
-    override fun getCacheNames(): Collection<String> {
-        return redisCacheManager.cacheNames
-    }
+    override fun getCacheNames(): Collection<String> = redisCacheManager.cacheNames
 }

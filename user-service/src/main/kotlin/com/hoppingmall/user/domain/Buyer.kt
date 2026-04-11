@@ -16,8 +16,6 @@ class Buyer private constructor(
 ) : BaseEntity() {
 
     companion object {
-        fun create(user: User): Buyer {
-            return Buyer(user.id!!)
-        }
+        fun create(user: User): Buyer = Buyer(user.id!!)
     }
 }

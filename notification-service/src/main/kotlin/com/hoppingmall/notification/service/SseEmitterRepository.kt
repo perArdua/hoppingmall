@@ -15,9 +15,8 @@ class SseEmitterRepository {
         return emitter
     }
 
-    fun findByUserId(userId: Long): List<SseEmitter> {
-        return emitters[userId]?.toList() ?: emptyList()
-    }
+    fun findByUserId(userId: Long): List<SseEmitter> =
+        emitters[userId]?.toList() ?: emptyList()
 
     fun remove(userId: Long, emitter: SseEmitter) {
         emitters.compute(userId) { _, list ->

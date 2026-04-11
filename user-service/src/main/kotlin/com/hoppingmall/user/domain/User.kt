@@ -25,9 +25,8 @@ class User private constructor(
 ) : BaseEntity() {
 
     companion object {
-        fun create(email: Email, password: Password, name: String, role: Role = Role.BUYER): User {
-            return User(email, password, name, role)
-        }
+        fun create(email: Email, password: Password, name: String, role: Role = Role.BUYER): User =
+            User(email, password, name, role)
     }
 
     fun updatePassword(newPassword: Password) {

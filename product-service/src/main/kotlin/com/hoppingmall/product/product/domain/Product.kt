@@ -53,8 +53,6 @@ class Product private constructor(
             description: String,
             price: BigDecimal,
             status: ProductStatus
-        ): Product {
-            return Product(sellerId, categoryId, name, description, price, status)
-        }
+        ): Product = Product(sellerId, categoryId, name, description, price, status)
     }
 }

@@ -61,8 +61,8 @@ class Payment private constructor(
             pointAmount: BigDecimal = BigDecimal.ZERO,
             couponId: Long? = null,
             couponDiscountAmount: BigDecimal = BigDecimal.ZERO
-        ): Payment {
-            return Payment(
+        ): Payment =
+            Payment(
                 orderId = orderId,
                 userId = userId,
                 amount = amount,
@@ -71,7 +71,6 @@ class Payment private constructor(
                 couponId = couponId,
                 couponDiscountAmount = couponDiscountAmount
             )
-        }
     }
 
     fun copy(): Payment {
@@ -103,11 +102,7 @@ class Payment private constructor(
         this.errorMessage = errorMessage
     }
 
-    fun isSuccess(): Boolean {
-        return status == PaymentStatus.SUCCESS
-    }
+    fun isSuccess(): Boolean = status == PaymentStatus.SUCCESS
 
-    fun isFailed(): Boolean {
-        return status == PaymentStatus.FAILED
-    }
+    fun isFailed(): Boolean = status == PaymentStatus.FAILED
 }

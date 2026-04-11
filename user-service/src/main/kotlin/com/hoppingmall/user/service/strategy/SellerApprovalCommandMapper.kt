@@ -14,7 +14,6 @@ class SellerApprovalCommandMapper(
         Seller.ApprovalStatus.REJECTED to reject,
     )
 
-    fun getCommand(status: Seller.ApprovalStatus): SellerApprovalCommand {
-        return commandMap[status] ?: throw SellerInvalidApprovalCommandException()
-    }
+    fun getCommand(status: Seller.ApprovalStatus): SellerApprovalCommand =
+        commandMap[status] ?: throw SellerInvalidApprovalCommandException()
 }

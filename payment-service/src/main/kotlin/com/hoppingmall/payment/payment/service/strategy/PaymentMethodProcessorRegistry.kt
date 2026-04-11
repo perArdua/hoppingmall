@@ -10,8 +10,7 @@ class PaymentMethodProcessorRegistry(
     private val processorMap: Map<PaymentMethod, PaymentMethodProcessor> =
         processors.associateBy { it.method }
 
-    fun getProcessor(method: PaymentMethod): PaymentMethodProcessor {
-        return processorMap[method]
+    fun getProcessor(method: PaymentMethod): PaymentMethodProcessor =
+        processorMap[method]
             ?: throw IllegalArgumentException("지원하지 않는 결제 수단: $method")
-    }
 }

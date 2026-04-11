@@ -18,11 +18,10 @@ class DistributedLockExecutor(
         private const val LEASE_TIME_MS = 30_000L
     }
 
-    private fun newTransactionTemplate(): TransactionTemplate {
-        return TransactionTemplate(transactionManager).apply {
+    private fun newTransactionTemplate(): TransactionTemplate =
+        TransactionTemplate(transactionManager).apply {
             propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
         }
-    }
 
     fun <T : Any> withLock(
         key: String,

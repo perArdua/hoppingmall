@@ -15,11 +15,10 @@ class IdempotencyService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Transactional(readOnly = true)
-    fun findByKey(key: String): IdempotencyRecord? {
-        return idempotencyRecordRepository.findByIdempotencyKey(key)
+    fun findByKey(key: String): IdempotencyRecord? =
+        idempotencyRecordRepository.findByIdempotencyKey(key)
             .filter { it.expiresAt.isAfter(LocalDateTime.now()) }
             .orElse(null)
-    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun save(
@@ -29,8 +28,8 @@ class IdempotencyService(
         responseStatus: Int,
         responseBody: String,
         ttlHours: Long
-    ): IdempotencyRecord {
-        return idempotencyRecordRepository.save(
+    ): IdempotencyRecord =
+        idempotencyRecordRepository.save(
             IdempotencyRecord(
                 idempotencyKey = key,
                 httpMethod = httpMethod,
@@ -40,7 +39,6 @@ class IdempotencyService(
                 expiresAt = LocalDateTime.now().plusHours(ttlHours)
             )
         )
-    }
 
     @Scheduled(cron = "0 0 3 * * ?")
     @Transactional

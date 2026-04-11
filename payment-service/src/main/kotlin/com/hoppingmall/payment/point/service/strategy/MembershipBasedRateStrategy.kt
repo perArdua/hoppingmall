@@ -9,7 +9,6 @@ class MembershipBasedRateStrategy(
     private val membershipQueryPort: MembershipQueryPort
 ) : PointEarnRateStrategy {
 
-    override fun getEarnRate(userId: Long): BigDecimal {
-        return membershipQueryPort.getPointEarningRate(userId)
-    }
+    override fun getEarnRate(userId: Long): BigDecimal =
+        membershipQueryPort.getPointEarningRate(userId)
 }
