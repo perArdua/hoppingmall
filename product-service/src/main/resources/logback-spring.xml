@@ -24,8 +24,15 @@
             </encoder>
         </appender>
 
-        <root level="INFO">
+        <appender name="ASYNC_JSON" class="ch.qos.logback.classic.AsyncAppender">
+            <queueSize>1024</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <neverBlock>true</neverBlock>
             <appender-ref ref="JSON_CONSOLE"/>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="ASYNC_JSON"/>
         </root>
     </springProfile>
 

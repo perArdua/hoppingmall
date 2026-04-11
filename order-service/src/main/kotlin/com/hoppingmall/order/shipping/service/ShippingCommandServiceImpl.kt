@@ -43,8 +43,7 @@ class ShippingCommandServiceImpl(
         }
 
         val orderItems = orderItemRepository.findByOrderId(request.orderId)
-        val hasSellerProduct = orderItems.any { true }
-        if (!hasSellerProduct) {
+        if (orderItems.isEmpty()) {
             throw OrderNotFoundException()
         }
 

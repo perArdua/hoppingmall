@@ -1,10 +1,10 @@
 package com.hoppingmall.payment.point.controller
 
+import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.payment.point.dto.request.PointPolicyRequest
 import com.hoppingmall.payment.point.dto.response.PointPolicyResponse
 import com.hoppingmall.payment.point.service.PointPolicyService
 import jakarta.validation.Valid
-import org.springframework.http.ResponseEntity
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
@@ -18,47 +18,41 @@ class PointPolicyController(
     @PostMapping
     fun createPolicy(
         @Valid @RequestBody request: PointPolicyRequest
-    ): ResponseEntity<PointPolicyResponse> {
-        val policy = pointPolicyService.createPolicy(request)
-        return ResponseEntity.ok(policy)
+    ): ApiResponse<PointPolicyResponse> {
+        return ApiResponse.success(pointPolicyService.createPolicy(request))
     }
 
     @PutMapping("/{policyId}")
     fun updatePolicy(
         @PathVariable policyId: Long,
         @Valid @RequestBody request: PointPolicyRequest
-    ): ResponseEntity<PointPolicyResponse> {
-        val policy = pointPolicyService.updatePolicy(policyId, request)
-        return ResponseEntity.ok(policy)
+    ): ApiResponse<PointPolicyResponse> {
+        return ApiResponse.success(pointPolicyService.updatePolicy(policyId, request))
     }
 
     @PostMapping("/{policyId}/activate")
     fun activatePolicy(
         @PathVariable policyId: Long
-    ): ResponseEntity<PointPolicyResponse> {
-        val policy = pointPolicyService.activatePolicy(policyId)
-        return ResponseEntity.ok(policy)
+    ): ApiResponse<PointPolicyResponse> {
+        return ApiResponse.success(pointPolicyService.activatePolicy(policyId))
     }
 
     @PostMapping("/{policyId}/deactivate")
     fun deactivatePolicy(
         @PathVariable policyId: Long
-    ): ResponseEntity<PointPolicyResponse> {
-        val policy = pointPolicyService.deactivatePolicy(policyId)
-        return ResponseEntity.ok(policy)
+    ): ApiResponse<PointPolicyResponse> {
+        return ApiResponse.success(pointPolicyService.deactivatePolicy(policyId))
     }
 
     @GetMapping("/current")
-    fun getCurrentPolicy(): ResponseEntity<PointPolicyResponse?> {
-        val policy = pointPolicyService.getCurrentPolicy()
-        return ResponseEntity.ok(policy)
+    fun getCurrentPolicy(): ApiResponse<PointPolicyResponse?> {
+        return ApiResponse.success(pointPolicyService.getCurrentPolicy())
     }
 
     @GetMapping("/{policyId}")
     fun getPolicyById(
         @PathVariable policyId: Long
-    ): ResponseEntity<PointPolicyResponse> {
-        val policy = pointPolicyService.getPolicyById(policyId)
-        return ResponseEntity.ok(policy)
+    ): ApiResponse<PointPolicyResponse> {
+        return ApiResponse.success(pointPolicyService.getPolicyById(policyId))
     }
 }

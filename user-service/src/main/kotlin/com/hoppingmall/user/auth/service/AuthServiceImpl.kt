@@ -29,13 +29,14 @@ class AuthServiceImpl(
 
     override fun login(request: SignInRequest): SignInResponse {
         val user = userQueryService.authenticate(request)
-        log.info("로그인 성공: userId={}, role={}", user.id, user.getRole())
+        val userId = user.id!!
+        log.info("로그인 성공: userId={}, role={}", userId, user.getRole())
 
-        val accessToken = tokenProvider.generateAccessToken(user.id!!, user.getRole())
-        val refreshToken = tokenProvider.generateRefreshToken(user.id!!)
+        val accessToken = tokenProvider.generateAccessToken(userId, user.getRole())
+        val refreshToken = tokenProvider.generateRefreshToken(userId)
 
         refreshTokenService.rotateRefreshToken(
-            userId = user.id!!,
+            userId = userId,
             newToken = refreshToken,
             ttl = jwtProperties.refreshExpirationMs
         )
@@ -48,13 +49,14 @@ class AuthServiceImpl(
 
         refreshTokenService.validate(userId, refreshToken)
 
-        val user = userRepository.findByIdOrNull(userId) ?: throw UserNotFoundException() 
+        val user = userRepository.findByIdOrNull(userId) ?: throw UserNotFoundException()
+        val uid = user.id!!
 
-        val newAccessToken = tokenProvider.generateAccessToken(user.id!!, user.getRole())
-        val newRefreshToken = tokenProvider.generateRefreshToken(user.id!!)
+        val newAccessToken = tokenProvider.generateAccessToken(uid, user.getRole())
+        val newRefreshToken = tokenProvider.generateRefreshToken(uid)
 
         refreshTokenService.rotateRefreshToken(
-            userId = user.id!!,
+            userId = uid,
             newToken = newRefreshToken,
             ttl = jwtProperties.refreshExpirationMs
         )

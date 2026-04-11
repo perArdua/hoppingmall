@@ -3,6 +3,7 @@ package com.hoppingmall.product.product.controller
 import com.hoppingmall.product.product.dto.response.*
 import com.hoppingmall.product.product.service.ProductStatisticsQueryService
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -133,6 +134,20 @@ class ProductStatisticsControllerTest {
         val result = controller.getDailyStatistics(1L, LocalDate.now().minusDays(7), LocalDate.now())
 
         assertThat(result.data).hasSize(1)
+    }
+
+    @Test
+    fun 일별_통계_조회_시_90일_초과하면_예외가_발생한다() {
+        assertThatThrownBy {
+            controller.getDailyStatistics(1L, LocalDate.now().minusDays(91), LocalDate.now())
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun 일별_통계_조회_시_시작일이_종료일보다_이후면_예외가_발생한다() {
+        assertThatThrownBy {
+            controller.getDailyStatistics(1L, LocalDate.now(), LocalDate.now().minusDays(1))
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test

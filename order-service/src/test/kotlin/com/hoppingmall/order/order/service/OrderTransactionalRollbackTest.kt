@@ -68,6 +68,9 @@ class OrderTransactionalRollbackTest {
     @Autowired
     private lateinit var sagaEventLogRepository: SagaEventLogRepository
 
+    @Autowired
+    private lateinit var txTemplate: TransactionTemplate
+
     @MockitoBean
     private lateinit var cartItemRepository: CartItemRepository
 
@@ -128,10 +131,12 @@ class OrderTransactionalRollbackTest {
         assertThat(propagatedMessages).contains("outbox publish failed")
 
         val reloadedOrder = orderRepository.findById(order.id!!).orElseThrow()
-        val reloadedLog = sagaEventLogRepository.findByEventId("payment-completed-txn-123")!!
-
         assertThat(reloadedOrder.status).isEqualTo(OrderStatus.PAID)
-        assertThat(reloadedLog.isStepCompleted(SagaEventLog.REMOTE_COMPLETED)).isFalse()
+
+        txTemplate.execute {
+            val reloadedLog = sagaEventLogRepository.findByEventId("payment-completed-txn-123")!!
+            assertThat(reloadedLog.isStepCompleted(SagaEventLog.REMOTE_COMPLETED)).isFalse()
+        }
     }
 
     @Test

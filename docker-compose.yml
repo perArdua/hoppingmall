@@ -43,6 +43,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: 4
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.6.0
@@ -293,11 +300,12 @@ services:
       context: .
       dockerfile: notification-service/Dockerfile
     container_name: notification-service
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
       redis-cluster-init:
         condition: service_started
     environment:
@@ -317,6 +325,7 @@ services:
       context: .
       dockerfile: user-service/Dockerfile
     container_name: user-service
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
@@ -341,6 +350,7 @@ services:
       context: .
       dockerfile: product-service/Dockerfile
     container_name: product-service
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
@@ -365,11 +375,12 @@ services:
       context: .
       dockerfile: order-service/Dockerfile
     container_name: order-service
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
       redis-cluster-init:
         condition: service_started
     environment:
@@ -391,11 +402,12 @@ services:
       context: .
       dockerfile: payment-service/Dockerfile
     container_name: payment-service
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
       redis-cluster-init:
         condition: service_started
     environment:
@@ -417,6 +429,7 @@ services:
       context: .
       dockerfile: settlement-service/Dockerfile
     container_name: settlement-service
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
@@ -438,6 +451,7 @@ services:
       context: .
       dockerfile: api-gateway/Dockerfile
     container_name: api-gateway
+    restart: unless-stopped
     depends_on:
       redis-cluster-init:
         condition: service_started

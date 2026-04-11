@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 class AccessTokenBlacklistRepositoryTest {
 
     @Mock
-    private lateinit var customStringRedisTemplate: RedisTemplate<String, String>
+    private lateinit var stringRedisTemplate: RedisTemplate<String, String>
 
     @Mock
     private lateinit var valueOperations: ValueOperations<String, String>
@@ -34,7 +34,7 @@ class AccessTokenBlacklistRepositoryTest {
 
     @Test
     fun 토큰을_블랙리스트에_추가한다() {
-        whenever(customStringRedisTemplate.opsForValue()).thenReturn(valueOperations)
+        whenever(stringRedisTemplate.opsForValue()).thenReturn(valueOperations)
 
         repository.add("test-token", 3600000L)
 
@@ -45,12 +45,12 @@ class AccessTokenBlacklistRepositoryTest {
     fun TTL이_0이하이면_블랙리스트에_추가하지_않는다() {
         repository.add("test-token", 0L)
 
-        verify(customStringRedisTemplate, never()).opsForValue()
+        verify(stringRedisTemplate, never()).opsForValue()
     }
 
     @Test
     fun 블랙리스트에_토큰이_존재하는지_확인한다() {
-        whenever(customStringRedisTemplate.hasKey("blacklist:test-token")).thenReturn(true)
+        whenever(stringRedisTemplate.hasKey("blacklist:test-token")).thenReturn(true)
 
         val result = repository.exists("test-token")
 
@@ -59,7 +59,7 @@ class AccessTokenBlacklistRepositoryTest {
 
     @Test
     fun 블랙리스트에_토큰이_존재하지_않으면_false를_반환한다() {
-        whenever(customStringRedisTemplate.hasKey("blacklist:test-token")).thenReturn(false)
+        whenever(stringRedisTemplate.hasKey("blacklist:test-token")).thenReturn(false)
 
         val result = repository.exists("test-token")
 
