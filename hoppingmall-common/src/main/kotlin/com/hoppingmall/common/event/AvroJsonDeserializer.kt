@@ -8,6 +8,10 @@ class AvroJsonDeserializer : Deserializer<String> {
 
     private val avroDeserializer = KafkaAvroDeserializer()
 
+    companion object {
+        private val objectMapper = com.fasterxml.jackson.databind.ObjectMapper()
+    }
+
     override fun configure(configs: Map<String, *>, isKey: Boolean) {
         avroDeserializer.configure(configs, isKey)
     }
@@ -31,7 +35,7 @@ class AvroJsonDeserializer : Deserializer<String> {
             val value = record.get(field.name())
             map[field.name()] = convertAvroValue(value)
         }
-        return com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(map)
+        return objectMapper.writeValueAsString(map)
     }
 
     private fun convertAvroValue(value: Any?): Any? {
