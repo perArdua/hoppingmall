@@ -14,6 +14,10 @@ class DistributedLockExecutor(
     private val transactionManager: PlatformTransactionManager
 ) {
 
+    companion object {
+        private const val LEASE_TIME_MS = 30_000L
+    }
+
     private fun newTransactionTemplate(): TransactionTemplate {
         return TransactionTemplate(transactionManager).apply {
             propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
@@ -26,7 +30,7 @@ class DistributedLockExecutor(
         action: () -> T
     ): T {
         val lock = redissonClient.getLock(key)
-        val acquired = lock.tryLock(waitTime.toMillis(), -1, TimeUnit.MILLISECONDS)
+        val acquired = lock.tryLock(waitTime.toMillis(), LEASE_TIME_MS, TimeUnit.MILLISECONDS)
         if (!acquired) {
             throw DistributedLockException()
         }
@@ -46,7 +50,7 @@ class DistributedLockExecutor(
         action: () -> Unit
     ) {
         val lock = redissonClient.getLock(key)
-        val acquired = lock.tryLock(waitTime.toMillis(), -1, TimeUnit.MILLISECONDS)
+        val acquired = lock.tryLock(waitTime.toMillis(), LEASE_TIME_MS, TimeUnit.MILLISECONDS)
         if (!acquired) {
             throw DistributedLockException()
         }
