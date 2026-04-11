@@ -26,6 +26,7 @@ import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.transaction.TransactionStatus
 import org.springframework.transaction.support.TransactionTemplate
@@ -150,6 +151,33 @@ class ProductStatisticsCommandServiceImplTest {
         service.flushDailySnapshot()
 
         verify(productDailyStatisticsRepository, org.mockito.kotlin.never())
+            .saveAll(any<List<ProductDailyStatistics>>())
+    }
+
+    @Test
+    fun 일별_스냅샷_다중_페이지를_처리한다() {
+        val stats1 = createStats(1L)
+        stats1.incrementSales(5, BigDecimal("50000"))
+        val stats2 = ProductStatistics.create(
+            productId = 2L, productName = "테스트2", sellerId = 1L, categoryId = 1L
+        ).withId(2L)
+        stats2.incrementSales(3, BigDecimal("30000"))
+
+        whenever(productStatisticsRepository.findAll(any<Pageable>()))
+            .thenReturn(PageImpl(listOf(stats1), PageRequest.of(0, 1), 2))
+            .thenReturn(PageImpl(listOf(stats2), PageRequest.of(1, 1), 2))
+        whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
+            .thenReturn(emptyList())
+        whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
+            .thenReturn(emptyList())
+        whenever(productDailyStatisticsRepository.saveAll(any<List<ProductDailyStatistics>>()))
+            .thenAnswer { it.arguments[0] }
+        whenever(productStatisticsRepository.saveAll(any<List<ProductStatistics>>()))
+            .thenAnswer { it.arguments[0] }
+
+        service.flushDailySnapshot()
+
+        verify(productDailyStatisticsRepository, org.mockito.kotlin.times(2))
             .saveAll(any<List<ProductDailyStatistics>>())
     }
 
