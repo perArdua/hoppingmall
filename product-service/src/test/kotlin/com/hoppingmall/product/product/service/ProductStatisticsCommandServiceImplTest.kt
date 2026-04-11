@@ -25,6 +25,9 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
 import org.springframework.transaction.TransactionStatus
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
@@ -141,12 +144,51 @@ class ProductStatisticsCommandServiceImplTest {
     }
 
     @Test
+    fun 통계가_없으면_일별_스냅샷을_건너뛴다() {
+        whenever(productStatisticsRepository.findAll(any<Pageable>()))
+            .thenReturn(PageImpl(emptyList()))
+
+        service.flushDailySnapshot()
+
+        verify(productDailyStatisticsRepository, org.mockito.kotlin.never())
+            .saveAll(any<List<ProductDailyStatistics>>())
+    }
+
+    @Test
+    fun 일별_스냅샷_다중_페이지를_처리한다() {
+        val stats1 = createStats(1L)
+        stats1.incrementSales(5, BigDecimal("50000"))
+        val stats2 = ProductStatistics.create(
+            productId = 2L, productName = "테스트2", sellerId = 1L, categoryId = 1L
+        ).withId(2L)
+        stats2.incrementSales(3, BigDecimal("30000"))
+
+        whenever(productStatisticsRepository.findAll(any<Pageable>()))
+            .thenReturn(PageImpl(listOf(stats1), PageRequest.of(0, 1), 2))
+            .thenReturn(PageImpl(listOf(stats2), PageRequest.of(1, 1), 2))
+        whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
+            .thenReturn(emptyList())
+        whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
+            .thenReturn(emptyList())
+        whenever(productDailyStatisticsRepository.saveAll(any<List<ProductDailyStatistics>>()))
+            .thenAnswer { it.arguments[0] }
+        whenever(productStatisticsRepository.saveAll(any<List<ProductStatistics>>()))
+            .thenAnswer { it.arguments[0] }
+
+        service.flushDailySnapshot()
+
+        verify(productDailyStatisticsRepository, org.mockito.kotlin.times(2))
+            .saveAll(any<List<ProductDailyStatistics>>())
+    }
+
+    @Test
     fun 일별_스냅샷을_저장한다() {
         val stats = createStats()
         stats.incrementSales(10, BigDecimal("100000"))
         val daily = ProductDailyStatistics.create(productId = 1L, statisticsDate = LocalDate.now())
 
-        whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAll(any<Pageable>()))
+            .thenReturn(PageImpl(listOf(stats)))
         whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
             .thenReturn(listOf(daily))
         whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
@@ -166,7 +208,8 @@ class ProductStatisticsCommandServiceImplTest {
         val stats = createStats()
         stats.incrementSales(10, BigDecimal("100000"))
 
-        whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAll(any<Pageable>()))
+            .thenReturn(PageImpl(listOf(stats)))
         whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
             .thenReturn(emptyList())
         whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
@@ -186,7 +229,7 @@ class ProductStatisticsCommandServiceImplTest {
         val stats = createStats()
         stats.incrementSales(10, BigDecimal("100000"))
 
-        whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAllActive()).thenReturn(listOf(stats))
         whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
             .thenReturn(emptyList())
         whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
@@ -199,9 +242,7 @@ class ProductStatisticsCommandServiceImplTest {
 
     @Test
     fun 오늘_활동이_없는_통계는_시간별_스냅샷에서_건너뛴다() {
-        val stats = createStats()
-
-        whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAllActive()).thenReturn(emptyList())
 
         service.flushHourlySnapshot()
 
@@ -217,7 +258,7 @@ class ProductStatisticsCommandServiceImplTest {
             productId = 1L, statisticsDate = LocalDate.now(), hour = java.time.LocalDateTime.now().hour
         )
 
-        whenever(productStatisticsRepository.findAll()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAllActive()).thenReturn(listOf(stats))
         whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
             .thenReturn(listOf(hourly))
         whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
