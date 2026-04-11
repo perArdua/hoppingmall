@@ -235,4 +235,14 @@ class CouponCommandServiceImplTest {
 
         verify(userCouponRepository).findByUserIdAndCouponId(10L, 1L)
     }
+
+    @Test
+    fun 쿠폰_사용_시_쿠폰이_존재하지_않으면_예외를_던진다() {
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        whenever(userCouponRepository.findByUserIdAndCouponId(10L, 1L)).thenReturn(userCoupon)
+        whenever(couponRepository.findById(1L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { service.useCoupon(10L, 1L, BigDecimal("30000"), 100L) }
+            .isInstanceOf(CouponNotFoundException::class.java)
+    }
 }

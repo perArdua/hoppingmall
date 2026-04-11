@@ -154,4 +154,36 @@ class PointPolicyServiceImplTest {
 
         assertThat(result).isNotNull
     }
+
+    @Test
+    fun 존재하지_않는_정책_업데이트_시_예외가_발생한다() {
+        whenever(pointPolicyRepository.findById(999L)).thenReturn(Optional.empty())
+
+        val request = PointPolicyRequest(
+            policyName = "수정 정책",
+            earnRate = BigDecimal("0.02"),
+            maxEarnRate = BigDecimal("0.10"),
+            minUseAmount = BigDecimal("200"),
+            maxUseAmount = BigDecimal("50000")
+        )
+
+        assertThatThrownBy { pointPolicyService.updatePolicy(999L, request) }
+            .isInstanceOf(PointPolicyNotFoundException::class.java)
+    }
+
+    @Test
+    fun 존재하지_않는_정책_활성화_시_예외가_발생한다() {
+        whenever(pointPolicyRepository.findById(999L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { pointPolicyService.activatePolicy(999L) }
+            .isInstanceOf(PointPolicyNotFoundException::class.java)
+    }
+
+    @Test
+    fun 존재하지_않는_정책_비활성화_시_예외가_발생한다() {
+        whenever(pointPolicyRepository.findById(999L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { pointPolicyService.deactivatePolicy(999L) }
+            .isInstanceOf(PointPolicyNotFoundException::class.java)
+    }
 }

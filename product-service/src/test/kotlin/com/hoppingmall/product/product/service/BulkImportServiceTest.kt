@@ -336,4 +336,20 @@ class BulkImportServiceTest {
 
         assertThat(job.failCount).isEqualTo(1)
     }
+
+    @Test
+    fun 존재하지_않는_작업으로_processImport_호출_시_예외를_발생시킨다() {
+        whenever(bulkImportJobRepository.findById(999L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { service.processImport(999L, 1L, emptyList(), emptyList()) }
+            .isInstanceOf(ProductException::class.java)
+    }
+
+    @Test
+    fun 존재하지_않는_작업_에러_조회_시_예외를_발생시킨다() {
+        whenever(bulkImportJobRepository.findById(999L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { service.getJobErrors(999L, 1L) }
+            .isInstanceOf(ProductException::class.java)
+    }
 }

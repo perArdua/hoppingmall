@@ -390,6 +390,28 @@ class OrderCommandServiceImplTest {
             .isInstanceOf(com.hoppingmall.order.order.exception.OrderProductNotFoundException::class.java)
     }
 
+    @Test
+    fun CREATED_상태_주문_취소_후_최종_조회_시_주문이_없으면_예외가_발생한다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        setEntityId(order, 1L)
+
+        val orderItem = OrderItem.create(
+            orderId = 1L, sellerId = 5L, productId = 100L,
+            productName = "상품A", productPrice = BigDecimal("50000"),
+            quantity = 1, reservationId = "rsv-1"
+        )
+        setEntityId(orderItem, 10L)
+
+        Mockito.`when`(orderRepository.findById(1L))
+            .thenReturn(Optional.of(order))
+            .thenReturn(Optional.of(order))
+            .thenReturn(Optional.empty())
+        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
+
+        assertThatThrownBy { service.cancelOrder(10L, 1L) }
+            .isInstanceOf(OrderNotFoundException::class.java)
+    }
+
     private fun setEntityId(entity: Any, id: Long) {
         ReflectionTestUtils.setField(entity, "id", id)
     }

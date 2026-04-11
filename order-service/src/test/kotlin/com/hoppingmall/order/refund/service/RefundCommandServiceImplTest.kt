@@ -286,4 +286,18 @@ class RefundCommandServiceImplTest {
         assertThatThrownBy { service.rejectRefund(999L, 5L, request) }
             .isInstanceOf(RefundNotFoundException::class.java)
     }
+
+    @Test
+    fun 환불_요청_시_주문이_존재하지_않으면_예외가_발생한다() {
+        val request = RefundCreateRequest(
+            orderId = 10L, reason = RefundReason.CHANGE_OF_MIND, reasonDetail = null,
+            items = listOf(RefundItemRequest(orderItemId = 1L, quantity = 1))
+        )
+
+        whenever(paymentQueryPort.findByOrderId(10L)).thenReturn(payment)
+        whenever(orderRepository.findById(10L)).thenReturn(Optional.empty())
+
+        assertThatThrownBy { service.requestRefund(1L, request) }
+            .isInstanceOf(OrderNotFoundException::class.java)
+    }
 }
