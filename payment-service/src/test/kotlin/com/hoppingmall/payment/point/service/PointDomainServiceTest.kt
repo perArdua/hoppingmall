@@ -16,10 +16,12 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.transaction.PlatformTransactionManager
 import java.math.BigDecimal
 
 @ExtendWith(MockitoExtension::class)
@@ -29,6 +31,9 @@ class PointDomainServiceTest {
 
     @Mock
     private lateinit var pointRepository: PointRepository
+
+    @Mock
+    private lateinit var txManager: PlatformTransactionManager
 
     @InjectMocks
     private lateinit var pointDomainService: PointDomainService
@@ -51,7 +56,10 @@ class PointDomainServiceTest {
         val idField = BaseEntity::class.java.getDeclaredField("id")
         idField.isAccessible = true
         idField.set(newPoint, 1L)
-        whenever(pointRepository.findByUserIdForUpdate(1L)).thenReturn(null)
+        whenever(pointRepository.findByUserIdForUpdate(1L))
+            .thenReturn(null)
+            .thenReturn(newPoint)
+        whenever(txManager.getTransaction(any())).thenReturn(mock())
         doAnswer { newPoint }.whenever(pointRepository).save(any())
 
         val result = pointDomainService.findOrCreatePoint(1L)
@@ -69,6 +77,7 @@ class PointDomainServiceTest {
         whenever(pointRepository.findByUserIdForUpdate(1L))
             .thenReturn(null)
             .thenReturn(existing)
+        whenever(txManager.getTransaction(any())).thenReturn(mock())
         doThrow(DataIntegrityViolationException("duplicate")).whenever(pointRepository).save(any())
 
         val result = pointDomainService.findOrCreatePoint(1L)
@@ -81,6 +90,7 @@ class PointDomainServiceTest {
         whenever(pointRepository.findByUserIdForUpdate(1L))
             .thenReturn(null)
             .thenReturn(null)
+        whenever(txManager.getTransaction(any())).thenReturn(mock())
         doThrow(DataIntegrityViolationException("duplicate")).whenever(pointRepository).save(any())
 
         assertThatThrownBy { pointDomainService.findOrCreatePoint(1L) }
