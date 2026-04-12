@@ -119,6 +119,9 @@ class RefundCompletionConsumerTest {
         verify(productStatisticsPort).incrementRefundStats(1L, 2L, BigDecimal("25000"))
         verify(productStatisticsPort).incrementRefundStats(2L, 1L, BigDecimal("25000"))
         verify(orderCommandPort).cancelOrder(event.orderId)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.INVENTORY_RESTORED)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.STATS_UPDATED)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.ORDER_CANCELLED)
     }
 
     @Test
@@ -135,6 +138,9 @@ class RefundCompletionConsumerTest {
         verify(inventoryCommandPort).increaseStock(1L, 1)
         verify(productStatisticsPort).incrementRefundStats(1L, 1L, BigDecimal("25000"))
         verify(orderCommandPort, never()).cancelOrder(any())
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.INVENTORY_RESTORED)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.STATS_UPDATED)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.ORDER_CANCELLED)
     }
 
     @Test
@@ -148,6 +154,7 @@ class RefundCompletionConsumerTest {
 
         verify(refundEventLogRepository, never()).save(any<RefundEventLog>())
         verify(refundLocalOperationService, never()).execute(any(), any())
+        verify(refundLocalOperationService, never()).markStepAndSave(any(), any())
         verify(inventoryCommandPort, never()).increaseStock(any(), any())
         verify(orderCommandPort, never()).cancelOrder(any())
     }
@@ -171,5 +178,8 @@ class RefundCompletionConsumerTest {
         verify(productStatisticsPort).incrementRefundStats(1L, 2L, BigDecimal("25000"))
         verify(productStatisticsPort).incrementRefundStats(2L, 1L, BigDecimal("25000"))
         verify(orderCommandPort).cancelOrder(event.orderId)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.INVENTORY_RESTORED)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.STATS_UPDATED)
+        verify(refundLocalOperationService).markStepAndSave(event.eventId, RefundEventLog.ORDER_CANCELLED)
     }
 }

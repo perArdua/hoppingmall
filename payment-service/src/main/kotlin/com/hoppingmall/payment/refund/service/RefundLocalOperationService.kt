@@ -20,6 +20,13 @@ class RefundLocalOperationService(
 ) {
 
     @Transactional
+    fun markStepAndSave(eventId: String, step: String) {
+        val eventLog = refundEventLogRepository.findByEventId(eventId) ?: return
+        eventLog.markStepCompleted(step)
+        refundEventLogRepository.save(eventLog)
+    }
+
+    @Transactional
     fun execute(event: RefundCompletedEvent, eventLog: RefundEventLog) {
         if (event.isFullRefund) {
             if (!eventLog.isStepCompleted(RefundEventLog.PAYMENT_UPDATED)) {
