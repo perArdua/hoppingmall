@@ -1,6 +1,7 @@
 package com.hoppingmall.product.product.domain.repository
 
 import com.hoppingmall.product.product.domain.ProductStatistics
+import com.hoppingmall.product.product.dto.TopSellingProductDto
 import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -51,8 +52,13 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     """)
     fun findSellerTodaySummary(@Param("sellerId") sellerId: Long): SellerTodaySummaryProjection
 
-    @Query("SELECT ps FROM ProductStatistics ps WHERE ps.sellerId = :sellerId ORDER BY ps.todaySalesAmount DESC LIMIT 1")
-    fun findTopSellingBySellerId(@Param("sellerId") sellerId: Long): ProductStatistics?
+    @Query("""
+        SELECT new com.hoppingmall.product.product.dto.TopSellingProductDto(
+            ps.productId, ps.productName
+        )
+        FROM ProductStatistics ps WHERE ps.sellerId = :sellerId ORDER BY ps.todaySalesAmount DESC LIMIT 1
+    """)
+    fun findTopSellingBySellerId(@Param("sellerId") sellerId: Long): TopSellingProductDto?
 
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.todaySalesQuantity > 0 OR ps.todayRefundQuantity > 0")
     fun findAllActive(): List<ProductStatistics>

@@ -40,14 +40,14 @@ class SellerDashboardServiceImpl(
 
     override fun getTodaySummary(sellerId: Long): SellerTodaySummaryResponse {
         val summary = productStatisticsRepository.findSellerTodaySummary(sellerId)
-        val topSelling = productStatisticsRepository.findTopSellingBySellerId(sellerId)
+        val topSellingDto = productStatisticsRepository.findTopSellingBySellerId(sellerId)
         return SellerTodaySummaryResponse(
             totalProducts = summary.getTotalProducts(),
             todaySalesAmount = summary.getTodaySalesAmount(),
             todayOrderCount = summary.getTodayOrderCount(),
             todayRefundAmount = summary.getTodayRefundAmount(),
-            topSellingProductId = topSelling?.productId,
-            topSellingProductName = topSelling?.productName
+            topSellingProductId = topSellingDto?.productId,
+            topSellingProductName = topSellingDto?.productName
         )
     }
 

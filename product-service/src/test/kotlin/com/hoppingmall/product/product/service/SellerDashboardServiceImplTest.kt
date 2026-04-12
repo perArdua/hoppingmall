@@ -7,6 +7,7 @@ import com.hoppingmall.product.product.domain.repository.ProductDailyStatisticsR
 import com.hoppingmall.product.product.domain.repository.ProductHourlyStatisticsRepository
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.product.product.domain.repository.SellerTodaySummaryProjection
+import com.hoppingmall.product.product.dto.TopSellingProductDto
 import com.hoppingmall.product.product.exception.ProductException
 import com.hoppingmall.product.product.exception.ProductStatisticsNotFoundException
 import com.hoppingmall.product.support.withId
@@ -92,11 +93,11 @@ class SellerDashboardServiceImplTest {
 
     @Test
     fun 오늘_요약을_조회한다() {
-        val topSelling = createStats()
+        val topSellingDto = TopSellingProductDto(productId = 1L, productName = "테스트")
         val summary = mockSummaryProjection(5L, BigDecimal("500000"), 10L, BigDecimal("10000"))
 
         whenever(productStatisticsRepository.findSellerTodaySummary(1L)).thenReturn(summary)
-        whenever(productStatisticsRepository.findTopSellingBySellerId(1L)).thenReturn(topSelling)
+        whenever(productStatisticsRepository.findTopSellingBySellerId(1L)).thenReturn(topSellingDto)
 
         val result = service.getTodaySummary(1L)
 
