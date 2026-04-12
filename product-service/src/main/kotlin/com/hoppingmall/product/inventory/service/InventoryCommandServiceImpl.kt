@@ -87,11 +87,12 @@ class InventoryCommandServiceImpl(
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         if (reservationIds.isEmpty()) return true
 
+        val now = LocalDateTime.now()
         val updatedCount = inventoryReservationRepository.batchUpdateStatusByCas(
             reservationIds = reservationIds,
             expectedStatus = ReservationStatus.RESERVED,
             targetStatus = ReservationStatus.CONFIRMED,
-            updatedAt = LocalDateTime.now()
+            updatedAt = now
         )
 
         if (updatedCount != reservationIds.size) {
@@ -107,7 +108,7 @@ class InventoryCommandServiceImpl(
                     reservationIds = reservationIds,
                     expectedStatus = ReservationStatus.CONFIRMED,
                     targetStatus = ReservationStatus.CANCELLED,
-                    updatedAt = LocalDateTime.now()
+                    updatedAt = now
                 )
                 reservationIds.mapNotNull { rsvId -> inventoryReservationRepository.findByReservationId(rsvId) }
                     .filter { it.status == ReservationStatus.CANCELLED }
