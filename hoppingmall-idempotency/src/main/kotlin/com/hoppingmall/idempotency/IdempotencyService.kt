@@ -17,8 +17,7 @@ class IdempotencyService(
     @Transactional(readOnly = true)
     fun findByKey(key: String): IdempotencyRecord? =
         idempotencyRecordRepository.findByIdempotencyKey(key)
-            .filter { it.expiresAt.isAfter(LocalDateTime.now()) }
-            .orElse(null)
+            ?.takeIf { it.expiresAt.isAfter(LocalDateTime.now()) }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun save(

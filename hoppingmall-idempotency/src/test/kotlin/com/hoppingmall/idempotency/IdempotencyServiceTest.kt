@@ -16,7 +16,6 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.time.LocalDateTime
-import java.util.Optional
 
 @DisplayName("IdempotencyService")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -44,7 +43,7 @@ class IdempotencyServiceTest {
                 expiresAt = LocalDateTime.now().plusHours(1)
             )
             whenever(idempotencyRecordRepository.findByIdempotencyKey("test-key"))
-                .thenReturn(Optional.of(record))
+                .thenReturn(record)
 
             val result = idempotencyService.findByKey("test-key")
 
@@ -62,7 +61,7 @@ class IdempotencyServiceTest {
                 expiresAt = LocalDateTime.now().minusHours(1)
             )
             whenever(idempotencyRecordRepository.findByIdempotencyKey("test-key"))
-                .thenReturn(Optional.of(expiredRecord))
+                .thenReturn(expiredRecord)
 
             val result = idempotencyService.findByKey("test-key")
 
@@ -72,7 +71,7 @@ class IdempotencyServiceTest {
         @Test
         fun 키가_존재하지_않으면_null을_반환한다() {
             whenever(idempotencyRecordRepository.findByIdempotencyKey("missing-key"))
-                .thenReturn(Optional.empty())
+                .thenReturn(null)
 
             val result = idempotencyService.findByKey("missing-key")
 
