@@ -107,6 +107,7 @@ class RefundCompletionConsumer(
             event.items.forEach { item ->
                 inventoryCommandPort.increaseStock(item.productId, item.quantity)
             }
+            refundLocalOperationService.markStepAndSave(event.eventId, RefundEventLog.INVENTORY_RESTORED)
             eventLog.markStepCompleted(RefundEventLog.INVENTORY_RESTORED)
         }
 
@@ -118,20 +119,19 @@ class RefundCompletionConsumer(
                     item.refundPrice
                 )
             }
+            refundLocalOperationService.markStepAndSave(event.eventId, RefundEventLog.STATS_UPDATED)
             eventLog.markStepCompleted(RefundEventLog.STATS_UPDATED)
         }
-
-        refundEventLogRepository.save(eventLog)
     }
 
     fun executeOrderOperations(event: RefundCompletedEvent, eventLog: RefundEventLog) {
         if (event.isFullRefund && !eventLog.isStepCompleted(RefundEventLog.ORDER_CANCELLED)) {
             orderCommandPort.cancelOrder(event.orderId)
+            refundLocalOperationService.markStepAndSave(event.eventId, RefundEventLog.ORDER_CANCELLED)
             eventLog.markStepCompleted(RefundEventLog.ORDER_CANCELLED)
         } else if (!event.isFullRefund) {
+            refundLocalOperationService.markStepAndSave(event.eventId, RefundEventLog.ORDER_CANCELLED)
             eventLog.markStepCompleted(RefundEventLog.ORDER_CANCELLED)
         }
-
-        refundEventLogRepository.save(eventLog)
     }
 }
