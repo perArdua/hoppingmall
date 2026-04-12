@@ -25,13 +25,10 @@ class Category private constructor(
         this.name = name
     }
 
-    fun isRootCategory(): Boolean {
-        return parentCategoryId == null
-    }
+    fun isRootCategory(): Boolean = parentCategoryId == null
 
     companion object {
-        fun create(name: String, parentCategoryId: Long?, depth: Int): Category {
-            return Category(name = name, parentCategoryId = parentCategoryId, depth = depth)
-        }
+        fun create(name: String, parentCategoryId: Long?, depth: Int): Category =
+            Category(name = name, parentCategoryId = parentCategoryId, depth = depth)
     }
 }

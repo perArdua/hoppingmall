@@ -6,6 +6,7 @@ import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.metrics.OutboxMetrics
 import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
 import org.springframework.scheduling.annotation.Scheduled
@@ -63,7 +64,7 @@ class OutboxEventPublisher(
 
     fun publishEvent(eventId: Long) {
         val event = transactionTemplate.execute {
-            outboxEventRepository.findById(eventId).orElse(null)
+            outboxEventRepository.findByIdOrNull(eventId)
         } ?: return
 
         if (event.processed || event.status != OutboxStatus.RETRYING) {

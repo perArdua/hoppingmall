@@ -61,8 +61,8 @@ class Coupon private constructor(
             totalQuantity: Int,
             validFrom: LocalDateTime,
             validTo: LocalDateTime
-        ): Coupon {
-            return Coupon(
+        ): Coupon =
+            Coupon(
                 name = name,
                 code = code,
                 discountType = discountType,
@@ -73,7 +73,6 @@ class Coupon private constructor(
                 validFrom = validFrom,
                 validTo = validTo
             )
-        }
     }
 
     fun calculateDiscount(orderAmount: BigDecimal): BigDecimal {
@@ -96,13 +95,9 @@ class Coupon private constructor(
             now.isBefore(validTo)
     }
 
-    fun isExpired(): Boolean {
-        return LocalDateTime.now().isAfter(validTo)
-    }
+    fun isExpired(): Boolean = LocalDateTime.now().isAfter(validTo)
 
-    fun isExhausted(): Boolean {
-        return issuedQuantity >= totalQuantity
-    }
+    fun isExhausted(): Boolean = issuedQuantity >= totalQuantity
 
     fun issue() {
         issuedQuantity++

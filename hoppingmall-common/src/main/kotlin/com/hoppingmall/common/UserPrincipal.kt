@@ -9,9 +9,8 @@ class UserPrincipal(
     private val role: String
 ) : UserDetails {
 
-    override fun getAuthorities(): Collection<GrantedAuthority> {
-        return listOf(SimpleGrantedAuthority("ROLE_$role"))
-    }
+    override fun getAuthorities(): Collection<GrantedAuthority> =
+        listOf(SimpleGrantedAuthority("ROLE_$role"))
 
     override fun getPassword(): String? = null
 
@@ -30,8 +29,6 @@ class UserPrincipal(
     fun getRole(): String = role
 
     companion object {
-        fun of(userId: Long, role: String): UserPrincipal {
-            return UserPrincipal(userId, role)
-        }
+        fun of(userId: Long, role: String): UserPrincipal = UserPrincipal(userId, role)
     }
 }

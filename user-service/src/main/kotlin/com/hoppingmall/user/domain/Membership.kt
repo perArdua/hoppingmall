@@ -20,9 +20,7 @@ class Membership(
 ) : BaseEntity() {
 
     companion object {
-        fun create(userId: Long): Membership {
-            return Membership(userId = userId)
-        }
+        fun create(userId: Long): Membership = Membership(userId = userId)
     }
 
     fun addPurchaseAmount(amount: BigDecimal) {

@@ -43,9 +43,8 @@ class MockPaymentService : PaymentService {
         }
     }
 
-    private fun generateMockTransactionId(): String {
-        return "MOCK_${System.currentTimeMillis()}_${Random.nextInt(1000, 9999)}"
-    }
+    private fun generateMockTransactionId(): String =
+        "MOCK_${System.currentTimeMillis()}_${Random.nextInt(1000, 9999)}"
 
     private fun getRandomErrorMessage(): String {
         val errors = listOf(

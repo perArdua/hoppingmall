@@ -42,13 +42,9 @@ data class PointPolicy(
         require(minUseAmount <= maxUseAmount) { "최소 사용 금액은 최대 사용 금액을 초과할 수 없습니다" }
     }
 
-    fun activate(): PointPolicy {
-        return this.copy(isActive = true)
-    }
+    fun activate(): PointPolicy = copy(isActive = true)
 
-    fun deactivate(): PointPolicy {
-        return this.copy(isActive = false)
-    }
+    fun deactivate(): PointPolicy = copy(isActive = false)
 
     fun update(
         policyName: String,
@@ -57,8 +53,8 @@ data class PointPolicy(
         minUseAmount: BigDecimal,
         maxUseAmount: BigDecimal,
         description: String?
-    ): PointPolicy {
-        return this.copy(
+    ): PointPolicy =
+        copy(
             policyName = policyName,
             earnRate = earnRate,
             maxEarnRate = maxEarnRate,
@@ -66,16 +62,14 @@ data class PointPolicy(
             maxUseAmount = maxUseAmount,
             description = description
         )
-    }
 
     fun calculateEarnPoints(purchaseAmount: BigDecimal): BigDecimal {
         require(purchaseAmount > BigDecimal.ZERO) { "구매 금액은 0보다 커야 합니다" }
         return purchaseAmount * earnRate
     }
 
-    fun canUsePoints(useAmount: BigDecimal): Boolean {
-        return useAmount >= minUseAmount && useAmount <= maxUseAmount
-    }
+    fun canUsePoints(useAmount: BigDecimal): Boolean =
+        useAmount >= minUseAmount && useAmount <= maxUseAmount
 
     companion object {
         fun create(
@@ -85,8 +79,8 @@ data class PointPolicy(
             minUseAmount: BigDecimal,
             maxUseAmount: BigDecimal,
             description: String? = null
-        ): PointPolicy {
-            return PointPolicy(
+        ): PointPolicy =
+            PointPolicy(
                 policyName = policyName,
                 earnRate = earnRate,
                 maxEarnRate = maxEarnRate,
@@ -95,6 +89,5 @@ data class PointPolicy(
                 isActive = false,
                 description = description
             )
-        }
     }
 }

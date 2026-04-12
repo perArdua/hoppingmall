@@ -28,8 +28,6 @@ class ProductImage private constructor(
             productId: Long,
             imageUrl: String,
             sortOrder: Int = 0
-        ): ProductImage {
-            return ProductImage(productId, imageUrl, sortOrder)
-        }
+        ): ProductImage = ProductImage(productId, imageUrl, sortOrder)
     }
 }

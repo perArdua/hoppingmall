@@ -29,9 +29,8 @@ class ShardedRedisCache(
         return delegate.get(key, type)
     }
 
-    override fun <T : Any?> get(key: Any, valueLoader: Callable<T>): T? {
-        return delegate.get(key, valueLoader)
-    }
+    override fun <T : Any?> get(key: Any, valueLoader: Callable<T>): T? =
+        delegate.get(key, valueLoader)
 
     override fun put(key: Any, value: Any?) {
         delegate.put(key, value)

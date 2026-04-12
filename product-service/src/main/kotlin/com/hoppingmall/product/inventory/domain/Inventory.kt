@@ -26,13 +26,10 @@ class Inventory private constructor(
         stockQuantity += quantity
     }
 
-    fun hasStock(quantity: Int): Boolean {
-        return stockQuantity >= quantity
-    }
+    fun hasStock(quantity: Int): Boolean = stockQuantity >= quantity
 
     companion object {
-        fun create(productId: Long, stockQuantity: Int): Inventory {
-            return Inventory(productId = productId, stockQuantity = stockQuantity)
-        }
+        fun create(productId: Long, stockQuantity: Int): Inventory =
+            Inventory(productId = productId, stockQuantity = stockQuantity)
     }
 }

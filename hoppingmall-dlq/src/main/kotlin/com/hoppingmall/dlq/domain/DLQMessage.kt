@@ -74,9 +74,7 @@ class DLQMessage(
         this.notes = notes
     }
 
-    fun getMessageKey(): String {
-        return "${originalTopic}:${originalPartition}:${originalOffset}"
-    }
+    fun getMessageKey(): String = "${originalTopic}:${originalPartition}:${originalOffset}"
 
     fun scheduleNextRetry() {
         this.status = DLQStatus.PENDING

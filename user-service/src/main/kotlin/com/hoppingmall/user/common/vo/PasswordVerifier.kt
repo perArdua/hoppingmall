@@ -7,9 +7,8 @@ import org.springframework.stereotype.Component
 class PasswordVerifier(
     private val passwordEncoder: PasswordEncoder
 ) {
-    fun matches(raw: String, encoded: Password): Boolean {
-        return passwordEncoder.matches(raw, encoded.value)
-    }
+    fun matches(raw: String, encoded: Password): Boolean =
+        passwordEncoder.matches(raw, encoded.value)
 
     fun assertMatches(raw: String, encoded: Password) {
         if (!matches(raw, encoded)) {

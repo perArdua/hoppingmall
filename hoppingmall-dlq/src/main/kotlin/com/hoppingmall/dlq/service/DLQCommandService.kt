@@ -8,6 +8,7 @@ import com.hoppingmall.dlq.metrics.DLQMetrics
 import com.hoppingmall.dlq.publisher.DLQMessagePublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.ConcurrentHashMap
@@ -81,7 +82,7 @@ class DLQCommandService(
         }
 
         return try {
-            val dlqMessage = dlqMessageRepository.findById(dlqMessageId).orElse(null)
+            val dlqMessage = dlqMessageRepository.findByIdOrNull(dlqMessageId)
             if (dlqMessage == null) {
                 logger.warn("DLQ 메시지를 찾을 수 없음: id={}", dlqMessageId)
                 return false
@@ -129,7 +130,7 @@ class DLQCommandService(
             dlqMetrics.recordDlqRetryFailed()
 
             try {
-                val dlqMessage = dlqMessageRepository.findById(dlqMessageId).orElse(null)
+                val dlqMessage = dlqMessageRepository.findByIdOrNull(dlqMessageId)
                 dlqMessage?.let {
                     if (it.retryCount >= MAX_RETRY_COUNT) {
                         it.markAsFailed("최대 재시도 후 실패: ${e.message}")

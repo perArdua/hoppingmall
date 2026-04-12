@@ -29,12 +29,11 @@ class Seller private constructor(
         this.approvalStatus = ApprovalStatus.REJECTED
     }
 
-    fun getApprovalStatus(): ApprovalStatus = this.approvalStatus
+    fun getApprovalStatus(): ApprovalStatus = approvalStatus
 
     companion object {
-        fun create(user: User, businessNumber: String): Seller {
-            return Seller(user.id!!, businessNumber, ApprovalStatus.PENDING)
-        }
+        fun create(user: User, businessNumber: String): Seller =
+            Seller(user.id!!, businessNumber, ApprovalStatus.PENDING)
     }
 
     enum class ApprovalStatus {

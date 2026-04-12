@@ -31,9 +31,8 @@ class OutboxEventService(
         )
     }
 
-    fun getEventsByAggregateId(aggregateId: String, aggregateType: String): List<OutboxEvent> {
-        return outboxEventRepository.findByAggregateIdAndType(aggregateId, aggregateType)
-    }
+    fun getEventsByAggregateId(aggregateId: String, aggregateType: String): List<OutboxEvent> =
+        outboxEventRepository.findByAggregateIdAndType(aggregateId, aggregateType)
 
     fun getEventStats(): Map<String, Long> {
         return mapOf(

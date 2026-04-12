@@ -3,6 +3,7 @@ package com.hoppingmall.payment.internal
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.service.PaymentCommandService
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.math.BigDecimal
@@ -23,7 +24,7 @@ class InternalPaymentController(
 
     @GetMapping("/{id}")
     fun getPaymentById(@PathVariable id: Long): ResponseEntity<PaymentInfoResponse> {
-        val payment = paymentRepository.findById(id).orElse(null)
+        val payment = paymentRepository.findByIdOrNull(id)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(toResponse(payment))
     }

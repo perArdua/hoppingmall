@@ -41,12 +41,11 @@ class Order private constructor(
         fun create(
             buyerId: Long,
             totalAmount: BigDecimal
-        ): Order {
-            return Order(
+        ): Order =
+            Order(
                 buyerId = buyerId,
                 totalAmount = totalAmount
             )
-        }
     }
 
     fun updateStatus(newStatus: OrderStatus) {
@@ -62,7 +61,5 @@ class Order private constructor(
         return OrderStatus.CANCELLED in allowed || OrderStatus.CANCEL_REQUESTED in allowed
     }
 
-    fun isCancelled(): Boolean {
-        return this.status == OrderStatus.CANCELLED
-    }
+    fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
 }
