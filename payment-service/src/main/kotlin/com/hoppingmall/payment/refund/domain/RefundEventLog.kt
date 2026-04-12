@@ -18,7 +18,7 @@ class RefundEventLog(
     @Column(nullable = false)
     val orderId: Long,
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "refund_event_log_steps", joinColumns = [JoinColumn(name = "refund_event_log_id")])
     @Column(name = "step")
     val completedSteps: MutableSet<String> = mutableSetOf()

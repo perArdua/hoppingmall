@@ -107,7 +107,7 @@ class RefundCompletionConsumerTest {
         val event = fullRefundEvent()
         val eventLog = newEventLog()
 
-        whenever(refundEventLogRepository.findByEventId(event.eventId)).thenReturn(null)
+        whenever(refundEventLogRepository.findByEventIdWithSteps(event.eventId)).thenReturn(null)
         whenever(refundEventLogRepository.save(any<RefundEventLog>())).thenReturn(eventLog)
         whenever(orderCommandPort.cancelOrder(event.orderId)).thenReturn(true)
 
@@ -126,7 +126,7 @@ class RefundCompletionConsumerTest {
         val event = partialRefundEvent()
         val eventLog = newEventLog(event.eventId)
 
-        whenever(refundEventLogRepository.findByEventId(event.eventId)).thenReturn(null)
+        whenever(refundEventLogRepository.findByEventIdWithSteps(event.eventId)).thenReturn(null)
         whenever(refundEventLogRepository.save(any<RefundEventLog>())).thenReturn(eventLog)
 
         consumer.processRefundCompletion(event)
@@ -142,7 +142,7 @@ class RefundCompletionConsumerTest {
         val event = fullRefundEvent()
         val completedLog = completedEventLog()
 
-        whenever(refundEventLogRepository.findByEventId(event.eventId)).thenReturn(completedLog)
+        whenever(refundEventLogRepository.findByEventIdWithSteps(event.eventId)).thenReturn(completedLog)
 
         consumer.processRefundCompletion(event)
 
@@ -160,7 +160,7 @@ class RefundCompletionConsumerTest {
         partialLog.markStepCompleted(RefundEventLog.COUPON_RESTORED)
         partialLog.markStepCompleted(RefundEventLog.POINTS_REFUNDED)
 
-        whenever(refundEventLogRepository.findByEventId(event.eventId)).thenReturn(partialLog)
+        whenever(refundEventLogRepository.findByEventIdWithSteps(event.eventId)).thenReturn(partialLog)
         whenever(orderCommandPort.cancelOrder(event.orderId)).thenReturn(true)
 
         consumer.processRefundCompletion(event)

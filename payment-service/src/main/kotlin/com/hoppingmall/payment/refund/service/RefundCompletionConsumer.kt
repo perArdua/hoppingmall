@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
 @Service
@@ -65,9 +66,10 @@ class RefundCompletionConsumer(
         )
     }
 
+    @Transactional
     fun processRefundCompletion(event: RefundCompletedEvent) {
         try {
-            val existingLog = refundEventLogRepository.findByEventId(event.eventId)
+            val existingLog = refundEventLogRepository.findByEventIdWithSteps(event.eventId)
             if (existingLog != null && existingLog.completedSteps.size >= 6) {
                 logger.info("이미 완료된 환불 이벤트: ${event.eventId}")
                 return
@@ -97,7 +99,7 @@ class RefundCompletionConsumer(
                 )
             )
         } catch (e: DataIntegrityViolationException) {
-            refundEventLogRepository.findByEventId(event.eventId)
+            refundEventLogRepository.findByEventIdWithSteps(event.eventId)
                 ?: throw e
         }
     }
