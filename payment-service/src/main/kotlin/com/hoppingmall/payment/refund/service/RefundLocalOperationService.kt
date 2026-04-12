@@ -21,7 +21,7 @@ class RefundLocalOperationService(
 
     @Transactional
     fun markStepAndSave(eventId: String, step: String) {
-        val eventLog = refundEventLogRepository.findByEventId(eventId) ?: return
+        val eventLog = refundEventLogRepository.findByEventIdWithSteps(eventId) ?: return
         eventLog.markStepCompleted(step)
         refundEventLogRepository.save(eventLog)
     }
