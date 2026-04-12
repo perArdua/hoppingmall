@@ -28,6 +28,7 @@ import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.SliceImpl
 import org.springframework.transaction.TransactionStatus
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
@@ -229,7 +230,8 @@ class ProductStatisticsCommandServiceImplTest {
         val stats = createStats()
         stats.incrementSales(10, BigDecimal("100000"))
 
-        whenever(productStatisticsRepository.findAllActive()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAllActive(any<Pageable>()))
+            .thenReturn(SliceImpl(listOf(stats)))
         whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
             .thenReturn(emptyList())
         whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
@@ -242,7 +244,8 @@ class ProductStatisticsCommandServiceImplTest {
 
     @Test
     fun 오늘_활동이_없는_통계는_시간별_스냅샷에서_건너뛴다() {
-        whenever(productStatisticsRepository.findAllActive()).thenReturn(emptyList())
+        whenever(productStatisticsRepository.findAllActive(any<Pageable>()))
+            .thenReturn(SliceImpl(emptyList()))
 
         service.flushHourlySnapshot()
 
@@ -258,7 +261,8 @@ class ProductStatisticsCommandServiceImplTest {
             productId = 1L, statisticsDate = LocalDate.now(), hour = java.time.LocalDateTime.now().hour
         )
 
-        whenever(productStatisticsRepository.findAllActive()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAllActive(any<Pageable>()))
+            .thenReturn(SliceImpl(listOf(stats)))
         whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
             .thenReturn(listOf(hourly))
         whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
