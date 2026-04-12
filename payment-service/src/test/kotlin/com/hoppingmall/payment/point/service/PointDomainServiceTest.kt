@@ -41,6 +41,7 @@ class PointDomainServiceTest {
     @Test
     fun 기존_포인트가_있으면_조회하여_반환한다() {
         val existing = Point(userId = 1L, balance = BigDecimal("1000"))
+        whenever(pointRepository.findByUserId(1L)).thenReturn(existing)
         whenever(pointRepository.findByUserIdForUpdate(1L)).thenReturn(existing)
 
         val result = pointDomainService.findOrCreatePoint(1L)
@@ -56,9 +57,8 @@ class PointDomainServiceTest {
         val idField = BaseEntity::class.java.getDeclaredField("id")
         idField.isAccessible = true
         idField.set(newPoint, 1L)
-        whenever(pointRepository.findByUserIdForUpdate(1L))
-            .thenReturn(null)
-            .thenReturn(newPoint)
+        whenever(pointRepository.findByUserId(1L)).thenReturn(null)
+        whenever(pointRepository.findByUserIdForUpdate(1L)).thenReturn(newPoint)
         whenever(txManager.getTransaction(any())).thenReturn(mock())
         doAnswer { newPoint }.whenever(pointRepository).save(any())
 
@@ -74,9 +74,8 @@ class PointDomainServiceTest {
         val idField = BaseEntity::class.java.getDeclaredField("id")
         idField.isAccessible = true
         idField.set(existing, 1L)
-        whenever(pointRepository.findByUserIdForUpdate(1L))
-            .thenReturn(null)
-            .thenReturn(existing)
+        whenever(pointRepository.findByUserId(1L)).thenReturn(null)
+        whenever(pointRepository.findByUserIdForUpdate(1L)).thenReturn(existing)
         whenever(txManager.getTransaction(any())).thenReturn(mock())
         doThrow(DataIntegrityViolationException("duplicate")).whenever(pointRepository).save(any())
 
@@ -87,9 +86,8 @@ class PointDomainServiceTest {
 
     @Test
     fun 동시_생성_충돌_후에도_조회_실패하면_예외가_발생한다() {
-        whenever(pointRepository.findByUserIdForUpdate(1L))
-            .thenReturn(null)
-            .thenReturn(null)
+        whenever(pointRepository.findByUserId(1L)).thenReturn(null)
+        whenever(pointRepository.findByUserIdForUpdate(1L)).thenReturn(null)
         whenever(txManager.getTransaction(any())).thenReturn(mock())
         doThrow(DataIntegrityViolationException("duplicate")).whenever(pointRepository).save(any())
 

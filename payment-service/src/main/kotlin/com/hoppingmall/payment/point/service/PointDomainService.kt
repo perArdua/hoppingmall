@@ -17,7 +17,13 @@ class PointDomainService(
 
     @Transactional
     fun findOrCreatePoint(userId: Long): Point {
-        pointRepository.findByUserIdForUpdate(userId)?.let { return it }
+        ensurePointExists(userId)
+        return pointRepository.findByUserIdForUpdate(userId)
+            ?: throw IllegalStateException("포인트 생성 실패: 사용자 $userId")
+    }
+
+    private fun ensurePointExists(userId: Long) {
+        if (pointRepository.findByUserId(userId) != null) return
 
         val newTx = TransactionTemplate(txManager).apply {
             propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
@@ -28,8 +34,5 @@ class PointDomainService(
             } catch (_: DataIntegrityViolationException) {
             }
         }
-
-        return pointRepository.findByUserIdForUpdate(userId)
-            ?: throw IllegalStateException("포인트 생성 실패: 사용자 $userId")
     }
 }
