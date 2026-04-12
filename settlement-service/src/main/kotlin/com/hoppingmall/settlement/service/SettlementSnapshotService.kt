@@ -4,6 +4,8 @@ import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,34 +18,50 @@ class SettlementSnapshotService(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
+    companion object {
+        private const val BATCH_SIZE = 200
+    }
+
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
     fun createSnapshot() {
         log.info("Settlement snapshot job started")
 
-        val settlements = settlementRepository.findAll()
-        val summaryMap = settlementSummaryRepository
-            .findBySettlementIdIn(settlements.map { it.id!! })
-            .associateBy { it.settlementId }
+        var totalCreated = 0
+        var totalUpdated = 0
+        var page = 0
 
-        val newSummaries = mutableListOf<SettlementSummary>()
+        do {
+            val pageable = PageRequest.of(page, BATCH_SIZE, Sort.by("id"))
+            val settlementPage = settlementRepository.findAll(pageable)
+            val settlements = settlementPage.content
 
-        settlements.forEach { settlement ->
-            val existing = summaryMap[settlement.id!!]
-            if (existing != null) {
-                existing.updateFrom(settlement)
-            } else {
-                newSummaries.add(SettlementSummary.from(settlement))
+            if (settlements.isEmpty()) break
+
+            val summaryMap = settlementSummaryRepository
+                .findBySettlementIdIn(settlements.map { it.id!! })
+                .associateBy { it.settlementId }
+
+            val newSummaries = mutableListOf<SettlementSummary>()
+
+            settlements.forEach { settlement ->
+                val existing = summaryMap[settlement.id!!]
+                if (existing != null) {
+                    existing.updateFrom(settlement)
+                } else {
+                    newSummaries.add(SettlementSummary.from(settlement))
+                }
             }
-        }
 
-        if (newSummaries.isNotEmpty()) {
-            settlementSummaryRepository.saveAll(newSummaries)
-        }
+            if (newSummaries.isNotEmpty()) {
+                settlementSummaryRepository.saveAll(newSummaries)
+            }
 
-        val created = newSummaries.size
-        val updated = settlements.size - created
+            totalCreated += newSummaries.size
+            totalUpdated += settlements.size - newSummaries.size
+            page++
+        } while (settlementPage.hasNext())
 
-        log.info("Settlement snapshot job completed: created=$created, updated=$updated")
+        log.info("Settlement snapshot job completed: created=$totalCreated, updated=$totalUpdated")
     }
 }
