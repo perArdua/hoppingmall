@@ -14,6 +14,7 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageImpl
@@ -80,6 +81,37 @@ class SettlementSnapshotServiceTest {
 
         settlementSnapshotService.createSnapshot()
 
+        verify(settlementSummaryRepository, never()).saveAll(any<List<SettlementSummary>>())
+    }
+
+    @Test
+    fun 다수_페이지의_정산_데이터를_배치_처리한다() {
+        val settlement1 = createSettlement(1L)
+        val settlement2 = createSettlement(2L)
+        val page0 = PageImpl(listOf(settlement1), PageRequest.of(0, 1, Sort.by("id")), 2)
+        val page1 = PageImpl(listOf(settlement2), PageRequest.of(1, 1, Sort.by("id")), 2)
+
+        whenever(settlementRepository.findAll(any<Pageable>()))
+            .thenReturn(page0)
+            .thenReturn(page1)
+        whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(emptyList())
+        whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(2L))).thenReturn(emptyList())
+        whenever(settlementSummaryRepository.saveAll(any<List<SettlementSummary>>())).thenAnswer { it.arguments[0] }
+
+        settlementSnapshotService.createSnapshot()
+
+        verify(settlementSummaryRepository, times(2)).saveAll(any<List<SettlementSummary>>())
+    }
+
+    @Test
+    fun 정산_데이터가_없으면_스냅샷을_생성하지_않는다() {
+        val emptyPage = PageImpl<Settlement>(emptyList(), PageRequest.of(0, 200, Sort.by("id")), 0)
+
+        whenever(settlementRepository.findAll(any<Pageable>())).thenReturn(emptyPage)
+
+        settlementSnapshotService.createSnapshot()
+
+        verify(settlementSummaryRepository, never()).findBySettlementIdIn(any())
         verify(settlementSummaryRepository, never()).saveAll(any<List<SettlementSummary>>())
     }
 }
