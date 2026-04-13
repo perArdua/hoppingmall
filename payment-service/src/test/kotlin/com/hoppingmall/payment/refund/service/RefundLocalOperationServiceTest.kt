@@ -85,6 +85,7 @@ class RefundLocalOperationServiceTest {
             amount = BigDecimal("50000"),
             method = PaymentMethod.CREDIT_CARD
         )
+        payment.updateStatus(newStatus = PaymentStatus.SUCCESS, transactionId = "txn-1")
 
         whenever(paymentRepository.findById(event.paymentId)).thenReturn(Optional.of(payment))
         whenever(refundEventLogRepository.save(any<RefundEventLog>())).thenReturn(eventLog)
