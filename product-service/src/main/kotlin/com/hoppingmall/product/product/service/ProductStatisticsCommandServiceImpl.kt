@@ -107,36 +107,47 @@ class ProductStatisticsCommandServiceImpl(
         logger.info("일별 통계 스냅샷 완료: ${totalProcessed}건")
     }
 
-    @Transactional
     override fun flushHourlySnapshot() {
         val now = java.time.LocalDateTime.now()
         val today = now.toLocalDate()
         val currentHour = now.hour
-        val activeStats = productStatisticsRepository.findAllActive()
-        if (activeStats.isEmpty()) {
-            logger.info("시간별 통계 스냅샷 완료: 0건 (${currentHour}시)")
-            return
-        }
+        var page = 0
+        var totalProcessed = 0
 
-        val productIds = activeStats.map { it.productId }
-        val existingHourlyMap = productHourlyStatisticsRepository
-            .findByStatisticsDateAndHourAndProductIdIn(today, currentHour, productIds)
-            .associateBy { it.productId }
-
-        val hourlyToSave = mutableListOf<ProductHourlyStatistics>()
-        for (stats in activeStats) {
-            val hourly = existingHourlyMap[stats.productId] ?: ProductHourlyStatistics.create(
-                productId = stats.productId,
-                statisticsDate = today,
-                hour = currentHour
+        while (true) {
+            val slice = productStatisticsRepository.findAllActive(
+                PageRequest.of(page, BATCH_SIZE, Sort.by("id"))
             )
-            hourly.updateFromStatistics(stats)
-            hourlyToSave.add(hourly)
+            if (slice.isEmpty) break
+
+            val chunk = slice.content
+            transactionTemplate.executeWithoutResult {
+                val productIds = chunk.map { it.productId }
+
+                val existingHourlyMap = productHourlyStatisticsRepository
+                    .findByStatisticsDateAndHourAndProductIdIn(today, currentHour, productIds)
+                    .associateBy { it.productId }
+
+                val hourlyToSave = mutableListOf<ProductHourlyStatistics>()
+                for (stats in chunk) {
+                    val hourly = existingHourlyMap[stats.productId] ?: ProductHourlyStatistics.create(
+                        productId = stats.productId,
+                        statisticsDate = today,
+                        hour = currentHour
+                    )
+                    hourly.updateFromStatistics(stats)
+                    hourlyToSave.add(hourly)
+                }
+
+                productHourlyStatisticsRepository.saveAll(hourlyToSave)
+            }
+
+            totalProcessed += chunk.size
+            if (!slice.hasNext()) break
+            page++
         }
 
-        productHourlyStatisticsRepository.saveAll(hourlyToSave)
-
-        logger.info("시간별 통계 스냅샷 완료: ${hourlyToSave.size}건 (${currentHour}시)")
+        logger.info("시간별 통계 스냅샷 완료: ${totalProcessed}건 (${currentHour}시)")
     }
 
     private fun toSalesAmountMap(rows: List<Array<Any>>): Map<Long, BigDecimal> {

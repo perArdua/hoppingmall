@@ -28,6 +28,8 @@ import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.SliceImpl
+import org.springframework.data.domain.Sort
 import org.springframework.transaction.TransactionStatus
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
@@ -229,7 +231,8 @@ class ProductStatisticsCommandServiceImplTest {
         val stats = createStats()
         stats.incrementSales(10, BigDecimal("100000"))
 
-        whenever(productStatisticsRepository.findAllActive()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAllActive(any<Pageable>()))
+            .thenReturn(SliceImpl(listOf(stats)))
         whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
             .thenReturn(emptyList())
         whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
@@ -242,7 +245,8 @@ class ProductStatisticsCommandServiceImplTest {
 
     @Test
     fun 오늘_활동이_없는_통계는_시간별_스냅샷에서_건너뛴다() {
-        whenever(productStatisticsRepository.findAllActive()).thenReturn(emptyList())
+        whenever(productStatisticsRepository.findAllActive(any<Pageable>()))
+            .thenReturn(SliceImpl(emptyList()))
 
         service.flushHourlySnapshot()
 
@@ -258,7 +262,8 @@ class ProductStatisticsCommandServiceImplTest {
             productId = 1L, statisticsDate = LocalDate.now(), hour = java.time.LocalDateTime.now().hour
         )
 
-        whenever(productStatisticsRepository.findAllActive()).thenReturn(listOf(stats))
+        whenever(productStatisticsRepository.findAllActive(any<Pageable>()))
+            .thenReturn(SliceImpl(listOf(stats)))
         whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
             .thenReturn(listOf(hourly))
         whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
@@ -267,5 +272,31 @@ class ProductStatisticsCommandServiceImplTest {
         service.flushHourlySnapshot()
 
         assertThat(hourly.hourlySalesQuantity).isEqualTo(10)
+    }
+
+    @Test
+    fun 다수_페이지의_시간별_스냅샷을_배치_처리한다() {
+        val stats1 = createStats(1L)
+        stats1.incrementSales(5, BigDecimal("50000"))
+        val stats2 = ProductStatistics.create(
+            productId = 2L, productName = "테스트2", sellerId = 1L, categoryId = 1L
+        ).withId(2L)
+        stats2.incrementSales(3, BigDecimal("30000"))
+
+        val slice0 = SliceImpl(listOf(stats1), PageRequest.of(0, 1, Sort.by("id")), true)
+        val slice1 = SliceImpl(listOf(stats2), PageRequest.of(1, 1, Sort.by("id")), false)
+
+        whenever(productStatisticsRepository.findAllActive(any<Pageable>()))
+            .thenReturn(slice0)
+            .thenReturn(slice1)
+        whenever(productHourlyStatisticsRepository.findByStatisticsDateAndHourAndProductIdIn(any(), any<Int>(), any()))
+            .thenReturn(emptyList())
+        whenever(productHourlyStatisticsRepository.saveAll(any<List<ProductHourlyStatistics>>()))
+            .thenAnswer { it.arguments[0] }
+
+        service.flushHourlySnapshot()
+
+        verify(productHourlyStatisticsRepository, org.mockito.kotlin.times(2))
+            .saveAll(any<List<ProductHourlyStatistics>>())
     }
 }

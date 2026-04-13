@@ -62,4 +62,7 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
 
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.todaySalesQuantity > 0 OR ps.todayRefundQuantity > 0")
     fun findAllActive(): List<ProductStatistics>
+
+    @Query("SELECT ps FROM ProductStatistics ps WHERE ps.todaySalesQuantity > 0 OR ps.todayRefundQuantity > 0")
+    fun findAllActive(pageable: Pageable): Slice<ProductStatistics>
 }
