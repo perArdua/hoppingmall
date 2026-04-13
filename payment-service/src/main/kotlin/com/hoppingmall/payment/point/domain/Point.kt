@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.point.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.payment.point.exception.PointInsufficientBalanceException
 import jakarta.persistence.*
 import java.math.BigDecimal
 
@@ -25,11 +26,9 @@ class Point(
     }
 
     fun usePoints(points: BigDecimal) {
-        if (points < BigDecimal.ZERO) {
-            throw IllegalArgumentException("포인트는 음수일 수 없습니다")
-        }
+        require(points >= BigDecimal.ZERO) { "포인트는 음수일 수 없습니다" }
         if (this.balance < points) {
-            throw IllegalArgumentException("포인트 잔액이 부족합니다")
+            throw PointInsufficientBalanceException()
         }
         this.balance = this.balance.subtract(points)
     }

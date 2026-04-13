@@ -48,7 +48,7 @@ class ProductTest {
     }
 
     @Test
-    fun 가격이_0_이하이면_예외를_발생시킨다() {
+    fun 수정_시_가격이_0_이하이면_예외를_발생시킨다() {
         val product = Product.create(
             sellerId = 1L, categoryId = 1L, name = "테스트상품",
             description = "설명", price = BigDecimal("10000"), status = ProductStatus.AVAILABLE
@@ -58,6 +58,26 @@ class ProductTest {
             product.update(
                 name = "수정상품", description = "수정설명",
                 price = BigDecimal.ZERO, categoryId = 1L, status = ProductStatus.AVAILABLE
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun 생성_시_가격이_0_이하이면_예외를_발생시킨다() {
+        assertThatThrownBy {
+            Product.create(
+                sellerId = 1L, categoryId = 1L, name = "테스트상품",
+                description = "설명", price = BigDecimal.ZERO, status = ProductStatus.AVAILABLE
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun 생성_시_가격이_음수이면_예외를_발생시킨다() {
+        assertThatThrownBy {
+            Product.create(
+                sellerId = 1L, categoryId = 1L, name = "테스트상품",
+                description = "설명", price = BigDecimal("-1000"), status = ProductStatus.AVAILABLE
             )
         }.isInstanceOf(IllegalArgumentException::class.java)
     }

@@ -116,11 +116,7 @@ class PaymentCommandServiceImpl(
     }
 
     private fun executeCancelPayment(payment: Payment): PaymentResponse {
-        if (payment.status != PaymentStatus.SUCCESS && payment.status != PaymentStatus.PENDING) {
-            throw PaymentInvalidStateException()
-        }
-
-        payment.status = PaymentStatus.CANCELLED
+        payment.updateStatus(PaymentStatus.CANCELLED)
         val cancelledPayment = paymentRepository.save(payment)
 
         paymentMetrics.recordPaymentCancelled()
@@ -132,16 +128,19 @@ class PaymentCommandServiceImpl(
     }
 
     private fun updatePaymentWithResult(payment: Payment, result: PaymentResult): Payment {
-        return payment.apply {
-            if (result.isSuccess) {
-                status = PaymentStatus.SUCCESS
-                transactionId = result.transactionId
+        if (result.isSuccess) {
+            payment.updateStatus(
+                newStatus = PaymentStatus.SUCCESS,
+                transactionId = result.transactionId,
                 completedAt = result.completedAt
-            } else {
-                status = PaymentStatus.FAILED
+            )
+        } else {
+            payment.updateStatus(
+                newStatus = PaymentStatus.FAILED,
                 errorMessage = result.errorMessage
-            }
+            )
         }
+        return payment
     }
 
     private fun publishPaymentEvents(payment: Payment, earnRate: BigDecimal? = null) {

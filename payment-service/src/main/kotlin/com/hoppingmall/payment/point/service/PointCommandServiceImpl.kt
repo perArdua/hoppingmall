@@ -6,7 +6,6 @@ import com.hoppingmall.payment.point.domain.PointHistoryRepository
 import com.hoppingmall.payment.point.dto.request.PointUseRequest
 import com.hoppingmall.payment.point.dto.response.PointUseResponse
 import com.hoppingmall.payment.point.enum.PointType
-import com.hoppingmall.payment.point.exception.PointInsufficientBalanceException
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -23,9 +22,7 @@ class PointCommandServiceImpl(
     @CacheEvict(cacheNames = ["point-balance"], key = "#userId")
     override fun usePoint(userId: Long, request: PointUseRequest): PointUseResponse {
         val point = pointDomainService.findOrCreatePoint(userId)
-        validateSufficientBalance(point, request.amount)
-
-        point.balance = point.balance.subtract(request.amount)
+        point.usePoints(request.amount)
         val savedPoint = pointRepository.save(point)
 
         val pointHistory = PointHistory(
@@ -53,7 +50,7 @@ class PointCommandServiceImpl(
         if (pointHistoryRepository.existsByEventId(eventId)) return
 
         val point = pointDomainService.findOrCreatePoint(userId)
-        point.balance = point.balance.add(amount)
+        point.addPoints(amount)
         pointRepository.save(point)
 
         val pointHistory = PointHistory(
@@ -68,9 +65,4 @@ class PointCommandServiceImpl(
         pointHistoryRepository.save(pointHistory)
     }
 
-    private fun validateSufficientBalance(point: com.hoppingmall.payment.point.domain.Point, useAmount: BigDecimal) {
-        if (point.balance < useAmount) {
-            throw PointInsufficientBalanceException()
-        }
-    }
 }

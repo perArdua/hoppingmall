@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.point.domain
 
+import com.hoppingmall.payment.point.exception.PointInsufficientBalanceException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -51,7 +52,7 @@ class PointTest {
         val point = Point(userId = 1L, balance = BigDecimal("100"))
 
         assertThatThrownBy { point.usePoints(BigDecimal("200")) }
-            .isInstanceOf(IllegalArgumentException::class.java)
+            .isInstanceOf(PointInsufficientBalanceException::class.java)
     }
 
     @Test

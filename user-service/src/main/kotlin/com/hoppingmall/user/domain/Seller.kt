@@ -1,6 +1,7 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.user.exception.seller.SellerInvalidApprovalStatusException
 import jakarta.persistence.*
 
 @Entity
@@ -22,11 +23,19 @@ class Seller private constructor(
 ) : BaseEntity() {
 
     fun approve() {
+        validatePendingStatus()
         this.approvalStatus = ApprovalStatus.APPROVED
     }
 
     fun reject() {
+        validatePendingStatus()
         this.approvalStatus = ApprovalStatus.REJECTED
+    }
+
+    private fun validatePendingStatus() {
+        if (this.approvalStatus != ApprovalStatus.PENDING) {
+            throw SellerInvalidApprovalStatusException()
+        }
     }
 
     fun getApprovalStatus(): ApprovalStatus = approvalStatus
