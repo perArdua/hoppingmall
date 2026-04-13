@@ -5,14 +5,19 @@ import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 
 @Service
 class OutboxMaintenanceScheduler(
     private val outboxEventRepository: OutboxEventRepository,
-    private val outboxEventPublisher: OutboxEventPublisher
+    private val outboxEventPublisher: OutboxEventPublisher,
+    transactionManager: PlatformTransactionManager
 ) {
+
+    private val transactionTemplate = TransactionTemplate(transactionManager)
 
     private val logger = LoggerFactory.getLogger(OutboxMaintenanceScheduler::class.java)
     private val maxRetries = 3
@@ -30,22 +35,27 @@ class OutboxMaintenanceScheduler(
     }
 
     @Scheduled(fixedDelayString = "\${outbox.maintenance.stale-check-ms:300000}")
-    @Transactional
     fun handleStaleEvents() {
         val cutoffDate = LocalDateTime.now().minusMinutes(10)
-        val staleEvents = outboxEventRepository.findStaleEvents(cutoffDate, 50)
+        val staleEvents = transactionTemplate.execute {
+            outboxEventRepository.findStaleEvents(cutoffDate, 50)
+        } ?: return
 
-        if (staleEvents.isNotEmpty()) {
-            logger.warn("Found ${staleEvents.size} stale outbox events, retrying...")
+        if (staleEvents.isEmpty()) return
 
-            staleEvents.forEach { event ->
-                val eventId = event.id ?: return@forEach
-                if (event.retryCount >= maxRetries) {
+        logger.warn("Found ${staleEvents.size} stale outbox events, retrying...")
+
+        staleEvents.forEach { event ->
+            val eventId = event.id ?: return@forEach
+            if (event.retryCount >= maxRetries) {
+                transactionTemplate.executeWithoutResult {
                     event.markAsFailedPermanently("Stale event - max retries exceeded")
                     outboxEventRepository.save(event)
-                    return@forEach
                 }
-                val claimed = outboxEventRepository.claimStaleEvent(
+                return@forEach
+            }
+            val claimed = transactionTemplate.execute {
+                outboxEventRepository.claimStaleEvent(
                     id = eventId,
                     nextStatus = OutboxStatus.RETRYING,
                     updatedAt = LocalDateTime.now(),
@@ -53,9 +63,9 @@ class OutboxMaintenanceScheduler(
                     maxRetries = maxRetries,
                     statuses = listOf(OutboxStatus.PENDING, OutboxStatus.FAILED, OutboxStatus.RETRYING)
                 )
-                if (claimed > 0) {
-                    outboxEventPublisher.publishEvent(eventId)
-                }
+            } ?: 0
+            if (claimed > 0) {
+                outboxEventPublisher.publishEvent(eventId)
             }
         }
     }
