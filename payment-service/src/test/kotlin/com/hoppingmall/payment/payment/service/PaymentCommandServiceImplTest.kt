@@ -79,7 +79,12 @@ class PaymentCommandServiceImplTest {
             method = PaymentMethod.CREDIT_CARD
         )
         if (status != PaymentStatus.PENDING) {
-            payment.updateStatus(status, transactionId = "test-tx-${System.nanoTime()}")
+            if (status == PaymentStatus.REFUNDED || status == PaymentStatus.CANCELLED) {
+                payment.updateStatus(newStatus = PaymentStatus.SUCCESS, transactionId = "test-tx-${System.nanoTime()}")
+                payment.updateStatus(newStatus = status)
+            } else {
+                payment.updateStatus(newStatus = status, transactionId = "test-tx-${System.nanoTime()}")
+            }
         }
         val idField = BaseEntity::class.java.getDeclaredField("id")
         idField.isAccessible = true

@@ -70,7 +70,7 @@ class PaymentTest {
         val completedAt = LocalDateTime.of(2024, 1, 1, 12, 0)
 
         payment.updateStatus(
-            status = PaymentStatus.SUCCESS,
+            newStatus = PaymentStatus.SUCCESS,
             transactionId = "txn-123",
             completedAt = completedAt,
             errorMessage = null
@@ -87,7 +87,7 @@ class PaymentTest {
         val payment = createPayment()
 
         payment.updateStatus(
-            status = PaymentStatus.FAILED,
+            newStatus = PaymentStatus.FAILED,
             transactionId = null,
             completedAt = null,
             errorMessage = "카드 한도 초과"

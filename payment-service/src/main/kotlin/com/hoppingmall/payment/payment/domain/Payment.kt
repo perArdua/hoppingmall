@@ -3,6 +3,7 @@ package com.hoppingmall.payment.payment.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
+import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -53,6 +54,14 @@ class Payment private constructor(
 ) : BaseEntity() {
 
     companion object {
+        private val allowedTransitions: Map<PaymentStatus, Set<PaymentStatus>> = mapOf(
+            PaymentStatus.PENDING to setOf(PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.CANCELLED),
+            PaymentStatus.SUCCESS to setOf(PaymentStatus.CANCELLED, PaymentStatus.REFUNDED),
+            PaymentStatus.FAILED to emptySet(),
+            PaymentStatus.CANCELLED to emptySet(),
+            PaymentStatus.REFUNDED to emptySet()
+        )
+
         fun create(
             orderId: Long,
             userId: Long,
@@ -91,15 +100,23 @@ class Payment private constructor(
     }
 
     fun updateStatus(
-        status: PaymentStatus,
+        newStatus: PaymentStatus,
         transactionId: String? = null,
         completedAt: LocalDateTime? = null,
         errorMessage: String? = null
     ) {
-        this.status = status
+        validateTransition(newStatus)
+        this.status = newStatus
         this.transactionId = transactionId
         this.completedAt = completedAt
         this.errorMessage = errorMessage
+    }
+
+    private fun validateTransition(newStatus: PaymentStatus) {
+        val allowed = allowedTransitions[this.status] ?: emptySet()
+        if (newStatus !in allowed) {
+            throw PaymentInvalidStateException()
+        }
     }
 
     fun isSuccess(): Boolean = status == PaymentStatus.SUCCESS
