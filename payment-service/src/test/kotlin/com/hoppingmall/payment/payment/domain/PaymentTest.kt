@@ -3,7 +3,9 @@ package com.hoppingmall.payment.payment.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
+import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -143,6 +145,43 @@ class PaymentTest {
         val payment = createPayment()
 
         assertThat(payment.isFailed()).isFalse()
+    }
+
+    @Test
+    fun FAILED_상태에서_상태_변경_시_예외가_발생한다() {
+        val payment = createPayment()
+        payment.updateStatus(PaymentStatus.FAILED)
+
+        assertThatThrownBy { payment.updateStatus(PaymentStatus.SUCCESS) }
+            .isInstanceOf(PaymentInvalidStateException::class.java)
+    }
+
+    @Test
+    fun CANCELLED_상태에서_상태_변경_시_예외가_발생한다() {
+        val payment = createPayment()
+        payment.updateStatus(PaymentStatus.CANCELLED)
+
+        assertThatThrownBy { payment.updateStatus(PaymentStatus.SUCCESS) }
+            .isInstanceOf(PaymentInvalidStateException::class.java)
+    }
+
+    @Test
+    fun REFUNDED_상태에서_상태_변경_시_예외가_발생한다() {
+        val payment = createPayment()
+        payment.updateStatus(PaymentStatus.SUCCESS)
+        payment.updateStatus(PaymentStatus.REFUNDED)
+
+        assertThatThrownBy { payment.updateStatus(PaymentStatus.SUCCESS) }
+            .isInstanceOf(PaymentInvalidStateException::class.java)
+    }
+
+    @Test
+    fun SUCCESS에서_PENDING으로_전환_시_예외가_발생한다() {
+        val payment = createPayment()
+        payment.updateStatus(PaymentStatus.SUCCESS)
+
+        assertThatThrownBy { payment.updateStatus(PaymentStatus.PENDING) }
+            .isInstanceOf(PaymentInvalidStateException::class.java)
     }
 
     @Test
