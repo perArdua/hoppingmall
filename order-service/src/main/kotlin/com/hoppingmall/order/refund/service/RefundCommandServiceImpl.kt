@@ -134,12 +134,11 @@ class RefundCommandServiceImpl(
     }
 
     override fun approveRefund(refundId: Long, approverId: Long): RefundResponse {
-        val payment = paymentQueryPort.findById(
-            (refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException()).paymentId
-        ) ?: throw RefundPaymentNotFoundException()
+        val paymentId = (refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException()).paymentId
+        val payment = paymentQueryPort.findById(paymentId) ?: throw RefundPaymentNotFoundException()
 
         return transactionTemplate.execute { _ ->
-            val refund = refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException() 
+            val refund = refundRepository.findByIdOrNull(refundId) ?: throw RefundNotFoundException()
 
             if (refund.sellerId != approverId) {
                 throw RefundAccessDeniedException()
