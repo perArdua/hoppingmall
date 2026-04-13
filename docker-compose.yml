@@ -8,6 +8,14 @@ services:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
+    command: >
+      --max-connections=200
+      --innodb-buffer-pool-size=1G
+      --innodb-log-file-size=256M
+      --innodb-flush-log-at-trx-commit=1
+      --innodb-flush-method=O_DIRECT
+      --slow-query-log=ON
+      --long-query-time=1
     volumes:
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
       - mysql-data:/var/lib/mysql
@@ -500,6 +508,33 @@ services:
         condition: service_started
     ports:
       - "9121:9121"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
 
   seed-runner:
     image: mysql:8.0

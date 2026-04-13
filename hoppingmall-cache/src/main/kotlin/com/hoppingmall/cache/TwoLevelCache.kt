@@ -36,8 +36,8 @@ class TwoLevelCache(
     companion object {
         private const val LOCK_KEY_PREFIX = "lock:"
         private val LOCK_LEASE_TIME = Duration.ofSeconds(3)
-        private const val LOCK_RETRY_INTERVAL_MS = 80L
-        private const val LOCK_MAX_WAIT_MS = 1500L
+        private const val LOCK_RETRY_INTERVAL_MS = 50L
+        private const val LOCK_MAX_WAIT_MS = 500L
     }
 
     override fun getName(): String = name

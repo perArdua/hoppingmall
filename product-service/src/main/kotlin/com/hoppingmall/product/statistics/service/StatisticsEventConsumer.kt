@@ -12,7 +12,6 @@ import com.hoppingmall.product.statistics.port.OrderItemQueryPort
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class StatisticsEventConsumer(
@@ -25,16 +24,19 @@ class StatisticsEventConsumer(
     private val logger = LoggerFactory.getLogger(StatisticsEventConsumer::class.java)
 
     @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "statistics-service")
-    @Transactional
     fun handlePaymentCompleted(message: String) {
         val event = objectMapper.readValue(message, PaymentCompletedEvent::class.java)
+
+        if (statisticsEventLogRepository.existsByEventId(event.transactionId)) return
+
+        val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
+
         executeIdempotently(
             eventId = event.transactionId,
             eventDescription = "통계",
             logger = logger,
             existsCheck = { statisticsEventLogRepository.existsByEventId(event.transactionId) }
         ) {
-            val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
             orderItems.forEach { item ->
                 productStatisticsCommandService.incrementSalesStats(
                     item.productId,
@@ -56,7 +58,6 @@ class StatisticsEventConsumer(
     }
 
     @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "statistics-compensation-service")
-    @Transactional
     fun handleCompensationEvent(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
@@ -68,13 +69,16 @@ class StatisticsEventConsumer(
     }
 
     private fun handlePaymentCancelled(event: PaymentCancelledEvent) {
+        if (statisticsEventLogRepository.existsByEventId(event.eventId)) return
+
+        val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
+
         executeIdempotently(
             eventId = event.eventId,
             eventDescription = "통계 보상",
             logger = logger,
             existsCheck = { statisticsEventLogRepository.existsByEventId(event.eventId) }
         ) {
-            val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
             orderItems.forEach { item ->
                 productStatisticsCommandService.decrementSalesStats(
                     item.productId,
@@ -96,7 +100,6 @@ class StatisticsEventConsumer(
     }
 
     @KafkaListener(topics = [KafkaTopics.PAYMENT_REVERSAL], groupId = "statistics-compensation-service")
-    @Transactional
     fun handlePaymentReversal(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
@@ -106,13 +109,16 @@ class StatisticsEventConsumer(
         val eventId = node.get("eventId")?.asText() ?: return
         val orderId = node.get("orderId")?.asLong() ?: return
 
+        if (statisticsEventLogRepository.existsByEventId(eventId)) return
+
+        val orderItems = orderItemQueryPort.findByOrderId(orderId)
+
         executeIdempotently(
             eventId = eventId,
             eventDescription = "통계 역보상",
             logger = logger,
             existsCheck = { statisticsEventLogRepository.existsByEventId(eventId) }
         ) {
-            val orderItems = orderItemQueryPort.findByOrderId(orderId)
             orderItems.forEach { item ->
                 productStatisticsCommandService.decrementSalesStats(
                     item.productId,

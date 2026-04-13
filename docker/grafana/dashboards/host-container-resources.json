@@ -1,0 +1,138 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Host CPU Usage (%)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "CPU Usage %"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] } }, "overrides": [] }
+    },
+    {
+      "title": "Host Memory Usage",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "node_memory_MemAvailable_bytes",
+          "legendFormat": "Available"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+    },
+    {
+      "title": "Host Disk Usage (%)",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"}) * 100)",
+          "legendFormat": "Disk Usage %"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] } }, "overrides": [] }
+    },
+    {
+      "title": "Host Network I/O",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[5m])",
+          "legendFormat": "{{device}} RX"
+        },
+        {
+          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[5m])",
+          "legendFormat": "{{device}} TX"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] }
+    },
+    {
+      "title": "",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "title": "Container CPU Usage",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 17 },
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total{name=~\"api-gateway|user-service|product-service|order-service|payment-service|notification-service|settlement-service|mysql|kafka|zookeeper\"}[5m]) * 100",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "fillOpacity": 10, "stacking": { "mode": "none" } } }, "overrides": [] }
+    },
+    {
+      "title": "Container Memory Usage",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 27 },
+      "targets": [
+        {
+          "expr": "container_memory_usage_bytes{name=~\"api-gateway|user-service|product-service|order-service|payment-service|notification-service|settlement-service|mysql|kafka|zookeeper\"}",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10, "stacking": { "mode": "none" } } }, "overrides": [] }
+    },
+    {
+      "title": "Container Network RX",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
+      "targets": [
+        {
+          "expr": "rate(container_network_receive_bytes_total{name=~\"api-gateway|user-service|product-service|order-service|payment-service|notification-service|settlement-service|mysql|kafka\"}[5m])",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] }
+    },
+    {
+      "title": "Container Network TX",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
+      "targets": [
+        {
+          "expr": "rate(container_network_transmit_bytes_total{name=~\"api-gateway|user-service|product-service|order-service|payment-service|notification-service|settlement-service|mysql|kafka\"}[5m])",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["infrastructure", "resources"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Host & Container Resources",
+  "uid": "host-container-resources",
+  "version": 1
+}

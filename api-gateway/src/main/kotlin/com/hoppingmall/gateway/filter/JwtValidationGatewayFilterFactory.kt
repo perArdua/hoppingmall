@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 
 @Component
 class JwtValidationGatewayFilterFactory(
@@ -28,7 +29,7 @@ class JwtValidationGatewayFilterFactory(
                 return@GatewayFilter onUnauthorized(exchange)
             }
 
-            try {
+            Mono.fromCallable {
                 val claims = Jwts.parserBuilder()
                     .setSigningKey(key)
                     .build()
@@ -37,7 +38,10 @@ class JwtValidationGatewayFilterFactory(
 
                 val userId = claims.subject
                 val role = claims["role"] as? String ?: "BUYER"
-
+                userId to role
+            }
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap { (userId, role) ->
                 val modifiedRequest = request.mutate()
                     .headers { it.remove("x-user-id"); it.remove("x-user-role") }
                     .header("x-user-id", userId)
@@ -45,9 +49,8 @@ class JwtValidationGatewayFilterFactory(
                     .build()
 
                 chain.filter(exchange.mutate().request(modifiedRequest).build())
-            } catch (e: Exception) {
-                onUnauthorized(exchange)
             }
+            .onErrorResume { onUnauthorized(exchange) }
         }
     }
 

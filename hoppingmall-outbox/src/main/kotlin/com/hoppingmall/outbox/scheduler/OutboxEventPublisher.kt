@@ -40,23 +40,69 @@ class OutboxEventPublisher(
             )
         } ?: return
 
-        if (pendingEvents.isNotEmpty()) {
-            logger.info("Processing ${pendingEvents.size} pending outbox events")
+        if (pendingEvents.isEmpty()) return
 
-            pendingEvents.forEach { event ->
-                val eventId = event.id ?: return@forEach
-                val claimed = transactionTemplate.execute {
-                    outboxEventRepository.claimEventForPublish(
-                        id = eventId,
-                        nextStatus = OutboxStatus.RETRYING,
-                        updatedAt = LocalDateTime.now(),
-                        pendingStatus = OutboxStatus.PENDING,
-                        failedStatus = OutboxStatus.FAILED,
-                        maxRetries = maxRetries
-                    )
-                } ?: 0
-                if (claimed > 0) {
-                    publishEvent(eventId)
+        logger.info("Processing ${pendingEvents.size} pending outbox events")
+
+        val claimedEventIds = pendingEvents.mapNotNull { event ->
+            val eventId = event.id ?: return@mapNotNull null
+            val claimed = transactionTemplate.execute {
+                outboxEventRepository.claimEventForPublish(
+                    id = eventId,
+                    nextStatus = OutboxStatus.RETRYING,
+                    updatedAt = LocalDateTime.now(),
+                    pendingStatus = OutboxStatus.PENDING,
+                    failedStatus = OutboxStatus.FAILED,
+                    maxRetries = maxRetries
+                )
+            } ?: 0
+            if (claimed > 0) eventId else null
+        }
+
+        if (claimedEventIds.isEmpty()) return
+
+        val preparedEvents = mutableListOf<Pair<OutboxEvent, Any>>()
+
+        claimedEventIds.forEach { eventId ->
+            val event = transactionTemplate.execute {
+                outboxEventRepository.findByIdOrNull(eventId)
+            } ?: return@forEach
+
+            if (event.processed || event.status != OutboxStatus.RETRYING) return@forEach
+
+            try {
+                val avroRecord = avroEventConverter.convertJsonToAvro(event.eventType, event.eventData)
+                preparedEvents.add(event to avroRecord)
+            } catch (e: Exception) {
+                logger.error("Failed to convert outbox event to Avro: ${event.id}", e)
+                transactionTemplate.executeWithoutResult {
+                    handlePublishFailure(event, e)
+                }
+            }
+        }
+
+        if (preparedEvents.isEmpty()) return
+
+        try {
+            val results = kafkaTemplate.executeInTransaction { template ->
+                val futures = preparedEvents.map { (event, avroRecord) ->
+                    event to template.send(event.topic, event.partitionKey ?: "", avroRecord)
+                }
+                futures.map { (event, future) ->
+                    event to future.get(10, TimeUnit.SECONDS)
+                }
+            } ?: return
+
+            transactionTemplate.executeWithoutResult {
+                results.forEach { (event, result) ->
+                    handlePublishSuccess(event, result)
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("Batch publish failed for ${preparedEvents.size} events", e)
+            transactionTemplate.executeWithoutResult {
+                preparedEvents.forEach { (event, _) ->
+                    if (!event.processed) handlePublishFailure(event, e)
                 }
             }
         }
