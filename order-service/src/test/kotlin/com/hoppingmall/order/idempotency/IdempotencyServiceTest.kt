@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import java.time.LocalDateTime
-import java.util.Optional
 
 @DisplayName("IdempotencyService")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -38,7 +37,7 @@ class IdempotencyServiceTest {
             )
 
             whenever(idempotencyRecordRepository.findByIdempotencyKey(key))
-                .thenReturn(Optional.of(record))
+                .thenReturn(record)
 
             val result = idempotencyService.findByKey(key)
 
@@ -61,7 +60,7 @@ class IdempotencyServiceTest {
             )
 
             whenever(idempotencyRecordRepository.findByIdempotencyKey(key))
-                .thenReturn(Optional.of(record))
+                .thenReturn(record)
 
             val result = idempotencyService.findByKey(key)
 
@@ -73,7 +72,7 @@ class IdempotencyServiceTest {
             val key = "nonexistent-key"
 
             whenever(idempotencyRecordRepository.findByIdempotencyKey(key))
-                .thenReturn(Optional.empty())
+                .thenReturn(null)
 
             val result = idempotencyService.findByKey(key)
 
