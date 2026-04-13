@@ -280,7 +280,7 @@ class OutboxEventPublisherTest {
     }
 
     @Test
-    fun 대기중인_이벤트를_클레임_후_발행한다() {
+    fun 대기중인_이벤트를_클레임_후_배치_발행한다() {
         val event = createOutboxEvent(status = OutboxStatus.PENDING)
         val avroRecord = mock<GenericRecord>()
         val sendResult = createSendResult("payment", "1", avroRecord)
@@ -323,5 +323,88 @@ class OutboxEventPublisherTest {
             maxRetries = eq(3)
         )
         assertThat(retryingEvent.status).isEqualTo(OutboxStatus.PUBLISHED)
+    }
+
+    @Test
+    fun 여러_이벤트를_단일_Kafka_트랜잭션으로_배치_발행한다() {
+        val event1 = createOutboxEvent(id = 1L, status = OutboxStatus.PENDING)
+        val event2 = createOutboxEvent(id = 2L, status = OutboxStatus.PENDING)
+        val avroRecord = mock<GenericRecord>()
+        val sendResult = createSendResult("payment", "1", avroRecord)
+
+        whenever(
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = 3,
+                limit = 100
+            )
+        ).thenReturn(listOf(event1, event2))
+        whenever(
+            outboxEventRepository.claimEventForPublish(
+                id = any(),
+                nextStatus = eq(OutboxStatus.RETRYING),
+                updatedAt = any(),
+                pendingStatus = eq(OutboxStatus.PENDING),
+                failedStatus = eq(OutboxStatus.FAILED),
+                maxRetries = eq(3)
+            )
+        ).thenReturn(1)
+
+        val retryingEvent1 = createOutboxEvent(id = 1L, status = OutboxStatus.RETRYING)
+        val retryingEvent2 = createOutboxEvent(id = 2L, status = OutboxStatus.RETRYING)
+        whenever(outboxEventRepository.findById(1L)).thenReturn(Optional.of(retryingEvent1))
+        whenever(outboxEventRepository.findById(2L)).thenReturn(Optional.of(retryingEvent2))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(avroRecord)
+        whenever(kafkaTemplate.send(any<String>(), any<String>(), any()))
+            .thenReturn(CompletableFuture.completedFuture(sendResult))
+        mockKafkaTransaction(sendResult)
+        whenever(outboxEventRepository.save(any<OutboxEvent>())).thenAnswer { it.arguments[0] as OutboxEvent }
+
+        outboxEventPublisher.publishPendingEvents()
+
+        assertThat(retryingEvent1.status).isEqualTo(OutboxStatus.PUBLISHED)
+        assertThat(retryingEvent2.status).isEqualTo(OutboxStatus.PUBLISHED)
+        verify(outboxEventRepository).save(eq(retryingEvent1))
+        verify(outboxEventRepository).save(eq(retryingEvent2))
+        verify(outboxMetrics, org.mockito.Mockito.times(2)).recordOutboxPublished("payment")
+    }
+
+    @Test
+    fun 배치_발행_실패_시_모든_이벤트를_실패_처리한다() {
+        val event = createOutboxEvent(id = 1L, status = OutboxStatus.PENDING)
+        val avroRecord = mock<GenericRecord>()
+
+        whenever(
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = 3,
+                limit = 100
+            )
+        ).thenReturn(listOf(event))
+        whenever(
+            outboxEventRepository.claimEventForPublish(
+                id = eq(1L),
+                nextStatus = eq(OutboxStatus.RETRYING),
+                updatedAt = any(),
+                pendingStatus = eq(OutboxStatus.PENDING),
+                failedStatus = eq(OutboxStatus.FAILED),
+                maxRetries = eq(3)
+            )
+        ).thenReturn(1)
+
+        val retryingEvent = createOutboxEvent(id = 1L, status = OutboxStatus.RETRYING)
+        whenever(outboxEventRepository.findById(1L)).thenReturn(Optional.of(retryingEvent))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(avroRecord)
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(RuntimeException("Kafka transaction failed"))
+        whenever(outboxEventRepository.save(any<OutboxEvent>())).thenAnswer { it.arguments[0] as OutboxEvent }
+
+        outboxEventPublisher.publishPendingEvents()
+
+        assertThat(retryingEvent.status).isEqualTo(OutboxStatus.FAILED)
+        verify(outboxMetrics).recordOutboxFailed("payment")
     }
 }
