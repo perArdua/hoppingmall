@@ -87,6 +87,17 @@ class StatisticsEventConsumerTest {
     }
 
     @Test
+    fun 이미_처리된_결제_취소_보상_이벤트를_무시한다() {
+        val message = """{"eventType":"PaymentCancelled","eventId":"evt-1","paymentId":1,"orderId":10,"userId":1,"amount":10000,"transactionId":"txn-1"}"""
+
+        whenever(statisticsEventLogRepository.existsByEventId("evt-1")).thenReturn(true)
+
+        consumer.handleCompensationEvent(message)
+
+        verify(productStatisticsCommandService, never()).decrementSalesStats(any(), any(), any())
+    }
+
+    @Test
     fun PaymentCancelled가_아닌_보상_이벤트는_무시한다() {
         val message = """{"eventType":"Other","eventId":"evt-1","orderId":10}"""
 
@@ -109,6 +120,17 @@ class StatisticsEventConsumerTest {
         consumer.handlePaymentReversal(message)
 
         verify(productStatisticsCommandService).decrementSalesStats(1L, 1L, BigDecimal("10000"))
+    }
+
+    @Test
+    fun 이미_처리된_역보상_이벤트를_무시한다() {
+        val message = """{"eventType":"PaymentReversalRequested","eventId":"rev-1","orderId":10}"""
+
+        whenever(statisticsEventLogRepository.existsByEventId("rev-1")).thenReturn(true)
+
+        consumer.handlePaymentReversal(message)
+
+        verify(productStatisticsCommandService, never()).decrementSalesStats(any(), any(), any())
     }
 
     @Test
