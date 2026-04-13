@@ -45,7 +45,7 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: "k8s,grpc"
             - name: JAVA_TOOL_OPTIONS
-              value: "-XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC"
+              value: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -78,8 +78,8 @@ spec:
             periodSeconds: 15
           resources:
             requests:
-              memory: "384Mi"
-              cpu: "250m"
+              memory: "1Gi"
+              cpu: "1000m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "1536Mi"
+              cpu: "1500m"
