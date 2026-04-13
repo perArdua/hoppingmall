@@ -276,4 +276,75 @@ class RateLimitGlobalFilterTest {
         assertThat(captured).hasSize(1)
         assertThat(exchange.response.headers.getFirst("X-RateLimit-Limit")).isEqualTo("200")
     }
+
+    @Test
+    fun httpMethod가_null인_정책은_모든_HTTP_메서드에_적용된다() {
+        val allMethodPolicy = listOf(
+            RateLimitPolicy("all-products", "/api/v1/products", null, RateLimitKeyType.USER_ID, 10, Duration.ofMinutes(1))
+        )
+        val filter = RateLimitGlobalFilter(allMethodPolicy, redisTemplate, true)
+        mockRedisIncrement(1L)
+
+        val request = MockServerHttpRequest.get("/api/v1/products").build()
+        val exchange = MockServerWebExchange.from(request)
+        val captured = mutableListOf<ServerWebExchange>()
+
+        filter.filter(exchange, chainCapturing(captured)).block()
+
+        assertThat(captured).hasSize(1)
+        assertThat(exchange.response.headers.getFirst("X-RateLimit-Limit")).isEqualTo("10")
+    }
+
+    @Test
+    fun USER_ID_키_타입에서_헤더가_없으면_IP로_폴백한다() {
+        mockRedisIncrement(1L)
+
+        val request = MockServerHttpRequest.get("/api/v1/products")
+            .remoteAddress(java.net.InetSocketAddress.createUnresolved("192.168.1.1", 8080))
+            .build()
+        val exchange = MockServerWebExchange.from(request)
+        val captured = mutableListOf<ServerWebExchange>()
+
+        buildFilter().filter(exchange, chainCapturing(captured)).block()
+
+        assertThat(captured).hasSize(1)
+    }
+
+    @Test
+    fun IP_키_타입에서_remoteAddress가_unresolved이면_anonymous로_폴백한다() {
+        val ipPolicy = listOf(
+            RateLimitPolicy("test-ip", "/api/v1/test", "GET", RateLimitKeyType.IP, 10, Duration.ofMinutes(1))
+        )
+        val filter = RateLimitGlobalFilter(ipPolicy, redisTemplate, true)
+        mockRedisIncrement(1L)
+
+        val request = MockServerHttpRequest.get("/api/v1/test")
+            .remoteAddress(java.net.InetSocketAddress.createUnresolved("unknown", 0))
+            .build()
+        val exchange = MockServerWebExchange.from(request)
+        val captured = mutableListOf<ServerWebExchange>()
+
+        filter.filter(exchange, chainCapturing(captured)).block()
+
+        assertThat(captured).hasSize(1)
+    }
+
+    @Test
+    fun USER_ID_키_타입에서_헤더와_remoteAddress_모두_없으면_anonymous를_사용한다() {
+        val allMethodPolicy = listOf(
+            RateLimitPolicy("test", "/api/v1/test", "GET", RateLimitKeyType.USER_ID, 10, Duration.ofMinutes(1))
+        )
+        val filter = RateLimitGlobalFilter(allMethodPolicy, redisTemplate, true)
+        mockRedisIncrement(1L)
+
+        val request = MockServerHttpRequest.get("/api/v1/test")
+            .remoteAddress(java.net.InetSocketAddress.createUnresolved("unknown", 0))
+            .build()
+        val exchange = MockServerWebExchange.from(request)
+        val captured = mutableListOf<ServerWebExchange>()
+
+        filter.filter(exchange, chainCapturing(captured)).block()
+
+        assertThat(captured).hasSize(1)
+    }
 }
