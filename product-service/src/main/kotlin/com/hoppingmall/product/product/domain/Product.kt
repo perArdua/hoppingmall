@@ -53,6 +53,9 @@ class Product private constructor(
             description: String,
             price: BigDecimal,
             status: ProductStatus
-        ): Product = Product(sellerId, categoryId, name, description, price, status)
+        ): Product {
+            require(price > BigDecimal.ZERO) { "가격은 0보다 커야 합니다" }
+            return Product(sellerId, categoryId, name, description, price, status)
+        }
     }
 }
