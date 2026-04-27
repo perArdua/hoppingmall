@@ -20,4 +20,10 @@ class SecurityConfig(
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         return configureBase(http).build()
     }
+
+    override fun configureServiceEndpoints(
+        auth: org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry
+    ) {
+        auth.requestMatchers("/ops/**").permitAll()
+    }
 }
