@@ -88,6 +88,28 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
         originalPartition: Int,
         originalOffset: Long
     ): Boolean
+
+    @Query("""
+        SELECT d FROM DLQMessage d
+        WHERE d.status = :status
+        AND d.archivedAt IS NULL
+        ORDER BY d.createdAt ASC
+    """)
+    fun findUnarchivedByStatus(
+        @Param("status") status: DLQStatus,
+        pageable: Pageable
+    ): Page<DLQMessage>
+
+    @Query("""
+        SELECT d FROM DLQMessage d
+        WHERE d.status = :status
+        AND d.archivedAt IS NOT NULL
+        AND d.archivedAt < :beforeTimestamp
+    """)
+    fun findArchivedMessagesBefore(
+        @Param("status") status: DLQStatus,
+        @Param("beforeTimestamp") beforeTimestamp: Long
+    ): List<DLQMessage>
 }
 
 interface DLQStatsProjection {

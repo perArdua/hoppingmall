@@ -52,7 +52,10 @@ class DLQMessage(
     var notes: String? = null,
 
     @Column(name = "next_retry_at")
-    var nextRetryAt: Long? = null
+    var nextRetryAt: Long? = null,
+
+    @Column(name = "archived_at")
+    var archivedAt: Long? = null
 
 ) : BaseEntity() {
 
@@ -72,6 +75,10 @@ class DLQMessage(
     fun markAsFailed(notes: String? = null) {
         this.status = DLQStatus.FAILED
         this.notes = notes
+    }
+
+    fun markAsArchived() {
+        this.archivedAt = System.currentTimeMillis()
     }
 
     fun getMessageKey(): String = "${originalTopic}:${originalPartition}:${originalOffset}"
