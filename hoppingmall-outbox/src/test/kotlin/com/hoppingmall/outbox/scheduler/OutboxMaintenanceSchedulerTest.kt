@@ -17,6 +17,7 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.test.util.ReflectionTestUtils
 import java.time.LocalDateTime
 
@@ -30,6 +31,9 @@ class OutboxMaintenanceSchedulerTest {
 
     @Mock
     private lateinit var outboxEventPublisher: OutboxEventPublisher
+
+    @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
 
     @InjectMocks
     private lateinit var outboxMaintenanceScheduler: OutboxMaintenanceScheduler
