@@ -9,10 +9,9 @@ import com.hoppingmall.payment.coupon.dto.request.CouponCreateRequest
 import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.DiscountType
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
-import com.hoppingmall.payment.coupon.exception.CouponNotFoundException
-import com.hoppingmall.payment.coupon.exception.CouponNotAvailableException
-import com.hoppingmall.payment.coupon.exception.CouponMinAmountNotMetException
-import com.hoppingmall.payment.internal.DistributedLockExecutor
+import com.hoppingmall.payment.coupon.exception.*
+import com.hoppingmall.payment.coupon.infrastructure.CouponReserveResult
+import com.hoppingmall.payment.coupon.infrastructure.CouponStockRedisRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -23,9 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.any
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.Optional
@@ -42,7 +39,7 @@ class CouponCommandServiceImplTest {
     private lateinit var userCouponRepository: UserCouponRepository
 
     @Mock
-    private lateinit var distributedLockExecutor: DistributedLockExecutor
+    private lateinit var couponStockRedisRepository: CouponStockRedisRepository
 
     @InjectMocks
     private lateinit var service: CouponCommandServiceImpl
@@ -97,14 +94,128 @@ class CouponCommandServiceImplTest {
             validFrom = LocalDateTime.now().minusDays(1),
             validTo = LocalDateTime.now().plusDays(7)
         )
-        val savedCoupon = createCoupon(id = 1L)
+        val savedCoupon = createCoupon(id = 1L, totalQuantity = 50)
         whenever(couponRepository.save(any<Coupon>())).thenReturn(savedCoupon)
 
         val result = service.createCoupon(request)
 
         assertThat(result.id).isEqualTo(1L)
-        assertThat(result.name).isEqualTo("테스트 쿠폰")
         verify(couponRepository).save(any<Coupon>())
+        verify(couponStockRedisRepository).initializeStock(1L, 50)
+    }
+
+    @Test
+    fun 쿠폰_발급_성공_시_유저쿠폰_응답을_반환한다() {
+        val coupon = createCoupon(id = 1L)
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(1)
+        whenever(userCouponRepository.save(any<UserCoupon>())).thenReturn(userCoupon)
+
+        val result = service.issueCoupon(10L, 1L)
+
+        assertThat(result).isNotNull
+        verify(couponStockRedisRepository).tryReserve(1L, 10L)
+        verify(couponRepository).incrementIssuedQuantity(1L)
+        verify(userCouponRepository).save(any<UserCoupon>())
+    }
+
+    @Test
+    fun 쿠폰_발급_시_재고_소진이면_예외를_던진다() {
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Exhausted)
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponExhaustedException::class.java)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_이미_발급된_사용자면_예외를_던진다() {
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.AlreadyIssued)
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponAlreadyIssuedException::class.java)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_재고_미초기화면_DB에서_초기화_후_재시도한다() {
+        val coupon = createCoupon(id = 1L, totalQuantity = 100, issuedQuantity = 10)
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L))
+            .thenReturn(CouponReserveResult.NotInitialized)
+            .thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponStockRedisRepository.initializeStock(1L, 90)).thenReturn(true)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(1)
+        whenever(userCouponRepository.save(any<UserCoupon>())).thenReturn(userCoupon)
+
+        service.issueCoupon(10L, 1L)
+
+        verify(couponStockRedisRepository).initializeStock(1L, 90)
+        verify(couponStockRedisRepository, times(2)).tryReserve(1L, 10L)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_DB_저장_실패하면_Redis_재고를_복원한다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(1)
+        whenever(userCouponRepository.save(any<UserCoupon>())).thenThrow(RuntimeException("DB error"))
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(RuntimeException::class.java)
+
+        verify(couponStockRedisRepository).restoreStock(1L, 10L)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_DB_재고_소진이면_Redis_복원_후_예외를_던진다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(0)
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponExhaustedException::class.java)
+
+        verify(couponStockRedisRepository).restoreStock(1L, 10L)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_만료된_쿠폰이면_Redis_복원_후_예외를_던진다() {
+        val expiredCoupon = createCoupon(id = 1L, validTo = LocalDateTime.now().minusDays(1))
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(expiredCoupon)
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponExpiredException::class.java)
+
+        verify(couponStockRedisRepository).restoreStock(1L, 10L)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_재시도_후에도_미초기화면_예외를_던진다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L))
+            .thenReturn(CouponReserveResult.NotInitialized)
+            .thenReturn(CouponReserveResult.NotInitialized)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponStockRedisRepository.initializeStock(eq(1L), any())).thenReturn(true)
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponNotFoundException::class.java)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_Redis_성공_후_쿠폰_조회_실패하면_Redis_복원_후_예외를_던진다() {
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(null)
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponNotFoundException::class.java)
+
+        verify(couponStockRedisRepository).restoreStock(1L, 10L)
     }
 
     @Test
@@ -142,6 +253,7 @@ class CouponCommandServiceImplTest {
 
         assertThat(userCoupon.status).isEqualTo(UserCouponStatus.ISSUED)
         verify(userCouponRepository).save(userCoupon)
+        verifyNoInteractions(couponStockRedisRepository)
     }
 
     @Test
@@ -163,6 +275,18 @@ class CouponCommandServiceImplTest {
 
         assertThat(result.id).isEqualTo(1L)
         verify(couponRepository).save(any<Coupon>())
+        verify(couponStockRedisRepository).deleteStock(1L)
+    }
+
+    @Test
+    fun 쿠폰_상태_ACTIVE_변경_시_Redis_재고를_초기화한다() {
+        val coupon = createCoupon(id = 1L, status = CouponStatus.INACTIVE, totalQuantity = 100, issuedQuantity = 20)
+        whenever(couponRepository.findById(1L)).thenReturn(Optional.of(coupon))
+        whenever(couponRepository.save(any<Coupon>())).thenReturn(coupon)
+
+        service.changeCouponStatus(1L, CouponStatus.ACTIVE)
+
+        verify(couponStockRedisRepository).initializeStock(1L, 80)
     }
 
     @Test
@@ -184,6 +308,7 @@ class CouponCommandServiceImplTest {
 
         assertThat(userCoupon.status).isEqualTo(UserCouponStatus.ISSUED)
         verify(userCouponRepository).save(userCoupon)
+        verifyNoInteractions(couponStockRedisRepository)
     }
 
     @Test
