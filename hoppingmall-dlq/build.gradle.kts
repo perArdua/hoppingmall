@@ -34,6 +34,7 @@ dependencies {
 	compileOnly("org.springframework.kafka:spring-kafka")
 	compileOnly("io.micrometer:micrometer-core")
 	compileOnly("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
+	implementation("software.amazon.awssdk:s3:2.31.9")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("io.micrometer:micrometer-core")
