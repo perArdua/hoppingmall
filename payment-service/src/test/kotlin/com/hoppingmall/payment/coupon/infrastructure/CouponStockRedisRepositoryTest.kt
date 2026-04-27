@@ -16,6 +16,7 @@ import org.mockito.kotlin.whenever
 import org.redisson.api.RBucket
 import org.redisson.api.RKeys
 import org.redisson.api.RScript
+import org.redisson.api.RSet
 import org.redisson.api.RedissonClient
 import org.redisson.client.codec.Codec
 
@@ -125,5 +126,17 @@ class CouponStockRedisRepositoryTest {
         repository.deleteStock(1L)
 
         verify(rKeys).delete("coupon:{1}:stock", "coupon:{1}:issued")
+    }
+
+    @Test
+    @Suppress("UNCHECKED_CAST")
+    fun getIssuedUserIds_set_멤버를_Long으로_파싱해서_반환한다() {
+        val rSet: RSet<String> = org.mockito.kotlin.mock()
+        whenever(redissonClient.getSet<String>(eq("coupon:{1}:issued"), any<Codec>())).thenReturn(rSet)
+        whenever(rSet.readAll()).thenReturn(setOf("10", "20", "abc"))
+
+        val result = repository.getIssuedUserIds(1L)
+
+        assertThat(result).containsExactlyInAnyOrder(10L, 20L)
     }
 }
