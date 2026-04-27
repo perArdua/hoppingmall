@@ -1,5 +1,6 @@
 package com.hoppingmall.dlq.service
 
+import com.hoppingmall.dlq.archival.DLQArchivalService
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
 import com.hoppingmall.dlq.domain.DeadLetterMessage
@@ -18,7 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
 class DLQCommandService(
     private val dlqMessageRepository: DLQMessageRepository,
     private val dlqMessagePublisher: DLQMessagePublisher,
-    private val dlqMetrics: DLQMetrics
+    private val dlqMetrics: DLQMetrics,
+    private val dlqArchivalService: DLQArchivalService
 ) {
 
     private val logger = LoggerFactory.getLogger(DLQCommandService::class.java)
@@ -184,8 +186,12 @@ class DLQCommandService(
 
         val deleteCount = processedMessages.content.size.toLong()
         if (deleteCount > 0) {
+            val archivedCount = dlqArchivalService.archiveBatch(processedMessages.content)
+            if (archivedCount < processedMessages.content.size) {
+                logger.warn("일부 DLQ 메시지 아카이빙 실패: topic={}, 아카이빙={}/{}", topic, archivedCount, deleteCount)
+            }
             dlqMessageRepository.deleteAll(processedMessages.content)
-            logger.info("처리 완료된 DLQ 메시지 삭제: topic={}, count={}", topic, deleteCount)
+            logger.info("처리 완료된 DLQ 메시지 삭제: topic={}, count={}, archived={}", topic, deleteCount, archivedCount)
         }
 
         return deleteCount
