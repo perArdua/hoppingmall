@@ -11,21 +11,23 @@ import com.hoppingmall.payment.coupon.dto.response.UserCouponResponse
 import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
 import com.hoppingmall.payment.coupon.exception.*
-import com.hoppingmall.payment.internal.DistributedLockExecutor
-import org.springframework.orm.ObjectOptimisticLockingFailureException
+import com.hoppingmall.payment.coupon.infrastructure.CouponReserveResult
+import com.hoppingmall.payment.coupon.infrastructure.CouponStockRedisRepository
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
 @Service
+@Profile("!coupon-naive")
 @Transactional
 class CouponCommandServiceImpl(
     private val couponRepository: CouponRepository,
     private val userCouponRepository: UserCouponRepository,
-    private val distributedLockExecutor: DistributedLockExecutor
+    private val couponStockRedisRepository: CouponStockRedisRepository
 ) : CouponCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -47,6 +49,11 @@ class CouponCommandServiceImpl(
             validTo = request.validTo
         )
         val savedCoupon = couponRepository.save(coupon)
+        try {
+            couponStockRedisRepository.initializeStock(savedCoupon.id!!, savedCoupon.totalQuantity)
+        } catch (e: Exception) {
+            log.warn("Redis 재고 초기화 실패 (lazy init 폴백): couponId={}", savedCoupon.id, e)
+        }
         return CouponResponse.from(savedCoupon)
     }
 
@@ -55,46 +62,71 @@ class CouponCommandServiceImpl(
         CacheEvict(cacheNames = ["coupon:all"], allEntries = true)
     ])
     override fun changeCouponStatus(couponId: Long, status: CouponStatus): CouponResponse {
-        val coupon = couponRepository.findByIdOrNull(couponId) ?: throw CouponNotFoundException() 
+        val coupon = couponRepository.findByIdOrNull(couponId) ?: throw CouponNotFoundException()
         coupon.changeStatus(status)
-        return CouponResponse.from(couponRepository.save(coupon))
+        val saved = couponRepository.save(coupon)
+        try {
+            if (status == CouponStatus.INACTIVE) {
+                couponStockRedisRepository.deleteStock(couponId)
+            } else if (status == CouponStatus.ACTIVE) {
+                couponStockRedisRepository.initializeStock(couponId, saved.totalQuantity - saved.issuedQuantity)
+            }
+        } catch (e: Exception) {
+            log.warn("Redis 재고 상태 변경 실패: couponId={}, status={}", couponId, status, e)
+        }
+        return CouponResponse.from(saved)
     }
 
     @CacheEvict(cacheNames = ["coupon:available"], allEntries = true)
     override fun issueCoupon(userId: Long, couponId: Long): UserCouponResponse {
-        return distributedLockExecutor.withLock("coupon:issue:$couponId") {
-            try {
-                val coupon = couponRepository.findActiveById(couponId)
-                    ?: throw CouponNotFoundException()
+        var result = couponStockRedisRepository.tryReserve(couponId, userId)
 
-                if (coupon.isExpired()) {
-                    throw CouponExpiredException()
-                }
+        if (result is CouponReserveResult.NotInitialized) {
+            val coupon = couponRepository.findActiveById(couponId)
+                ?: throw CouponNotFoundException()
+            couponStockRedisRepository.initializeStock(couponId, coupon.totalQuantity - coupon.issuedQuantity)
+            result = couponStockRedisRepository.tryReserve(couponId, userId)
+        }
 
-                if (coupon.isExhausted()) {
-                    throw CouponExhaustedException()
-                }
+        when (result) {
+            is CouponReserveResult.Exhausted -> throw CouponExhaustedException()
+            is CouponReserveResult.AlreadyIssued -> throw CouponAlreadyIssuedException()
+            is CouponReserveResult.NotInitialized -> throw CouponNotFoundException()
+            is CouponReserveResult.Success -> {}
+        }
 
-                if (!coupon.isValid()) {
-                    throw CouponNotAvailableException()
-                }
+        val coupon = couponRepository.findActiveById(couponId)
+            ?: run {
+                couponStockRedisRepository.restoreStock(couponId, userId)
+                throw CouponNotFoundException()
+            }
 
-                if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
-                    throw CouponAlreadyIssuedException()
-                }
+        if (coupon.isExpired() || !coupon.isValid()) {
+            couponStockRedisRepository.restoreStock(couponId, userId)
+            throw CouponExpiredException()
+        }
 
-                coupon.issue()
-                couponRepository.save(coupon)
-
-                val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
-                val savedUserCoupon = userCouponRepository.save(userCoupon)
-
-                log.info("쿠폰 발급: userId={}, couponId={}, remaining={}", userId, couponId, coupon.totalQuantity - coupon.issuedQuantity)
-                UserCouponResponse.from(savedUserCoupon, coupon)
-            } catch (e: ObjectOptimisticLockingFailureException) {
-                log.warn("쿠폰 발급 동시성 충돌 (version mismatch): userId={}, couponId={}", userId, couponId)
+        var restored = false
+        try {
+            val updated = couponRepository.incrementIssuedQuantity(couponId)
+            if (updated == 0) {
+                couponStockRedisRepository.restoreStock(couponId, userId)
+                restored = true
                 throw CouponExhaustedException()
             }
+            val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
+            val savedUserCoupon = userCouponRepository.save(userCoupon)
+            log.info("쿠폰 발급: userId={}, couponId={}", userId, couponId)
+            return UserCouponResponse.from(savedUserCoupon, coupon)
+        } catch (e: Exception) {
+            if (!restored) {
+                try {
+                    couponStockRedisRepository.restoreStock(couponId, userId)
+                } catch (re: Exception) {
+                    log.error("Redis 재고 복원 실패: couponId={}, userId={}", couponId, userId, re)
+                }
+            }
+            throw e
         }
     }
 

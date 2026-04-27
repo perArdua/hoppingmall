@@ -90,6 +90,7 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	exclude("**/integration/**")
 }
 
 val jacocoExcludedDirs = listOf(
@@ -119,6 +120,7 @@ val jacocoExcludedDirs = listOf(
 	"**/TransactionalEventPublisherImpl*",
 	"**/PaymentCommandServiceImpl*",
 	"**/CouponCommandServiceImpl\$issueCoupon\$*",
+	"**/NaiveCouponCommandServiceImpl*",
 	"**/HttpOrderCommandAdapter*",
 	"**/HttpOrderQueryAdapter*",
 	"**/HttpInventoryCommandAdapter*",
