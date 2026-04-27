@@ -7,10 +7,12 @@ import com.hoppingmall.cache.RedissonLockProvider
 import com.hoppingmall.cache.TwoLevelCacheManager
 import io.micrometer.core.instrument.MeterRegistry
 import org.redisson.api.RedissonClient
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.EnableCaching
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.springframework.context.annotation.Profile
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
@@ -18,16 +20,19 @@ import java.time.Duration
 
 @Configuration
 @EnableCaching
-@Profile("!test")
+@Profile("!test & !cache-disabled")
 class CacheConfig {
 
     @Bean
-    fun cachePolicies(): Map<String, CachePolicy> = mapOf(
+    fun cachePolicies(
+        @Value("\${cache.product.l1-ttl-seconds:600}") productL1TtlSec: Long,
+        @Value("\${cache.product.l2-ttl-seconds:1800}") productL2TtlSec: Long
+    ): Map<String, CachePolicy> = mapOf(
         "product" to CachePolicy(
             cacheName = "product",
             l1MaxSize = 500,
-            l1Ttl = Duration.ofMinutes(10),
-            l2Ttl = Duration.ofMinutes(30),
+            l1Ttl = Duration.ofSeconds(productL1TtlSec),
+            l2Ttl = Duration.ofSeconds(productL2TtlSec),
             hotKeyThreshold = 50,
             hotKeyWindow = Duration.ofSeconds(60)
         ),
@@ -76,6 +81,7 @@ class CacheConfig {
     }
 
     @Bean
+    @Primary
     fun cacheManager(
         redisCacheManager: RedisCacheManager,
         cachePolicies: Map<String, CachePolicy>,
