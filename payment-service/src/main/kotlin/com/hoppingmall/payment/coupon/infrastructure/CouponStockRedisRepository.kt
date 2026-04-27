@@ -51,6 +51,11 @@ class CouponStockRedisRepository(
         redissonClient.keys.delete(stockKey(couponId), issuedKey(couponId))
     }
 
+    fun getIssuedUserIds(couponId: Long): Set<Long> {
+        val set = redissonClient.getSet<String>(issuedKey(couponId), StringCodec.INSTANCE)
+        return set.readAll().mapNotNullTo(mutableSetOf()) { it.toLongOrNull() }
+    }
+
     private fun stockKey(couponId: Long) = "coupon:{$couponId}:stock"
     private fun issuedKey(couponId: Long) = "coupon:{$couponId}:issued"
 
