@@ -10,7 +10,10 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.kafka.support.SendResult
+import java.util.concurrent.CompletableFuture
 
 @DisplayName("KafkaDLQMessagePublisher")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -23,11 +26,15 @@ class KafkaDLQMessagePublisherTest {
     @InjectMocks
     private lateinit var kafkaDLQMessagePublisher: KafkaDLQMessagePublisher
 
+    private fun completedSendResult(): CompletableFuture<SendResult<String, Any>> =
+        CompletableFuture.completedFuture(null)
+
     @Test
     fun 메시지를_Kafka로_발행하고_true를_반환한다() {
         val topic = "test-topic"
         val key = "test-key"
         val value = """{"orderId": 1}"""
+        whenever(kafkaTemplate.send(topic, key, value)).thenReturn(completedSendResult())
 
         val result = kafkaDLQMessagePublisher.publish(topic, key, value)
 
@@ -39,6 +46,7 @@ class KafkaDLQMessagePublisherTest {
     fun value가_null이어도_발행하고_true를_반환한다() {
         val topic = "test-topic"
         val key = "test-key"
+        whenever(kafkaTemplate.send(topic, key, null)).thenReturn(completedSendResult())
 
         val result = kafkaDLQMessagePublisher.publish(topic, key, null)
 
