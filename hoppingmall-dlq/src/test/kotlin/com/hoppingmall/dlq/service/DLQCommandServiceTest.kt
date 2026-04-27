@@ -1,5 +1,6 @@
 package com.hoppingmall.dlq.service
 
+import com.hoppingmall.dlq.archival.DLQArchivalService
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
 import com.hoppingmall.dlq.domain.DeadLetterMessage
@@ -24,7 +25,8 @@ class DLQCommandServiceTest {
     private val dlqMessageRepository: DLQMessageRepository = mock()
     private val dlqMessagePublisher: DLQMessagePublisher = mock()
     private val dlqMetrics: DLQMetrics = mock()
-    private val dlqCommandService = DLQCommandService(dlqMessageRepository, dlqMessagePublisher, dlqMetrics)
+    private val dlqArchivalService: DLQArchivalService = mock()
+    private val dlqCommandService = DLQCommandService(dlqMessageRepository, dlqMessagePublisher, dlqMetrics, dlqArchivalService)
 
     @Nested
     @DisplayName("saveDLQMessage")
@@ -333,7 +335,7 @@ class DLQCommandServiceTest {
     inner class ClearProcessedDLQMessages {
 
         @Test
-        fun 처리_완료된_DLQ_메시지들을_삭제한다() {
+        fun 처리_완료된_DLQ_메시지들을_아카이빙_후_삭제한다() {
             val topic = "payment"
             val processedMessage1 = createDLQMessage(topic = topic, status = DLQStatus.PROCESSED)
             val processedMessage2 = createDLQMessage(topic = topic, status = DLQStatus.PROCESSED)
@@ -342,10 +344,12 @@ class DLQCommandServiceTest {
             whenever(dlqMessageRepository.findByOriginalTopicAndStatusOrderByCreatedAtDesc(
                 eq(topic), eq(DLQStatus.PROCESSED), any()
             )).thenReturn(processedMessages)
+            whenever(dlqArchivalService.archiveBatch(any())).thenReturn(2)
 
             val deletedCount = dlqCommandService.clearProcessedDLQMessages(topic)
 
             assertEquals(2, deletedCount)
+            verify(dlqArchivalService).archiveBatch(processedMessages.content)
             verify(dlqMessageRepository).deleteAll(processedMessages.content)
         }
 
