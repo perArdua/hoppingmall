@@ -19,6 +19,8 @@ import org.springframework.cache.annotation.Caching
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal
 
 @Service
@@ -95,39 +97,44 @@ class CouponCommandServiceImpl(
             is CouponReserveResult.Success -> {}
         }
 
+        registerStockRestoreOnRollback(couponId, userId)
+
         val coupon = couponRepository.findActiveById(couponId)
-            ?: run {
-                couponStockRedisRepository.restoreStock(couponId, userId)
-                throw CouponNotFoundException()
-            }
+            ?: throw CouponNotFoundException()
 
         if (coupon.isExpired() || !coupon.isValid()) {
-            couponStockRedisRepository.restoreStock(couponId, userId)
             throw CouponExpiredException()
         }
 
-        var restored = false
-        try {
-            val updated = couponRepository.incrementIssuedQuantity(couponId)
-            if (updated == 0) {
-                couponStockRedisRepository.restoreStock(couponId, userId)
-                restored = true
-                throw CouponExhaustedException()
-            }
-            val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
-            val savedUserCoupon = userCouponRepository.save(userCoupon)
-            log.info("쿠폰 발급: userId={}, couponId={}", userId, couponId)
-            return UserCouponResponse.from(savedUserCoupon, coupon)
-        } catch (e: Exception) {
-            if (!restored) {
-                try {
-                    couponStockRedisRepository.restoreStock(couponId, userId)
-                } catch (re: Exception) {
-                    log.error("Redis 재고 복원 실패: couponId={}, userId={}", couponId, userId, re)
+        val updated = couponRepository.incrementIssuedQuantity(couponId)
+        if (updated == 0) {
+            throw CouponExhaustedException()
+        }
+
+        val userCoupon = UserCoupon.create(userId = userId, couponId = couponId)
+        val savedUserCoupon = userCouponRepository.save(userCoupon)
+        log.info("쿠폰 발급: userId={}, couponId={}", userId, couponId)
+        return UserCouponResponse.from(savedUserCoupon, coupon)
+    }
+
+    private fun registerStockRestoreOnRollback(couponId: Long, userId: Long) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            log.warn("트랜잭션 동기화 비활성 — Redis 재고 보상 훅 미등록: couponId={}, userId={}", couponId, userId)
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCompletion(status: Int) {
+                    if (status != TransactionSynchronization.STATUS_ROLLED_BACK) return
+                    try {
+                        couponStockRedisRepository.restoreStock(couponId, userId)
+                        log.info("Redis 재고 복원 (tx rollback): couponId={}, userId={}", couponId, userId)
+                    } catch (e: Exception) {
+                        log.error("Redis 재고 복원 실패 (tx rollback): couponId={}, userId={}", couponId, userId, e)
+                    }
                 }
             }
-            throw e
-        }
+        )
     }
 
     override fun useCoupon(userId: Long, couponId: Long, orderAmount: BigDecimal, orderId: Long): BigDecimal {

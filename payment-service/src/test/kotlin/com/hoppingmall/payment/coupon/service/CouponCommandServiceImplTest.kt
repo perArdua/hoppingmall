@@ -21,8 +21,11 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito.mockStatic
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.Optional
@@ -156,7 +159,7 @@ class CouponCommandServiceImplTest {
     }
 
     @Test
-    fun 쿠폰_발급_시_DB_저장_실패하면_Redis_재고를_복원한다() {
+    fun 쿠폰_발급_시_DB_저장_실패하면_예외를_던진다() {
         val coupon = createCoupon(id = 1L)
         whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
         whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
@@ -165,12 +168,10 @@ class CouponCommandServiceImplTest {
 
         assertThatThrownBy { service.issueCoupon(10L, 1L) }
             .isInstanceOf(RuntimeException::class.java)
-
-        verify(couponStockRedisRepository).restoreStock(1L, 10L)
     }
 
     @Test
-    fun 쿠폰_발급_시_DB_재고_소진이면_Redis_복원_후_예외를_던진다() {
+    fun 쿠폰_발급_시_DB_재고_소진이면_예외를_던진다() {
         val coupon = createCoupon(id = 1L)
         whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
         whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
@@ -178,20 +179,16 @@ class CouponCommandServiceImplTest {
 
         assertThatThrownBy { service.issueCoupon(10L, 1L) }
             .isInstanceOf(CouponExhaustedException::class.java)
-
-        verify(couponStockRedisRepository).restoreStock(1L, 10L)
     }
 
     @Test
-    fun 쿠폰_발급_시_만료된_쿠폰이면_Redis_복원_후_예외를_던진다() {
+    fun 쿠폰_발급_시_만료된_쿠폰이면_예외를_던진다() {
         val expiredCoupon = createCoupon(id = 1L, validTo = LocalDateTime.now().minusDays(1))
         whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
         whenever(couponRepository.findActiveById(1L)).thenReturn(expiredCoupon)
 
         assertThatThrownBy { service.issueCoupon(10L, 1L) }
             .isInstanceOf(CouponExpiredException::class.java)
-
-        verify(couponStockRedisRepository).restoreStock(1L, 10L)
     }
 
     @Test
@@ -208,14 +205,95 @@ class CouponCommandServiceImplTest {
     }
 
     @Test
-    fun 쿠폰_발급_시_Redis_성공_후_쿠폰_조회_실패하면_Redis_복원_후_예외를_던진다() {
+    fun 쿠폰_발급_시_Redis_성공_후_쿠폰_조회_실패하면_예외를_던진다() {
         whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
         whenever(couponRepository.findActiveById(1L)).thenReturn(null)
 
         assertThatThrownBy { service.issueCoupon(10L, 1L) }
             .isInstanceOf(CouponNotFoundException::class.java)
+    }
+
+    @Test
+    fun 쿠폰_발급_후_트랜잭션_롤백_시_Redis_재고가_복원된다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(0)
+
+        mockStatic(TransactionSynchronizationManager::class.java).use { mocked ->
+            mocked.`when`<Boolean> { TransactionSynchronizationManager.isSynchronizationActive() }.thenReturn(true)
+            val captor = argumentCaptor<TransactionSynchronization>()
+
+            assertThatThrownBy { service.issueCoupon(10L, 1L) }
+                .isInstanceOf(CouponExhaustedException::class.java)
+
+            mocked.verify { TransactionSynchronizationManager.registerSynchronization(captor.capture()) }
+            captor.firstValue.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+        }
 
         verify(couponStockRedisRepository).restoreStock(1L, 10L)
+    }
+
+    @Test
+    fun 롤백_훅에서_Redis_복원이_실패해도_삼킨다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(0)
+        whenever(couponStockRedisRepository.restoreStock(1L, 10L)).thenThrow(RuntimeException("Redis down"))
+
+        mockStatic(TransactionSynchronizationManager::class.java).use { mocked ->
+            mocked.`when`<Boolean> { TransactionSynchronizationManager.isSynchronizationActive() }.thenReturn(true)
+            val captor = argumentCaptor<TransactionSynchronization>()
+
+            assertThatThrownBy { service.issueCoupon(10L, 1L) }
+                .isInstanceOf(CouponExhaustedException::class.java)
+
+            mocked.verify { TransactionSynchronizationManager.registerSynchronization(captor.capture()) }
+            captor.firstValue.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+        }
+    }
+
+    @Test
+    fun 트랜잭션_커밋_시에는_Redis_재고가_복원되지_않는다() {
+        val coupon = createCoupon(id = 1L)
+        val userCoupon = createUserCoupon(id = 1L, userId = 10L, couponId = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(1)
+        whenever(userCouponRepository.save(any<UserCoupon>())).thenReturn(userCoupon)
+
+        mockStatic(TransactionSynchronizationManager::class.java).use { mocked ->
+            mocked.`when`<Boolean> { TransactionSynchronizationManager.isSynchronizationActive() }.thenReturn(true)
+            val captor = argumentCaptor<TransactionSynchronization>()
+
+            service.issueCoupon(10L, 1L)
+
+            mocked.verify { TransactionSynchronizationManager.registerSynchronization(captor.capture()) }
+            captor.firstValue.afterCompletion(TransactionSynchronization.STATUS_COMMITTED)
+        }
+
+        verify(couponStockRedisRepository, never()).restoreStock(any(), any())
+    }
+
+    @Test
+    fun 트랜잭션_동기화_비활성_시_훅_등록을_건너뛴다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(0)
+
+        mockStatic(TransactionSynchronizationManager::class.java).use { mocked ->
+            mocked.`when`<Boolean> { TransactionSynchronizationManager.isSynchronizationActive() }.thenReturn(false)
+
+            assertThatThrownBy { service.issueCoupon(10L, 1L) }
+                .isInstanceOf(CouponExhaustedException::class.java)
+
+            mocked.verify(
+                { TransactionSynchronizationManager.registerSynchronization(any()) },
+                org.mockito.kotlin.never()
+            )
+        }
     }
 
     @Test
