@@ -2,11 +2,17 @@ package com.hoppingmall.cache
 
 import com.github.benmanes.caffeine.cache.Cache
 import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.cache.support.AbstractValueAdaptingCache
 import java.time.Duration
 import java.util.concurrent.Callable
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class TwoLevelCache(
     private val name: String,
@@ -32,12 +38,26 @@ class TwoLevelCache(
     private val l2FailureCounter = meterRegistry?.let {
         Counter.builder("cache.l2.failure").tag("cache", name).register(it)
     }
+    private val singleFlightCollapsedCounter = meterRegistry?.let {
+        Counter.builder("cache.singleflight.collapsed").tag("cache", name).register(it)
+    }
+
+    private val inFlightLoads = ConcurrentHashMap<Any, CompletableFuture<Any?>>()
+
+    init {
+        meterRegistry?.let {
+            Gauge.builder("cache.singleflight.inflight", inFlightLoads) { it.size.toDouble() }
+                .tag("cache", name)
+                .register(it)
+        }
+    }
 
     companion object {
         private const val LOCK_KEY_PREFIX = "lock:"
         private val LOCK_LEASE_TIME = Duration.ofSeconds(3)
         private const val LOCK_RETRY_INTERVAL_MS = 50L
         private const val LOCK_MAX_WAIT_MS = 500L
+        private const val SINGLE_FLIGHT_TIMEOUT_MS = 500L
     }
 
     override fun getName(): String = name
@@ -93,7 +113,7 @@ class TwoLevelCache(
         }
 
         missCounter?.increment()
-        return loadAndCache(key, valueLoader)
+        return loadWithSingleFlight(key, valueLoader)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -153,6 +173,38 @@ class TwoLevelCache(
         val loaded = valueLoader.call()
         put(key, loaded)
         return loaded
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : Any?> loadWithSingleFlight(key: Any, valueLoader: Callable<T>): T? {
+        val newFuture = CompletableFuture<Any?>()
+        val existing = inFlightLoads.putIfAbsent(key, newFuture)
+
+        if (existing != null) {
+            singleFlightCollapsedCounter?.increment()
+            return try {
+                existing.get(SINGLE_FLIGHT_TIMEOUT_MS, TimeUnit.MILLISECONDS) as T?
+            } catch (e: TimeoutException) {
+                log.warn("Single-flight 대기 초과 [cache={}, key={}], DB 로더 직접 호출", name, key)
+                loadAndCache(key, valueLoader)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                loadAndCache(key, valueLoader)
+            } catch (e: ExecutionException) {
+                throw e.cause ?: e
+            }
+        }
+
+        return try {
+            val result = loadAndCache(key, valueLoader)
+            newFuture.complete(result)
+            result
+        } catch (e: Exception) {
+            newFuture.completeExceptionally(e)
+            throw e
+        } finally {
+            inFlightLoads.remove(key, newFuture)
+        }
     }
 
     override fun put(key: Any, value: Any?) {
