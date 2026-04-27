@@ -34,7 +34,7 @@ class CartItem private constructor(
     @Column
     var quantity: Int,
 
-    @Column(precision = 10, scale = 2)
+    @Column(precision = 19, scale = 2)
     var totalPrice: BigDecimal,
 ): BaseEntity() {
 
