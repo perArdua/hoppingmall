@@ -32,8 +32,8 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("com.github.ben-manes.caffeine:caffeine")
 	implementation("io.micrometer:micrometer-core")
-	compileOnly("org.springframework.boot:spring-boot-starter-data-redis")
-	compileOnly("org.redisson:redisson-spring-boot-starter:4.3.0")
+	implementation("org.springframework.boot:spring-boot-starter-data-redis")
+	implementation("org.redisson:redisson-spring-boot-starter:4.3.0")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

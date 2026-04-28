@@ -7,6 +7,7 @@ import com.hoppingmall.cache.RedissonLockProvider
 import com.hoppingmall.cache.TwoLevelCacheManager
 import io.micrometer.core.instrument.MeterRegistry
 import org.redisson.api.RedissonClient
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.EnableCaching
@@ -63,8 +64,16 @@ class CacheConfig {
     )
 
     @Bean
-    fun hotKeyDetectorRegistry(cachePolicies: Map<String, CachePolicy>): HotKeyDetectorRegistry {
-        return HotKeyDetectorRegistry(cachePolicies.values)
+    fun hotKeyDetectorRegistry(
+        cachePolicies: Map<String, CachePolicy>,
+        @Value("\${cache.hot-key.detector-type:local}") detectorType: String,
+        redissonClient: ObjectProvider<RedissonClient>
+    ): HotKeyDetectorRegistry {
+        return HotKeyDetectorRegistry(
+            policies = cachePolicies.values,
+            detectorType = detectorType,
+            redissonClient = redissonClient.ifAvailable
+        )
     }
 
     @Bean
