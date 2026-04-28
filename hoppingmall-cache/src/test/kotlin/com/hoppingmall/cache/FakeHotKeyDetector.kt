@@ -1,11 +1,6 @@
 package com.hoppingmall.cache
 
-import java.time.Duration
-
-class FakeHotKeyDetector : HotKeyDetector(
-    threshold = Long.MAX_VALUE,
-    windowDuration = Duration.ofHours(1)
-) {
+class FakeHotKeyDetector : HotKeyDetector {
     var overrideIsHot: Boolean = false
     var recordCount: Int = 0
         private set
@@ -20,4 +15,6 @@ class FakeHotKeyDetector : HotKeyDetector(
         overrideIsHot = false
         recordCount = 0
     }
+
+    override fun close() {}
 }

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.mock
+import org.redisson.api.RedissonClient
 import java.time.Duration
 
 @DisplayName("HotKeyDetectorRegistry")
@@ -76,6 +78,31 @@ class HotKeyDetectorRegistryTest {
         val registry = HotKeyDetectorRegistry(emptyList())
 
         assertThat(registry.getDetector("any")).isNull()
+        registry.close()
+    }
+
+    @Test
+    fun redis_모드에서_RedissonClient가_주어지면_RedisHotKeyDetector를_생성한다() {
+        val mockRedisson: RedissonClient = mock()
+        val registry = HotKeyDetectorRegistry(
+            policies = listOf(policy("product", 5L)),
+            detectorType = "redis",
+            redissonClient = mockRedisson
+        )
+
+        assertThat(registry.getDetector("product")).isInstanceOf(RedisHotKeyDetector::class.java)
+        registry.close()
+    }
+
+    @Test
+    fun redis_모드에서_RedissonClient가_null이면_LocalHotKeyDetector로_폴백한다() {
+        val registry = HotKeyDetectorRegistry(
+            policies = listOf(policy("product", 5L)),
+            detectorType = "redis",
+            redissonClient = null
+        )
+
+        assertThat(registry.getDetector("product")).isInstanceOf(LocalHotKeyDetector::class.java)
         registry.close()
     }
 }
