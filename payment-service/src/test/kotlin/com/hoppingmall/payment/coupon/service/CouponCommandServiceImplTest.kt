@@ -5,13 +5,16 @@ import com.hoppingmall.payment.coupon.domain.Coupon
 import com.hoppingmall.payment.coupon.domain.UserCoupon
 import com.hoppingmall.payment.coupon.domain.repository.CouponRepository
 import com.hoppingmall.payment.coupon.domain.repository.UserCouponRepository
+import com.hoppingmall.payment.coupon.dto.event.CouponRestoreEvent
 import com.hoppingmall.payment.coupon.dto.request.CouponCreateRequest
+import com.hoppingmall.payment.coupon.enum.CouponRestoreReason
 import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.DiscountType
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
 import com.hoppingmall.payment.coupon.exception.*
 import com.hoppingmall.payment.coupon.infrastructure.CouponReserveResult
 import com.hoppingmall.payment.coupon.infrastructure.CouponStockRedisRepository
+import com.hoppingmall.payment.coupon.metrics.CouponCompensationMetrics
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -43,6 +46,12 @@ class CouponCommandServiceImplTest {
 
     @Mock
     private lateinit var couponStockRedisRepository: CouponStockRedisRepository
+
+    @Mock
+    private lateinit var compensationPublisher: CouponCompensationPublisher
+
+    @Mock
+    private lateinit var compensationMetrics: CouponCompensationMetrics
 
     @InjectMocks
     private lateinit var service: CouponCommandServiceImpl
@@ -235,7 +244,7 @@ class CouponCommandServiceImplTest {
     }
 
     @Test
-    fun 롤백_훅에서_Redis_복원이_실패해도_삼킨다() {
+    fun 롤백_훅에서_Redis_복원이_실패하면_보상_이벤트를_발행한다() {
         val coupon = createCoupon(id = 1L)
         whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
         whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
@@ -252,6 +261,61 @@ class CouponCommandServiceImplTest {
             mocked.verify { TransactionSynchronizationManager.registerSynchronization(captor.capture()) }
             captor.firstValue.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
         }
+
+        val eventCaptor = argumentCaptor<CouponRestoreEvent>()
+        verify(compensationPublisher).publish(eventCaptor.capture())
+        assertThat(eventCaptor.firstValue.couponId).isEqualTo(1L)
+        assertThat(eventCaptor.firstValue.userId).isEqualTo(10L)
+        assertThat(eventCaptor.firstValue.reason).isEqualTo(CouponRestoreReason.DB_INSERT_FAILED)
+        assertThat(eventCaptor.firstValue.retryCount).isEqualTo(0)
+        verify(compensationMetrics).recordSyncFailure()
+    }
+
+    @Test
+    fun 롤백_훅에서_동기_보상_성공_시_보상_이벤트는_발행하지_않고_sync_success_만_기록한다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(0)
+
+        mockStatic(TransactionSynchronizationManager::class.java).use { mocked ->
+            mocked.`when`<Boolean> { TransactionSynchronizationManager.isSynchronizationActive() }.thenReturn(true)
+            val captor = argumentCaptor<TransactionSynchronization>()
+
+            assertThatThrownBy { service.issueCoupon(10L, 1L) }
+                .isInstanceOf(CouponExhaustedException::class.java)
+
+            mocked.verify { TransactionSynchronizationManager.registerSynchronization(captor.capture()) }
+            captor.firstValue.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+        }
+
+        verify(couponStockRedisRepository).restoreStock(1L, 10L)
+        verify(compensationMetrics).recordSyncSuccess()
+        verify(compensationPublisher, never()).publish(any())
+    }
+
+    @Test
+    fun 보상_큐_발행마저_실패해도_예외를_삼킨다() {
+        val coupon = createCoupon(id = 1L)
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
+        whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(0)
+        whenever(couponStockRedisRepository.restoreStock(1L, 10L)).thenThrow(RuntimeException("Redis down"))
+        whenever(compensationPublisher.publish(any())).thenThrow(RuntimeException("Kafka also down"))
+
+        mockStatic(TransactionSynchronizationManager::class.java).use { mocked ->
+            mocked.`when`<Boolean> { TransactionSynchronizationManager.isSynchronizationActive() }.thenReturn(true)
+            val captor = argumentCaptor<TransactionSynchronization>()
+
+            assertThatThrownBy { service.issueCoupon(10L, 1L) }
+                .isInstanceOf(CouponExhaustedException::class.java)
+
+            mocked.verify { TransactionSynchronizationManager.registerSynchronization(captor.capture()) }
+            captor.firstValue.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+        }
+
+        verify(compensationPublisher).publish(any())
+        verify(compensationMetrics).recordSyncFailure()
     }
 
     @Test
