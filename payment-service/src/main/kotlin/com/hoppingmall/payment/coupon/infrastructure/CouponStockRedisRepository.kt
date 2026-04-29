@@ -47,6 +47,22 @@ class CouponStockRedisRepository(
         )
     }
 
+    fun restoreStockIdempotent(couponId: Long, userId: Long): CouponRestoreResult {
+        val script = redissonClient.getScript(StringCodec.INSTANCE)
+        val result = script.eval<Long>(
+            RScript.Mode.READ_WRITE,
+            RESTORE_IDEMPOTENT_SCRIPT,
+            RScript.ReturnType.LONG,
+            listOf(stockKey(couponId), issuedKey(couponId), restoredKey(couponId, userId)),
+            userId.toString(),
+            RESTORED_TTL_SECONDS.toString()
+        )
+        return when (result.toInt()) {
+            2 -> CouponRestoreResult.AlreadyRestored
+            else -> CouponRestoreResult.Restored
+        }
+    }
+
     fun deleteStock(couponId: Long) {
         redissonClient.keys.delete(stockKey(couponId), issuedKey(couponId))
     }
@@ -58,8 +74,11 @@ class CouponStockRedisRepository(
 
     private fun stockKey(couponId: Long) = "coupon:{$couponId}:stock"
     private fun issuedKey(couponId: Long) = "coupon:{$couponId}:issued"
+    private fun restoredKey(couponId: Long, userId: Long) = "coupon:{$couponId}:restored:$userId"
 
     companion object {
+        const val RESTORED_TTL_SECONDS = 86_400L
+
         const val RESERVE_SCRIPT = """
             local stockKey = KEYS[1]
             local userSetKey = KEYS[2]
@@ -92,6 +111,25 @@ class CouponStockRedisRepository(
                 redis.call('INCR', stockKey)
             end
             redis.call('SREM', userSetKey, userId)
+            return 1
+        """
+
+        const val RESTORE_IDEMPOTENT_SCRIPT = """
+            local stockKey = KEYS[1]
+            local userSetKey = KEYS[2]
+            local restoredKey = KEYS[3]
+            local userId = ARGV[1]
+            local ttl = tonumber(ARGV[2])
+
+            if redis.call('EXISTS', restoredKey) == 1 then
+                return 2
+            end
+
+            if redis.call('EXISTS', stockKey) == 1 then
+                redis.call('INCR', stockKey)
+            end
+            redis.call('SREM', userSetKey, userId)
+            redis.call('SET', restoredKey, '1', 'EX', ttl)
             return 1
         """
     }

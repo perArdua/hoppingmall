@@ -120,6 +120,43 @@ class CouponStockRedisRepositoryTest {
     }
 
     @Test
+    fun restoreStockIdempotent_복원_성공_시_Restored를_반환한다() {
+        whenever(redissonClient.getScript(any<Codec>())).thenReturn(rScript)
+        whenever(rScript.eval<Long>(any(), any<String>(), any(), any<List<Any>>(), any(), any())).thenReturn(1L)
+
+        val result = repository.restoreStockIdempotent(1L, 10L)
+
+        assertThat(result).isEqualTo(CouponRestoreResult.Restored)
+    }
+
+    @Test
+    fun restoreStockIdempotent_이미_복원된_경우_AlreadyRestored를_반환한다() {
+        whenever(redissonClient.getScript(any<Codec>())).thenReturn(rScript)
+        whenever(rScript.eval<Long>(any(), any<String>(), any(), any<List<Any>>(), any(), any())).thenReturn(2L)
+
+        val result = repository.restoreStockIdempotent(1L, 10L)
+
+        assertThat(result).isEqualTo(CouponRestoreResult.AlreadyRestored)
+    }
+
+    @Test
+    fun restoreStockIdempotent_3개_키와_TTL_인자를_Lua에_전달한다() {
+        whenever(redissonClient.getScript(any<Codec>())).thenReturn(rScript)
+        whenever(rScript.eval<Long>(any(), any<String>(), any(), any<List<Any>>(), any(), any())).thenReturn(1L)
+
+        repository.restoreStockIdempotent(7L, 42L)
+
+        verify(rScript).eval<Long>(
+            eq(org.redisson.api.RScript.Mode.READ_WRITE),
+            eq(CouponStockRedisRepository.RESTORE_IDEMPOTENT_SCRIPT),
+            eq(org.redisson.api.RScript.ReturnType.LONG),
+            eq(listOf("coupon:{7}:stock", "coupon:{7}:issued", "coupon:{7}:restored:42")),
+            eq("42"),
+            eq(CouponStockRedisRepository.RESTORED_TTL_SECONDS.toString())
+        )
+    }
+
+    @Test
     fun deleteStock_두_키를_모두_삭제한다() {
         whenever(redissonClient.keys).thenReturn(rKeys)
 
