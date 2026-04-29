@@ -5,14 +5,17 @@ import com.hoppingmall.payment.coupon.domain.Coupon
 import com.hoppingmall.payment.coupon.domain.UserCoupon
 import com.hoppingmall.payment.coupon.domain.repository.CouponRepository
 import com.hoppingmall.payment.coupon.domain.repository.UserCouponRepository
+import com.hoppingmall.payment.coupon.dto.event.CouponRestoreEvent
 import com.hoppingmall.payment.coupon.dto.request.CouponCreateRequest
 import com.hoppingmall.payment.coupon.dto.response.CouponResponse
 import com.hoppingmall.payment.coupon.dto.response.UserCouponResponse
+import com.hoppingmall.payment.coupon.enum.CouponRestoreReason
 import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
 import com.hoppingmall.payment.coupon.exception.*
 import com.hoppingmall.payment.coupon.infrastructure.CouponReserveResult
 import com.hoppingmall.payment.coupon.infrastructure.CouponStockRedisRepository
+import com.hoppingmall.payment.coupon.metrics.CouponCompensationMetrics
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
@@ -29,7 +32,9 @@ import java.math.BigDecimal
 class CouponCommandServiceImpl(
     private val couponRepository: CouponRepository,
     private val userCouponRepository: UserCouponRepository,
-    private val couponStockRedisRepository: CouponStockRedisRepository
+    private val couponStockRedisRepository: CouponStockRedisRepository,
+    private val compensationPublisher: CouponCompensationPublisher,
+    private val compensationMetrics: CouponCompensationMetrics
 ) : CouponCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -128,13 +133,36 @@ class CouponCommandServiceImpl(
                     if (status != TransactionSynchronization.STATUS_ROLLED_BACK) return
                     try {
                         couponStockRedisRepository.restoreStock(couponId, userId)
+                        compensationMetrics.recordSyncSuccess()
                         log.info("Redis 재고 복원 (tx rollback): couponId={}, userId={}", couponId, userId)
                     } catch (e: Exception) {
-                        log.error("Redis 재고 복원 실패 (tx rollback): couponId={}, userId={}", couponId, userId, e)
+                        compensationMetrics.recordSyncFailure()
+                        log.error(
+                            "Redis 재고 복원 실패 (tx rollback) → 보상 큐 발행 시도: couponId={}, userId={}",
+                            couponId, userId, e
+                        )
+                        publishCompensationEvent(couponId, userId, CouponRestoreReason.DB_INSERT_FAILED)
                     }
                 }
             }
         )
+    }
+
+    private fun publishCompensationEvent(couponId: Long, userId: Long, reason: CouponRestoreReason) {
+        try {
+            compensationPublisher.publish(
+                CouponRestoreEvent(
+                    couponId = couponId,
+                    userId = userId,
+                    reason = reason
+                )
+            )
+        } catch (e: Exception) {
+            log.error(
+                "보상 큐 발행마저 실패 (수동 개입 필요): couponId={}, userId={}, reason={}",
+                couponId, userId, reason, e
+            )
+        }
     }
 
     override fun useCoupon(userId: Long, couponId: Long, orderAmount: BigDecimal, orderId: Long): BigDecimal {
