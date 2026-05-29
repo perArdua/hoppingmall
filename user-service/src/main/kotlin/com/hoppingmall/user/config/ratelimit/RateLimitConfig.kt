@@ -11,7 +11,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 @Configuration
-@Profile("!test")
+@Profile("!test & !loadtest")
 class RateLimitConfig(
     private val redissonClient: RedissonClient
 ) : WebMvcConfigurer {

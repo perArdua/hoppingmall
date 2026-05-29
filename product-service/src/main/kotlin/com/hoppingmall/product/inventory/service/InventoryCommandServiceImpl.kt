@@ -18,6 +18,7 @@ import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import kotlin.random.Random
 
 @Service
 @Transactional
@@ -29,6 +30,15 @@ class InventoryCommandServiceImpl(
 
     @Value("\${inventory.reservation.ttl-minutes:10}")
     private var ttlMinutes: Long = 10
+
+    @Value("\${chaos.inventory.failure-rate:0.0}")
+    private var chaosFailureRate: Float = 0.0f
+
+    private fun maybeInjectChaos(operation: String) {
+        if (chaosFailureRate > 0 && Random.nextFloat() < chaosFailureRate) {
+            throw RuntimeException("Chaos injection: inventory $operation failed")
+        }
+    }
 
     override fun initStock(request: InventoryInitRequest): InventoryResponse {
         if (!productRepository.existsById(request.productId)) {
@@ -74,6 +84,7 @@ class InventoryCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun reserveStock(productId: Long, quantity: Int): String {
+        maybeInjectChaos("reserveStock")
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
             ?: throw InventoryNotFoundException()
 
@@ -85,6 +96,7 @@ class InventoryCommandServiceImpl(
     }
 
     override fun confirmReservations(reservationIds: List<String>): Boolean {
+        maybeInjectChaos("confirmReservations")
         if (reservationIds.isEmpty()) return true
 
         val now = LocalDateTime.now()
@@ -124,6 +136,7 @@ class InventoryCommandServiceImpl(
     }
 
     override fun cancelReservation(reservationId: String) {
+        maybeInjectChaos("cancelReservation")
         val reservation = inventoryReservationRepository.findByReservationId(reservationId)
             ?: return
 
