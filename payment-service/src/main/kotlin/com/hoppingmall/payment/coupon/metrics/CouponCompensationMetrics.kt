@@ -2,11 +2,9 @@ package com.hoppingmall.payment.coupon.metrics
 
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.stereotype.Component
 
 @Component
-@ConditionalOnBean(MeterRegistry::class)
 class CouponCompensationMetrics(
     meterRegistry: MeterRegistry
 ) {
