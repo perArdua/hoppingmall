@@ -11,10 +11,13 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.mockito.kotlin.any
+import org.mockito.kotlin.atLeast
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import java.util.concurrent.RejectedExecutionException
 import org.springframework.cache.concurrent.ConcurrentMapCache
 import java.time.Duration
 import java.util.concurrent.Callable
@@ -70,6 +73,7 @@ class TwoLevelCacheXFetchTest {
         random: () -> Double = { 1.0 },
         executor: Executor? = sameThreadExecutor,
         refreshGuard: RefreshGuard? = null,
+        hotKeyDetector: HotKeyDetector? = null,
         l2: org.springframework.cache.Cache = ConcurrentMapCache(policy.cacheName)
     ): TwoLevelCache {
         val caffeine = Caffeine.newBuilder()
@@ -83,11 +87,15 @@ class TwoLevelCacheXFetchTest {
             policy = policy,
             refreshExecutor = executor,
             refreshGuard = refreshGuard,
+            hotKeyDetector = hotKeyDetector,
             meterRegistry = meterRegistry,
             clock = clock,
             random = random
         )
     }
+
+    private fun entryAt(l2: org.springframework.cache.Cache, key: String): CacheEntry<*> =
+        l2.get(key)?.get() as CacheEntry<*>
 
     private fun refreshTriggered() = meterRegistry.counter("cache.xfetch.refresh.triggered", "cache", "product").count()
     private fun refreshSuccess() = meterRegistry.counter("cache.xfetch.refresh.success", "cache", "product").count()
@@ -218,7 +226,8 @@ class TwoLevelCacheXFetchTest {
             assertThat(v).isEqualTo("v1")
             assertThat(loads.get()).isEqualTo(1) // 가드 미획득 → 갱신 로드 없음
             verify(guard).tryAcquire(any(), any())
-            assertThat(refreshTriggered()).isEqualTo(1.0) // 트리거는 됐으나 가드에서 멈춤
+            // 메트릭은 가드 획득(=실제 갱신 주도) 이후에만 증가하므로, 가드 패배 시 triggered/success 모두 0.
+            assertThat(refreshTriggered()).isEqualTo(0.0)
             assertThat(refreshSuccess()).isEqualTo(0.0)
         }
 
@@ -335,6 +344,134 @@ class TwoLevelCacheXFetchTest {
             assertThat(v).isEqualTo("v1")
             assertThat(loads.get()).isEqualTo(1) // XFetch 트리거 안 됨
             assertThat(meterRegistry.find("cache.xfetch.refresh.triggered").counter()?.count() ?: 0.0).isEqualTo(0.0)
+        }
+    }
+
+    @Nested
+    @DisplayName("버그1: 갱신 시 lastLoadDuration 실측")
+    inner class RefreshMeasuresDuration {
+        @Test
+        fun 갱신은_duration을_실측해_저장하고_물리만료_전_조기갱신이_지속된다() {
+            val now = AtomicLong(0L)
+            val l2 = ConcurrentMapCache("product")
+            val cache = cache(hotPolicy, clock = { now.get() }, random = { 1e-6 }, l2 = l2)
+            val loads = AtomicInteger(0)
+
+            // 콜드 적재: now 0→100 → duration=100, physicalExpireAt=100+1000=1100
+            now.set(0L)
+            cache.get("k", Callable { loads.incrementAndGet(); now.addAndGet(100L); "v1" })
+            assertThat(entryAt(l2, "k").lastLoadDurationMs).isEqualTo(100L)
+
+            // now=600(<1100): 갱신 트리거, 갱신 로더도 50ms 소요
+            now.set(600L)
+            cache.get("k", Callable { loads.incrementAndGet(); now.addAndGet(50L); "v2" })
+            val refreshed = entryAt(l2, "k")
+            assertThat(refreshed.lastLoadDurationMs).isEqualTo(50L) // 버그1 핵심: 0이 아닌 실측
+            assertThat(refreshed.value).isEqualTo("v2")
+            assertThat(loads.get()).isEqualTo(2)
+
+            // 2차 갱신 store는 now=650 → physicalExpireAt=1650. duration=50>0 덕에 now=1000(<1650)에도 조기 트리거.
+            // (duration=0이었다면 gate=now=1000<1650 → 트리거 안 됨 = 회귀 가드)
+            now.set(1000L)
+            cache.get("k", Callable { loads.incrementAndGet(); now.addAndGet(50L); "v3" })
+            assertThat(loads.get()).isEqualTo(3)
+        }
+    }
+
+    @Nested
+    @DisplayName("버그2: 제출 거부 시 refreshInFlight 비잔류")
+    inner class RejectionCleansInFlight {
+        @Test
+        fun 갱신_제출_거부시_키가_잔류하지_않고_다음_읽기에서_재트리거된다() {
+            val now = AtomicLong(0L)
+            val attempts = AtomicInteger(0)
+            val rejecting = Executor { attempts.incrementAndGet(); throw RejectedExecutionException("full") }
+            val cache = cache(hotPolicy, clock = { now.get() }, random = { 1e-6 }, executor = rejecting)
+
+            now.set(0L)
+            cache.get("k", Callable { now.addAndGet(100L); "v1" }) // 콜드 적재(동기, executor 무관)
+
+            now.set(600L)
+            assertThat(cache.get("k", Callable { "x" })).isEqualTo("v1") // 트리거 → 거부(attempt1)
+            assertThat(cache.get("k", Callable { "x" })).isEqualTo("v1") // 다시 트리거 → 거부(attempt2)
+
+            assertThat(attempts.get()).isEqualTo(2) // 잔류했다면 add 실패로 2번째 제출이 없었을 것
+            assertThat(meterRegistry.find("cache.xfetch.refresh.discarded").counter()?.count() ?: 0.0).isEqualTo(2.0)
+        }
+    }
+
+    @Nested
+    @DisplayName("버그3: 감지기 게이팅")
+    inner class DetectorGating {
+        @Test
+        fun isHot_false면_논리만료여도_갱신을_트리거하지_않는다() {
+            val now = AtomicLong(0L)
+            val detector = mock<HotKeyDetector>()
+            whenever(detector.isHot(any())).thenReturn(false)
+            val cache = cache(hotPolicy, clock = { now.get() }, random = { 1e-6 }, hotKeyDetector = detector)
+            val loads = AtomicInteger(0)
+
+            now.set(0L)
+            cache.get("k", Callable { loads.incrementAndGet(); now.addAndGet(100L); "v1" })
+            now.set(600L)
+            cache.get("k", Callable { loads.incrementAndGet(); "v2" })
+
+            assertThat(loads.get()).isEqualTo(1) // 콜드만, 갱신 없음
+            assertThat(refreshTriggered()).isEqualTo(0.0)
+        }
+
+        @Test
+        fun isHot_true면_논리만료시_갱신을_트리거한다() {
+            val now = AtomicLong(0L)
+            val detector = mock<HotKeyDetector>()
+            whenever(detector.isHot(any())).thenReturn(true)
+            val cache = cache(hotPolicy, clock = { now.get() }, random = { 1e-6 }, hotKeyDetector = detector)
+            val loads = AtomicInteger(0)
+
+            now.set(0L)
+            cache.get("k", Callable { loads.incrementAndGet(); now.addAndGet(100L); "v1" })
+            now.set(600L)
+            cache.get("k", Callable { loads.incrementAndGet(); now.addAndGet(50L); "v2" })
+
+            assertThat(loads.get()).isEqualTo(2)
+            assertThat(refreshSuccess()).isEqualTo(1.0)
+        }
+
+        @Test
+        fun recordAccess는_L1_히트에서도_호출된다() {
+            val now = AtomicLong(0L)
+            val detector = mock<HotKeyDetector>()
+            whenever(detector.isHot(any())).thenReturn(false)
+            val cache = cache(hotPolicy, clock = { now.get() }, random = { 1.0 }, hotKeyDetector = detector)
+
+            now.set(0L)
+            cache.get("k", Callable { now.addAndGet(10L); "v1" }) // 콜드(미스)
+            now.set(50L)
+            cache.get("k", Callable { "v1" }) // L1 히트
+
+            verify(detector, atLeast(2)).recordAccess(eq("k")) // 최상단 이동으로 L1 히트도 카운트
+        }
+    }
+
+    @Nested
+    @DisplayName("다듬기: 가드 패배 시 로컬 cooldown")
+    inner class GuardLossCooldown {
+        @Test
+        fun 가드_패배시_cooldown_동안_tryAcquire를_반복호출하지_않는다() {
+            val now = AtomicLong(0L)
+            val guard = mock<RefreshGuard>()
+            whenever(guard.tryAcquire(any(), any())).thenReturn(false)
+            val cache = cache(hotPolicy, clock = { now.get() }, random = { 1e-6 }, refreshGuard = guard)
+
+            now.set(0L)
+            cache.get("k", Callable { now.addAndGet(100L); "v1" })
+
+            now.set(600L)
+            cache.get("k", Callable { "v2" }) // 트리거 → tryAcquire=false → cooldown(만료 1600) 설정
+            now.set(700L) // cooldown 이내
+            cache.get("k", Callable { "v3" }) // 억제됨 → tryAcquire 재호출 없음
+
+            verify(guard, times(1)).tryAcquire(any(), any())
         }
     }
 }

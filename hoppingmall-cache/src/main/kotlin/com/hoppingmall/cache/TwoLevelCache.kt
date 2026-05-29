@@ -65,6 +65,9 @@ class TwoLevelCache(
     private val refreshInFlight = ConcurrentHashMap.newKeySet<Any>()
     // evict 발생 횟수 — bg 갱신이 evict와 경합 시 stale 값 부활 방지(writeback 가드)
     private val evictEpoch = AtomicLong(0)
+    // 인스턴스 간 가드 패배(다른 인스턴스가 갱신 중) 시 그 키의 로컬 재시도 억제 만료시각(ms).
+    // 갱신 윈도우 동안 진 인스턴스가 SET NX를 반복 호출하는 폭주를 막는다.
+    private val refreshCooldownUntil = ConcurrentHashMap<Any, Long>()
 
     // 이 캐시가 XFetch 래핑(CacheEntry) 대상인지. 현재 hotKeyThreshold>0(product)만 true.
     private val wrapEntries: Boolean = policy.dynamicHotKeyEnabled
@@ -84,6 +87,7 @@ class TwoLevelCache(
         private const val XFETCH_BETA = 1.0
         private val REFRESH_GUARD_TTL = Duration.ofSeconds(3)
         private val REFRESH_FAIL_COOLDOWN = Duration.ofMillis(200)
+        private val REFRESH_LOCAL_COOLDOWN = Duration.ofSeconds(1)
         private const val SINGLE_FLIGHT_TIMEOUT_MS = 500L
         private const val REFRESH_GUARD_PREFIX = "refresh:"
     }
@@ -95,11 +99,11 @@ class TwoLevelCache(
 
     /** sync=false 경로(@Cacheable 일반). 로더가 없으므로 갱신은 트리거하지 않고 unwrap만 한다. */
     override fun lookup(key: Any): Any? {
+        hotKeyDetector?.recordAccess(key.toString()) // 최상단: L1 히트 포함 모든 접근 카운트(핫 판정 정확도)
         caffeineCache.getIfPresent(key)?.let {
             l1HitCounter?.increment()
             return unwrap(it)
         }
-        hotKeyDetector?.recordAccess(key.toString())
         val l2 = safeL2Get(key)
         if (l2 != null) {
             l2HitCounter?.increment()
@@ -113,12 +117,12 @@ class TwoLevelCache(
     /** sync=true 경로(@Cacheable sync). 값이 있으면 즉시 반환(무블로킹) + XFetch 갱신 트리거. 하드미스만 동기 로드. */
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any?> get(key: Any, valueLoader: Callable<T>): T? {
+        hotKeyDetector?.recordAccess(key.toString()) // 최상단: L1 히트 포함 모든 접근 카운트(핫 판정 정확도)
         caffeineCache.getIfPresent(key)?.let { stored ->
             l1HitCounter?.increment()
             maybeTriggerRefresh(key, stored, valueLoader)
             return fromStoreValue(unwrap(stored)) as T?
         }
-        hotKeyDetector?.recordAccess(key.toString())
 
         val l2 = safeL2Get(key)
         if (l2 != null) {
@@ -176,7 +180,15 @@ class TwoLevelCache(
     private fun maybeTriggerRefresh(key: Any, stored: Any, valueLoader: Callable<*>?) {
         if (valueLoader == null) return
         val entry = stored as? CacheEntry<*> ?: return // 비래핑(비핫/콜드 NullValue)은 트리거 안 함
+        // 감지기 게이팅: 핫키만 백그라운드 갱신(콜드 키 갱신 낭비 제거). detector 없으면 게이팅 안 함.
+        if (hotKeyDetector != null && !hotKeyDetector.isHot(key.toString())) return
         if (!shouldRefresh(entry)) return
+        // 인스턴스 간 가드 패배 후 로컬 cooldown 중이면 재submit 억제(SET NX 폭주 방지).
+        val cooldownUntil = refreshCooldownUntil[key]
+        if (cooldownUntil != null) {
+            if (clock() < cooldownUntil) return
+            refreshCooldownUntil.remove(key, cooldownUntil)
+        }
         if (!refreshInFlight.add(key)) return // 로컬 dedup: 이미 갱신 중
         val executor = refreshExecutor
         if (executor == null) {
@@ -185,9 +197,8 @@ class TwoLevelCache(
         }
         try {
             executor.execute { doRefresh(key, valueLoader) }
-            refreshTriggeredCounter?.increment()
-            staleServedCounter?.increment()
         } catch (e: RejectedExecutionException) {
+            // 풀 포화(AbortPolicy) → 드롭하되 refreshInFlight 정리(영구 잔류 방지). 다음 읽기에서 재트리거.
             refreshDiscardedCounter?.increment()
             refreshInFlight.remove(key)
         }
@@ -205,8 +216,16 @@ class TwoLevelCache(
         val guardKey = "$REFRESH_GUARD_PREFIX$name:$key"
         try {
             val acquired = refreshGuard?.tryAcquire(guardKey, REFRESH_GUARD_TTL) ?: true
-            if (!acquired) return // 다른 인스턴스가 갱신 중 → stale 서빙(이미 반환됨)
+            if (!acquired) {
+                // 다른 인스턴스가 갱신 중 → stale 서빙(이미 반환됨). 갱신 윈도우 동안 로컬 재시도 억제.
+                refreshCooldownUntil[key] = clock() + REFRESH_LOCAL_COOLDOWN.toMillis()
+                return
+            }
+            // 메트릭은 실제 갱신을 주도(가드 획득)한 인스턴스에서만 카운트(정확도).
+            refreshTriggeredCounter?.increment()
+            staleServedCounter?.increment()
             val epochAtStart = evictEpoch.get()
+            val t0 = clock()
             val loaded = try {
                 valueLoader.call()
             } catch (e: Exception) {
@@ -215,9 +234,16 @@ class TwoLevelCache(
                 refreshGuard?.markFailed(guardKey, REFRESH_FAIL_COOLDOWN)
                 return
             }
+            val durationMs = clock() - t0 // 실측 → 다음 XFetch가 물리 만료 전 조기 갱신을 유지(버그1 수정)
             // 갱신 도중 evict가 끼었으면 부활시키지 않는다.
             if (evictEpoch.get() != epochAtStart) return
-            store(key, loaded, 0L) // 소요시간은 doRefresh 진입 전 측정 어려우므로 보수적으로 0; 다음 콜드로드가 정밀 갱신
+            store(key, loaded, durationMs)
+            // TOCTOU: 위 체크와 store 사이에 evict가 끼면 stale이 부활할 수 있어 store 직후 재확인해 제거(best-effort).
+            // 완전 차단은 키별 락/무효화 전파(pub-sub)가 필요 — 스코프 외. 잔여 창은 극소.
+            if (evictEpoch.get() != epochAtStart) {
+                caffeineCache.invalidate(key)
+                try { redisCache.evict(key) } catch (e: Exception) { l2FailureCounter?.increment() }
+            }
             refreshSuccessCounter?.increment()
             // 성공 시 가드는 release하지 않고 TTL(3s)로 만료 → 같은 창 재갱신 방지
         } finally {
