@@ -7,6 +7,7 @@ import org.springframework.cache.CacheManager
 import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
+import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
@@ -76,11 +77,19 @@ class TwoLevelCacheManager(
             policies: Map<String, CachePolicy>,
             defaultTtl: Duration = Duration.ofMinutes(30)
         ): RedisCacheManager {
+            // 값 직렬화를 JSON으로 (키는 기본 StringRedisSerializer 유지). JDK 직렬화는 비Serializable 값에서 실패함.
+            // 기본 경로: 캐시별 타입드 직렬화(@class 없음). valueType 미선언 캐시는 fallback(@class, 한정 PTV).
+            val fallbackPair = SerializationPair.fromSerializer(CacheValueSerializer.fallback())
             val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(defaultTtl)
+                .serializeValuesWith(fallbackPair)
             val perCacheConfigs = policies.mapValues { (_, policy) ->
+                val valuePair = policy.valueType
+                    ?.let { SerializationPair.fromSerializer(TypedCacheValueSerializer(CacheValueSerializer.mapper, it)) }
+                    ?: fallbackPair
                 RedisCacheConfiguration.defaultCacheConfig()
                     .entryTtl(policy.l2Ttl)
+                    .serializeValuesWith(valuePair)
             }
             return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

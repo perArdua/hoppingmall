@@ -34,6 +34,8 @@ dependencies {
 	implementation("io.micrometer:micrometer-core")
 	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 	implementation("org.redisson:redisson-spring-boot-starter:4.3.0")
+	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -41,6 +43,7 @@ dependencies {
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.springframework.boot:spring-boot-starter-data-redis")
 	testImplementation("org.redisson:redisson-spring-boot-starter:4.3.0")
+	testImplementation("com.github.codemonstur:embedded-redis:1.4.3")
 }
 
 tasks.withType<Test> {
