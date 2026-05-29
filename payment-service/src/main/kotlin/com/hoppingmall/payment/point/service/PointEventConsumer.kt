@@ -11,10 +11,12 @@ import com.hoppingmall.payment.point.domain.PointHistoryRepository
 import com.hoppingmall.payment.point.domain.PointRepository
 import com.hoppingmall.payment.point.enum.PointType
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import kotlin.random.Random
 
 @Service
 @Transactional
@@ -29,8 +31,14 @@ class PointEventConsumer(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
+    @Value("\${chaos.point.failure-rate:0.0}")
+    private var chaosFailureRate: Float = 0.0f
+
     @KafkaListener(topics = [KafkaTopics.POINT_EARN_REQUEST], groupId = "point-service")
     fun handlePointEarnRequest(message: String) {
+        if (chaosFailureRate > 0 && Random.nextFloat() < chaosFailureRate) {
+            throw RuntimeException("Chaos injection: point operation failed")
+        }
         val event = objectMapper.readValue(message, PointEarnRequestEvent::class.java)
         executeIdempotently(
             eventId = event.eventId,

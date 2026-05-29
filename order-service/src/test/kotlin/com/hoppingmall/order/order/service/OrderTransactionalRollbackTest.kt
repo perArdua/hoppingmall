@@ -3,6 +3,7 @@ package com.hoppingmall.order.order.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.config.OrderMetrics
+import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.SagaEventLog
@@ -85,6 +86,9 @@ class OrderTransactionalRollbackTest {
 
     @MockitoBean
     private lateinit var orderMetrics: OrderMetrics
+
+    @MockitoBean
+    private lateinit var sagaCompensationMetrics: SagaCompensationMetrics
 
     @MockitoBean
     private lateinit var transactionalEventPublisher: TransactionalEventPublisher

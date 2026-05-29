@@ -54,6 +54,17 @@ class InventoryCommandServiceImplTest {
     }
 
     @Test
+    fun 카오스_실패율이_주입되면_재고_예약이_예외를_던진다() {
+        val field = InventoryCommandServiceImpl::class.java.getDeclaredField("chaosFailureRate")
+        field.isAccessible = true
+        field.set(service, 1.0f)
+
+        assertThatThrownBy { service.reserveStock(1L, 1) }
+            .isInstanceOf(RuntimeException::class.java)
+            .hasMessageContaining("Chaos injection")
+    }
+
+    @Test
     fun 재고를_초기화한다() {
         val inventory = Inventory.create(productId = 1L, stockQuantity = 100).withId(1L)
         val request = com.hoppingmall.product.inventory.dto.request.InventoryInitRequest(productId = 1L, stockQuantity = 100)

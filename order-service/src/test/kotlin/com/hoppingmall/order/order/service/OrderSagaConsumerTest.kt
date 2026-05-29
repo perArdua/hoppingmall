@@ -11,6 +11,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.order.order.enum.OrderStatus
+import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
@@ -60,6 +61,9 @@ class OrderSagaConsumerTest {
     @Mock
     private lateinit var transactionTemplate: TransactionTemplate
 
+    @Mock
+    private lateinit var sagaCompensationMetrics: SagaCompensationMetrics
+
     private lateinit var consumer: OrderSagaConsumer
 
     @BeforeEach
@@ -69,6 +73,8 @@ class OrderSagaConsumerTest {
             val callback = invocation.arguments[0] as TransactionCallback<Any?>
             callback.doInTransaction(mock())
         }
+        Mockito.lenient().`when`(objectMapper.copy()).thenReturn(objectMapper)
+        Mockito.lenient().`when`(objectMapper.setPropertyNamingStrategy(any())).thenReturn(objectMapper)
         consumer = OrderSagaConsumer(
             sagaEventLogRepository,
             orderRepository,
@@ -76,7 +82,8 @@ class OrderSagaConsumerTest {
             inventoryCommandPort,
             transactionalEventPublisher,
             objectMapper,
-            transactionTemplate
+            transactionTemplate,
+            sagaCompensationMetrics
         )
     }
 

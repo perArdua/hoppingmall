@@ -5,6 +5,7 @@ import com.hoppingmall.order.order.domain.SagaEventLog
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
+import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -17,6 +18,7 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.Mockito
 import org.mockito.kotlin.any
+import org.mockito.kotlin.check
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
@@ -45,6 +47,9 @@ class SagaTimeoutSchedulerTest {
     @Mock
     private lateinit var transactionTemplate: TransactionTemplate
 
+    @Mock
+    private lateinit var sagaCompensationMetrics: SagaCompensationMetrics
+
     private lateinit var scheduler: SagaTimeoutScheduler
 
     @BeforeEach
@@ -58,7 +63,8 @@ class SagaTimeoutSchedulerTest {
             sagaEventLogRepository,
             orderRepository,
             transactionalEventPublisher,
-            transactionTemplate
+            transactionTemplate,
+            sagaCompensationMetrics
         )
     }
 
@@ -68,6 +74,7 @@ class SagaTimeoutSchedulerTest {
             eventId = "payment-completed-txn-1",
             eventType = "PAYMENT_COMPLETED",
             orderId = 1L,
+            paymentId = 100L,
             timeoutAt = LocalDateTime.now().minusMinutes(1)
         ).apply {
             id = 100L
@@ -90,9 +97,53 @@ class SagaTimeoutSchedulerTest {
             aggregateType = eq("Order"),
             aggregateId = eq("1"),
             eventType = eq("PaymentReversalRequested"),
-            eventData = any(),
+            eventData = check<Any> {
+                @Suppress("UNCHECKED_CAST")
+                val data = it as Map<String, Any?>
+                assertThat(data["paymentId"]).isEqualTo(100L)
+                assertThat(data["userId"]).isEqualTo(10L)
+                assertThat(data["reason"]).isEqualTo("SAGA_TIMEOUT")
+            },
             topic = eq("payment-reversal"),
             partitionKey = eq("1")
+        )
+    }
+
+    @Test
+    fun paymentId가_없는_타임아웃_saga는_userId만_포함하여_역보상을_발행한다() {
+        val saga = SagaEventLog(
+            eventId = "payment-completed-txn-4",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 4L,
+            timeoutAt = LocalDateTime.now().minusMinutes(1)
+        ).apply {
+            id = 400L
+            markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
+        }
+        val order = Order.create(buyerId = 40L, totalAmount = BigDecimal("10000"))
+        order.updateStatus(OrderStatus.PAYING)
+        order.updateStatus(OrderStatus.PAID)
+
+        whenever(sagaEventLogRepository.findTimedOutSagas(any())).thenReturn(listOf(saga))
+        whenever(sagaEventLogRepository.findById(400L)).thenReturn(Optional.of(saga))
+        whenever(orderRepository.findById(4L)).thenReturn(Optional.of(order))
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
+
+        scheduler.checkTimedOutSagas()
+
+        verify(transactionalEventPublisher).publishEvent(
+            aggregateType = eq("Order"),
+            aggregateId = eq("4"),
+            eventType = eq("PaymentReversalRequested"),
+            eventData = check<Any> {
+                @Suppress("UNCHECKED_CAST")
+                val data = it as Map<String, Any?>
+                assertThat(data).doesNotContainKey("paymentId")
+                assertThat(data["userId"]).isEqualTo(40L)
+                assertThat(data["reason"]).isEqualTo("SAGA_TIMEOUT")
+            },
+            topic = eq("payment-reversal"),
+            partitionKey = eq("4")
         )
     }
 

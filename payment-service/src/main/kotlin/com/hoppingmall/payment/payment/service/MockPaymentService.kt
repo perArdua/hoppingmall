@@ -5,6 +5,7 @@ import com.hoppingmall.payment.payment.dto.PaymentResult
 import com.hoppingmall.payment.payment.exception.PaymentException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidAmountException
 import com.hoppingmall.payment.payment.exception.code.PaymentErrorCode
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import kotlin.random.Random
@@ -12,10 +13,13 @@ import kotlin.random.Random
 @Service
 class MockPaymentService : PaymentService {
 
+    @Value("\${chaos.payment.failure-rate:0.0}")
+    private var failureRate: Float = 0.0f
+
     override fun processPayment(payment: Payment): PaymentResult {
         validatePayment(payment)
 
-        val isSuccess = Random.nextFloat() < 0.9f
+        val isSuccess = Random.nextFloat() >= failureRate
 
         return if (isSuccess) {
             val transactionId = generateMockTransactionId()
