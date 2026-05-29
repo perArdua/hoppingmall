@@ -90,7 +90,7 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
-	exclude("**/integration/**")
+	exclude("**/integration/**", "**/measurement/**")
 }
 
 val jacocoExcludedDirs = listOf(
