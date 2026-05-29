@@ -33,8 +33,9 @@ class OrderSagaConsumer(
 
     // Kafka 이벤트(Avro→JSON)는 camelCase 필드명을 사용하므로, 전역 SNAKE_CASE ObjectMapper 대신
     // camelCase 매퍼로 역직렬화한다 (전역 매퍼로 읽으면 orderId 등이 0으로 유실됨).
-    private val eventMapper: ObjectMapper =
+    private val eventMapper: ObjectMapper by lazy {
         objectMapper.copy().setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE)
+    }
 
     @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "order-saga-service")
     fun handlePaymentCompleted(message: String) {
