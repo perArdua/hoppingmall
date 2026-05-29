@@ -1,6 +1,10 @@
 package com.hoppingmall.payment.config
 
 import com.hoppingmall.cache.CachePolicy
+import com.hoppingmall.cache.CacheValueSerializer
+import com.hoppingmall.payment.coupon.dto.response.CouponResponse
+import com.hoppingmall.payment.point.dto.response.PointBalanceResponse
+import com.hoppingmall.payment.point.dto.response.PointPolicyResponse
 import com.hoppingmall.cache.HotKeyDetectorRegistry
 import com.hoppingmall.cache.LockProvider
 import com.hoppingmall.cache.RedissonLockProvider
@@ -30,25 +34,29 @@ class CacheConfig {
             cacheName = "point-balance",
             l1MaxSize = 1000,
             l1Ttl = Duration.ofSeconds(30),
-            l2Ttl = Duration.ofMinutes(30)
+            l2Ttl = Duration.ofMinutes(30),
+            valueType = CacheValueSerializer.typeOf(PointBalanceResponse::class.java)
         ),
         "coupon:available" to CachePolicy(
             cacheName = "coupon:available",
             l1MaxSize = 100,
             l1Ttl = Duration.ofMinutes(5),
-            l2Ttl = Duration.ofMinutes(30)
+            l2Ttl = Duration.ofMinutes(30),
+            valueType = CacheValueSerializer.listOf(CouponResponse::class.java)
         ),
         "coupon:all" to CachePolicy(
             cacheName = "coupon:all",
             l1MaxSize = 100,
             l1Ttl = Duration.ofMinutes(5),
-            l2Ttl = Duration.ofMinutes(30)
+            l2Ttl = Duration.ofMinutes(30),
+            valueType = CacheValueSerializer.listOf(CouponResponse::class.java)
         ),
         "point-policy" to CachePolicy(
             cacheName = "point-policy",
             l1MaxSize = 10,
             l1Ttl = Duration.ofMinutes(30),
-            l2Ttl = Duration.ofMinutes(30)
+            l2Ttl = Duration.ofMinutes(30),
+            valueType = CacheValueSerializer.typeOf(PointPolicyResponse::class.java)
         )
     )
 
