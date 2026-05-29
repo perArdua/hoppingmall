@@ -23,7 +23,6 @@ import java.util.concurrent.Callable
 class TwoLevelCacheLookupTest {
 
     private val redisCache: Cache = mock()
-    private val lockProvider = FakeLockProvider()
     private lateinit var meterRegistry: SimpleMeterRegistry
 
     private val normalPolicy = CachePolicy(
@@ -46,7 +45,6 @@ class TwoLevelCacheLookupTest {
 
     @BeforeEach
     fun setUp() {
-        lockProvider.reset()
         meterRegistry = SimpleMeterRegistry()
     }
 
@@ -55,7 +53,13 @@ class TwoLevelCacheLookupTest {
             .maximumSize(policy.l1MaxSize)
             .expireAfterWrite(policy.l1Ttl)
             .build<Any, Any>()
-        return TwoLevelCache(policy.cacheName, caffeineCache, redisCache, policy, lockProvider, meterRegistry = meterRegistry)
+        return TwoLevelCache(
+            name = policy.cacheName,
+            caffeineCache = caffeineCache,
+            redisCache = redisCache,
+            policy = policy,
+            meterRegistry = meterRegistry
+        )
     }
 
     @Nested
@@ -99,6 +103,16 @@ class TwoLevelCacheLookupTest {
         }
 
         @Test
+        fun lookup은_핫_캐시여도_CacheEntry를_언래핑하여_반환한다() {
+            val cache = createCache(hotKeyPolicy)
+            cache.put("k1", "v1") // 핫 정책이므로 CacheEntry로 래핑되어 저장됨
+
+            val result = cache.get("k1")
+
+            assertThat(result?.get()).isEqualTo("v1")
+        }
+
+        @Test
         fun getName은_cacheName을_반환한다() {
             val cache = createCache(normalPolicy)
             assertThat(cache.name).isEqualTo("category")
@@ -116,14 +130,14 @@ class TwoLevelCacheLookupTest {
     inner class PutNull {
 
         @Test
-        fun null_값을_put하면_L1에서_무효화한다() {
+        fun null_값을_put하면_이후_조회가_캐시된_null을_반환한다() {
             val cache = createCache(normalPolicy)
             cache.put("k1", "v1")
             cache.put("k1", null)
 
             val result = cache.get("k1")
 
-            assertThat(result).isNull()
+            assertThat(result?.get()).isNull()
         }
     }
 
@@ -139,6 +153,7 @@ class TwoLevelCacheLookupTest {
             cache.clear()
 
             verify(redisCache).clear()
+            whenever(redisCache.get(any<Any>())).thenReturn(null)
             assertThat(cache.get("k1")).isNull()
         }
 
@@ -150,6 +165,7 @@ class TwoLevelCacheLookupTest {
 
             cache.clear()
 
+            whenever(redisCache.get(any<Any>())).thenReturn(null)
             assertThat(cache.get("k1")).isNull()
             assertThat(meterRegistry.counter("cache.l2.failure", "cache", "category").count()).isEqualTo(1.0)
         }
@@ -167,6 +183,7 @@ class TwoLevelCacheLookupTest {
 
             cache.evict("k1")
 
+            whenever(redisCache.get(any<Any>())).thenReturn(null)
             assertThat(cache.get("k1")).isNull()
             assertThat(meterRegistry.counter("cache.l2.failure", "cache", "category").count()).isEqualTo(1.0)
         }
@@ -196,102 +213,6 @@ class TwoLevelCacheLookupTest {
             cache.get("k1", Callable { "loaded" })
 
             assertThat(meterRegistry.counter("cache.l2.failure", "cache", "category").count()).isEqualTo(1.0)
-        }
-    }
-
-    @Nested
-    @DisplayName("핫키 락 재확인 경로")
-    inner class HotKeyLockRecheck {
-
-        @Test
-        fun 락_획득_후_L2에_값이_있으면_DB_로더를_호출하지_않는다() {
-            val fakeDetector = FakeHotKeyDetector()
-            fakeDetector.overrideIsHot = true
-            val shardedCache: Cache = mock()
-
-            val caffeineCache = Caffeine.newBuilder()
-                .maximumSize(hotKeyPolicy.l1MaxSize)
-                .expireAfterWrite(hotKeyPolicy.l1Ttl)
-                .build<Any, Any>()
-
-            val cache = TwoLevelCache(
-                hotKeyPolicy.cacheName, caffeineCache, redisCache, hotKeyPolicy,
-                lockProvider, shardedCache, fakeDetector, meterRegistry
-            )
-
-            val wrapper: Cache.ValueWrapper = mock()
-            whenever(wrapper.get()).thenReturn("recheck-value")
-            whenever(shardedCache.get("k1")).thenReturn(null)
-            whenever(redisCache.get("k1")).thenReturn(wrapper)
-
-            var loaderCalled = false
-            val result = cache.get("k1", Callable {
-                loaderCalled = true
-                "should-not-load"
-            })
-
-            assertThat(result).isEqualTo("recheck-value")
-            assertThat(loaderCalled).isFalse()
-            assertThat(meterRegistry.counter("cache.l2.hit", "cache", "product").count()).isEqualTo(1.0)
-        }
-
-        @Test
-        fun 락_획득_예외_발생_시_waitForCacheOrFallback으로_대기한다() {
-            val fakeDetector = FakeHotKeyDetector()
-            fakeDetector.overrideIsHot = true
-            val shardedCache: Cache = mock()
-
-            val failingLock = object : LockProvider {
-                override fun tryLock(key: String, leaseTime: Duration): Boolean =
-                    throw RuntimeException("lock service down")
-                override fun unlock(key: String) {}
-            }
-
-            val caffeineCache = Caffeine.newBuilder()
-                .maximumSize(hotKeyPolicy.l1MaxSize)
-                .expireAfterWrite(hotKeyPolicy.l1Ttl)
-                .build<Any, Any>()
-
-            val cache = TwoLevelCache(
-                hotKeyPolicy.cacheName, caffeineCache, redisCache, hotKeyPolicy,
-                failingLock, shardedCache, fakeDetector, meterRegistry
-            )
-
-            whenever(shardedCache.get("k1")).thenReturn(null)
-            val wrapper: Cache.ValueWrapper = mock()
-            whenever(wrapper.get()).thenReturn("waited-value")
-            whenever(redisCache.get("k1")).thenReturn(wrapper)
-
-            val result = cache.get("k1", Callable { "fallback" })
-
-            assertThat(result).isEqualTo("waited-value")
-        }
-    }
-
-    @Nested
-    @DisplayName("핫키 null 값 put")
-    inner class HotKeyNullPut {
-
-        @Test
-        fun 핫키_상태에서_null_값을_put하면_샤딩된_캐시에_위임한다() {
-            val fakeDetector = FakeHotKeyDetector()
-            fakeDetector.overrideIsHot = true
-            val shardedCache: Cache = mock()
-
-            val caffeineCache = Caffeine.newBuilder()
-                .maximumSize(hotKeyPolicy.l1MaxSize)
-                .expireAfterWrite(hotKeyPolicy.l1Ttl)
-                .build<Any, Any>()
-
-            val cache = TwoLevelCache(
-                hotKeyPolicy.cacheName, caffeineCache, redisCache, hotKeyPolicy,
-                lockProvider, shardedCache, fakeDetector, meterRegistry
-            )
-
-            cache.put("k1", null)
-
-            verify(shardedCache).put("k1", null)
-            verify(redisCache, never()).put(any(), any())
         }
     }
 }

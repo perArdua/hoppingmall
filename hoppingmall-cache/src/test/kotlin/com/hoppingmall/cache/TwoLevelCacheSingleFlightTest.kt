@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicReference
 class TwoLevelCacheSingleFlightTest {
 
     private val redisCache: Cache = mock()
-    private val lockProvider = FakeLockProvider()
     private lateinit var meterRegistry: SimpleMeterRegistry
 
     private val normalPolicy = CachePolicy(
@@ -41,19 +40,8 @@ class TwoLevelCacheSingleFlightTest {
         jitterPercent = 10
     )
 
-    private val hotKeyPolicy = CachePolicy(
-        cacheName = "product",
-        l1MaxSize = 100,
-        l1Ttl = Duration.ofSeconds(10),
-        l2Ttl = Duration.ofMinutes(10),
-        jitterPercent = 10,
-        hotKeyThreshold = 5L,
-        hotKeyShardCount = 4
-    )
-
     @BeforeEach
     fun setUp() {
-        lockProvider.reset()
         meterRegistry = SimpleMeterRegistry()
         whenever(redisCache.get(org.mockito.kotlin.any())).thenReturn(null)
     }
@@ -64,8 +52,11 @@ class TwoLevelCacheSingleFlightTest {
             .expireAfterWrite(normalPolicy.l1Ttl)
             .build<Any, Any>()
         return TwoLevelCache(
-            normalPolicy.cacheName, caffeineCache, redisCache, normalPolicy,
-            lockProvider, meterRegistry = meterRegistry
+            name = normalPolicy.cacheName,
+            caffeineCache = caffeineCache,
+            redisCache = redisCache,
+            policy = normalPolicy,
+            meterRegistry = meterRegistry
         )
     }
 
@@ -73,8 +64,8 @@ class TwoLevelCacheSingleFlightTest {
         meterRegistry.counter("cache.singleflight.collapsed", "cache", cacheName).count()
 
     @Nested
-    @DisplayName("비-hot 키 동시 요청")
-    inner class NonHotConcurrency {
+    @DisplayName("하드미스 동시 요청")
+    inner class HardMissConcurrency {
 
         @Test
         fun 동시_100_스레드_cache_miss_시_DB_로더는_1회만_호출된다() {
@@ -111,7 +102,6 @@ class TwoLevelCacheSingleFlightTest {
 
             assertEquals(1, loaderCount.get(), "loader 호출은 정확히 1회")
             assertEquals(threadCount, results.size)
-            println("[VERIFY] 100 threads -> DB 1 call: loaderCount=${loaderCount.get()}")
         }
 
         @Test
@@ -365,37 +355,6 @@ class TwoLevelCacheSingleFlightTest {
 
             assertEquals(2, loaderCount.get(), "creator + follower-fallback after interrupt = 2 loader calls")
             assertTrue(followerInterruptedFlag.get(), "interrupt flag restored on follower thread")
-        }
-    }
-
-    @Nested
-    @DisplayName("hot 키 경로 비간섭")
-    inner class HotKeyNonInterference {
-
-        @Test
-        fun hot_키_요청은_loadWithLock을_사용하고_inFlightLoads에_등록되지_않는다() {
-            val fakeDetector = FakeHotKeyDetector()
-            fakeDetector.overrideIsHot = true
-            val shardedCache: Cache = mock()
-            whenever(shardedCache.get(8L)).thenReturn(null)
-            whenever(redisCache.get(8L)).thenReturn(null)
-
-            val caffeineCache = Caffeine.newBuilder()
-                .maximumSize(hotKeyPolicy.l1MaxSize)
-                .expireAfterWrite(hotKeyPolicy.l1Ttl)
-                .build<Any, Any>()
-
-            val cache = TwoLevelCache(
-                hotKeyPolicy.cacheName, caffeineCache, redisCache, hotKeyPolicy,
-                lockProvider, shardedCache, fakeDetector, meterRegistry
-            )
-
-            val v = cache.get(8L, Callable { "loaded" })
-
-            assertEquals("loaded", v)
-            assertEquals(1, lockProvider.lockCallCount, "hot 경로는 분산락 사용")
-            assertEquals(1, lockProvider.unlockCallCount)
-            assertEquals(0.0, collapsedCount("product"), 0.0001, "hot 경로는 collapsed 카운터 미증가")
         }
     }
 }

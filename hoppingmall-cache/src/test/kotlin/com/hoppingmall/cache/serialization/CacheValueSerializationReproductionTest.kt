@@ -3,7 +3,6 @@ package com.hoppingmall.cache.serialization
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.hoppingmall.cache.CachePolicy
 import com.hoppingmall.cache.CacheValueSerializer
-import com.hoppingmall.cache.FakeLockProvider
 import com.hoppingmall.cache.TwoLevelCache
 import com.hoppingmall.cache.TwoLevelCacheManager
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -132,22 +131,28 @@ class CacheValueSerializationReproductionTest {
     @Test
     fun 한_인스턴스가_put하면_다른_인스턴스가_L2를_통해_읽는다_공유_입증() {
         assumeTrue(redisUp, "embedded redis 미기동 → skip")
-        val sharedL2 = cacheManager().getCache("product")!!
-        val policy = policies["product"]!!
+        // 공유 입증은 핫키 래핑과 무관하므로 비핫(wrapEntries=false) 정책으로 단순화한다.
+        // L2 직렬화는 list 캐시(product-list)의 평면 타입드 직렬화를 그대로 재사용한다.
+        val sharedL2 = cacheManager().getCache("product-list")!!
+        val policy = policies["product-list"]!!
         val registry = SimpleMeterRegistry()
 
         fun instance() = TwoLevelCache(
-            "product",
-            Caffeine.newBuilder().maximumSize(policy.l1MaxSize).expireAfterWrite(policy.l1Ttl).build(),
-            sharedL2, policy, FakeLockProvider(), null, null, registry
+            name = "product-list",
+            caffeineCache = Caffeine.newBuilder()
+                .maximumSize(policy.l1MaxSize).expireAfterWrite(policy.l1Ttl).build(),
+            redisCache = sharedL2,
+            policy = policy,
+            meterRegistry = registry
         )
 
         val instanceA = instance()
         val instanceB = instance() // 같은 L2(Redis), 다른 L1(Caffeine)
 
-        instanceA.put("product:2", sampleValue())
+        val list = listOf(sampleValue(2L))
+        instanceA.put("list:shared", list)
 
-        assertThat(instanceB.get("product:2")?.get()).isEqualTo(sampleValue())
+        assertThat(instanceB.get("list:shared")?.get()).isEqualTo(list)
         assertThat(registry.find("cache.l2.failure").counter()?.count() ?: 0.0).isEqualTo(0.0)
     }
 

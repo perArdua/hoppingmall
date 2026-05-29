@@ -23,7 +23,6 @@ class TwoLevelCacheManagerExtraTest {
         return TwoLevelCacheManager(
             redisCacheManager = redisCacheManager,
             policies = policies.associateBy { it.cacheName },
-            lockProvider = FakeLockProvider(),
             hotKeyDetectorRegistry = HotKeyDetectorRegistry(policies.toList())
         )
     }
@@ -58,7 +57,7 @@ class TwoLevelCacheManagerExtraTest {
     }
 
     @Test
-    fun hotKey_비활성_정책은_ShardedRedisCache_없이_TwoLevelCache를_생성한다() {
+    fun hotKey_비활성_정책도_TwoLevelCache를_생성한다() {
         val redisCacheManager = mock<CacheManager>()
         val redisCache = mock<Cache>()
         val pol = policy("simple-cache", hotKeyThreshold = 0L)
