@@ -1,6 +1,8 @@
 package com.hoppingmall.notification.config
 
 import com.hoppingmall.cache.CachePolicy
+import com.hoppingmall.cache.CacheValueSerializer
+import com.hoppingmall.notification.dto.response.UnreadCountResponse
 import com.hoppingmall.cache.HotKeyDetectorRegistry
 import com.hoppingmall.cache.LockProvider
 import com.hoppingmall.cache.RedissonLockProvider
@@ -29,7 +31,8 @@ class CacheConfig {
             cacheName = "unread-count",
             l1MaxSize = 500,
             l1Ttl = Duration.ofSeconds(60),
-            l2Ttl = Duration.ofMinutes(5)
+            l2Ttl = Duration.ofMinutes(5),
+            valueType = CacheValueSerializer.typeOf(UnreadCountResponse::class.java)
         )
     )
 

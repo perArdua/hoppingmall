@@ -1,6 +1,10 @@
 package com.hoppingmall.product.config
 
 import com.hoppingmall.cache.CachePolicy
+import com.hoppingmall.cache.CacheValueSerializer
+import com.hoppingmall.product.category.dto.response.CategoryResponse
+import com.hoppingmall.product.inventory.dto.response.InventoryResponse
+import com.hoppingmall.product.product.dto.response.ProductResponse
 import com.hoppingmall.cache.HotKeyDetectorRegistry
 import com.hoppingmall.cache.LockProvider
 import com.hoppingmall.cache.RedissonLockProvider
@@ -35,31 +39,36 @@ class CacheConfig {
             l1Ttl = Duration.ofSeconds(productL1TtlSec),
             l2Ttl = Duration.ofSeconds(productL2TtlSec),
             hotKeyThreshold = 50,
-            hotKeyWindow = Duration.ofSeconds(60)
+            hotKeyWindow = Duration.ofSeconds(60),
+            valueType = CacheValueSerializer.typeOf(ProductResponse::class.java)
         ),
         "inventory" to CachePolicy(
             cacheName = "inventory",
             l1MaxSize = 500,
             l1Ttl = Duration.ofMinutes(5),
-            l2Ttl = Duration.ofMinutes(15)
+            l2Ttl = Duration.ofMinutes(15),
+            valueType = CacheValueSerializer.typeOf(InventoryResponse::class.java)
         ),
         "category" to CachePolicy(
             cacheName = "category",
             l1MaxSize = 200,
             l1Ttl = Duration.ofMinutes(60),
-            l2Ttl = Duration.ofMinutes(120)
+            l2Ttl = Duration.ofMinutes(120),
+            valueType = CacheValueSerializer.typeOf(CategoryResponse::class.java)
         ),
         "categories:root" to CachePolicy(
             cacheName = "categories:root",
             l1MaxSize = 1,
             l1Ttl = Duration.ofMinutes(60),
-            l2Ttl = Duration.ofMinutes(120)
+            l2Ttl = Duration.ofMinutes(120),
+            valueType = CacheValueSerializer.listOf(CategoryResponse::class.java)
         ),
         "categories:sub" to CachePolicy(
             cacheName = "categories:sub",
             l1MaxSize = 100,
             l1Ttl = Duration.ofMinutes(60),
-            l2Ttl = Duration.ofMinutes(120)
+            l2Ttl = Duration.ofMinutes(120),
+            valueType = CacheValueSerializer.listOf(CategoryResponse::class.java)
         )
     )
 
