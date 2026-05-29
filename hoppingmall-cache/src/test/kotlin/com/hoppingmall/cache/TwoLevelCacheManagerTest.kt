@@ -26,7 +26,6 @@ class TwoLevelCacheManagerTest {
         return TwoLevelCacheManager(
             redisCacheManager = redisCacheManager,
             policies = policies.associateBy { it.cacheName },
-            lockProvider = FakeLockProvider(),
             hotKeyDetectorRegistry = HotKeyDetectorRegistry(policies.toList()),
             meterRegistry = SimpleMeterRegistry()
         )

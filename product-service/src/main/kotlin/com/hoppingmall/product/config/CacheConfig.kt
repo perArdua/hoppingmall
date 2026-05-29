@@ -6,8 +6,8 @@ import com.hoppingmall.product.category.dto.response.CategoryResponse
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
 import com.hoppingmall.product.product.dto.response.ProductResponse
 import com.hoppingmall.cache.HotKeyDetectorRegistry
-import com.hoppingmall.cache.LockProvider
-import com.hoppingmall.cache.RedissonLockProvider
+import com.hoppingmall.cache.RefreshGuard
+import com.hoppingmall.cache.RedissonRefreshGuard
 import com.hoppingmall.cache.TwoLevelCacheManager
 import io.micrometer.core.instrument.MeterRegistry
 import org.redisson.api.RedissonClient
@@ -40,7 +40,7 @@ class CacheConfig {
             l2Ttl = Duration.ofSeconds(productL2TtlSec),
             hotKeyThreshold = 50,
             hotKeyWindow = Duration.ofSeconds(60),
-            valueType = CacheValueSerializer.typeOf(ProductResponse::class.java)
+            valueType = CacheValueSerializer.entryOf(ProductResponse::class.java)
         ),
         "inventory" to CachePolicy(
             cacheName = "inventory",
@@ -86,8 +86,8 @@ class CacheConfig {
     }
 
     @Bean
-    fun lockProvider(redissonClient: RedissonClient): LockProvider {
-        return RedissonLockProvider(redissonClient)
+    fun refreshGuard(redissonClient: RedissonClient): RefreshGuard {
+        return RedissonRefreshGuard(redissonClient)
     }
 
     @Bean
@@ -103,15 +103,15 @@ class CacheConfig {
     fun cacheManager(
         redisCacheManager: RedisCacheManager,
         cachePolicies: Map<String, CachePolicy>,
-        lockProvider: LockProvider,
+        refreshGuard: RefreshGuard,
         hotKeyDetectorRegistry: HotKeyDetectorRegistry,
         meterRegistry: MeterRegistry
     ): CacheManager {
         return TwoLevelCacheManager(
             redisCacheManager = redisCacheManager,
             policies = cachePolicies,
-            lockProvider = lockProvider,
             hotKeyDetectorRegistry = hotKeyDetectorRegistry,
+            refreshGuard = refreshGuard,
             meterRegistry = meterRegistry
         )
     }

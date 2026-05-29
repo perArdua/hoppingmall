@@ -4,8 +4,8 @@ import com.hoppingmall.cache.CachePolicy
 import com.hoppingmall.cache.CacheValueSerializer
 import com.hoppingmall.notification.dto.response.UnreadCountResponse
 import com.hoppingmall.cache.HotKeyDetectorRegistry
-import com.hoppingmall.cache.LockProvider
-import com.hoppingmall.cache.RedissonLockProvider
+import com.hoppingmall.cache.RefreshGuard
+import com.hoppingmall.cache.RedissonRefreshGuard
 import com.hoppingmall.cache.TwoLevelCacheManager
 import io.micrometer.core.instrument.MeterRegistry
 import org.redisson.api.RedissonClient
@@ -50,8 +50,8 @@ class CacheConfig {
     }
 
     @Bean
-    fun lockProvider(redissonClient: RedissonClient): LockProvider {
-        return RedissonLockProvider(redissonClient)
+    fun refreshGuard(redissonClient: RedissonClient): RefreshGuard {
+        return RedissonRefreshGuard(redissonClient)
     }
 
     @Bean
@@ -68,15 +68,15 @@ class CacheConfig {
     fun cacheManager(
         redisCacheManager: RedisCacheManager,
         cachePolicies: Map<String, CachePolicy>,
-        lockProvider: LockProvider,
+        refreshGuard: RefreshGuard,
         hotKeyDetectorRegistry: HotKeyDetectorRegistry,
         meterRegistry: MeterRegistry
     ): CacheManager {
         return TwoLevelCacheManager(
             redisCacheManager = redisCacheManager,
             policies = cachePolicies,
-            lockProvider = lockProvider,
             hotKeyDetectorRegistry = hotKeyDetectorRegistry,
+            refreshGuard = refreshGuard,
             meterRegistry = meterRegistry
         )
     }

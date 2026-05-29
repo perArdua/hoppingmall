@@ -10,14 +10,28 @@ import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class TwoLevelCacheManager(
     private val redisCacheManager: CacheManager,
     private val policies: Map<String, CachePolicy>,
-    private val lockProvider: LockProvider,
     private val hotKeyDetectorRegistry: HotKeyDetectorRegistry,
+    private val refreshGuard: RefreshGuard? = null,
     private val meterRegistry: MeterRegistry? = null
 ) : CacheManager {
+
+    // XFetch 비동기 갱신 전용 풀(탐지 스케줄러와 격리). 큐 한정 + AbortPolicy:
+    // 포화 시 RejectedExecutionException을 던져 호출부(maybeTriggerRefresh)가 refreshInFlight를 정리하게 한다.
+    // (DiscardPolicy는 조용히 버려서 doRefresh.finally가 안 돌아 키가 영구 잔류 → 그 키 갱신 정지 버그 유발)
+    private val refreshExecutor: Executor = ThreadPoolExecutor(
+        2, 4, 60L, TimeUnit.SECONDS,
+        LinkedBlockingQueue(64),
+        { r -> Thread(r, "cache-xfetch-refresh").apply { isDaemon = true } },
+        ThreadPoolExecutor.AbortPolicy()
+    )
 
     private sealed interface CacheLookupResult {
         data class Present(val cache: Cache) : CacheLookupResult
@@ -51,15 +65,18 @@ class TwoLevelCacheManager(
                 .build<Any, Any>()
 
             val detector = hotKeyDetectorRegistry.getDetector(cacheName)
-            val shardedRedisCache = if (policy.dynamicHotKeyEnabled) {
-                ShardedRedisCache(redisCache, policy.hotKeyShardCount)
-            } else null
 
             CacheLookupResult.Present(
                 TwoLevelCache(
-                cacheName, caffeineCache, redisCache, policy, lockProvider,
-                shardedRedisCache, detector, meterRegistry
-            )
+                    name = cacheName,
+                    caffeineCache = caffeineCache,
+                    redisCache = redisCache,
+                    policy = policy,
+                    refreshExecutor = refreshExecutor,
+                    refreshGuard = refreshGuard,
+                    hotKeyDetector = detector,
+                    meterRegistry = meterRegistry
+                )
             )
         }
 
