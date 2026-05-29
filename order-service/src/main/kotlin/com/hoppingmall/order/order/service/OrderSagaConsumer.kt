@@ -1,6 +1,7 @@
 package com.hoppingmall.order.order.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.hoppingmall.order.order.domain.SagaEventLog
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
@@ -8,6 +9,7 @@ import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.order.enum.OrderStatus
+import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
@@ -24,13 +26,19 @@ class OrderSagaConsumer(
     private val inventoryCommandPort: InventoryCommandPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper,
-    private val transactionTemplate: TransactionTemplate
+    private val transactionTemplate: TransactionTemplate,
+    private val sagaCompensationMetrics: SagaCompensationMetrics
 ) {
     private val logger = LoggerFactory.getLogger(OrderSagaConsumer::class.java)
 
+    // Kafka 이벤트(Avro→JSON)는 camelCase 필드명을 사용하므로, 전역 SNAKE_CASE ObjectMapper 대신
+    // camelCase 매퍼로 역직렬화한다 (전역 매퍼로 읽으면 orderId 등이 0으로 유실됨).
+    private val eventMapper: ObjectMapper =
+        objectMapper.copy().setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE)
+
     @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "order-saga-service")
     fun handlePaymentCompleted(message: String) {
-        val event = objectMapper.readValue(message, PaymentCompletedEvent::class.java)
+        val event = eventMapper.readValue(message, PaymentCompletedEvent::class.java)
         val eventId = "payment-completed-${event.transactionId}"
 
         val existingLog = sagaEventLogRepository.findByEventId(eventId)
@@ -61,7 +69,12 @@ class OrderSagaConsumer(
             if (order.status !in setOf(OrderStatus.CREATED, OrderStatus.PAYING)) {
                 logger.warn("주문 상태가 CREATED/PAYING이 아님: orderId=${event.orderId}, status=${order.status}")
                 val log = sagaEventLogRepository.findByEventId(eventId)
-                    ?: SagaEventLog(eventId = eventId, eventType = "PAYMENT_COMPLETED", orderId = event.orderId)
+                    ?: SagaEventLog(
+                        eventId = eventId,
+                        eventType = "PAYMENT_COMPLETED",
+                        orderId = event.orderId,
+                        paymentId = event.paymentId
+                    )
                 log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
                 log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
                 sagaEventLogRepository.save(log)
@@ -74,7 +87,12 @@ class OrderSagaConsumer(
             order.updateStatus(OrderStatus.PAID)
             orderRepository.save(order)
 
-            val log = SagaEventLog(eventId = eventId, eventType = "PAYMENT_COMPLETED", orderId = event.orderId)
+            val log = SagaEventLog(
+                eventId = eventId,
+                eventType = "PAYMENT_COMPLETED",
+                orderId = event.orderId,
+                paymentId = event.paymentId
+            )
             log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
             sagaEventLogRepository.save(log)
 
@@ -107,6 +125,8 @@ class OrderSagaConsumer(
     }
 
     fun compensateFailedConfirmation(eventId: String, event: PaymentCompletedEvent) {
+        sagaCompensationMetrics.recordTriggered()
+        val startTime = System.currentTimeMillis()
         val compensated = transactionTemplate.execute {
             val order = orderRepository.findByIdOrNull(event.orderId) ?: return@execute false
             if (order.status == OrderStatus.PAID && order.isCancellable()) {
@@ -138,6 +158,8 @@ class OrderSagaConsumer(
         } ?: false
 
         if (compensated) {
+            sagaCompensationMetrics.recordSuccess()
+            sagaCompensationMetrics.recordRecoveryTime(System.currentTimeMillis() - startTime)
             logger.warn("예약 만료로 주문 취소 + 결제 역보상 요청: orderId=${event.orderId}")
         }
     }
@@ -165,6 +187,9 @@ class OrderSagaConsumer(
 
         val orderId = node.get("orderId")?.asLong() ?: return
 
+        sagaCompensationMetrics.recordTriggered()
+        val startTime = System.currentTimeMillis()
+
         val reservationIds = if (existingLog == null || !existingLog.isStepCompleted(SagaEventLog.LOCAL_COMPLETED)) {
             executeCompensationLocalPhase(eventId, orderId)
         } else {
@@ -173,7 +198,7 @@ class OrderSagaConsumer(
 
         if (reservationIds == null) return
 
-        executeCompensationRemotePhase(eventId, orderId, reservationIds)
+        executeCompensationRemotePhase(eventId, orderId, reservationIds, startTime)
     }
 
     private fun executeCompensationLocalPhase(eventId: String, orderId: Long): List<String>? {
@@ -197,7 +222,7 @@ class OrderSagaConsumer(
         }
     }
 
-    private fun executeCompensationRemotePhase(eventId: String, orderId: Long, reservationIds: List<String>) {
+    private fun executeCompensationRemotePhase(eventId: String, orderId: Long, reservationIds: List<String>, startTime: Long) {
         try {
             reservationIds.forEach { inventoryCommandPort.cancelReservation(it) }
         } catch (e: Exception) {
@@ -210,6 +235,8 @@ class OrderSagaConsumer(
             sagaEventLogRepository.save(log)
         }
 
+        sagaCompensationMetrics.recordSuccess()
+        sagaCompensationMetrics.recordRecoveryTime(System.currentTimeMillis() - startTime)
         logger.info("결제 보상 처리 완료 (예약 취소 + 주문 CANCELLED): orderId=$orderId")
     }
 }

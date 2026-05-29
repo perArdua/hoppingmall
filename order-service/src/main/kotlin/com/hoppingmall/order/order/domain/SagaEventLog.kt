@@ -21,6 +21,9 @@ class SagaEventLog(
     @Column(nullable = false)
     val orderId: Long,
 
+    @Column(nullable = true)
+    val paymentId: Long? = null,
+
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
