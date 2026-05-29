@@ -10,14 +10,27 @@ import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class TwoLevelCacheManager(
     private val redisCacheManager: CacheManager,
     private val policies: Map<String, CachePolicy>,
-    private val lockProvider: LockProvider,
     private val hotKeyDetectorRegistry: HotKeyDetectorRegistry,
+    private val refreshGuard: RefreshGuard? = null,
     private val meterRegistry: MeterRegistry? = null
 ) : CacheManager {
+
+    // XFetch 비동기 갱신 전용 풀(탐지 스케줄러와 격리). 큐 한정 + DiscardPolicy:
+    // 갱신은 best-effort라 포화 시 드롭되어도 stale 서빙 + 다음 읽기에서 재시도된다.
+    private val refreshExecutor: Executor = ThreadPoolExecutor(
+        2, 4, 60L, TimeUnit.SECONDS,
+        LinkedBlockingQueue(64),
+        { r -> Thread(r, "cache-xfetch-refresh").apply { isDaemon = true } },
+        ThreadPoolExecutor.DiscardPolicy()
+    )
 
     private sealed interface CacheLookupResult {
         data class Present(val cache: Cache) : CacheLookupResult
@@ -51,15 +64,18 @@ class TwoLevelCacheManager(
                 .build<Any, Any>()
 
             val detector = hotKeyDetectorRegistry.getDetector(cacheName)
-            val shardedRedisCache = if (policy.dynamicHotKeyEnabled) {
-                ShardedRedisCache(redisCache, policy.hotKeyShardCount)
-            } else null
 
             CacheLookupResult.Present(
                 TwoLevelCache(
-                cacheName, caffeineCache, redisCache, policy, lockProvider,
-                shardedRedisCache, detector, meterRegistry
-            )
+                    name = cacheName,
+                    caffeineCache = caffeineCache,
+                    redisCache = redisCache,
+                    policy = policy,
+                    refreshExecutor = refreshExecutor,
+                    refreshGuard = refreshGuard,
+                    hotKeyDetector = detector,
+                    meterRegistry = meterRegistry
+                )
             )
         }
 

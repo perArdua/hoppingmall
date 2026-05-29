@@ -35,6 +35,10 @@ object CacheValueSerializer {
     fun listOf(elementType: Class<*>): JavaType =
         mapper.typeFactory.constructCollectionType(List::class.java, elementType)
 
+    /** CacheEntry<valueType> JavaType — XFetch 래핑 캐시(product)의 타입드 직렬화용. */
+    fun entryOf(valueType: Class<*>): JavaType =
+        mapper.typeFactory.constructParametricType(CacheEntry::class.java, valueType)
+
     fun fallback(): GenericJackson2JsonRedisSerializer {
         val typeValidator = BasicPolymorphicTypeValidator.builder()
             .allowIfSubType("com.hoppingmall.")
