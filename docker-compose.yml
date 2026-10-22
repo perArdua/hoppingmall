@@ -454,6 +454,28 @@ services:
       retries: 10
       start_period: 60s
 
+  consistency-monitor:
+    build:
+      context: .
+      dockerfile: consistency-monitor/Dockerfile
+    container_name: consistency-monitor
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      CONSISTENCY_DB_URL: jdbc:mysql://mysql:3306/consistency_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      CONSISTENCY_DB_USERNAME: root
+      CONSISTENCY_DB_PASSWORD: root
+    ports:
+      - "8087:8087"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8087/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
   api-gateway:
     build:
       context: .
