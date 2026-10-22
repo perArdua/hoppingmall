@@ -1,5 +1,8 @@
 package com.hoppingmall.user.consumer
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.user.domain.MembershipEventLog
 import com.hoppingmall.user.domain.enums.MembershipGrade
 import com.hoppingmall.user.domain.repository.MembershipEventLogRepository
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Spy
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.never
@@ -32,8 +36,14 @@ class MembershipEventConsumerTest {
     @Mock
     private lateinit var membershipEventLogRepository: MembershipEventLogRepository
 
+    @Spy
+    private var kafkaEventMapper: KafkaEventMapper =
+        KafkaEventMapper(ObjectMapper().setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE))
+
     @InjectMocks
     private lateinit var membershipEventConsumer: MembershipEventConsumer
+
+    private fun message(event: MembershipUpdateRequestEvent): String = ObjectMapper().writeValueAsString(event)
 
     private fun createEvent(
         eventId: String = "membership-TXN_123456",
@@ -67,7 +77,7 @@ class MembershipEventConsumerTest {
         whenever(membershipEventLogRepository.save(any<MembershipEventLog>()))
             .thenAnswer { it.arguments[0] }
 
-        membershipEventConsumer.handleMembershipUpdateRequest(event)
+        membershipEventConsumer.handleMembershipUpdateRequest(message(event))
 
         verify(membershipCommandService).addPurchaseAmount(event.userId, event.amount)
         verify(membershipEventLogRepository).save(any<MembershipEventLog>())
@@ -79,7 +89,7 @@ class MembershipEventConsumerTest {
 
         whenever(membershipEventLogRepository.existsByEventId(event.eventId)).thenReturn(true)
 
-        membershipEventConsumer.handleMembershipUpdateRequest(event)
+        membershipEventConsumer.handleMembershipUpdateRequest(message(event))
 
         verify(membershipCommandService, never()).addPurchaseAmount(any(), any())
         verify(membershipEventLogRepository, never()).save(any<MembershipEventLog>())
@@ -95,7 +105,7 @@ class MembershipEventConsumerTest {
         whenever(membershipEventLogRepository.save(any<MembershipEventLog>()))
             .thenThrow(DataIntegrityViolationException("duplicate"))
 
-        membershipEventConsumer.handleMembershipUpdateRequest(event)
+        membershipEventConsumer.handleMembershipUpdateRequest(message(event))
 
         verify(membershipCommandService).addPurchaseAmount(event.userId, event.amount)
     }

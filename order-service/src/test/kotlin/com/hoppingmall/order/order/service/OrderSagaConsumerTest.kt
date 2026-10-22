@@ -3,6 +3,7 @@ package com.hoppingmall.order.order.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.LongNode
 import com.fasterxml.jackson.databind.node.TextNode
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.SagaEventLog
@@ -59,6 +60,9 @@ class OrderSagaConsumerTest {
     private lateinit var objectMapper: ObjectMapper
 
     @Mock
+    private lateinit var kafkaEventMapper: KafkaEventMapper
+
+    @Mock
     private lateinit var transactionTemplate: TransactionTemplate
 
     @Mock
@@ -73,8 +77,6 @@ class OrderSagaConsumerTest {
             val callback = invocation.arguments[0] as TransactionCallback<Any?>
             callback.doInTransaction(mock())
         }
-        Mockito.lenient().`when`(objectMapper.copy()).thenReturn(objectMapper)
-        Mockito.lenient().`when`(objectMapper.setPropertyNamingStrategy(any())).thenReturn(objectMapper)
         consumer = OrderSagaConsumer(
             sagaEventLogRepository,
             orderRepository,
@@ -82,6 +84,7 @@ class OrderSagaConsumerTest {
             inventoryCommandPort,
             transactionalEventPublisher,
             objectMapper,
+            kafkaEventMapper,
             transactionTemplate,
             sagaCompensationMetrics
         )
@@ -111,7 +114,7 @@ class OrderSagaConsumerTest {
             orderId = 1L
         ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
 
-        whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
+        whenever(kafkaEventMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
         whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
             .thenReturn(null)
@@ -138,7 +141,7 @@ class OrderSagaConsumerTest {
             markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
         }
 
-        whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
+        whenever(kafkaEventMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
         whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
             .thenReturn(fullyCompleted)
@@ -164,7 +167,7 @@ class OrderSagaConsumerTest {
             orderId = 1L
         ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
 
-        whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
+        whenever(kafkaEventMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
         whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
             .thenReturn(null)
@@ -202,7 +205,7 @@ class OrderSagaConsumerTest {
             orderId = 1L
         ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
 
-        whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
+        whenever(kafkaEventMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
         whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
             .thenReturn(null)
@@ -223,7 +226,7 @@ class OrderSagaConsumerTest {
         order.updateStatus(OrderStatus.PAYING)
         order.updateStatus(OrderStatus.PAID)
 
-        whenever(objectMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
+        whenever(kafkaEventMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
             .thenReturn(paymentCompletedEvent)
         whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123")).thenReturn(null)
         whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
