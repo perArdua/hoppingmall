@@ -6,6 +6,7 @@ import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect
 import org.redisson.api.RedissonClient
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
@@ -23,6 +24,9 @@ class IdempotencyAspect(
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    @Value("\${idempotency.lock-timeout-seconds:0}")
+    private var lockTimeoutOverrideSeconds: Long = 0
 
     @Around("@annotation(idempotent)")
     fun handleIdempotency(joinPoint: ProceedingJoinPoint, idempotent: Idempotent): Any? {
@@ -42,7 +46,7 @@ class IdempotencyAspect(
         val lockKey = "idempotency:$key"
         val lock = redissonClient.getLock(lockKey)
 
-        if (!lock.tryLock(0, idempotent.lockTimeoutSeconds, TimeUnit.SECONDS)) {
+        if (!lock.tryLock(0, lockTimeoutSeconds(idempotent), TimeUnit.SECONDS)) {
             throw IdempotencyConflictException()
         }
 
@@ -79,6 +83,9 @@ class IdempotencyAspect(
         val body = objectMapper.readValue(record.responseBody, Any::class.java)
         return ResponseEntity.status(record.responseStatus).body(body)
     }
+
+    private fun lockTimeoutSeconds(idempotent: Idempotent): Long =
+        if (lockTimeoutOverrideSeconds > 0) lockTimeoutOverrideSeconds else idempotent.lockTimeoutSeconds
 
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"

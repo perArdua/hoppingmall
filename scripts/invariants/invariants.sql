@@ -94,6 +94,39 @@ SELECT CONCAT('user_db.membership_event_logs:', m.id), NULL, m.order_id, m.payme
 FROM user_db.membership_event_logs m
 WHERE m.deleted_at IS NULL
   AND (m.order_id = 0 OR m.payment_id = 0 OR m.event_id = '');
+
+-- @INV INV-9 | 주문 생성 API로 만든 주문인데 멱등 레코드(키=clientId-clientSeq)가 가리키지 않음 ({{ORPHAN_GRACE_MINUTES}}분 경과)
+SELECT o.id AS order_id, o.buyer_id, o.status, o.created_at
+FROM order_db.orders o
+WHERE o.deleted_at IS NULL
+  AND o.created_at < NOW() - INTERVAL {{ORPHAN_GRACE_MINUTES}} MINUTE
+  AND NOT EXISTS (
+    SELECT 1 FROM order_db.idempotency_records r
+    WHERE r.endpoint = '/api/v1/orders'
+      AND CAST(JSON_EXTRACT(r.response_body, '$.data.id') AS UNSIGNED) = o.id
+  );
+
+-- @INV INV-10 | 같은 주문의 결제→주문 이벤트가 outbox 순서와 다른 순서로 처리됨(saga_event_logs 기록 시각 기준)
+SELECT CONCAT(a.order_id, ':', a.outbox_id, '>', b.outbox_id) AS entity, a.order_id, a.event_type AS earlier_event, b.event_type AS later_event, a.processed_at AS earlier_processed_at, b.processed_at AS later_processed_at
+FROM (
+        SELECT CAST(JSON_EXTRACT(e.event_data, '$.orderId') AS UNSIGNED) AS order_id, e.id AS outbox_id, e.event_type, s.created_at AS processed_at
+        FROM payment_db.outbox_events e
+        JOIN order_db.saga_event_logs s ON s.event_id = CASE e.event_type
+            WHEN 'PaymentCompleted' THEN CONCAT('payment-completed-', JSON_UNQUOTE(JSON_EXTRACT(e.event_data, '$.transactionId')))
+            ELSE JSON_UNQUOTE(JSON_EXTRACT(e.event_data, '$.eventId'))
+        END
+        WHERE e.status = 'PUBLISHED' AND e.topic IN ('payment', 'payment-compensation')
+     ) a
+JOIN (
+        SELECT CAST(JSON_EXTRACT(e.event_data, '$.orderId') AS UNSIGNED) AS order_id, e.id AS outbox_id, e.event_type, s.created_at AS processed_at
+        FROM payment_db.outbox_events e
+        JOIN order_db.saga_event_logs s ON s.event_id = CASE e.event_type
+            WHEN 'PaymentCompleted' THEN CONCAT('payment-completed-', JSON_UNQUOTE(JSON_EXTRACT(e.event_data, '$.transactionId')))
+            ELSE JSON_UNQUOTE(JSON_EXTRACT(e.event_data, '$.eventId'))
+        END
+        WHERE e.status = 'PUBLISHED' AND e.topic IN ('payment', 'payment-compensation')
+     ) b ON b.order_id = a.order_id AND b.outbox_id > a.outbox_id
+WHERE a.processed_at > b.processed_at;
 
 -- @INV INV-11 | Outbox 이벤트가 {{OUTBOX_MAX_SECONDS}}초 넘게 미발행(PENDING/RETRYING)
 SELECT CONCAT('order_db.outbox_events:', e.id) AS entity, e.event_type, e.topic, e.status, e.retry_count, e.created_at, TIMESTAMPDIFF(SECOND, e.created_at, NOW()) AS age_seconds

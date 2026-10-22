@@ -22,7 +22,7 @@ class DLQScheduler(
         private const val AUTO_RETRY_BATCH_SIZE = 20
     }
 
-    @Scheduled(fixedDelay = 30_000)
+    @Scheduled(fixedDelayString = "\${dlq.retry.scheduler-interval-ms:30000}")
     fun autoRetryPendingMessages() {
         val now = System.currentTimeMillis()
         val pageable = PageRequest.of(0, AUTO_RETRY_BATCH_SIZE)

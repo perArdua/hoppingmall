@@ -3,11 +3,13 @@ package com.hoppingmall.outbox.scheduler
 import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Duration
 import java.time.LocalDateTime
 
 @Service
@@ -21,6 +23,9 @@ class OutboxMaintenanceScheduler(
 
     private val logger = LoggerFactory.getLogger(OutboxMaintenanceScheduler::class.java)
     private val maxRetries = 3
+
+    @Value("\${outbox.maintenance.stale-threshold-ms:600000}")
+    private var staleThresholdMs: Long = 600_000
     private val cleanupDays = 7L
 
     @Scheduled(cron = "\${outbox.maintenance.cleanup-cron:0 0 2 * * ?}")
@@ -36,7 +41,7 @@ class OutboxMaintenanceScheduler(
 
     @Scheduled(fixedDelayString = "\${outbox.maintenance.stale-check-ms:300000}")
     fun handleStaleEvents() {
-        val cutoffDate = LocalDateTime.now().minusMinutes(10)
+        val cutoffDate = LocalDateTime.now().minus(Duration.ofMillis(staleThresholdMs))
         val staleEvents = transactionTemplate.execute {
             outboxEventRepository.findStaleEvents(cutoffDate, 50)
         } ?: return

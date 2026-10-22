@@ -42,13 +42,13 @@ class InventoryReservation(
     var id: Long? = null
 
     companion object {
-        fun create(productId: Long, quantity: Int, ttlMinutes: Long): InventoryReservation {
+        fun create(productId: Long, quantity: Int, ttlSeconds: Long): InventoryReservation {
             val now = LocalDateTime.now()
             return InventoryReservation(
                 reservationId = UUID.randomUUID().toString(),
                 productId = productId,
                 quantity = quantity,
-                expiresAt = now.plusMinutes(ttlMinutes),
+                expiresAt = now.plusSeconds(ttlSeconds),
                 createdAt = now,
                 updatedAt = now
             )

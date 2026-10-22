@@ -14,12 +14,12 @@ interface SagaEventLogRepository : JpaRepository<SagaEventLog, Long> {
         """
         SELECT s FROM SagaEventLog s
         WHERE s.timedOut = false
-        AND s.timeoutAt < :now
+        AND s.createdAt < :createdBefore
         AND NOT EXISTS (
             SELECT 1 FROM s.completedSteps step WHERE step = 'REMOTE_COMPLETED'
         )
-        ORDER BY s.timeoutAt ASC
+        ORDER BY s.createdAt ASC
     """
     )
-    fun findTimedOutSagas(@Param("now") now: LocalDateTime): List<SagaEventLog>
+    fun findTimedOutSagas(@Param("createdBefore") createdBefore: LocalDateTime): List<SagaEventLog>
 }

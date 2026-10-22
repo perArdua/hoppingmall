@@ -28,8 +28,8 @@ class InventoryCommandServiceImpl(
     private val productRepository: ProductRepository
 ) : InventoryCommandService {
 
-    @Value("\${inventory.reservation.ttl-minutes:10}")
-    private var ttlMinutes: Long = 10
+    @Value("\${inventory.reservation.ttl-seconds:600}")
+    private var ttlSeconds: Long = 600
 
     @Value("\${chaos.inventory.failure-rate:0.0}")
     private var chaosFailureRate: Float = 0.0f
@@ -90,7 +90,7 @@ class InventoryCommandServiceImpl(
 
         inventory.decreaseStock(quantity)
 
-        val reservation = InventoryReservation.create(productId, quantity, ttlMinutes)
+        val reservation = InventoryReservation.create(productId, quantity, ttlSeconds)
         inventoryReservationRepository.save(reservation)
         return reservation.reservationId
     }

@@ -19,7 +19,7 @@ class ReservationExpiryScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(ReservationExpiryScheduler::class.java)
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelayString = "\${inventory.reservation.expiry-interval-ms:60000}")
     @Transactional
     fun expireReservations() {
         val expiredReservations = inventoryReservationRepository.findExpiredReservations(

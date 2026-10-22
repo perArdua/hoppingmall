@@ -29,6 +29,14 @@ class KafkaConsumerConfig(
     @Value("\${spring.kafka.properties.schema.registry.url:http://localhost:8081}") private val schemaRegistryUrl: String,
     @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService
 ) {
+    @Value("\${kafka.consumer.max-poll-interval-ms:300000}")
+    private var maxPollIntervalMs: Int = 300_000
+
+    @Value("\${kafka.consumer.session-timeout-ms:30000}")
+    private var sessionTimeoutMs: Int = 30_000
+
+    @Value("\${kafka.consumer.heartbeat-interval-ms:10000}")
+    private var heartbeatIntervalMs: Int = 10_000
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -42,10 +50,10 @@ class KafkaConsumerConfig(
             ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
             ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to false,
             ConsumerConfig.ISOLATION_LEVEL_CONFIG to "read_committed",
-            ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG to 300_000,
+            ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG to maxPollIntervalMs,
             ConsumerConfig.MAX_POLL_RECORDS_CONFIG to 100,
-            ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG to 30_000,
-            ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG to 10_000,
+            ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG to sessionTimeoutMs,
+            ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG to heartbeatIntervalMs,
             ConsumerConfig.FETCH_MIN_BYTES_CONFIG to 1024,
             ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG to 500,
             "schema.registry.url" to schemaRegistryUrl,
