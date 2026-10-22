@@ -12,6 +12,7 @@
     ]}},
     {"name": "title", "type": "string"},
     {"name": "content", "type": "string"},
-    {"name": "metadata", "type": ["null", "string"], "default": null}
+    {"name": "metadata", "type": ["null", "string"], "default": null},
+    {"name": "eventType", "type": "string", "default": ""}
   ]
 }

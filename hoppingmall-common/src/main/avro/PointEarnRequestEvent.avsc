@@ -8,6 +8,7 @@
     {"name": "orderId", "type": "long"},
     {"name": "paymentId", "type": "long"},
     {"name": "earnAmount", "type": "string"},
-    {"name": "reason", "type": "string", "default": "결제 완료"}
+    {"name": "reason", "type": "string", "default": "결제 완료"},
+    {"name": "eventType", "type": "string", "default": ""}
   ]
 }

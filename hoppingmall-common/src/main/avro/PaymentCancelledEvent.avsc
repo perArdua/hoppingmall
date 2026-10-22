@@ -8,6 +8,7 @@
     {"name": "orderId", "type": "long"},
     {"name": "userId", "type": "long"},
     {"name": "amount", "type": "string"},
-    {"name": "transactionId", "type": "string", "default": ""}
+    {"name": "transactionId", "type": "string", "default": ""},
+    {"name": "eventType", "type": "string", "default": ""}
   ]
 }

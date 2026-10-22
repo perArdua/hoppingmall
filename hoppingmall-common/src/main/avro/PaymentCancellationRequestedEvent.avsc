@@ -4,6 +4,7 @@
   "namespace": "com.hoppingmall.common.event",
   "fields": [
     {"name": "eventId", "type": "string"},
-    {"name": "orderId", "type": "long"}
+    {"name": "orderId", "type": "long"},
+    {"name": "eventType", "type": "string", "default": ""}
   ]
 }

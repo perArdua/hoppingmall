@@ -4,6 +4,7 @@ import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.service.DLQCommandService
 import com.hoppingmall.common.config.kafka.BusinessContextConsumerInterceptor
+import io.confluent.kafka.serializers.subject.TopicRecordNameStrategy
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.errors.SerializationException
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -49,6 +50,7 @@ class KafkaConsumerConfig(
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
         configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = AvroJsonDeserializer::class.java
         configProps["schema.registry.url"] = schemaRegistryUrl
+        configProps["value.subject.name.strategy"] = TopicRecordNameStrategy::class.java.name
 
         configProps[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = false
         configProps[ConsumerConfig.ISOLATION_LEVEL_CONFIG] = "read_committed"
