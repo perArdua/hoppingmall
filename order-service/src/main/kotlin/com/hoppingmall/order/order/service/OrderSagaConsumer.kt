@@ -1,13 +1,13 @@
 package com.hoppingmall.order.order.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.hoppingmall.order.order.domain.SagaEventLog
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
@@ -26,20 +26,15 @@ class OrderSagaConsumer(
     private val inventoryCommandPort: InventoryCommandPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper,
+    private val kafkaEventMapper: KafkaEventMapper,
     private val transactionTemplate: TransactionTemplate,
     private val sagaCompensationMetrics: SagaCompensationMetrics
 ) {
     private val logger = LoggerFactory.getLogger(OrderSagaConsumer::class.java)
 
-    // Kafka 이벤트(Avro→JSON)는 camelCase 필드명을 사용하므로, 전역 SNAKE_CASE ObjectMapper 대신
-    // camelCase 매퍼로 역직렬화한다 (전역 매퍼로 읽으면 orderId 등이 0으로 유실됨).
-    private val eventMapper: ObjectMapper by lazy {
-        objectMapper.copy().setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE)
-    }
-
     @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "order-saga-service")
     fun handlePaymentCompleted(message: String) {
-        val event = eventMapper.readValue(message, PaymentCompletedEvent::class.java)
+        val event = kafkaEventMapper.readValue(message, PaymentCompletedEvent::class.java)
         val eventId = "payment-completed-${event.transactionId}"
 
         val existingLog = sagaEventLogRepository.findByEventId(eventId)

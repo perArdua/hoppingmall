@@ -2,6 +2,7 @@ package com.hoppingmall.user.consumer
 
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.common.consumer.executeIdempotently
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.user.domain.MembershipEventLog
 import com.hoppingmall.user.domain.repository.MembershipEventLogRepository
 import com.hoppingmall.user.service.MembershipCommandService
@@ -14,13 +15,15 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class MembershipEventConsumer(
     private val membershipCommandService: MembershipCommandService,
-    private val membershipEventLogRepository: MembershipEventLogRepository
+    private val membershipEventLogRepository: MembershipEventLogRepository,
+    private val kafkaEventMapper: KafkaEventMapper
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(topics = [KafkaTopics.MEMBERSHIP_UPDATE_REQUEST], groupId = "membership-service")
-    fun handleMembershipUpdateRequest(event: MembershipUpdateRequestEvent) {
+    fun handleMembershipUpdateRequest(message: String) {
+        val event = kafkaEventMapper.readValue(message, MembershipUpdateRequestEvent::class.java)
         executeIdempotently(
             eventId = event.eventId,
             eventDescription = "멤버십",

@@ -1,6 +1,7 @@
 package com.hoppingmall.order.order.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
@@ -95,6 +96,9 @@ class OrderTransactionalRollbackTest {
 
     @MockitoBean
     private lateinit var objectMapper: ObjectMapper
+
+    @MockitoBean
+    private lateinit var kafkaEventMapper: KafkaEventMapper
 
     @Test
     fun compensateFailedConfirmation_중_역보상_이벤트_발행이_실패하면_주문_취소가_롤백된다() {

@@ -3,6 +3,7 @@ package com.hoppingmall.order.order.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.event.AvroEventConverter
 import com.hoppingmall.common.event.AvroJsonDeserializer
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.SagaEventLog
@@ -84,6 +85,7 @@ class OrderSagaConsumerAvroRoundTripTest {
             inventoryCommandPort,
             transactionalEventPublisher,
             objectMapper,
+            KafkaEventMapper(objectMapper),
             transactionTemplate,
             sagaCompensationMetrics
         )
