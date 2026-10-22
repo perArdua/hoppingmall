@@ -29,7 +29,7 @@ WHERE o.deleted_at IS NULL
   AND o.created_at < NOW() - INTERVAL {{PAYING_MAX_MINUTES}} MINUTE;
 
 -- @INV INV-3a | 주문은 CANCELLED인데 그 주문의 재고 예약이 CONFIRMED
-SELECT o.id AS order_id, o.status AS order_status, oi.id AS order_item_id, r.reservation_id, r.status AS reservation_status, r.quantity
+SELECT r.reservation_id, o.id AS order_id, o.status AS order_status, oi.id AS order_item_id, r.status AS reservation_status, r.quantity
 FROM order_db.orders o
 JOIN order_db.order_items oi ON oi.order_id = o.id AND oi.deleted_at IS NULL
 JOIN product_db.inventory_reservations r ON r.reservation_id = oi.reservation_id
@@ -74,23 +74,65 @@ GROUP BY p.order_id
 HAVING COUNT(*) > 1;
 
 -- @INV INV-7 | 이벤트 처리 이력의 식별자가 0이거나 멱등 키가 빈 문자열
-SELECT 'payment_db.point_histories' AS source, h.id, h.user_id, h.order_id, h.payment_id, h.event_id AS idempotency_key, h.created_at
+SELECT CONCAT('payment_db.point_histories:', h.id) AS entity, h.user_id, h.order_id, h.payment_id, h.event_id AS idempotency_key, h.created_at
 FROM payment_db.point_histories h
 WHERE h.deleted_at IS NULL
   AND h.type = 'EARN'
   AND (h.user_id = 0 OR h.order_id = 0 OR h.payment_id = 0 OR h.event_id = '')
 UNION ALL
-SELECT 'payment_db.payment_event_logs', l.id, NULL, l.order_id, l.payment_id, l.transaction_id, l.created_at
+SELECT CONCAT('payment_db.payment_event_logs:', l.id), NULL, l.order_id, l.payment_id, l.transaction_id, l.created_at
 FROM payment_db.payment_event_logs l
 WHERE l.deleted_at IS NULL
   AND (l.order_id = 0 OR l.payment_id = 0 OR l.transaction_id = '')
 UNION ALL
-SELECT 'product_db.statistics_event_logs', s.id, NULL, s.order_id, NULL, s.event_id, s.created_at
+SELECT CONCAT('product_db.statistics_event_logs:', s.id), NULL, s.order_id, NULL, s.event_id, s.created_at
 FROM product_db.statistics_event_logs s
 WHERE s.deleted_at IS NULL
   AND (s.order_id = 0 OR s.event_id = '')
 UNION ALL
-SELECT 'user_db.membership_event_logs', m.id, NULL, m.order_id, m.payment_id, m.event_id, m.created_at
+SELECT CONCAT('user_db.membership_event_logs:', m.id), NULL, m.order_id, m.payment_id, m.event_id, m.created_at
 FROM user_db.membership_event_logs m
 WHERE m.deleted_at IS NULL
   AND (m.order_id = 0 OR m.payment_id = 0 OR m.event_id = '');
+
+-- @INV INV-11 | Outbox 이벤트가 {{OUTBOX_MAX_SECONDS}}초 넘게 미발행(PENDING/RETRYING)
+SELECT CONCAT('order_db.outbox_events:', e.id) AS entity, e.event_type, e.topic, e.status, e.retry_count, e.created_at, TIMESTAMPDIFF(SECOND, e.created_at, NOW()) AS age_seconds
+FROM order_db.outbox_events e
+WHERE e.status IN ('PENDING', 'RETRYING')
+  AND e.created_at < NOW() - INTERVAL {{OUTBOX_MAX_SECONDS}} SECOND
+UNION ALL
+SELECT CONCAT('payment_db.outbox_events:', e.id), e.event_type, e.topic, e.status, e.retry_count, e.created_at, TIMESTAMPDIFF(SECOND, e.created_at, NOW())
+FROM payment_db.outbox_events e
+WHERE e.status IN ('PENDING', 'RETRYING')
+  AND e.created_at < NOW() - INTERVAL {{OUTBOX_MAX_SECONDS}} SECOND;
+
+-- @INV INV-12 | DLQ 메시지가 {{DLQ_MAX_SECONDS}}초 넘게 미처리(PENDING/RETRYING/FAILED)
+SELECT CONCAT('order_db.dlq_messages:', d.id) AS entity, d.original_topic, d.status, d.retry_count, d.created_at, TIMESTAMPDIFF(SECOND, d.created_at, NOW()) AS age_seconds
+FROM order_db.dlq_messages d
+WHERE d.deleted_at IS NULL AND d.archived_at IS NULL
+  AND d.status IN ('PENDING', 'RETRYING', 'FAILED')
+  AND d.created_at < NOW() - INTERVAL {{DLQ_MAX_SECONDS}} SECOND
+UNION ALL
+SELECT CONCAT('payment_db.dlq_messages:', d.id), d.original_topic, d.status, d.retry_count, d.created_at, TIMESTAMPDIFF(SECOND, d.created_at, NOW())
+FROM payment_db.dlq_messages d
+WHERE d.deleted_at IS NULL AND d.archived_at IS NULL
+  AND d.status IN ('PENDING', 'RETRYING', 'FAILED')
+  AND d.created_at < NOW() - INTERVAL {{DLQ_MAX_SECONDS}} SECOND
+UNION ALL
+SELECT CONCAT('product_db.dlq_messages:', d.id), d.original_topic, d.status, d.retry_count, d.created_at, TIMESTAMPDIFF(SECOND, d.created_at, NOW())
+FROM product_db.dlq_messages d
+WHERE d.deleted_at IS NULL AND d.archived_at IS NULL
+  AND d.status IN ('PENDING', 'RETRYING', 'FAILED')
+  AND d.created_at < NOW() - INTERVAL {{DLQ_MAX_SECONDS}} SECOND
+UNION ALL
+SELECT CONCAT('user_db.dlq_messages:', d.id), d.original_topic, d.status, d.retry_count, d.created_at, TIMESTAMPDIFF(SECOND, d.created_at, NOW())
+FROM user_db.dlq_messages d
+WHERE d.deleted_at IS NULL AND d.archived_at IS NULL
+  AND d.status IN ('PENDING', 'RETRYING', 'FAILED')
+  AND d.created_at < NOW() - INTERVAL {{DLQ_MAX_SECONDS}} SECOND
+UNION ALL
+SELECT CONCAT('notification_db.dlq_messages:', d.id), d.original_topic, d.status, d.retry_count, d.created_at, TIMESTAMPDIFF(SECOND, d.created_at, NOW())
+FROM notification_db.dlq_messages d
+WHERE d.deleted_at IS NULL AND d.archived_at IS NULL
+  AND d.status IN ('PENDING', 'RETRYING', 'FAILED')
+  AND d.created_at < NOW() - INTERVAL {{DLQ_MAX_SECONDS}} SECOND;

@@ -533,3 +533,42 @@ groups:
           severity: critical
         annotations:
           summary: "결제 실패 발생 (5분간 {{ $values.A }} 건)"
+  - orgId: 1
+    name: consistency-alerts
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: invariant-critical-violation
+        title: "CRITICAL 정합성 위반 > 0"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "sum(max_over_time(invariant_violation_count{severity=\"CRITICAL\"}[1m]))"
+              instant: true
+              range: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL 정합성 위반 {{ $values.A }} 건 (2주기 지속)"

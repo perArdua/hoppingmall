@@ -64,6 +64,10 @@ jobs:
               - 'settlement-service/**'
               - 'hoppingmall-common/**'
               - '.github/workflows/**'
+            consistency_monitor:
+              - 'consistency-monitor/**'
+              - 'scripts/invariants/**'
+              - '.github/workflows/**'
             user_service:
               - 'user-service/**'
               - 'hoppingmall-common/**'
@@ -90,6 +94,7 @@ jobs:
           PRODUCT_SERVICE: ${{ steps.changes.outputs.product_service }}
           SETTLEMENT_SERVICE: ${{ steps.changes.outputs.settlement_service }}
           USER_SERVICE: ${{ steps.changes.outputs.user_service }}
+          CONSISTENCY_MONITOR: ${{ steps.changes.outputs.consistency_monitor }}
           K8S_CHANGED: ${{ steps.changes.outputs.k8s }}
           SHARED_MODULES: ${{ steps.changes.outputs.shared_modules }}
         run: |
@@ -116,6 +121,9 @@ jobs:
           if [[ "$USER_SERVICE" == "true" ]]; then
             impacted_services+=('"user-service"')
           fi
+          if [[ "$CONSISTENCY_MONITOR" == "true" ]]; then
+            impacted_services+=('"consistency-monitor"')
+          fi
 
           if ((${#impacted_services[@]} > 0)); then
             impacted_joined=$(IFS=,; echo "${impacted_services[*]}")
@@ -126,7 +134,7 @@ jobs:
             echo 'test_matrix={"service":[]}' >> "$GITHUB_OUTPUT"
           fi
 
-          all_services='"api-gateway","notification-service","order-service","payment-service","product-service","settlement-service","user-service"'
+          all_services='"api-gateway","notification-service","order-service","payment-service","product-service","settlement-service","user-service","consistency-monitor"'
 
           if [[ "$EVENT_NAME" == "push" ]]; then
             echo "run_docker=true" >> "$GITHUB_OUTPUT"

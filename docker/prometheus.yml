@@ -78,6 +78,13 @@ scrape_configs:
         labels:
           service: 'settlement-service'
 
+  - job_name: 'consistency-monitor'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['consistency-monitor:8087']
+        labels:
+          service: 'consistency-monitor'
+
   - job_name: 'api-gateway'
     metrics_path: '/actuator/prometheus'
     metric_relabel_configs:
