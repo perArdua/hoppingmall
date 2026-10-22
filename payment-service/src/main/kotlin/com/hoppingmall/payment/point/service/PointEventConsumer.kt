@@ -3,6 +3,7 @@ package com.hoppingmall.payment.point.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.common.consumer.executeIdempotently
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.payment.common.NotificationType
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
@@ -25,6 +26,7 @@ class PointEventConsumer(
     private val pointHistoryRepository: PointHistoryRepository,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper,
+    private val kafkaEventMapper: KafkaEventMapper,
     private val cacheManager: CacheManager,
     private val pointDomainService: PointDomainService
 ) {
@@ -39,7 +41,7 @@ class PointEventConsumer(
         if (chaosFailureRate > 0 && Random.nextFloat() < chaosFailureRate) {
             throw RuntimeException("Chaos injection: point operation failed")
         }
-        val event = objectMapper.readValue(message, PointEarnRequestEvent::class.java)
+        val event = kafkaEventMapper.readValue(message, PointEarnRequestEvent::class.java)
         executeIdempotently(
             eventId = event.eventId,
             eventDescription = "포인트",

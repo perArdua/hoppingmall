@@ -1,7 +1,9 @@
 package com.hoppingmall.product.statistics.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.product.product.domain.StatisticsEventLog
 import com.hoppingmall.product.product.domain.repository.StatisticsEventLogRepository
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
@@ -39,6 +41,10 @@ class StatisticsEventConsumerTest {
 
     @Spy
     private var objectMapper: ObjectMapper = ObjectMapper().registerModule(JavaTimeModule())
+        .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+
+    @Spy
+    private var kafkaEventMapper: KafkaEventMapper = KafkaEventMapper(objectMapper)
 
     @InjectMocks
     private lateinit var consumer: StatisticsEventConsumer

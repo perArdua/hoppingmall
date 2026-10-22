@@ -3,6 +3,7 @@ package com.hoppingmall.product.statistics.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.common.consumer.executeIdempotently
+import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.product.product.domain.StatisticsEventLog
 import com.hoppingmall.product.product.domain.repository.StatisticsEventLogRepository
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
@@ -18,14 +19,15 @@ class StatisticsEventConsumer(
     private val statisticsEventLogRepository: StatisticsEventLogRepository,
     private val orderItemQueryPort: OrderItemQueryPort,
     private val productStatisticsCommandService: ProductStatisticsCommandService,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val kafkaEventMapper: KafkaEventMapper
 ) {
 
     private val logger = LoggerFactory.getLogger(StatisticsEventConsumer::class.java)
 
     @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "statistics-service")
     fun handlePaymentCompleted(message: String) {
-        val event = objectMapper.readValue(message, PaymentCompletedEvent::class.java)
+        val event = kafkaEventMapper.readValue(message, PaymentCompletedEvent::class.java)
 
         if (statisticsEventLogRepository.existsByEventId(event.transactionId)) return
 
@@ -64,7 +66,7 @@ class StatisticsEventConsumer(
 
         if (eventType != "PaymentCancelled") return
 
-        val event = objectMapper.treeToValue(node, PaymentCancelledEvent::class.java)
+        val event = kafkaEventMapper.treeToValue(node, PaymentCancelledEvent::class.java)
         handlePaymentCancelled(event)
     }
 
