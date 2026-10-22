@@ -15,21 +15,21 @@ MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
 
 run_mysql() {
-  MYSQL_PWD="$MYSQL_PASSWORD" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --protocol=TCP -N -B "$@"
+  MYSQL_PWD="$MYSQL_PASSWORD" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --protocol=TCP -N -B "$@" | tr -d '\r'
 }
 
 EXECUTED_AT="$(date '+%Y-%m-%dT%H:%M:%S%z')"
 GIT_HEAD="$(git -C "$(dirname "$0")" rev-parse HEAD 2>/dev/null || echo unknown)"
 TARGET="$MYSQL_USER@$MYSQL_HOST:$MYSQL_PORT"
 
-acked_ids="$(grep -o 'OLC ORDER_OK order_id=[0-9]*' "$K6_OUTPUT" | sed 's/.*order_id=//' | sort -un || true)"
+acked_ids="$(grep -o 'OLC ORDER_OK order_id=[0-9]*' "$K6_OUTPUT" | sed 's/.*order_id=//' | tr -d '\r' | sort -nu || true)"
 acked_count="$(printf '%s' "$acked_ids" | grep -c . || true)"
 
 missing_ids=""
 if [[ "$acked_count" -gt 0 ]]; then
   id_list="$(printf '%s' "$acked_ids" | paste -sd, -)"
-  found_ids="$(run_mysql -e "SELECT id FROM order_db.orders WHERE id IN ($id_list)" | sort -un)"
-  missing_ids="$(comm -23 <(printf '%s\n' "$acked_ids") <(printf '%s\n' "$found_ids") | grep . || true)"
+  found_ids="$(run_mysql -e "SELECT id FROM order_db.orders WHERE id IN ($id_list)")"
+  missing_ids="$(awk 'NR == FNR { found[$1]; next } !($1 in found)' <(printf '%s\n' "$found_ids") <(printf '%s\n' "$acked_ids") | grep . || true)"
 fi
 missing_count="$(printf '%s' "$missing_ids" | grep -c . || true)"
 db_orders="$(run_mysql -e "SELECT COUNT(*) FROM order_db.orders WHERE deleted_at IS NULL")"
