@@ -72,3 +72,25 @@ WHERE p.deleted_at IS NULL
   AND p.status = 'SUCCESS'
 GROUP BY p.order_id
 HAVING COUNT(*) > 1;
+
+-- @INV INV-7 | 이벤트 처리 이력의 식별자가 0이거나 멱등 키가 빈 문자열
+SELECT 'payment_db.point_histories' AS source, h.id, h.user_id, h.order_id, h.payment_id, h.event_id AS idempotency_key, h.created_at
+FROM payment_db.point_histories h
+WHERE h.deleted_at IS NULL
+  AND h.type = 'EARN'
+  AND (h.user_id = 0 OR h.order_id = 0 OR h.payment_id = 0 OR h.event_id = '')
+UNION ALL
+SELECT 'payment_db.payment_event_logs', l.id, NULL, l.order_id, l.payment_id, l.transaction_id, l.created_at
+FROM payment_db.payment_event_logs l
+WHERE l.deleted_at IS NULL
+  AND (l.order_id = 0 OR l.payment_id = 0 OR l.transaction_id = '')
+UNION ALL
+SELECT 'product_db.statistics_event_logs', s.id, NULL, s.order_id, NULL, s.event_id, s.created_at
+FROM product_db.statistics_event_logs s
+WHERE s.deleted_at IS NULL
+  AND (s.order_id = 0 OR s.event_id = '')
+UNION ALL
+SELECT 'user_db.membership_event_logs', m.id, NULL, m.order_id, m.payment_id, m.event_id, m.created_at
+FROM user_db.membership_event_logs m
+WHERE m.deleted_at IS NULL
+  AND (m.order_id = 0 OR m.payment_id = 0 OR m.event_id = '');
