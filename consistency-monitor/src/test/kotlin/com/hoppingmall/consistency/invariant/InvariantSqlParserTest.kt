@@ -28,7 +28,7 @@ class InvariantSqlParserTest {
 
         assertThat(definitions.map { it.id }).containsExactly(
             "INV-1", "INV-1R", "INV-2a", "INV-2b", "INV-3a", "INV-3b",
-            "INV-4", "INV-5", "INV-6", "INV-7", "INV-11", "INV-12"
+            "INV-4", "INV-5", "INV-6", "INV-7", "INV-9", "INV-10", "INV-11", "INV-12"
         )
         assertThat(definitions).allSatisfy {
             assertThat(it.sql).startsWith("SELECT").doesNotContain("{{").doesNotEndWith(";")

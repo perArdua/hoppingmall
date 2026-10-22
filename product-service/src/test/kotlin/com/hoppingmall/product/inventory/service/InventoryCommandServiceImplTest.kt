@@ -48,9 +48,9 @@ class InventoryCommandServiceImplTest {
 
     @BeforeEach
     fun setUp() {
-        val field = InventoryCommandServiceImpl::class.java.getDeclaredField("ttlMinutes")
+        val field = InventoryCommandServiceImpl::class.java.getDeclaredField("ttlSeconds")
         field.isAccessible = true
-        field.set(service, 10L)
+        field.set(service, 600L)
     }
 
     @Test

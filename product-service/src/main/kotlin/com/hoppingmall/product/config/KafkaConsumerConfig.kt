@@ -26,6 +26,14 @@ import org.springframework.util.backoff.FixedBackOff
 class KafkaConsumerConfig(
     @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService
 ) {
+    @Value("\${kafka.consumer.max-poll-interval-ms:300000}")
+    private var maxPollIntervalMs: Int = 300_000
+
+    @Value("\${kafka.consumer.session-timeout-ms:30000}")
+    private var sessionTimeoutMs: Int = 30_000
+
+    @Value("\${kafka.consumer.heartbeat-interval-ms:10000}")
+    private var heartbeatIntervalMs: Int = 10_000
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -55,10 +63,10 @@ class KafkaConsumerConfig(
         configProps[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = false
         configProps[ConsumerConfig.ISOLATION_LEVEL_CONFIG] = "read_committed"
 
-        configProps[ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG] = 300_000
+        configProps[ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG] = maxPollIntervalMs
         configProps[ConsumerConfig.MAX_POLL_RECORDS_CONFIG] = 100
-        configProps[ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG] = 30_000
-        configProps[ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG] = 10_000
+        configProps[ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG] = sessionTimeoutMs
+        configProps[ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG] = heartbeatIntervalMs
 
         return DefaultKafkaConsumerFactory(configProps)
     }

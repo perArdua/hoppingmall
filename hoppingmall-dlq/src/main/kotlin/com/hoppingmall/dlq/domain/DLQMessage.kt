@@ -94,7 +94,8 @@ class DLQMessage(
     }
 
     companion object {
-        private val BACKOFF_INTERVALS = longArrayOf(
+        @Volatile
+        var backoffIntervalsMs: LongArray = longArrayOf(
             60_000L,
             300_000L,
             1_800_000L
@@ -112,8 +113,9 @@ class DLQMessage(
         )
 
         fun calculateNextRetryAt(retryCount: Int): Long {
-            val index = (retryCount).coerceAtMost(BACKOFF_INTERVALS.size - 1)
-            return System.currentTimeMillis() + BACKOFF_INTERVALS[index]
+            val intervals = backoffIntervalsMs
+            val index = (retryCount).coerceAtMost(intervals.size - 1)
+            return System.currentTimeMillis() + intervals[index]
         }
     }
 }

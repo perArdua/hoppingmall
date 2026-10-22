@@ -8,9 +8,11 @@ import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Duration
 import java.time.LocalDateTime
 
 @Service
@@ -23,9 +25,14 @@ class SagaTimeoutScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(SagaTimeoutScheduler::class.java)
 
-    @Scheduled(fixedDelay = 60_000)
+    @Value("\${saga.timeout-ms:300000}")
+    private var sagaTimeoutMs: Long = 300_000
+
+    @Scheduled(fixedDelayString = "\${saga.timeout-scan-interval-ms:60000}")
     fun checkTimedOutSagas() {
-        val timedOutSagas = sagaEventLogRepository.findTimedOutSagas(LocalDateTime.now())
+        val timedOutSagas = sagaEventLogRepository.findTimedOutSagas(
+            LocalDateTime.now().minus(Duration.ofMillis(sagaTimeoutMs))
+        )
         if (timedOutSagas.isEmpty()) return
 
         logger.warn("타임아웃된 saga {} 건 감지", timedOutSagas.size)
