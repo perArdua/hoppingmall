@@ -6,6 +6,7 @@ import com.hoppingmall.common.config.kafka.BusinessContextProducerInterceptor
 import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.service.DLQCommandService
 import io.confluent.kafka.serializers.KafkaAvroSerializer
+import io.confluent.kafka.serializers.subject.TopicRecordNameStrategy
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -53,6 +54,7 @@ class KafkaConfig(
         configProps[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
         configProps[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = KafkaAvroSerializer::class.java
         configProps["schema.registry.url"] = schemaRegistryUrl
+        configProps["value.subject.name.strategy"] = TopicRecordNameStrategy::class.java.name
 
         configProps[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
         configProps[ProducerConfig.ACKS_CONFIG] = "all"
@@ -102,6 +104,7 @@ class KafkaConfig(
         configProps[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
         configProps[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = AvroJsonDeserializer::class.java
         configProps["schema.registry.url"] = schemaRegistryUrl
+        configProps["value.subject.name.strategy"] = TopicRecordNameStrategy::class.java.name
 
         configProps[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = false
         configProps[ConsumerConfig.ISOLATION_LEVEL_CONFIG] = "read_committed"

@@ -4,6 +4,7 @@ import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.service.DLQCommandService
 import com.hoppingmall.common.config.kafka.BusinessContextConsumerInterceptor
+import io.confluent.kafka.serializers.subject.TopicRecordNameStrategy
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.errors.SerializationException
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -47,7 +48,8 @@ class KafkaConsumerConfig(
             ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG to 10_000,
             ConsumerConfig.FETCH_MIN_BYTES_CONFIG to 1024,
             ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG to 500,
-            "schema.registry.url" to schemaRegistryUrl
+            "schema.registry.url" to schemaRegistryUrl,
+            "value.subject.name.strategy" to TopicRecordNameStrategy::class.java.name
         )
         return DefaultKafkaConsumerFactory(props)
     }

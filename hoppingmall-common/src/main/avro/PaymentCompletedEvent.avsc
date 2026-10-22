@@ -11,6 +11,7 @@
     {"name": "method", "type": {"type": "enum", "name": "PaymentMethod", "symbols": ["CREDIT_CARD", "BANK_TRANSFER"]}},
     {"name": "status", "type": {"type": "enum", "name": "PaymentStatus", "symbols": ["PENDING", "SUCCESS", "FAILED", "CANCELLED"]}},
     {"name": "transactionId", "type": "string"},
-    {"name": "completedAt", "type": "string"}
+    {"name": "completedAt", "type": "string"},
+    {"name": "eventType", "type": "string", "default": ""}
   ]
 }

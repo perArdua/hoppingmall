@@ -9,6 +9,10 @@ import org.springframework.stereotype.Component
 @Component
 class AvroEventConverter(private val objectMapper: ObjectMapper) {
 
+    companion object {
+        private const val EVENT_TYPE_FIELD = "eventType"
+    }
+
     private val schemaMap: Map<String, Schema> = mapOf(
         "PaymentCompletedEvent" to PaymentCompletedEvent.getClassSchema(),
         "PaymentFailedEvent" to PaymentFailedEvent.getClassSchema(),
@@ -37,7 +41,7 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
                 throw IllegalArgumentException("Unknown event type: $eventType")
             }
         val jsonMap = objectMapper.readValue(jsonData, Map::class.java)
-        return buildGenericRecord(schema, jsonMap)
+        return buildGenericRecord(schema, jsonMap).apply { put(EVENT_TYPE_FIELD, eventType) }
     }
 
     private fun buildGenericRecord(schema: Schema, map: Map<*, *>): GenericRecord {
