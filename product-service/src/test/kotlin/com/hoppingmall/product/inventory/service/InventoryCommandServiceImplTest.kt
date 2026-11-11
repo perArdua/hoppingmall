@@ -191,65 +191,55 @@ class InventoryCommandServiceImplTest {
 
     @Test
     fun 여러_예약을_한번에_취소한다() {
-        val r1 = InventoryReservation(
-            reservationId = "rsv-1", productId = 1L, quantity = 3,
-            status = ReservationStatus.RESERVED, expiresAt = LocalDateTime.now().plusMinutes(10)
-        )
-        val r2 = InventoryReservation(
-            reservationId = "rsv-2", productId = 2L, quantity = 5,
-            status = ReservationStatus.RESERVED, expiresAt = LocalDateTime.now().plusMinutes(10)
-        )
         val inv1 = Inventory.create(productId = 1L, stockQuantity = 0)
         val inv2 = Inventory.create(productId = 2L, stockQuantity = 0)
 
-        whenever(inventoryReservationRepository.findByReservationIdIn(listOf("rsv-1", "rsv-2")))
-            .thenReturn(listOf(r1, r2))
-        whenever(inventoryReservationRepository.batchUpdateStatusByCas(
-            reservationIds = eq(listOf("rsv-1", "rsv-2")),
-            expectedStatus = eq(ReservationStatus.RESERVED),
-            targetStatus = eq(ReservationStatus.CANCELLED),
-            updatedAt = any()
-        )).thenReturn(2)
+        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1", "rsv-2")))
+            .thenReturn(listOf(lockedRow(10L, 1L, 3), lockedRow(11L, 2L, 5)))
         whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L, 2L)))
             .thenReturn(listOf(inv1, inv2))
 
         service.cancelReservations(listOf("rsv-1", "rsv-2"))
 
+        verify(inventoryReservationRepository).cancelByIds(eq(listOf(10L, 11L)), any())
         assertThat(inv1.stockQuantity).isEqualTo(3)
         assertThat(inv2.stockQuantity).isEqualTo(5)
     }
 
     @Test
-    fun 예약이_없으면_취소를_건너뛴다() {
-        whenever(inventoryReservationRepository.findByReservationIdIn(listOf("rsv-1", "rsv-2")))
+    fun 잠근_시점에_RESERVED인_예약의_수량만_복원한다() {
+        val inventory = Inventory.create(productId = 1L, stockQuantity = 0)
+
+        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1", "rsv-2", "rsv-3")))
+            .thenReturn(listOf(lockedRow(10L, 1L, 3), lockedRow(12L, 1L, 4)))
+        whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L)))
+            .thenReturn(listOf(inventory))
+
+        service.cancelReservations(listOf("rsv-1", "rsv-2", "rsv-3"))
+
+        verify(inventoryReservationRepository).cancelByIds(eq(listOf(10L, 12L)), any())
+        assertThat(inventory.stockQuantity).isEqualTo(7)
+    }
+
+    @Test
+    fun 잠글_RESERVED_예약이_없으면_취소를_건너뛴다() {
+        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1", "rsv-2")))
             .thenReturn(emptyList())
 
         service.cancelReservations(listOf("rsv-1", "rsv-2"))
 
-        verify(inventoryReservationRepository, never()).batchUpdateStatusByCas(any(), any(), any(), any())
+        verify(inventoryReservationRepository, never()).cancelByIds(any(), any())
+        verify(inventoryRepository, never()).findByProductIdInForUpdate(any())
     }
 
     @Test
     fun 빈_예약_목록이면_취소를_건너뛴다() {
         service.cancelReservations(emptyList())
 
-        verify(inventoryReservationRepository, never()).findByReservationIdIn(any())
+        verify(inventoryReservationRepository, never()).lockCancellable(any())
     }
 
-    @Test
-    fun RESERVED_상태가_아닌_예약만_있으면_취소를_건너뛴다() {
-        val confirmed = InventoryReservation(
-            reservationId = "rsv-1", productId = 1L, quantity = 3,
-            status = ReservationStatus.CONFIRMED, expiresAt = LocalDateTime.now().plusMinutes(10)
-        )
-
-        whenever(inventoryReservationRepository.findByReservationIdIn(listOf("rsv-1")))
-            .thenReturn(listOf(confirmed))
-
-        service.cancelReservations(listOf("rsv-1"))
-
-        verify(inventoryReservationRepository, never()).batchUpdateStatusByCas(any(), any(), any(), any())
-    }
+    private fun lockedRow(id: Long, productId: Long, quantity: Int): Array<Any> = arrayOf(id, productId, quantity)
 
     @Test
     fun 확정_시_일부_이미_확정된_예약이_있으면_성공으로_간주한다() {
