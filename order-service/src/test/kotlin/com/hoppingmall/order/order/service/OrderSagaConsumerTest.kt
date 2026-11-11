@@ -131,6 +131,74 @@ class OrderSagaConsumerTest {
     }
 
     @Test
+    fun 주문_항목들이_같은_예약을_공유하면_확정에_예약ID를_한_번씩만_넘긴다() {
+        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
+        order.updateStatus(OrderStatus.PAYING)
+        val sagaLog = SagaEventLog(
+            eventId = "payment-completed-txn-123",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 1L
+        ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
+
+        whenever(kafkaEventMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
+            .thenReturn(paymentCompletedEvent)
+        whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123"))
+            .thenReturn(null)
+            .thenReturn(sagaLog)
+        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(sharedReservationItems())
+        whenever(inventoryCommandPort.confirmReservations(listOf("rsv-1", "rsv-2"))).thenReturn(true)
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
+
+        consumer.handlePaymentCompleted("{}")
+
+        verify(inventoryCommandPort).confirmReservations(listOf("rsv-1", "rsv-2"))
+        verify(transactionalEventPublisher, never()).publishEvent(any(), any(), any(), any(), any(), any())
+        assertThat(order.status).isEqualTo(OrderStatus.PAID)
+        assertThat(sagaLog.isStepCompleted(SagaEventLog.REMOTE_COMPLETED)).isTrue()
+    }
+
+    @Test
+    fun 로컬_단계_완료_후_재처리할_때도_공유된_예약ID를_한_번씩만_확정한다() {
+        val localCompleted = SagaEventLog(
+            eventId = "payment-completed-txn-123",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 1L
+        ).apply { markStepCompleted(SagaEventLog.LOCAL_COMPLETED) }
+
+        whenever(kafkaEventMapper.readValue(any<String>(), eq(PaymentCompletedEvent::class.java)))
+            .thenReturn(paymentCompletedEvent)
+        whenever(sagaEventLogRepository.findByEventId("payment-completed-txn-123")).thenReturn(localCompleted)
+        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(sharedReservationItems())
+        whenever(inventoryCommandPort.confirmReservations(listOf("rsv-1", "rsv-2"))).thenReturn(true)
+        whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
+
+        consumer.handlePaymentCompleted("{}")
+
+        verify(inventoryCommandPort).confirmReservations(listOf("rsv-1", "rsv-2"))
+        verify(transactionalEventPublisher, never()).publishEvent(any(), any(), any(), any(), any(), any())
+        assertThat(localCompleted.isStepCompleted(SagaEventLog.REMOTE_COMPLETED)).isTrue()
+    }
+
+    private fun sharedReservationItems(): List<OrderItem> = listOf(
+        OrderItem.create(
+            orderId = 1L, sellerId = 2L, productId = 3L,
+            productName = "상품A", productPrice = BigDecimal("20000"),
+            quantity = 2, reservationId = "rsv-1"
+        ),
+        OrderItem.create(
+            orderId = 1L, sellerId = 2L, productId = 3L,
+            productName = "상품A", productPrice = BigDecimal("20000"),
+            quantity = 1, reservationId = "rsv-1"
+        ),
+        OrderItem.create(
+            orderId = 1L, sellerId = 2L, productId = 4L,
+            productName = "상품B", productPrice = BigDecimal("10000"),
+            quantity = 1, reservationId = "rsv-2"
+        )
+    )
+
+    @Test
     fun 이미_처리된_결제_완료_이벤트는_무시한다() {
         val fullyCompleted = SagaEventLog(
             eventId = "payment-completed-txn-123",
