@@ -14,6 +14,7 @@ import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.config.OrderMetrics
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.web.client.HttpClientErrorException
 import java.math.BigDecimal
 
 @Service
@@ -62,7 +64,7 @@ class OrderCommandServiceImpl(
         }
 
         val items = cartItems.map { it.productId to it.quantity }
-        val reservationMap = inventoryCommandPort.batchReserveStock(items)
+        val reservationMap = reserveStock(items)
 
         val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
 
@@ -90,6 +92,13 @@ class OrderCommandServiceImpl(
             OrderResponse.from(order, savedOrderItems)
         }!!
     }
+
+    private fun reserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
+        try {
+            inventoryCommandPort.batchReserveStock(items)
+        } catch (e: HttpClientErrorException.BadRequest) {
+            throw OrderOutOfStockException()
+        }
 
     override fun cancelOrder(buyerId: Long, orderId: Long): OrderResponse {
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
