@@ -75,6 +75,8 @@ dependencies {
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.assertj:assertj-core:3.24.2")
 	testImplementation("org.springframework.security:spring-security-test")
+	testImplementation("org.testcontainers:mysql:1.21.4")
+	testImplementation("org.testcontainers:junit-jupiter:1.21.4")
 
 	implementation("io.grpc:grpc-protobuf:$grpcVersion")
 	implementation("io.grpc:grpc-stub:$grpcVersion")
