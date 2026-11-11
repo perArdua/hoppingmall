@@ -11,6 +11,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
@@ -34,7 +35,10 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
 import org.springframework.test.util.ReflectionTestUtils
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.transaction.support.TransactionCallback
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
@@ -128,6 +132,40 @@ class OrderCommandServiceImplTest {
 
         assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
             .isInstanceOf(RuntimeException::class.java)
+    }
+
+    @Test
+    fun 재고_서비스가_재고_부족으로_400을_응답하면_ORD007_재고_부족_예외로_바꾼다() {
+        stubReservableCart()
+        whenever(inventoryCommandPort.batchReserveStock(any()))
+            .thenThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "INV002", HttpHeaders.EMPTY, ByteArray(0), null))
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
+            .isInstanceOf(OrderOutOfStockException::class.java)
+            .extracting { (it as OrderOutOfStockException).errorCode }
+            .satisfies({ errorCode ->
+                assertThat(errorCode.code).isEqualTo("ORD007")
+                assertThat(errorCode.status).isEqualTo(HttpStatus.BAD_REQUEST)
+            })
+        verify(orderRepository, never()).save(any<Order>())
+        verify(cartItemRepository, never()).deleteAllById(any())
+    }
+
+    @Test
+    fun 재고_서비스의_400이_아닌_클라이언트_오류는_그대로_전파한다() {
+        stubReservableCart()
+        val notFound = HttpClientErrorException.create(HttpStatus.NOT_FOUND, "INV001", HttpHeaders.EMPTY, ByteArray(0), null)
+        whenever(inventoryCommandPort.batchReserveStock(any())).thenThrow(notFound)
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
+            .isSameAs(notFound)
+        verify(orderRepository, never()).save(any<Order>())
+    }
+
+    private fun stubReservableCart() {
+        whenever(cartItemRepository.findAllById(listOf(1L)))
+            .thenReturn(listOf(createCartItem(id = 1L, buyerId = 10L, productId = 100L, quantity = 1)))
+        whenever(productQueryPort.findProductsByIds(listOf(100L))).thenReturn(listOf(createProductInfo(id = 100L, sellerId = 5L)))
     }
 
     @Test

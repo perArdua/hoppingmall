@@ -14,4 +14,5 @@ enum class OrderErrorCode(
     ORDER_EMPTY_ITEMS("ORD004", "주문 항목이 비어있습니다.", HttpStatus.BAD_REQUEST),
     ORDER_PRODUCT_NOT_FOUND("ORD005", "상품을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     ORDER_PAYMENT_CANCELLATION_FAILED("ORD006", "결제 취소에 실패했습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE),
+    ORDER_OUT_OF_STOCK("ORD007", "재고가 부족합니다.", HttpStatus.BAD_REQUEST),
 }
