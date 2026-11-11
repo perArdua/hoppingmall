@@ -28,6 +28,8 @@ repositories {
 	maven { url = uri("https://packages.confluent.io/maven/") }
 }
 
+extra["testcontainers.version"] = "1.21.4"
+
 val grpcVersion = "1.62.2"
 val grpcKotlinVersion = "1.4.1"
 val protobufVersion = "3.25.3"
