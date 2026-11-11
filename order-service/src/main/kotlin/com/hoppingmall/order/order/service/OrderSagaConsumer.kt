@@ -92,7 +92,7 @@ class OrderSagaConsumer(
             log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
             sagaEventLogRepository.save(log)
 
-            orderItemRepository.findByOrderId(event.orderId).mapNotNull { it.reservationId }
+            orderItemRepository.findByOrderId(event.orderId).mapNotNull { it.reservationId }.distinct()
         }
     }
 
@@ -163,7 +163,7 @@ class OrderSagaConsumer(
     private fun reconstructReservationIds(orderId: Long): List<String>? {
         val orderItems = orderItemRepository.findByOrderId(orderId)
         if (orderItems.isEmpty()) return null
-        return orderItems.mapNotNull { it.reservationId }
+        return orderItems.mapNotNull { it.reservationId }.distinct()
     }
 
     @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "order-saga-service")

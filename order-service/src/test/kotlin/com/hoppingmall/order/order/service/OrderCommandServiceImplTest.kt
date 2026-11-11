@@ -120,6 +120,38 @@ class OrderCommandServiceImplTest {
     }
 
     @Test
+    fun 같은_상품_장바구니_행이_여러_개면_수량을_합쳐_상품당_한_번만_예약한다() {
+        val cartItem1 = createCartItem(id = 1L, buyerId = 10L, productId = 100L, quantity = 2)
+        val cartItem2 = createCartItem(id = 2L, buyerId = 10L, productId = 100L, quantity = 3)
+        val cartItem3 = createCartItem(id = 3L, buyerId = 10L, productId = 200L, quantity = 1)
+
+        whenever(cartItemRepository.findAllById(listOf(1L, 2L, 3L))).thenReturn(listOf(cartItem1, cartItem2, cartItem3))
+        whenever(productQueryPort.findProductsByIds(listOf(100L, 200L)))
+            .thenReturn(listOf(createProductInfo(id = 100L, sellerId = 5L), createProductInfo(id = 200L, sellerId = 6L)))
+        whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 5, 200L to 1)))
+            .thenReturn(mapOf(100L to "rsv-100", 200L to "rsv-200"))
+        whenever(orderRepository.save(any<Order>())).thenAnswer {
+            val order = it.arguments[0] as Order
+            setEntityId(order, 1L)
+            order
+        }
+        val savedItems = mutableListOf<OrderItem>()
+        whenever(orderItemRepository.saveAll(any<List<OrderItem>>())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val items = it.arguments[0] as List<OrderItem>
+            items.forEachIndexed { idx, item -> setEntityId(item, (idx + 1).toLong()) }
+            savedItems.addAll(items)
+            items
+        }
+
+        val result = service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L, 3L)))
+
+        verify(inventoryCommandPort).batchReserveStock(listOf(100L to 5, 200L to 1))
+        assertThat(result.items.map { it.quantity }).containsExactly(2, 3, 1)
+        assertThat(savedItems.map { it.reservationId }).containsExactly("rsv-100", "rsv-100", "rsv-200")
+    }
+
+    @Test
     fun 재고_예약_실패_시_이전_예약을_롤백한다() {
         val cartItem1 = createCartItem(id = 1L, buyerId = 10L, productId = 100L, quantity = 1)
         val cartItem2 = createCartItem(id = 2L, buyerId = 10L, productId = 200L, quantity = 1)

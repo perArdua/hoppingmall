@@ -63,7 +63,7 @@ class OrderCommandServiceImpl(
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
 
-        val items = cartItems.map { it.productId to it.quantity }
+        val items = cartItems.groupBy { it.productId }.map { (productId, rows) -> productId to rows.sumOf { it.quantity } }
         val reservationMap = reserveStock(items)
 
         val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
