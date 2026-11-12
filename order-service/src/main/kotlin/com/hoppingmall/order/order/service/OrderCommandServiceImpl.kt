@@ -56,7 +56,7 @@ class OrderCommandServiceImpl(
     override fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse {
         val cartItems = cartItemRepository.findAllById(request.cartItemIds)
 
-        if (cartItems.isEmpty()) {
+        if (cartItems.isEmpty() || cartItems.size != request.cartItemIds.distinct().size) {
             throw OrderEmptyItemsException()
         }
 
