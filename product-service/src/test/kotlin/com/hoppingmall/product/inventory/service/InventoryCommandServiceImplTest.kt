@@ -53,6 +53,9 @@ class InventoryCommandServiceImplTest {
     private lateinit var productRepository: ProductRepository
 
     @Mock
+    private lateinit var bucketStockService: BucketStockService
+
+    @Mock
     private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
 
     @Mock
