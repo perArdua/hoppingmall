@@ -9,6 +9,7 @@ import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import com.hoppingmall.product.wishlist.exception.WishlistAlreadyExistsException
 import com.hoppingmall.product.wishlist.exception.WishlistNotFoundException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -28,7 +29,11 @@ class WishlistCommandServiceImpl(
 
         val wishlist = Wishlist.create(buyerId, request.productId)
         wishlistRepository.deleteSoftDeleted(buyerId, request.productId)
-        val savedWishlist = wishlistRepository.save(wishlist)
+        val savedWishlist = try {
+            wishlistRepository.save(wishlist)
+        } catch (e: DataIntegrityViolationException) {
+            throw WishlistAlreadyExistsException()
+        }
 
         return WishlistResponse.from(savedWishlist, product)
     }
