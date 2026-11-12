@@ -67,8 +67,9 @@ class ReservationLinkCheckJob(
         var abortedTotal = 0
         var batches = 0
         var failed = false
+        val failedProductIds = mutableSetOf<Long>()
         while (System.currentTimeMillis() - started < budgetMs) {
-            val candidates = collectCandidates(now)
+            val candidates = collectCandidates(now, failedProductIds)
             if (candidates.isEmpty()) break
             batches++
             val result = try {
@@ -81,7 +82,7 @@ class ReservationLinkCheckJob(
             }
             checked.increment(candidates.size.toDouble())
             linkedTotal += claim(result.linked, now)
-            abortedTotal += abort(candidates, result.aborted)
+            abortedTotal += abort(candidates, result.aborted, failedProductIds)
             if (candidates.size < batchSize) break
         }
         return CycleResult(batches, linkedTotal, abortedTotal, floor, failed)
@@ -92,10 +93,11 @@ class ReservationLinkCheckJob(
         oldestAgeMs.set(if (oldest == null) 0 else Duration.between(oldest, now).toMillis())
     }
 
-    private fun collectCandidates(now: LocalDateTime): List<Pair<String, Long>> {
+    private fun collectCandidates(now: LocalDateTime, excludedProductIds: Set<Long>): List<Pair<String, Long>> {
         val out = mutableListOf<Pair<String, Long>>()
         val products = inventoryReservationRepository.countExpiredGroupByProduct(now)
             .map { (it[0] as Number).toLong() }
+            .filterNot { it in excludedProductIds }
             .sorted()
         for (productId in products) {
             val remaining = batchSize - out.size
@@ -115,11 +117,12 @@ class ReservationLinkCheckJob(
         return n
     }
 
-    private fun abort(candidates: List<Pair<String, Long>>, aborted: List<String>): Int {
+    private fun abort(candidates: List<Pair<String, Long>>, aborted: List<String>, failedProductIds: MutableSet<Long>): Int {
         if (aborted.isEmpty()) return 0
         val abortedSet = aborted.toSet()
         val total = expireByProduct(
-            candidates.filter { it.first in abortedSet }.groupBy({ it.second }, { it.first })
+            candidates.filter { it.first in abortedSet }.groupBy({ it.second }, { it.first }),
+            failedProductIds
         )
         abortedCounter.increment(total.toDouble())
         return total
@@ -133,12 +136,16 @@ class ReservationLinkCheckJob(
         return total
     }
 
-    private fun expireByProduct(reservationIdsByProduct: Map<Long, List<String>>): Int {
+    private fun expireByProduct(
+        reservationIdsByProduct: Map<Long, List<String>>,
+        failedProductIds: MutableSet<Long> = mutableSetOf()
+    ): Int {
         var total = 0
         reservationIdsByProduct.toSortedMap().forEach { (productId, reservationIds) ->
             try {
                 total += expireLocked(productId, reservationIds)
             } catch (e: Exception) {
+                failedProductIds.add(productId)
                 failedProducts.increment()
                 logger.error("링크 확인 만료 처리 실패: productId={}", productId, e)
             }

@@ -6,7 +6,7 @@ interface PasswordPolicy {
 
 class DefaultPasswordPolicy : PasswordPolicy {
     override fun validate(raw: String) {
-        if (raw.length < 8) {
+        if (raw.isBlank() || raw.length < 8) {
             throw WeakPasswordException()
         }
     }

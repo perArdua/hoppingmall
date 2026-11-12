@@ -45,7 +45,7 @@ class ProductSearchRepositoryImpl(
         sb.append(" AND p.deleted_at IS NULL")
 
         appendCommonConditions(sb, categoryId, status, minPrice, maxPrice)
-        sb.append(" ORDER BY MATCH(p.name, p.description) AGAINST(:keyword IN BOOLEAN MODE) DESC")
+        sb.append(" ORDER BY MATCH(p.name, p.description) AGAINST(:keyword IN BOOLEAN MODE) DESC, p.id")
         sb.append(" LIMIT :limit OFFSET :offset")
 
         val query = entityManager.createNativeQuery(sb.toString(), Product::class.java)
@@ -73,6 +73,7 @@ class ProductSearchRepositoryImpl(
             sb.append(" AND (p.name LIKE :keyword OR p.description LIKE :keyword)")
         }
         appendCommonJpqlConditions(sb, categoryId, status, minPrice, maxPrice)
+        sb.append(" ORDER BY p.id")
 
         val query = entityManager.createQuery(sb.toString(), Product::class.java)
         if (!keyword.isNullOrBlank()) {

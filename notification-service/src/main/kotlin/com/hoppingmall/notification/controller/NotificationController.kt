@@ -11,6 +11,7 @@ import com.hoppingmall.notification.service.NotificationSseService
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
+import org.springframework.data.domain.Sort
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -38,7 +39,7 @@ class NotificationController(
     fun getNotifications(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @RequestParam(required = false) type: NotificationType?,
-        @PageableDefault(size = 20, sort = ["createdAt"]) pageable: Pageable
+        @PageableDefault(size = 20, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
     ): ResponseEntity<ApiResponse<Slice<NotificationResponse>>> {
         val notifications = notificationQueryService.getNotifications(
             userPrincipal.getUserId(), type, pageable

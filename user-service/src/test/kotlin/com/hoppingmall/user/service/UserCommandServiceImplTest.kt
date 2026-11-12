@@ -68,8 +68,7 @@ class UserCommandServiceImplTest {
         val request = SignUpRequest(
             email = "signup@example.com",
             password = "Password1234",
-            name = "홍길동",
-            role = Role.SELLER
+            name = "홍길동"
         )
         val userCaptor = argumentCaptor<User>()
         whenever(passwordEncoder.encode(request.password)).thenReturn("encoded-password")
@@ -95,8 +94,7 @@ class UserCommandServiceImplTest {
         val request = SignUpRequest(
             email = "duplicate@example.com",
             password = "Password1234",
-            name = "중복회원",
-            role = Role.BUYER
+            name = "중복회원"
         )
         doThrow(UserAlreadyExistsException()).whenever(userDomainService)
             .validateNewUser(Email(request.email), request.password)

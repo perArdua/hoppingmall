@@ -8,6 +8,7 @@ import com.hoppingmall.order.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.order.cartItem.dto.response.CartItemResponse
 import com.hoppingmall.order.cartItem.exception.CartItemAccessDeniedException
 import com.hoppingmall.order.cartItem.exception.CartItemConcurrentAddException
+import com.hoppingmall.order.cartItem.exception.CartItemInvalidQuantityException
 import com.hoppingmall.order.cartItem.exception.CartItemNotFoundException
 import com.hoppingmall.order.cartItem.exception.CartItemProductNotFoundException
 import com.hoppingmall.order.port.ProductInfo
@@ -40,7 +41,7 @@ class CartItemCommandServiceImpl(
     }
 
     private fun updateExistingCartItem(existingCartItem: CartItem, additionalQuantity: Int): CartItem {
-        existingCartItem.updateQuantity(existingCartItem.quantity + additionalQuantity)
+        existingCartItem.updateQuantity(validQuantity(existingCartItem.quantity.toLong() + additionalQuantity))
         return existingCartItem
     }
 
@@ -50,6 +51,7 @@ class CartItemCommandServiceImpl(
         productImageUrl: String?,
         quantity: Int
     ): CartItem {
+        validQuantity(quantity.toLong())
         val newCartItem = CartItem.create(
             buyerId = buyerId,
             productId = product.id,
@@ -75,7 +77,7 @@ class CartItemCommandServiceImpl(
             throw CartItemAccessDeniedException()
         }
 
-        cartItem.updateQuantity(request.quantity)
+        cartItem.updateQuantity(validQuantity(request.quantity.toLong()))
 
         return CartItemResponse.from(cartItem)
     }
@@ -88,5 +90,17 @@ class CartItemCommandServiceImpl(
         }
 
         cartItem.softDelete()
+    }
+
+    private fun validQuantity(quantity: Long): Int {
+        if (quantity < MIN_QUANTITY || quantity > MAX_QUANTITY) {
+            throw CartItemInvalidQuantityException()
+        }
+        return quantity.toInt()
+    }
+
+    companion object {
+        private const val MIN_QUANTITY = 1L
+        private const val MAX_QUANTITY = 999_999_999L
     }
 }

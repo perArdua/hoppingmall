@@ -5,7 +5,9 @@ import com.hoppingmall.common.config.InternalTokenFilter
 import com.hoppingmall.common.config.GatewayHeaderAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
+import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.web.SecurityFilterChain
 
@@ -19,5 +21,13 @@ class SecurityConfig(
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         return configureBase(http).build()
+    }
+
+    override fun configureServiceEndpoints(
+        auth: AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry
+    ) {
+        auth
+            .requestMatchers(HttpMethod.POST, "/api/v1/point-policies", "/api/v1/point-policies/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.PUT, "/api/v1/point-policies/**").hasRole("ADMIN")
     }
 }

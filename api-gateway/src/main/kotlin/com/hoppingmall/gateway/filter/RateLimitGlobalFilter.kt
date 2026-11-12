@@ -5,7 +5,7 @@ import com.hoppingmall.gateway.config.RateLimitPolicy
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cloud.gateway.filter.GatewayFilterChain
 import org.springframework.cloud.gateway.filter.GlobalFilter
-import org.springframework.core.Ordered
+import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter
 import org.springframework.core.annotation.Order
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate
 import org.springframework.http.HttpStatus
@@ -16,7 +16,7 @@ import reactor.core.publisher.Mono
 import java.time.Duration
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 5)
+@Order(RouteToRequestUrlFilter.ROUTE_TO_URL_FILTER_ORDER - 1)
 class RateLimitGlobalFilter(
     private val policies: List<RateLimitPolicy>,
     private val redisTemplate: ReactiveStringRedisTemplate,

@@ -12,4 +12,5 @@ enum class CartItemErrorCode(
     CART_ITEM_ACCESS_DENIED("C002", "본인의 장바구니만 수정할 수 있습니다.", HttpStatus.FORBIDDEN),
     CART_ITEM_PRODUCT_NOT_FOUND("C003", "상품을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     CART_ITEM_CONCURRENT_ADD("C004", "같은 상품을 동시에 담는 요청이 있어 처리하지 못했습니다. 다시 시도해 주세요.", HttpStatus.CONFLICT),
+    CART_ITEM_INVALID_QUANTITY("C005", "장바구니 수량은 1개 이상 999,999,999개 이하여야 합니다.", HttpStatus.BAD_REQUEST),
 }

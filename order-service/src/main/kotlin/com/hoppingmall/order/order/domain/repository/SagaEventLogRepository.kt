@@ -1,6 +1,7 @@
 package com.hoppingmall.order.order.domain.repository
 
 import com.hoppingmall.order.order.domain.SagaEventLog
+import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -8,6 +9,8 @@ import java.time.LocalDateTime
 
 interface SagaEventLogRepository : JpaRepository<SagaEventLog, Long> {
     fun existsByEventId(eventId: String): Boolean
+
+    @EntityGraph(attributePaths = ["completedSteps"])
     fun findByEventId(eventId: String): SagaEventLog?
 
     @Query(
