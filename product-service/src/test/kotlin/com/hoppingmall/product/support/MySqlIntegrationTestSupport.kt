@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.cache.CacheManager
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
@@ -28,11 +29,19 @@ abstract class MySqlIntegrationTestSupport {
     @Autowired
     protected lateinit var dataSource: DataSource
 
+    @Autowired
+    private lateinit var cacheManager: CacheManager
+
     protected val executor: ExecutorService = Executors.newCachedThreadPool()
 
     @BeforeEach
     fun cleanTables() {
         CLEANED_TABLES.forEach { jdbcTemplate.update("DELETE FROM $it") }
+    }
+
+    @BeforeEach
+    fun clearCaches() {
+        cacheManager.cacheNames.forEach { cacheManager.getCache(it)?.clear() }
     }
 
     @AfterEach
