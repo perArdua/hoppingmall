@@ -23,6 +23,8 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.beans.factory.ObjectProvider
+import org.springframework.cache.CacheManager
 import java.time.LocalDateTime
 
 @DisplayName("InventoryCommandServiceImpl")
@@ -38,6 +40,9 @@ class InventoryReservationServiceTest {
 
     @Mock
     private lateinit var productRepository: ProductRepository
+
+    @Mock
+    private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
 
     @InjectMocks
     private lateinit var service: InventoryCommandServiceImpl
