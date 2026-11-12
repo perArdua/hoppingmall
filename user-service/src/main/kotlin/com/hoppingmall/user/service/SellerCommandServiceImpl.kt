@@ -7,6 +7,7 @@ import com.hoppingmall.user.dto.request.SellerApplyRequest
 import com.hoppingmall.user.exception.seller.SellerAlreadyAppliedException
 import com.hoppingmall.user.exception.seller.SellerBusinessNumberDuplicateException
 import com.hoppingmall.user.exception.user.UserNotFoundException
+import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -35,19 +36,23 @@ class SellerCommandServiceImpl(
 
         if (application != null) {
             application.reapply(request.businessNumber)
+            writeApplication { sellerRepository.flush() }
             return
         }
 
         val seller = Seller.create(user, request.businessNumber)
-        saveApplication(seller)
+        writeApplication { sellerRepository.save(seller) }
     }
 
-    private fun saveApplication(seller: Seller) {
+    private fun writeApplication(write: () -> Unit) {
         try {
-            sellerRepository.save(seller)
+            write()
         } catch (ex: DataIntegrityViolationException) {
             if (ex.mostSpecificCause.message?.contains(Seller.USER_ID_UNIQUE_CONSTRAINT, ignoreCase = true) == true) {
                 throw SellerAlreadyAppliedException()
+            }
+            if ((ex.cause as? ConstraintViolationException)?.kind == ConstraintViolationException.ConstraintKind.UNIQUE) {
+                throw SellerBusinessNumberDuplicateException()
             }
             throw ex
         }
