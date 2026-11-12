@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.stereotype.Component
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
 import java.time.Duration
 
@@ -26,10 +27,14 @@ class HttpSellerQueryAdapter(
     @CircuitBreaker(name = "seller-query", fallbackMethod = "findByUserIdFallback")
     @Retry(name = "seller-query")
     override fun findByUserId(userId: Long): SellerInfo? {
-        val response = restTemplate.getForEntity(
-            "$userServiceUrl/internal/api/v1/sellers/by-user/$userId",
-            SellerResponse::class.java
-        )
+        val response = try {
+            restTemplate.getForEntity(
+                "$userServiceUrl/internal/api/v1/sellers/by-user/$userId",
+                SellerResponse::class.java
+            )
+        } catch (e: HttpClientErrorException.NotFound) {
+            return null
+        }
         val body = response.body ?: return null
         return SellerInfo(id = body.id, userId = body.userId)
     }
