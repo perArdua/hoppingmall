@@ -163,6 +163,7 @@ class ProductStatisticsCommandServiceImpl(
         if (existing != null) return existing
 
         val product = productRepository.findByIdOrNull(productId)
+            ?: productRepository.findIncludingDeletedById(productId)
             ?: throw IllegalArgumentException("상품을 찾을 수 없습니다: $productId")
 
         return productStatisticsRepository.save(

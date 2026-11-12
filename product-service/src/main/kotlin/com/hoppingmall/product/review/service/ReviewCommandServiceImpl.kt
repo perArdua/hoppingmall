@@ -45,6 +45,7 @@ class ReviewCommandServiceImpl(
             content = request.content,
             imageUrl = request.imageUrl
         )
+        reviewRepository.deleteSoftDeletedByOrderItemId(request.orderItemId)
         val savedReview = reviewRepository.save(review)
 
         updateProductReviewStats(orderItemInfo.productId)

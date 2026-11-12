@@ -5,7 +5,9 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import org.hibernate.annotations.SQLRestriction
 @Entity
+@SQLRestriction("deleted_at IS NULL")
 @Table(
     name = "product_images",
     indexes = [Index(name = "idx_product_images_product_id", columnList = "productId")]

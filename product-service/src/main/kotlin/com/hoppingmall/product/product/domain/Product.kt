@@ -3,9 +3,11 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.product.common.enums.ProductStatus
 import jakarta.persistence.*
+import org.hibernate.annotations.SQLRestriction
 import java.math.BigDecimal
 
 @Entity
+@SQLRestriction("deleted_at IS NULL")
 @Table(
     name = "products",
     indexes = [

@@ -2,6 +2,9 @@ package com.hoppingmall.product.category.domain.repository
 
 import com.hoppingmall.product.category.domain.Category
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -12,4 +15,8 @@ interface CategoryRepository : JpaRepository<Category, Long> {
     fun existsByParentCategoryId(parentCategoryId: Long): Boolean
     fun findNullableById(id: Long): Category?
     fun findByParentCategoryIdIsNull(): List<Category>
+
+    @Modifying
+    @Query(value = "DELETE FROM categories WHERE name = :name AND deleted_at IS NOT NULL", nativeQuery = true)
+    fun deleteSoftDeletedByName(@Param("name") name: String): Int
 }
