@@ -39,7 +39,7 @@ class NotificationController(
     fun getNotifications(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @RequestParam(required = false) type: NotificationType?,
-        @PageableDefault(size = 20, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
+        @PageableDefault(size = 20, sort = ["createdAt", "id"], direction = Sort.Direction.DESC) pageable: Pageable
     ): ResponseEntity<ApiResponse<Slice<NotificationResponse>>> {
         val notifications = notificationQueryService.getNotifications(
             userPrincipal.getUserId(), type, pageable
