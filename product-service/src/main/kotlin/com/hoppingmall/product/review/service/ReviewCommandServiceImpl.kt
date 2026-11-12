@@ -12,6 +12,7 @@ import com.hoppingmall.product.review.exception.ReviewAlreadyExistsException
 import com.hoppingmall.product.review.exception.ReviewException
 import com.hoppingmall.product.review.exception.ReviewNotFoundException
 import com.hoppingmall.product.review.exception.code.ReviewErrorCode
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -46,7 +47,11 @@ class ReviewCommandServiceImpl(
             imageUrl = request.imageUrl
         )
         reviewRepository.deleteSoftDeletedByOrderItemId(request.orderItemId)
-        val savedReview = reviewRepository.save(review)
+        val savedReview = try {
+            reviewRepository.save(review)
+        } catch (e: DataIntegrityViolationException) {
+            throw ReviewAlreadyExistsException()
+        }
 
         updateProductReviewStats(orderItemInfo.productId)
 

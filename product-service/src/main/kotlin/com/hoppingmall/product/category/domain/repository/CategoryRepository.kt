@@ -16,6 +16,9 @@ interface CategoryRepository : JpaRepository<Category, Long> {
     fun findNullableById(id: Long): Category?
     fun findByParentCategoryIdIsNull(): List<Category>
 
+    @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Product p WHERE p.categoryId = :categoryId")
+    fun existsProductByCategoryId(@Param("categoryId") categoryId: Long): Boolean
+
     @Modifying
     @Query(value = "DELETE FROM categories WHERE name = :name AND deleted_at IS NOT NULL", nativeQuery = true)
     fun deleteSoftDeletedByName(@Param("name") name: String): Int

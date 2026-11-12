@@ -12,4 +12,5 @@ enum class CategoryErrorCode(
     CATEGORY_ALREADY_EXISTS("CAT002", "이미 존재하는 카테고리 이름입니다.", HttpStatus.CONFLICT),
     CATEGORY_HAS_CHILDREN("CAT003", "하위 카테고리가 존재하여 삭제할 수 없습니다.", HttpStatus.BAD_REQUEST),
     CATEGORY_CIRCULAR_REFERENCE("CAT004", "순환 참조가 발생하는 카테고리 구조입니다.", HttpStatus.BAD_REQUEST),
+    CATEGORY_HAS_PRODUCTS("CAT005", "상품이 남아 있는 카테고리는 삭제할 수 없습니다.", HttpStatus.CONFLICT),
 }

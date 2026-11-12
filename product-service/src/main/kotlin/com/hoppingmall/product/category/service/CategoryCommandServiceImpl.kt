@@ -8,9 +8,11 @@ import com.hoppingmall.product.category.dto.response.CategoryResponse
 import com.hoppingmall.product.category.exception.CategoryAlreadyExistsException
 import com.hoppingmall.product.category.exception.CategoryCircularReferenceException
 import com.hoppingmall.product.category.exception.CategoryHasChildrenException
+import com.hoppingmall.product.category.exception.CategoryHasProductsException
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -48,7 +50,11 @@ class CategoryCommandServiceImpl(
             depth = depth
         )
         categoryRepository.deleteSoftDeletedByName(request.name)
-        val savedCategory = categoryRepository.save(category)
+        val savedCategory = try {
+            categoryRepository.save(category)
+        } catch (e: DataIntegrityViolationException) {
+            throw CategoryAlreadyExistsException()
+        }
         return CategoryResponse.from(savedCategory)
     }
 
@@ -81,6 +87,10 @@ class CategoryCommandServiceImpl(
 
         if (categoryRepository.existsByParentCategoryId(category.id!!)) {
             throw CategoryHasChildrenException()
+        }
+
+        if (categoryRepository.existsProductByCategoryId(category.id!!)) {
+            throw CategoryHasProductsException()
         }
 
         category.softDelete()

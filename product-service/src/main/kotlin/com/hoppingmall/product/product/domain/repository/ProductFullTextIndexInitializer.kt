@@ -22,12 +22,13 @@ class ProductFullTextIndexInitializer(
     }
 
     fun ensureIndex() {
-        if (!isMySql() || hasFullTextIndex()) return
+        if (!isMySql()) return
         try {
+            if (hasFullTextIndex()) return
             jdbcTemplate.execute(CREATE_INDEX_SQL)
             logger.info("상품 검색 FULLTEXT 인덱스 생성: {}", INDEX_NAME)
         } catch (e: DataAccessException) {
-            if (hasFullTextIndex()) return
+            if (runCatching { hasFullTextIndex() }.getOrDefault(false)) return
             logger.error("상품 검색 FULLTEXT 인덱스 생성 실패, 키워드 검색이 동작하지 않습니다", e)
         }
     }

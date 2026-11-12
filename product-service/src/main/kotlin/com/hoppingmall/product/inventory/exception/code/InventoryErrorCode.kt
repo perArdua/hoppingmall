@@ -15,4 +15,5 @@ enum class InventoryErrorCode(
     INVENTORY_BUSY("INV005", "재고 요청이 몰려 처리할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
     INVENTORY_BUDGET_EXCEEDED("INV006", "재고 예약 처리 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
     INVALID_RESERVE_QUANTITY("INV007", "예약 수량은 1개 이상이어야 합니다.", HttpStatus.BAD_REQUEST),
+    INVALID_STOCK_CHANGE_QUANTITY("INV008", "재고 증감 수량은 1개 이상이어야 합니다.", HttpStatus.BAD_REQUEST),
 }

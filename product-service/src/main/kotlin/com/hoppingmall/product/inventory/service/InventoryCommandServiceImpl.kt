@@ -10,6 +10,7 @@ import com.hoppingmall.product.inventory.dto.response.InventoryResponse
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidQuantityException
+import com.hoppingmall.product.inventory.exception.InventoryInvalidStockChangeQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryNotFoundException
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
@@ -88,6 +89,7 @@ class InventoryCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun decreaseStock(productId: Long, quantity: Int) {
+        requirePositiveStockChange(quantity)
         if (bucketStockService.enabled) {
             bucketStockService.decrease(productId, quantity)
             return
@@ -100,7 +102,12 @@ class InventoryCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun increaseStock(productId: Long, quantity: Int) {
+        requirePositiveStockChange(quantity)
         restoreStock(productId, quantity)
+    }
+
+    private fun requirePositiveStockChange(quantity: Int) {
+        if (quantity <= 0) throw InventoryInvalidStockChangeQuantityException()
     }
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
