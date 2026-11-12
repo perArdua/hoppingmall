@@ -94,8 +94,8 @@ class OrderCommandServiceImpl(
         reservationMap: Map<Long, String>,
         totalAmount: BigDecimal,
         fence: ReservationFence?
-    ): OrderResponse =
-        transactionTemplate.execute {
+    ): OrderResponse {
+        val response = transactionTemplate.execute {
             if (fence != null && fence.link(reservationMap.values).isNotEmpty()) {
                 throw OrderReservationFencedException()
             }
@@ -117,10 +117,12 @@ class OrderCommandServiceImpl(
 
             cartItemRepository.deleteAllById(request.cartItemIds)
 
-            orderMetrics.recordOrderCreated(totalAmount)
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
             OrderResponse.from(order, savedOrderItems)
         }!!
+        orderMetrics.recordOrderCreated(totalAmount)
+        return response
+    }
 
     private fun reserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
         try {
