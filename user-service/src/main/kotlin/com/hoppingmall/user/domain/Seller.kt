@@ -7,7 +7,7 @@ import jakarta.persistence.*
 @Entity
 @Table(
     name = "sellers",
-    indexes = [Index(name = "idx_sellers_user_id", columnList = "user_id")]
+    uniqueConstraints = [UniqueConstraint(name = Seller.USER_ID_UNIQUE_CONSTRAINT, columnNames = ["user_id"])]
 )
 class Seller private constructor(
     @Column(name = "user_id", nullable = false)
@@ -41,6 +41,8 @@ class Seller private constructor(
     fun getApprovalStatus(): ApprovalStatus = approvalStatus
 
     companion object {
+        const val USER_ID_UNIQUE_CONSTRAINT = "uk_sellers_user_id"
+
         fun create(user: User, businessNumber: String): Seller =
             Seller(user.id!!, businessNumber, ApprovalStatus.PENDING)
     }

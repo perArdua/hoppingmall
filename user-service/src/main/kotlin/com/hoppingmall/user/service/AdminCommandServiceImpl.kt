@@ -1,10 +1,10 @@
 package com.hoppingmall.user.service
 
-import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.user.domain.Seller
 import com.hoppingmall.user.domain.repository.SellerRepository
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SellerApprovalRequest
+import com.hoppingmall.user.exception.seller.SellerAlreadyProcessedException
 import com.hoppingmall.user.exception.seller.SellerNotFoundException
 import com.hoppingmall.user.exception.user.UserNotFoundException
 import com.hoppingmall.user.service.strategy.SellerApprovalCommandMapper
@@ -23,6 +23,9 @@ class AdminCommandServiceImpl(
         val seller = findSellerById(sellerId)
 
         val command = commandMapper.getCommand(request.toApprovalStatus())
+        if (seller.getApprovalStatus() != Seller.ApprovalStatus.PENDING) {
+            throw SellerAlreadyProcessedException()
+        }
         command.execute(seller)
 
         if (seller.getApprovalStatus() == Seller.ApprovalStatus.APPROVED) {
@@ -37,5 +40,5 @@ class AdminCommandServiceImpl(
     }
 
     private fun findSellerById(sellerId: Long): Seller =
-        sellerRepository.findByIdOrNull(sellerId) ?: throw SellerNotFoundException() 
+        sellerRepository.findById(sellerId).orElseThrow { SellerNotFoundException() }
 }
