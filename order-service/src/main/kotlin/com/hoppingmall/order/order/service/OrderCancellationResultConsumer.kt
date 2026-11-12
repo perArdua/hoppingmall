@@ -80,7 +80,7 @@ class OrderCancellationResultConsumer(
             val orderItems = orderItemRepository.findByOrderId(orderId)
             val reservationIds = orderItems.mapNotNull { it.reservationId }
             if (reservationIds.isNotEmpty()) {
-                inventoryCommandPort.cancelReservations(reservationIds)
+                inventoryCommandPort.cancelConfirmedReservations(reservationIds)
             } else {
                 orderItems.forEach { item ->
                     inventoryCommandPort.increaseStock(item.productId, item.quantity)

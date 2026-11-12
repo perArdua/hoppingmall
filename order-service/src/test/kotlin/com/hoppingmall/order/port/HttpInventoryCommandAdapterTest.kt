@@ -268,6 +268,17 @@ class HttpInventoryCommandAdapterTest {
     }
 
     @Test
+    fun 확정된_예약_취소는_예약_id_목록을_본문으로_확정_예약_배치_취소_경로에_보낸다() {
+        adapter.cancelConfirmedReservations(listOf("rsv-1", "rsv-2"))
+
+        verify(restTemplate).postForEntity(
+            eq("http://localhost:8083/internal/api/v1/inventory/reservations/batch-cancel-confirmed"),
+            eq(listOf("rsv-1", "rsv-2")),
+            eq(Void::class.java)
+        )
+    }
+
+    @Test
     fun 배치_확정_응답이_null이면_false를_반환한다() {
         val response = ResponseEntity.ok<HttpInventoryCommandAdapter.ConfirmationResponse>(null)
         whenever(restTemplate.postForEntity(

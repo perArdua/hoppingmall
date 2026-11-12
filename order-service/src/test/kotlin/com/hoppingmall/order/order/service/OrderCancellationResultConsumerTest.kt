@@ -99,7 +99,7 @@ class OrderCancellationResultConsumerTest {
         consumer.handleCancellationResult(message)
 
         assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
-        verify(inventoryCommandPort).cancelReservations(listOf("rsv-1"))
+        verify(inventoryCommandPort).cancelConfirmedReservations(listOf("rsv-1"))
     }
 
     @Test
