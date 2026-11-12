@@ -11,5 +11,8 @@ interface InventoryBucketRepository : JpaRepository<InventoryBucket, InventoryBu
     @Query("SELECT COALESCE(SUM(b.stockQuantity), 0) FROM InventoryBucket b WHERE b.productId = :productId")
     fun sumStock(@Param("productId") productId: Long): Long
 
+    @Query("SELECT b.productId, SUM(b.stockQuantity) FROM InventoryBucket b WHERE b.productId IN :productIds GROUP BY b.productId")
+    fun sumStockByProductIds(@Param("productIds") productIds: List<Long>): List<Array<Any>>
+
     fun countByProductId(productId: Long): Long
 }

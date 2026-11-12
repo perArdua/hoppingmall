@@ -111,6 +111,12 @@ class BucketStockService(
 
     fun totalStock(productId: Long): Int = inventoryBucketRepository.sumStock(productId).toInt()
 
+    fun totalStocks(productIds: List<Long>): Map<Long, Int> {
+        if (productIds.isEmpty()) return emptyMap()
+        return inventoryBucketRepository.sumStockByProductIds(productIds)
+            .associate { (it[0] as Number).toLong() to (it[1] as Number).toInt() }
+    }
+
     fun hasBuckets(productId: Long): Boolean = inventoryBucketRepository.countByProductId(productId) > 0
 
     private fun tryTake(productId: Long, bucketNo: Int, quantity: Int): TakeResult =

@@ -2,6 +2,7 @@ package com.hoppingmall.product.statistics.service
 
 import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
+import com.hoppingmall.product.inventory.service.BucketStockService
 import com.hoppingmall.product.product.domain.ProductStatistics
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageImpl
@@ -40,6 +43,9 @@ class ProductStatisticsSchedulerTest {
     private lateinit var inventoryRepository: InventoryRepository
 
     @Mock
+    private lateinit var bucketStockService: BucketStockService
+
+    @Mock
     private lateinit var productStatisticsCommandService: ProductStatisticsCommandService
 
     @Mock
@@ -52,7 +58,7 @@ class ProductStatisticsSchedulerTest {
     fun 장바구니_및_재고를_동기화한다() {
         val scheduler = ProductStatisticsScheduler(
             productStatisticsRepository, cartItemQueryPort,
-            inventoryRepository, productStatisticsCommandService, transactionTemplate
+            inventoryRepository, bucketStockService, productStatisticsCommandService, transactionTemplate
         )
         val stats = ProductStatistics.create(
             productId = 1L, productName = "테스트", sellerId = 1L, categoryId = 1L
@@ -79,10 +85,42 @@ class ProductStatisticsSchedulerTest {
     }
 
     @Test
+    fun bucket_모드에서는_페이지의_상품들_버킷_합을_한_번에_읽어_통계에_넣는다() {
+        val scheduler = ProductStatisticsScheduler(
+            productStatisticsRepository, cartItemQueryPort,
+            inventoryRepository, bucketStockService, productStatisticsCommandService, transactionTemplate
+        )
+        val first = ProductStatistics.create(productId = 1L, productName = "테스트", sellerId = 1L, categoryId = 1L).withId(1L)
+        val second = ProductStatistics.create(productId = 2L, productName = "테스트", sellerId = 1L, categoryId = 1L).withId(2L)
+        val withoutBuckets = ProductStatistics.create(productId = 3L, productName = "테스트", sellerId = 1L, categoryId = 1L).withId(3L)
+        val page = PageImpl(listOf(first, second, withoutBuckets), PageRequest.of(0, 500), 3)
+
+        whenever(cartItemQueryPort.aggregateCartByProduct()).thenReturn(emptyList())
+        whenever(transactionTemplate.execute(any<TransactionCallback<Pair<Boolean, Int>>>()))
+            .thenAnswer { invocation ->
+                @Suppress("UNCHECKED_CAST")
+                val callback = invocation.arguments[0] as TransactionCallback<Pair<Boolean, Int>>
+                callback.doInTransaction(transactionStatus)
+            }
+        whenever(productStatisticsRepository.findAll(any<PageRequest>())).thenReturn(page)
+        whenever(bucketStockService.enabled).thenReturn(true)
+        whenever(bucketStockService.totalStocks(listOf(1L, 2L, 3L))).thenReturn(mapOf(1L to 77, 2L to 35))
+
+        scheduler.syncCartAndInventory()
+
+        assertThat(first.currentStock).isEqualTo(77)
+        assertThat(second.currentStock).isEqualTo(35)
+        assertThat(withoutBuckets.currentStock).isZero()
+        verify(bucketStockService, times(1)).totalStocks(any())
+        verify(bucketStockService, never()).totalStock(any())
+        verify(inventoryRepository, never()).findAllByProductIdIn(any())
+    }
+
+    @Test
     fun 일별_통계_마감을_수행한다() {
         val scheduler = ProductStatisticsScheduler(
             productStatisticsRepository, cartItemQueryPort,
-            inventoryRepository, productStatisticsCommandService, transactionTemplate
+            inventoryRepository, bucketStockService, productStatisticsCommandService, transactionTemplate
         )
 
         scheduler.flushDailyStatistics()

@@ -1,6 +1,7 @@
 package com.hoppingmall.product.statistics.service
 
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
+import com.hoppingmall.product.inventory.service.BucketStockService
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
 import com.hoppingmall.product.statistics.port.CartItemQueryPort
@@ -17,6 +18,7 @@ class ProductStatisticsScheduler(
     private val productStatisticsRepository: ProductStatisticsRepository,
     private val cartItemQueryPort: CartItemQueryPort,
     private val inventoryRepository: InventoryRepository,
+    private val bucketStockService: BucketStockService,
     private val productStatisticsCommandService: ProductStatisticsCommandService,
     private val transactionTemplate: TransactionTemplate
 ) {
@@ -39,12 +41,11 @@ class ProductStatisticsScheduler(
             val batchUpdated = transactionTemplate.execute {
                 val statsPage = productStatisticsRepository.findAll(PageRequest.of(currentPage, 500))
                 val productIds = statsPage.content.map { it.productId }
-                val inventoryMap = inventoryRepository.findAllByProductIdIn(productIds).associateBy { it.productId }
+                val stockMap = currentStocks(productIds)
 
                 for (stats in statsPage.content) {
                     val cart = cartMap[stats.productId]
-                    val inventory = inventoryMap[stats.productId]
-                    stats.updateCartAndInventory(cart?.buyerCount ?: 0L, inventory?.stockQuantity ?: 0)
+                    stats.updateCartAndInventory(cart?.buyerCount ?: 0L, stockMap[stats.productId] ?: 0)
                 }
 
                 statsPage.hasNext() to statsPage.content.size
@@ -66,4 +67,11 @@ class ProductStatisticsScheduler(
         productStatisticsCommandService.flushDailySnapshot()
         logger.info("일별 통계 마감 완료")
     }
+
+    private fun currentStocks(productIds: List<Long>): Map<Long, Int> =
+        if (bucketStockService.enabled) {
+            bucketStockService.totalStocks(productIds)
+        } else {
+            inventoryRepository.findAllByProductIdIn(productIds).associate { it.productId to it.stockQuantity }
+        }
 }
