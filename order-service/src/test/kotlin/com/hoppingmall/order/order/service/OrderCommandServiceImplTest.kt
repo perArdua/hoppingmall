@@ -13,6 +13,7 @@ import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
+import com.hoppingmall.order.order.exception.OrderReservationFencedException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
@@ -31,9 +32,12 @@ import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argThat
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.http.HttpHeaders
@@ -210,6 +214,111 @@ class OrderCommandServiceImplTest {
         assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
             .isSameAs(conflict)
         verify(orderRepository, never()).save(any<Order>())
+    }
+
+    @Test
+    fun fence_충돌이면_ORD009로_끝나고_주문을_저장하지_않으며_예약을_중복_없이_한_번_배치_취소한다() {
+        whenever(cartItemRepository.findAllById(listOf(1L, 2L))).thenReturn(
+            listOf(
+                createCartItem(id = 1L, buyerId = 10L, productId = 100L, quantity = 1),
+                createCartItem(id = 2L, buyerId = 10L, productId = 200L, quantity = 2)
+            )
+        )
+        whenever(productQueryPort.findProductsByIds(listOf(100L, 200L)))
+            .thenReturn(listOf(createProductInfo(id = 100L, sellerId = 5L), createProductInfo(id = 200L, sellerId = 5L)))
+        whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 1, 200L to 2)))
+            .thenReturn(mapOf(100L to "rsv-1", 200L to "rsv-1"))
+        val fence = enabledFence()
+        whenever(fence.link(any())).thenReturn(listOf("rsv-1"))
+        service.reservationFence = fence
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
+            .isInstanceOf(OrderReservationFencedException::class.java)
+            .extracting { (it as OrderReservationFencedException).errorCode }
+            .satisfies({ errorCode ->
+                assertThat(errorCode.code).isEqualTo("ORD009")
+                assertThat(errorCode.status).isEqualTo(HttpStatus.CONFLICT)
+            })
+        verify(orderRepository, never()).save(any<Order>())
+        verify(cartItemRepository, never()).deleteAllById(any())
+        verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-1"))
+    }
+
+    @Test
+    fun fence_충돌_뒤_예약_취소가_실패해도_ORD009가_그대로_나간다() {
+        stubCartOfTwoRowsForOneProduct()
+        val fence = enabledFence()
+        whenever(fence.link(any())).thenReturn(listOf("rsv-1"))
+        whenever(inventoryCommandPort.cancelReservations(any())).thenThrow(RuntimeException("재고 서비스 연결 실패"))
+        service.reservationFence = fence
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
+            .isInstanceOf(OrderReservationFencedException::class.java)
+        verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-1"))
+        verify(orderRepository, never()).save(any<Order>())
+    }
+
+    @Test
+    fun fence가_켜져_있고_충돌이_없으면_주문_저장_전에_예약을_연결한다() {
+        stubCartOfTwoRowsForOneProduct()
+        stubOrderSave()
+        val fence = enabledFence()
+        whenever(fence.link(any())).thenReturn(emptyList())
+        service.reservationFence = fence
+
+        val result = service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L)))
+
+        assertThat(result.status).isEqualTo(OrderStatus.PAYING)
+        val order = inOrder(fence, orderRepository)
+        order.verify(fence).link(argThat<Collection<String>> { toList() == listOf("rsv-1") })
+        order.verify(orderRepository).save(any<Order>())
+        verify(inventoryCommandPort, never()).cancelReservations(any())
+    }
+
+    @Test
+    fun fence_플래그가_꺼져_있으면_fence를_부르지_않고_주문을_생성한다() {
+        stubCartOfTwoRowsForOneProduct()
+        stubOrderSave()
+        val fence = mock<ReservationFence>()
+        whenever(fence.enabled).thenReturn(false)
+        service.reservationFence = fence
+
+        val result = service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L)))
+
+        assertThat(result.status).isEqualTo(OrderStatus.PAYING)
+        verify(fence, never()).link(any())
+        verify(inventoryCommandPort, never()).cancelReservations(any())
+    }
+
+    private fun enabledFence(): ReservationFence {
+        val fence = mock<ReservationFence>()
+        whenever(fence.enabled).thenReturn(true)
+        return fence
+    }
+
+    private fun stubCartOfTwoRowsForOneProduct() {
+        whenever(cartItemRepository.findAllById(listOf(1L, 2L))).thenReturn(
+            listOf(
+                createCartItem(id = 1L, buyerId = 10L, productId = 100L, quantity = 1),
+                createCartItem(id = 2L, buyerId = 10L, productId = 100L, quantity = 2)
+            )
+        )
+        whenever(productQueryPort.findProductsByIds(listOf(100L))).thenReturn(listOf(createProductInfo(id = 100L, sellerId = 5L)))
+        whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 3))).thenReturn(mapOf(100L to "rsv-1"))
+    }
+
+    private fun stubOrderSave() {
+        whenever(orderRepository.save(any<Order>())).thenAnswer {
+            val order = it.arguments[0] as Order
+            setEntityId(order, 1L)
+            order
+        }
+        whenever(orderItemRepository.saveAll(any<List<OrderItem>>())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val items = it.arguments[0] as List<OrderItem>
+            items.forEachIndexed { idx, item -> setEntityId(item, (idx + 1).toLong()) }
+            items
+        }
     }
 
     @Test
