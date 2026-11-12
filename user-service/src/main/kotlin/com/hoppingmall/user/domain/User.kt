@@ -37,6 +37,12 @@ class User private constructor(
         this.name = newName
     }
 
+    fun grantSellerRole() {
+        if (role == Role.BUYER) {
+            role = Role.SELLER
+        }
+    }
+
     fun getPassword(): Password = password
     fun getName(): String = name
     fun getRole(): Role = role
