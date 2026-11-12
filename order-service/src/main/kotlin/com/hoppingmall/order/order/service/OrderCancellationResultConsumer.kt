@@ -49,16 +49,33 @@ class OrderCancellationResultConsumer(
             return
         }
 
-        val cancelled = transactionTemplate.execute {
+        val log = if (existingLog == null || !existingLog.isStepCompleted(SagaEventLog.LOCAL_COMPLETED)) {
+            executeCompletedLocalPhase(eventId, orderId, existingLog) ?: return
+        } else {
+            existingLog
+        }
+
+        restoreInventory(orderId)
+
+        transactionTemplate.execute {
+            log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+            sagaEventLogRepository.save(log)
+        }
+
+        logger.info("결제 취소 완료 처리: orderId=$orderId, CANCELLED 전환 + 재고 복구")
+    }
+
+    private fun executeCompletedLocalPhase(eventId: String, orderId: Long, existingLog: SagaEventLog?): SagaEventLog? {
+        return transactionTemplate.execute {
             val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=$orderId")
-                return@execute false
+                return@execute null
             }
 
             if (order.status != OrderStatus.CANCEL_REQUESTED) {
                 logger.warn("CANCEL_REQUESTED가 아닌 주문: orderId=$orderId, status=${order.status}")
-                return@execute false
+                return@execute null
             }
 
             order.updateStatus(OrderStatus.CANCELLED)
@@ -70,22 +87,7 @@ class OrderCancellationResultConsumer(
                 orderId = orderId
             )
             log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
-            log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
-            sagaEventLogRepository.save(log)
-
-            true
-        } ?: false
-
-        if (cancelled) {
-            val orderItems = orderItemRepository.findByOrderId(orderId)
-            val reservationIds = orderItems.mapNotNull { it.reservationId }
-            if (reservationIds.isNotEmpty()) {
-                inventoryCommandPort.cancelConfirmedReservations(reservationIds)
-            } else {
-                orderItems.forEach { item ->
-                    inventoryCommandPort.increaseStock(item.productId, item.quantity)
-                }
-            }
+            val savedLog = sagaEventLogRepository.save(log)
 
             transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",
@@ -94,7 +96,7 @@ class OrderCancellationResultConsumer(
                 eventData = mapOf(
                     "eventType" to "OrderCancellationNotificationRequested",
                     "eventId" to "notif-cancel-$eventId",
-                    "userId" to (orderRepository.findByIdOrNull(orderId)?.buyerId ?: 0L),
+                    "userId" to order.buyerId,
                     "type" to "PAYMENT_CANCELLED",
                     "title" to "주문이 취소되었습니다",
                     "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다."
@@ -103,7 +105,19 @@ class OrderCancellationResultConsumer(
                 partitionKey = orderId.toString()
             )
 
-            logger.info("결제 취소 완료 처리: orderId=$orderId, CANCELLED 전환 + 재고 복구")
+            savedLog
+        }
+    }
+
+    private fun restoreInventory(orderId: Long) {
+        val orderItems = orderItemRepository.findByOrderId(orderId)
+        val reservationIds = orderItems.mapNotNull { it.reservationId }
+        if (reservationIds.isNotEmpty()) {
+            inventoryCommandPort.cancelConfirmedReservations(reservationIds)
+        } else {
+            orderItems.forEach { item ->
+                inventoryCommandPort.increaseStock(item.productId, item.quantity)
+            }
         }
     }
 
