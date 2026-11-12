@@ -2,6 +2,10 @@ package com.hoppingmall.gateway.filter
 
 import com.hoppingmall.gateway.config.RateLimitKeyType
 import com.hoppingmall.gateway.config.RateLimitPolicy
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Metrics
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cloud.gateway.filter.GatewayFilterChain
 import org.springframework.cloud.gateway.filter.GlobalFilter
@@ -14,6 +18,7 @@ import org.springframework.util.AntPathMatcher
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import java.time.Duration
+import java.util.Optional
 
 @Component
 @Order(RouteToRequestUrlFilter.ROUTE_TO_URL_FILTER_ORDER - 1)
@@ -21,12 +26,16 @@ class RateLimitGlobalFilter(
     private val policies: List<RateLimitPolicy>,
     private val redisTemplate: ReactiveStringRedisTemplate,
     @Value("\${gateway.rate-limit.enabled:true}")
-    private val enabled: Boolean
+    private val enabled: Boolean,
+    private val meterRegistry: MeterRegistry = Metrics.globalRegistry
 ) : GlobalFilter {
 
     private val pathMatcher = AntPathMatcher()
 
     companion object {
+        private val log = LoggerFactory.getLogger(RateLimitGlobalFilter::class.java)
+        private const val REDIS_FAILURE_METRIC = "gateway.ratelimit.redis.failures"
+
         private val GLOBAL_FALLBACK = RateLimitPolicy(
             id = "global",
             pathPattern = "/**",
@@ -83,27 +92,65 @@ class RateLimitGlobalFilter(
         val window = System.currentTimeMillis() / (windowSeconds * 1000)
         val redisKey = "rl:${policy.id}:$key:$window"
 
-        return redisTemplate.opsForValue().increment(redisKey)
+        return Mono.defer { redisTemplate.opsForValue().increment(redisKey) }
             .flatMap { count ->
                 if (count == 1L) {
-                    redisTemplate.expire(redisKey, policy.window).thenReturn(count)
+                    setExpiry(redisKey, policy).thenReturn(count)
                 } else {
                     Mono.just(count)
                 }
             }
+            .map { Optional.of(it) }
+            .onErrorResume { e ->
+                recordRedisFailure(policy, "increment", e)
+                Mono.just(Optional.empty())
+            }
             .flatMap { count ->
-                val remaining = (policy.maxRequests - count).coerceAtLeast(0)
-                exchange.response.headers.set("X-RateLimit-Limit", policy.maxRequests.toString())
-                exchange.response.headers.set("X-RateLimit-Remaining", remaining.toString())
-
-                if (count <= policy.maxRequests) {
-                    chain.filter(exchange)
+                if (count.isPresent) {
+                    applyLimit(exchange, chain, policy, count.get())
                 } else {
-                    exchange.response.statusCode = HttpStatus.TOO_MANY_REQUESTS
-                    exchange.response.headers.set("Retry-After", windowSeconds.toString())
-                    exchange.response.setComplete()
+                    chain.filter(exchange)
                 }
             }
+    }
+
+    private fun setExpiry(redisKey: String, policy: RateLimitPolicy): Mono<Boolean> =
+        Mono.defer { redisTemplate.expire(redisKey, policy.window) }
+            .onErrorResume { e ->
+                recordRedisFailure(policy, "expire", e)
+                Mono.defer { redisTemplate.delete(redisKey) }
+                    .onErrorResume { deleteError ->
+                        recordRedisFailure(policy, "delete", deleteError)
+                        Mono.empty()
+                    }
+                    .thenReturn(false)
+            }
+
+    private fun applyLimit(
+        exchange: ServerWebExchange,
+        chain: GatewayFilterChain,
+        policy: RateLimitPolicy,
+        count: Long
+    ): Mono<Void> {
+        val remaining = (policy.maxRequests - count).coerceAtLeast(0)
+        exchange.response.headers.set("X-RateLimit-Limit", policy.maxRequests.toString())
+        exchange.response.headers.set("X-RateLimit-Remaining", remaining.toString())
+
+        if (count <= policy.maxRequests) {
+            return chain.filter(exchange)
+        }
+        exchange.response.statusCode = HttpStatus.TOO_MANY_REQUESTS
+        exchange.response.headers.set("Retry-After", policy.window.seconds.toString())
+        return exchange.response.setComplete()
+    }
+
+    private fun recordRedisFailure(policy: RateLimitPolicy, operation: String, e: Throwable) {
+        log.warn("레이트리밋 Redis 호출 실패, 요청은 통과시킴 [policy={}, operation={}]: {}", policy.id, operation, e.message)
+        Counter.builder(REDIS_FAILURE_METRIC)
+            .tag("policy", policy.id)
+            .tag("operation", operation)
+            .register(meterRegistry)
+            .increment()
     }
 
     private fun isExcluded(path: String): Boolean {
