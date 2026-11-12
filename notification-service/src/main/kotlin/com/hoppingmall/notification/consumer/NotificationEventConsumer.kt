@@ -9,6 +9,7 @@ import com.hoppingmall.notification.dto.response.NotificationResponse
 import com.hoppingmall.notification.enums.NotificationType
 import com.hoppingmall.notification.service.NotificationSseService
 import com.hoppingmall.notification.service.SseNotificationMessage
+import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
 import org.springframework.data.redis.core.RedisTemplate
@@ -25,7 +26,8 @@ class NotificationEventConsumer(
     private val notificationRepository: NotificationRepository,
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
-    private val cacheManager: CacheManager
+    private val cacheManager: CacheManager,
+    private val meterRegistry: MeterRegistry?
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -42,11 +44,13 @@ class NotificationEventConsumer(
             else -> objectMapper.readValue(value.toString(), Map::class.java) as Map<String, Any>
         }
 
-        val eventId = event["event_id"]?.toString() ?: event["eventId"]?.toString() ?: return
-        val userId = (event["user_id"] ?: event["userId"])?.toString()?.toLongOrNull() ?: return
-        val typeStr = event["type"]?.toString() ?: return
-        val title = event["title"]?.toString() ?: return
-        val content = event["content"]?.toString() ?: return
+        val eventId = event["event_id"]?.toString() ?: event["eventId"]?.toString()
+            ?: return discard(record, null, "missing_event_id")
+        val userId = (event["user_id"] ?: event["userId"])?.toString()?.toLongOrNull()?.takeIf { it > 0 }
+            ?: return discard(record, eventId, "invalid_user_id")
+        val typeStr = event["type"]?.toString() ?: return discard(record, eventId, "missing_type")
+        val title = event["title"]?.toString() ?: return discard(record, eventId, "missing_title")
+        val content = event["content"]?.toString() ?: return discard(record, eventId, "missing_content")
         val metadata = event["metadata"]?.toString()
 
         executeIdempotently(
@@ -78,6 +82,14 @@ class NotificationEventConsumer(
         }
     }
 
+    private fun discard(record: ConsumerRecord<String, Any>, eventId: String?, reason: String) {
+        log.warn(
+            "알림 이벤트 버림: reason={}, eventId={}, topic={}, partition={}, offset={}",
+            reason, eventId, record.topic(), record.partition(), record.offset()
+        )
+        meterRegistry?.counter(DISCARDED_METRIC, "reason", reason)?.increment()
+    }
+
     private fun evictUnreadCountAndPublishAfterCommit(notification: Notification) {
         val cache = cacheManager.getCache("unread-count")
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -106,5 +118,9 @@ class NotificationEventConsumer(
         } catch (e: Exception) {
             log.warn("SSE Redis publish 실패: userId={}, error={}", notification.userId, e.message)
         }
+    }
+
+    companion object {
+        const val DISCARDED_METRIC = "notification.event.discarded"
     }
 }
