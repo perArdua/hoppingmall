@@ -25,4 +25,10 @@ class SecurityConfig(
     ) {
         auth.requestMatchers("/internal/**").denyAll()
     }
+
+    override fun configureServiceEndpoints(
+        auth: AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry
+    ) {
+        auth.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+    }
 }
