@@ -24,6 +24,6 @@ class SecurityConfig(
     override fun configureServiceEndpoints(
         auth: org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry
     ) {
-        auth.requestMatchers("/ops/**").permitAll()
+        auth.requestMatchers("/ops/**", "/api/v1/admin/**").hasRole("ADMIN")
     }
 }
