@@ -34,6 +34,9 @@ spring:
 
   cloud:
     gateway:
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 10s
       globalcors:
         cors-configurations:
           '[/**]':
@@ -132,6 +135,15 @@ spring:
             - Path=/api/v1/users/**,/api/v1/auth/**,/api/v1/sellers/**,/api/v1/admin/sellers/**,/api/v1/memberships/**
           filters:
             - JwtValidation
+
+        - id: notification-service-subscribe
+          uri: ${ROUTES_NOTIFICATION_SERVICE:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/notifications/subscribe
+          filters:
+            - JwtValidation
+          metadata:
+            response-timeout: -1
 
         - id: notification-service
           uri: ${ROUTES_NOTIFICATION_SERVICE:http://localhost:8081}
