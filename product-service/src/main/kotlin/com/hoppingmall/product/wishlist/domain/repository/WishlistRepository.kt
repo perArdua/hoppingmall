@@ -17,7 +17,7 @@ interface WishlistRepository : JpaRepository<Wishlist, Long> {
         SELECT new com.hoppingmall.product.wishlist.dto.response.WishlistResponse(
             w.id, w.productId, p.name, p.price, p.status, w.createdAt
         )
-        FROM Wishlist w LEFT JOIN Product p ON w.productId = p.id
+        FROM Wishlist w JOIN Product p ON w.productId = p.id
         WHERE w.buyerId = :buyerId
     """)
     fun findByBuyerIdWithProduct(buyerId: Long, pageable: Pageable): Slice<WishlistResponse>

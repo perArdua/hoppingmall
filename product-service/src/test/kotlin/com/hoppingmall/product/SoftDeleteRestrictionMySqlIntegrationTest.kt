@@ -265,16 +265,14 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
     }
 
     @Test
-    fun 찜한_상품이_삭제되면_찜_목록에_상품_정보_없이_남는다() {
+    fun 찜한_상품이_삭제되면_찜_목록에_나오지_않는다() {
         val productId = createProduct(createCategory("소프트삭제-찜목록"), listOf("a.jpg"))
-        val wishlistId = wishlistCommandService.addWishlist(BUYER_ID, WishlistCreateRequest(productId)).id
+        wishlistCommandService.addWishlist(BUYER_ID, WishlistCreateRequest(productId))
         productCommandService.deleteProduct(productId)
 
         val wishlists = wishlistQueryService.getWishlists(BUYER_ID, page).content
 
-        assertThat(wishlists.map { it.id }).containsExactly(wishlistId)
-        assertThat(wishlists.single().productId).isEqualTo(productId)
-        assertThat(wishlists.single().productName).isNull()
+        assertThat(wishlists).isEmpty()
     }
 
     @Test
