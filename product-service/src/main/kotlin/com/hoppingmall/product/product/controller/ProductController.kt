@@ -13,6 +13,7 @@ import com.hoppingmall.product.product.service.ProductQueryService
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
+import org.springframework.data.web.SortDefault
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
@@ -27,7 +28,7 @@ class ProductController(
 ) {
 
     @GetMapping
-    fun getProducts(pageable: Pageable): ApiResponse<Slice<ProductResponse>> {
+    fun getProducts(@SortDefault("id") pageable: Pageable): ApiResponse<Slice<ProductResponse>> {
         val products = productQueryService.getProducts(pageable)
         return ApiResponse.success(products)
     }
@@ -42,7 +43,7 @@ class ProductController(
     @GetMapping("/seller/{sellerId}")
     fun getProductsBySeller(
         @PathVariable sellerId: Long,
-        pageable: Pageable
+        @SortDefault("id") pageable: Pageable
     ): ApiResponse<Slice<ProductResponse>> {
         val products = productQueryService.getProductsBySellerId(sellerId, pageable)
         return ApiResponse.success(products)
@@ -51,7 +52,7 @@ class ProductController(
     @GetMapping("/category/{categoryId}")
     fun getProductsByCategory(
         @PathVariable categoryId: Long,
-        pageable: Pageable
+        @SortDefault("id") pageable: Pageable
     ): ApiResponse<Slice<ProductResponse>> {
         val products = productQueryService.getProductsByCategoryId(categoryId, pageable)
         return ApiResponse.success(products)
