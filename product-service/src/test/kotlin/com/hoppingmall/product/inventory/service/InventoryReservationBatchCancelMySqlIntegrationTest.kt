@@ -20,7 +20,9 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.sql.Connection
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import javax.sql.DataSource
 
 @DisplayName("재고 예약 배치 취소 MySQL 통합 테스트")
@@ -95,44 +97,76 @@ class InventoryReservationBatchCancelMySqlIntegrationTest {
         return reservationId
     }
 
-    private fun cancelWhileHolding(reservationId: String, holdingChanges: (Connection) -> Unit): Result<Unit> {
+    private fun cancelWhileHolding(reservationId: String, holdingChanges: (Connection) -> Unit): Result<Unit> =
+        runWhileHolding(holdingChanges, "배치 취소", "inventory_reservations") {
+            inventoryCommandService.cancelReservations(listOf(reservationId))
+        }
+
+    private fun runWhileHolding(
+        holdingChanges: (Connection) -> Unit,
+        actionName: String,
+        waitTable: String,
+        action: () -> Unit
+    ): Result<Unit> {
         dataSource.connection.use { holder ->
             holder.autoCommit = false
             holdingChanges(holder)
-            val holderTransactionId = transactionIdOf(holder)
 
-            val cancel = executor.submit<Result<Unit>> {
-                runCatching { inventoryCommandService.cancelReservations(listOf(reservationId)) }
+            val enteredAt = AtomicLong(0L)
+            val pending = executor.submit<Result<Unit>> {
+                enteredAt.set(System.currentTimeMillis())
+                runCatching { action() }
             }
 
-            awaitReservationLockWait(holderTransactionId)
+            awaitLockWait(pending, enteredAt, actionName, waitTable)
             holder.commit()
-            return cancel.get(30, TimeUnit.SECONDS)
+            return pending.get(30, TimeUnit.SECONDS)
         }
     }
 
-    private fun transactionIdOf(connection: Connection): String =
-        connection.prepareStatement("SELECT trx_id FROM information_schema.innodb_trx WHERE trx_mysql_thread_id = CONNECTION_ID()")
-            .use { statement -> statement.executeQuery().use { it.next(); it.getString(1) } }
-
-    private fun awaitReservationLockWait(blockingTransactionId: String) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-        while (System.nanoTime() < deadline) {
-            val waits = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*) FROM performance_schema.data_lock_waits w
-                JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
-                WHERE w.BLOCKING_ENGINE_TRANSACTION_ID = ?
-                AND l.OBJECT_SCHEMA = DATABASE()
-                AND l.OBJECT_NAME = 'inventory_reservations'
-                """.trimIndent(),
-                Long::class.java,
-                blockingTransactionId
-            )!!
-            if (waits > 0) return
+    private fun awaitLockWait(pending: Future<Result<Unit>>, enteredAt: AtomicLong, actionName: String, waitTable: String) {
+        val startedAt = System.currentTimeMillis()
+        val deadline = startedAt + LOCK_WAIT_LIMIT_MS
+        while (System.currentTimeMillis() < deadline) {
+            if (lockWaitCount(waitTable) > 0) return
+            if (pending.isDone) {
+                throw AssertionError("${actionName}가 잠금에 걸리지 않고 끝났다\n" + lockDiagnostics(pending, enteredAt, startedAt))
+            }
             Thread.onSpinWait()
         }
-        throw AssertionError("배치 취소가 inventory_reservations 잠금을 기다리지 않았다")
+        throw AssertionError("${actionName}의 $waitTable 잠금 대기가 ${LOCK_WAIT_LIMIT_MS}ms 안에 보이지 않았다\n" + lockDiagnostics(pending, enteredAt, startedAt))
+    }
+
+    private fun lockWaitCount(waitTable: String): Long =
+        jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*) FROM performance_schema.data_lock_waits w
+            JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
+            WHERE l.OBJECT_SCHEMA = DATABASE()
+            AND l.OBJECT_NAME = ?
+            """.trimIndent(),
+            Long::class.java,
+            waitTable
+        )!!
+
+    private fun lockDiagnostics(pending: Future<Result<Unit>>, enteredAt: AtomicLong, startedAt: Long): String {
+        val now = System.currentTimeMillis()
+        val entered = enteredAt.get()
+        val outcome = if (pending.isDone) runCatching { pending.get() }.fold({ it.toString() }, { it.toString() }) else "running"
+        return listOf(
+            "elapsedSincePollStartMs=${now - startedAt}",
+            "actionEnteredAt=${if (entered == 0L) "not yet" else "$entered (${entered - startedAt}ms from poll start)"}",
+            "future.done=${pending.isDone}, outcome=$outcome",
+            "innodb_trx=" + jdbcTemplate.queryForList(
+                "SELECT trx_id, trx_state, trx_mysql_thread_id, trx_started, trx_query FROM information_schema.innodb_trx"
+            ),
+            "data_locks=" + jdbcTemplate.queryForList(
+                "SELECT ENGINE_TRANSACTION_ID, OBJECT_SCHEMA, OBJECT_NAME, INDEX_NAME, LOCK_TYPE, LOCK_MODE, LOCK_STATUS, LOCK_DATA FROM performance_schema.data_locks"
+            ),
+            "data_lock_waits=" + jdbcTemplate.queryForList(
+                "SELECT REQUESTING_ENGINE_TRANSACTION_ID, BLOCKING_ENGINE_TRANSACTION_ID, REQUESTING_ENGINE_LOCK_ID, BLOCKING_ENGINE_LOCK_ID FROM performance_schema.data_lock_waits"
+            )
+        ).joinToString("\n")
     }
 
     private fun stock(): Int =
@@ -143,6 +177,7 @@ class InventoryReservationBatchCancelMySqlIntegrationTest {
 
     companion object {
         private const val PRODUCT_ID = 2001L
+        private const val LOCK_WAIT_LIMIT_MS = 15_000L
 
         @JvmStatic
         @DynamicPropertySource
