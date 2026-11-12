@@ -140,30 +140,15 @@ class InventoryCommandServiceImpl(
 
     override fun cancelReservation(reservationId: String) {
         maybeInjectChaos("cancelReservation")
-        val reservation = inventoryReservationRepository.findByReservationId(reservationId)
-            ?: return
-
-        if (reservation.status != ReservationStatus.RESERVED) {
-            return
-        }
-
-        val updated = inventoryReservationRepository.updateStatusByCas(
-            reservationId = reservationId,
-            expectedStatus = ReservationStatus.RESERVED,
-            targetStatus = ReservationStatus.CANCELLED,
-            updatedAt = LocalDateTime.now()
-        )
-
-        if (updated > 0) {
-            val inventory = inventoryRepository.findByProductIdForUpdate(reservation.productId)
-                ?: return
-            inventory.increaseStock(reservation.quantity)
-        }
+        cancelLocked(listOf(reservationId))
     }
 
     override fun cancelReservations(reservationIds: List<String>) {
         if (reservationIds.isEmpty()) return
+        cancelLocked(reservationIds)
+    }
 
+    private fun cancelLocked(reservationIds: List<String>) {
         val locked = inventoryReservationRepository.lockCancellable(reservationIds)
         if (locked.isEmpty()) return
 
