@@ -1,6 +1,7 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.user.exception.seller.SellerAlreadyAppliedException
 import com.hoppingmall.user.exception.seller.SellerInvalidApprovalStatusException
 import jakarta.persistence.*
 
@@ -13,14 +14,17 @@ class Seller private constructor(
     @Column(name = "user_id", nullable = false)
     val userId: Long,
 
-    @Column(name = "business_number", unique = true, nullable = false)
-    val businessNumber: String,
+    businessNumber: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "approval_status", nullable = false)
     private var approvalStatus: ApprovalStatus = ApprovalStatus.PENDING
 
 ) : BaseEntity() {
+
+    @Column(name = "business_number", unique = true, nullable = false)
+    var businessNumber: String = businessNumber
+        private set
 
     fun approve() {
         validatePendingStatus()
@@ -30,6 +34,14 @@ class Seller private constructor(
     fun reject() {
         validatePendingStatus()
         this.approvalStatus = ApprovalStatus.REJECTED
+    }
+
+    fun reapply(businessNumber: String) {
+        if (this.approvalStatus != ApprovalStatus.REJECTED) {
+            throw SellerAlreadyAppliedException()
+        }
+        this.businessNumber = businessNumber
+        this.approvalStatus = ApprovalStatus.PENDING
     }
 
     private fun validatePendingStatus() {
