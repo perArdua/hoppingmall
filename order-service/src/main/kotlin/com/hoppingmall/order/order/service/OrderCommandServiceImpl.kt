@@ -1,6 +1,7 @@
 package com.hoppingmall.order.order.service
 
 import org.springframework.data.repository.findByIdOrNull
+import com.hoppingmall.order.cartItem.domain.CartItem
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.OrderItem
@@ -18,13 +19,16 @@ import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
+import com.hoppingmall.order.order.exception.OrderReservationFencedException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
+import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
@@ -45,6 +49,9 @@ class OrderCommandServiceImpl(
 ) : OrderCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    @Autowired(required = false)
+    var reservationFence: ReservationFence? = null
 
     override fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse {
         val cartItems = cartItemRepository.findAllById(request.cartItemIds)
@@ -69,7 +76,29 @@ class OrderCommandServiceImpl(
 
         val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
 
-        return transactionTemplate.execute {
+        val fence = reservationFence?.takeIf { it.enabled }
+        return try {
+            createOrderInTransaction(buyerId, request, cartItems, productMap, reservationMap, totalAmount, fence)
+        } catch (e: OrderReservationFencedException) {
+            runCatching { inventoryCommandPort.cancelReservations(reservationMap.values.distinct()) }
+                .onFailure { log.warn("fence 충돌 후 예약 취소 실패: rids={}", reservationMap.values, it) }
+            throw e
+        }
+    }
+
+    private fun createOrderInTransaction(
+        buyerId: Long,
+        request: OrderCreateRequest,
+        cartItems: List<CartItem>,
+        productMap: Map<Long, ProductInfo>,
+        reservationMap: Map<Long, String>,
+        totalAmount: BigDecimal,
+        fence: ReservationFence?
+    ): OrderResponse =
+        transactionTemplate.execute {
+            if (fence != null && fence.link(reservationMap.values).isNotEmpty()) {
+                throw OrderReservationFencedException()
+            }
             val order = orderRepository.save(Order.create(buyerId = buyerId, totalAmount = totalAmount))
 
             val orderItems = cartItems.map { cartItem ->
@@ -92,7 +121,6 @@ class OrderCommandServiceImpl(
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
             OrderResponse.from(order, savedOrderItems)
         }!!
-    }
 
     private fun reserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
         try {
