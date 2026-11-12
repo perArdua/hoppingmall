@@ -6,6 +6,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.SQLRestriction
 import java.math.BigDecimal
 
 @Entity
@@ -19,6 +20,7 @@ import java.math.BigDecimal
         UniqueConstraint(name = "uk_cart_items_buyer_product", columnNames = ["buyerId", "productId"])
     ]
 )
+@SQLRestriction("deleted_at IS NULL")
 class CartItem private constructor(
     @Column
     val buyerId: Long,
