@@ -72,6 +72,7 @@ class BucketStockService(
         bucketAttempts.record(bucketCount.toDouble())
         if (holdsShortBucket) throw BucketWalkExhaustedException(productId)
         waitCounter.increment()
+        ReserveDeadline.check()
         val lock = inventoryBucketLocker.lockWaiting(productId, start)
         if (lock is BucketLock.Acquired && lock.stockQuantity >= quantity &&
             inventoryBucketLocker.decrease(productId, start, quantity) > 0
@@ -83,6 +84,7 @@ class BucketStockService(
 
     fun reserveLockingAll(productId: Long, quantity: Int) {
         fallbackCounter.increment()
+        ReserveDeadline.check()
         takeAcrossBuckets(productId, quantity)
     }
 

@@ -2,6 +2,8 @@ package com.hoppingmall.product.internal
 
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.inventory.service.InventoryCommandService
+import com.hoppingmall.product.inventory.service.ReserveDeadline
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -10,6 +12,9 @@ import org.springframework.web.bind.annotation.*
 class InternalInventoryController(
     private val inventoryCommandService: InventoryCommandService
 ) {
+
+    @Value("\${inventory.link-check.enabled:false}")
+    private var budgetEnabled: Boolean = false
 
     @PostMapping("/{productId}/decrease")
     fun decreaseStock(@PathVariable productId: Long, @RequestParam quantity: Int): ResponseEntity<Void> {
@@ -57,10 +62,19 @@ class InternalInventoryController(
     }
 
     @PostMapping("/batch-reserve")
-    fun batchReserveStock(@RequestBody items: List<ReserveRequest>): ResponseEntity<Map<Long, String>> {
-        val pairs = items.map { it.productId to it.quantity }
-        val result = inventoryCommandService.batchReserveStock(pairs)
-        return ResponseEntity.ok(result)
+    fun batchReserveStock(
+        @RequestBody items: List<ReserveRequest>,
+        @RequestHeader(name = ReserveDeadline.HEADER, required = false) budgetMs: Long? = null
+    ): ResponseEntity<Map<Long, String>> {
+        val receivedAt = System.currentTimeMillis()
+        if (budgetEnabled && budgetMs != null && budgetMs > 0) ReserveDeadline.set(receivedAt + budgetMs)
+        try {
+            val pairs = items.map { it.productId to it.quantity }
+            val result = inventoryCommandService.batchReserveStock(pairs)
+            return ResponseEntity.ok(result)
+        } finally {
+            ReserveDeadline.clear()
+        }
     }
 
     data class ReserveRequest(val productId: Long, val quantity: Int)
