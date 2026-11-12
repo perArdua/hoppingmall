@@ -32,7 +32,11 @@ class RefundLocalOperationService(
             if (!eventLog.isStepCompleted(RefundEventLog.PAYMENT_UPDATED)) {
                 val payment = paymentRepository.findByIdOrNull(event.paymentId)
                 if (payment != null) {
-                    payment.updateStatus(PaymentStatus.REFUNDED)
+                    payment.updateStatus(
+                        newStatus = PaymentStatus.REFUNDED,
+                        transactionId = payment.transactionId,
+                        completedAt = payment.completedAt
+                    )
                     paymentRepository.save(payment)
                 }
                 eventLog.markStepCompleted(RefundEventLog.PAYMENT_UPDATED)
