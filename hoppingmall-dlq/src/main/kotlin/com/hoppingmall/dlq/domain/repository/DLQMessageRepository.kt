@@ -83,6 +83,17 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
         pageable: Pageable
     ): Page<DLQMessage>
 
+    fun findFirstByOriginalTopicAndContentHashOrderByIdDesc(
+        originalTopic: String,
+        contentHash: String
+    ): DLQMessage?
+
+    fun findByStatusAndRetryCountGreaterThanEqual(
+        status: DLQStatus,
+        retryCount: Int,
+        pageable: Pageable
+    ): List<DLQMessage>
+
     fun existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
         originalTopic: String,
         originalPartition: Int,
