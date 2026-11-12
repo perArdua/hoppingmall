@@ -8,6 +8,7 @@ import com.hoppingmall.product.category.dto.response.CategoryResponse
 import com.hoppingmall.product.category.exception.CategoryAlreadyExistsException
 import com.hoppingmall.product.category.exception.CategoryCircularReferenceException
 import com.hoppingmall.product.category.exception.CategoryHasChildrenException
+import com.hoppingmall.product.category.exception.CategoryHasProductsException
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching
@@ -86,6 +87,10 @@ class CategoryCommandServiceImpl(
 
         if (categoryRepository.existsByParentCategoryId(category.id!!)) {
             throw CategoryHasChildrenException()
+        }
+
+        if (categoryRepository.existsProductByCategoryId(category.id!!)) {
+            throw CategoryHasProductsException()
         }
 
         category.softDelete()
