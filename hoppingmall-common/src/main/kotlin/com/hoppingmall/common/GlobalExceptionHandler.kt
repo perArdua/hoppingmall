@@ -1,6 +1,7 @@
 package com.hoppingmall.common
 
 import org.slf4j.LoggerFactory
+import org.springframework.data.mapping.PropertyReferenceException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -43,6 +44,12 @@ class GlobalExceptionHandler {
     )
     fun handleBadRequest(ex: Exception): ResponseEntity<ApiResponse<Unit>> {
         log.warn("BadRequest: {}", ex.message)
+        return ResponseEntity.badRequest().body(ApiResponse.failure(CommonErrorCode.INVALID_INPUT))
+    }
+
+    @ExceptionHandler(PropertyReferenceException::class)
+    fun handleInvalidSortProperty(ex: PropertyReferenceException): ResponseEntity<ApiResponse<Unit>> {
+        log.warn("InvalidSortProperty: {}", ex.message)
         return ResponseEntity.badRequest().body(ApiResponse.failure(CommonErrorCode.INVALID_INPUT))
     }
 
