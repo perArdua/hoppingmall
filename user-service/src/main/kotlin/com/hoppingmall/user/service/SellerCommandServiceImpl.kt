@@ -21,12 +21,20 @@ class SellerCommandServiceImpl(
         val user = userRepository.findNullableById(userId)
             ?: throw UserNotFoundException()
 
-        if (sellerRepository.findNullableByUserId(userId) != null) {
+        val application = sellerRepository.findNullableByUserId(userId)
+        if (application != null && application.getApprovalStatus() != Seller.ApprovalStatus.REJECTED) {
             throw SellerAlreadyAppliedException()
         }
 
-        if (sellerRepository.existsByBusinessNumber(request.businessNumber)) {
+        if (application?.businessNumber != request.businessNumber &&
+            sellerRepository.existsByBusinessNumber(request.businessNumber)
+        ) {
             throw SellerBusinessNumberDuplicateException()
+        }
+
+        if (application != null) {
+            application.reapply(request.businessNumber)
+            return
         }
 
         val seller = Seller.create(user, request.businessNumber)
