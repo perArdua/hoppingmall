@@ -2,8 +2,10 @@ package com.hoppingmall.product.review.domain
 
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
+import org.hibernate.annotations.SQLRestriction
 
 @Entity
+@SQLRestriction("deleted_at IS NULL")
 @Table(
     name = "reviews",
     uniqueConstraints = [UniqueConstraint(columnNames = ["order_item_id"])],

@@ -27,6 +27,7 @@ class WishlistCommandServiceImpl(
         }
 
         val wishlist = Wishlist.create(buyerId, request.productId)
+        wishlistRepository.deleteSoftDeleted(buyerId, request.productId)
         val savedWishlist = wishlistRepository.save(wishlist)
 
         return WishlistResponse.from(savedWishlist, product)

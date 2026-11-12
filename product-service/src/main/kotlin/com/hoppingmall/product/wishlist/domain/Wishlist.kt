@@ -5,8 +5,10 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.SQLRestriction
 
 @Entity
+@SQLRestriction("deleted_at IS NULL")
 @Table(
     name = "wishlists",
     uniqueConstraints = [UniqueConstraint(columnNames = ["buyer_id", "product_id"])]

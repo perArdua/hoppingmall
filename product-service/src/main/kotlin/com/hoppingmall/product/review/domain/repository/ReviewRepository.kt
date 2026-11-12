@@ -4,6 +4,7 @@ import com.hoppingmall.product.review.domain.Review
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -20,4 +21,8 @@ interface ReviewRepository : JpaRepository<Review, Long> {
 
     @Query("SELECT COUNT(r) FROM Review r WHERE r.productId = :productId")
     fun countByProductId(@Param("productId") productId: Long): Long
+
+    @Modifying
+    @Query(value = "DELETE FROM reviews WHERE order_item_id = :orderItemId AND deleted_at IS NOT NULL", nativeQuery = true)
+    fun deleteSoftDeletedByOrderItemId(@Param("orderItemId") orderItemId: Long): Int
 }

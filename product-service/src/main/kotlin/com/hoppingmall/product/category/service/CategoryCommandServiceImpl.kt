@@ -47,6 +47,7 @@ class CategoryCommandServiceImpl(
             parentCategoryId = request.parentCategoryId,
             depth = depth
         )
+        categoryRepository.deleteSoftDeletedByName(request.name)
         val savedCategory = categoryRepository.save(category)
         return CategoryResponse.from(savedCategory)
     }
@@ -64,6 +65,7 @@ class CategoryCommandServiceImpl(
             throw CategoryAlreadyExistsException()
         }
 
+        categoryRepository.deleteSoftDeletedByName(request.name)
         category.update(request.name)
         return CategoryResponse.from(category)
     }
