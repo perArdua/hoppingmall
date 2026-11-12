@@ -181,6 +181,7 @@ class InventoryCommandServiceImpl(
             }
             throw e
         }
+        ReserveDeadline.check()
         evictInventoryCacheAfterCommit(reservationMap.keys)
         return reservationMap
     }
@@ -199,7 +200,15 @@ class InventoryCommandServiceImpl(
 
     private fun reserveOne(productId: Long, quantity: Int, lockAll: Boolean): String {
         maybeInjectChaos("reserveStock")
-        val reservation = InventoryReservation.create(productId, quantity, ttlSeconds)
+        val deadline = ReserveDeadline.current()
+        val reservation = if (deadline != null) {
+            InventoryReservation.create(
+                productId, quantity,
+                LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(deadline + ReserveDeadline.EXPIRY_GRACE_MS), java.time.ZoneId.systemDefault())
+            )
+        } else {
+            InventoryReservation.create(productId, quantity, ttlSeconds)
+        }
         if (bucketStockService.enabled && lockAll) {
             bucketStockService.reserveLockingAll(productId, quantity)
         } else if (bucketStockService.enabled) {
