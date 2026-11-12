@@ -2,9 +2,11 @@ package com.hoppingmall.payment.coupon.domain.repository
 
 import com.hoppingmall.payment.coupon.domain.UserCoupon
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
+import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -14,6 +16,7 @@ interface UserCouponRepository : JpaRepository<UserCoupon, Long> {
 
     fun existsByUserIdAndCouponId(userId: Long, couponId: Long): Boolean
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findByUserIdAndCouponId(userId: Long, couponId: Long): UserCoupon?
 
     fun findByUserIdAndStatus(userId: Long, status: UserCouponStatus): List<UserCoupon>
