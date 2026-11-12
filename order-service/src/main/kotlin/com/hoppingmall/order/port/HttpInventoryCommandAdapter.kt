@@ -84,6 +84,15 @@ class HttpInventoryCommandAdapter(
     }
 
     @CircuitBreaker(name = "inventory-command")
+    override fun cancelConfirmedReservations(reservationIds: List<String>) {
+        restTemplate.postForEntity(
+            "$productServiceUrl/internal/api/v1/inventory/reservations/batch-cancel-confirmed",
+            reservationIds,
+            Void::class.java
+        )
+    }
+
+    @CircuitBreaker(name = "inventory-command")
     override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
         val requestBody = items.map { BatchReserveRequest(it.first, it.second) }
         val responseType = object : org.springframework.core.ParameterizedTypeReference<Map<Long, String>>() {}
