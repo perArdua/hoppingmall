@@ -4,6 +4,7 @@ import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
@@ -27,6 +28,9 @@ class ReservationExpiryScheduler(
 
     @Value("\${inventory.expiry.limit:100}")
     private var expiryLimit: Int = 100
+
+    @Autowired
+    private var inventoryCacheEvictor: InventoryCacheEvictor? = null
 
     @Scheduled(fixedDelayString = "\${inventory.reservation.expiry-interval-ms:60000}")
     @Transactional
@@ -64,6 +68,7 @@ class ReservationExpiryScheduler(
                 if (expiredQuantity > 0) {
                     val inventory = inventoryRepository.findByProductIdForUpdate(productId)
                     inventory?.increaseStock(expiredQuantity)
+                    inventoryCacheEvictor?.evictAfterCommit(productId)
                 }
             }
     }

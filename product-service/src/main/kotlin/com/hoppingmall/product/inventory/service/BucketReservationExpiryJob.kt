@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.DistributionSummary
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
@@ -32,6 +33,9 @@ class BucketReservationExpiryJob(
 
     @Value("\${inventory.link-check.enabled:false}")
     private var linkCheckEnabled: Boolean = false
+
+    @Autowired
+    private var inventoryCacheEvictor: InventoryCacheEvictor? = null
 
     private val batchSize = DistributionSummary.builder("inventory.expiry.batch.size")
         .description("Reservations expired per chunk transaction")
@@ -93,6 +97,7 @@ class BucketReservationExpiryJob(
         if (updated != ids.size) return CAS_MISMATCH
 
         bucketStockService.restore(productId, quantity)
+        inventoryCacheEvictor?.evictAfterCommit(productId)
         batchSize.record(ids.size.toDouble())
         return ids.size
     }
