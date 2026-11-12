@@ -21,6 +21,7 @@ import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -28,7 +29,6 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.cache.CacheManager
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.SimpleTransactionStatus
-import java.time.LocalDateTime
 
 @DisplayName("InventoryCommandServiceImpl")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -131,74 +131,52 @@ class InventoryReservationServiceTest {
 
     @Test
     fun 예약_취소_시_재고가_원복된다() {
-        val reservation = InventoryReservation(
-            reservationId = "rsv-1",
-            productId = 1L,
-            quantity = 5,
-            status = ReservationStatus.RESERVED,
-            expiresAt = LocalDateTime.now().plusMinutes(10)
-        )
         val inventory = Inventory.create(productId = 1L, stockQuantity = 0)
 
-        whenever(inventoryReservationRepository.findByReservationId("rsv-1")).thenReturn(reservation)
-        whenever(
-            inventoryReservationRepository.updateStatusByCas(
-                reservationId = eq("rsv-1"),
-                expectedStatus = eq(ReservationStatus.RESERVED),
-                targetStatus = eq(ReservationStatus.CANCELLED),
-                updatedAt = any()
-            )
-        ).thenReturn(1)
-        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(inventory)
+        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1")))
+            .thenReturn(listOf(arrayOf<Any>(10L, 1L, 5)))
+        whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L))).thenReturn(listOf(inventory))
 
         service.cancelReservation("rsv-1")
 
+        verify(inventoryReservationRepository).cancelByIds(eq(listOf(10L)), any())
         assertThat(inventory.stockQuantity).isEqualTo(5)
     }
 
     @Test
-    fun 이미_취소된_예약_취소는_무시된다() {
-        val reservation = InventoryReservation(
-            reservationId = "rsv-1",
-            productId = 1L,
-            quantity = 5,
-            status = ReservationStatus.CANCELLED,
-            expiresAt = LocalDateTime.now().plusMinutes(10)
-        )
+    fun 예약_취소는_예약_행을_잠근_뒤_상태를_바꾸고_재고_행을_잠근다() {
+        val inventory = Inventory.create(productId = 1L, stockQuantity = 0)
 
-        whenever(inventoryReservationRepository.findByReservationId("rsv-1")).thenReturn(reservation)
+        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1")))
+            .thenReturn(listOf(arrayOf<Any>(10L, 1L, 5)))
+        whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L))).thenReturn(listOf(inventory))
 
         service.cancelReservation("rsv-1")
 
-        verify(inventoryReservationRepository, never()).updateStatusByCas(any(), any(), any(), any())
-        verify(inventoryRepository, never()).findByProductIdForUpdate(any())
+        val order = inOrder(inventoryReservationRepository, inventoryRepository)
+        order.verify(inventoryReservationRepository).lockCancellable(listOf("rsv-1"))
+        order.verify(inventoryReservationRepository).cancelByIds(eq(listOf(10L)), any())
+        order.verify(inventoryRepository).findByProductIdInForUpdate(listOf(1L))
     }
 
     @Test
-    fun 이미_만료된_예약_취소는_무시된다() {
-        val reservation = InventoryReservation(
-            reservationId = "rsv-1",
-            productId = 1L,
-            quantity = 5,
-            status = ReservationStatus.EXPIRED,
-            expiresAt = LocalDateTime.now().minusMinutes(5)
-        )
-
-        whenever(inventoryReservationRepository.findByReservationId("rsv-1")).thenReturn(reservation)
+    fun 예약_취소_시_재고_행이_없으면_예약만_취소된다() {
+        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1")))
+            .thenReturn(listOf(arrayOf<Any>(10L, 1L, 5)))
+        whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L))).thenReturn(emptyList())
 
         service.cancelReservation("rsv-1")
 
-        verify(inventoryReservationRepository, never()).updateStatusByCas(any(), any(), any(), any())
-        verify(inventoryRepository, never()).findByProductIdForUpdate(any())
+        verify(inventoryReservationRepository).cancelByIds(eq(listOf(10L)), any())
     }
 
     @Test
-    fun 존재하지_않는_예약_취소는_무시된다() {
-        whenever(inventoryReservationRepository.findByReservationId("rsv-unknown")).thenReturn(null)
+    fun 취소할_수_있는_예약이_없으면_예약_취소는_무시된다() {
+        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1"))).thenReturn(emptyList())
 
-        service.cancelReservation("rsv-unknown")
+        service.cancelReservation("rsv-1")
 
-        verify(inventoryReservationRepository, never()).updateStatusByCas(any(), any(), any(), any())
-        verify(inventoryRepository, never()).findByProductIdForUpdate(any())
+        verify(inventoryReservationRepository, never()).cancelByIds(any(), any())
+        verify(inventoryRepository, never()).findByProductIdInForUpdate(any())
     }
 }
