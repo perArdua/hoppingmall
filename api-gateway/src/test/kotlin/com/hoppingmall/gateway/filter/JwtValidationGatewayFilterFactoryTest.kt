@@ -15,6 +15,7 @@ import org.springframework.mock.http.server.reactive.MockServerHttpRequest
 import org.springframework.mock.web.server.MockServerWebExchange
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
+import java.net.ConnectException
 import java.util.Date
 
 @DisplayName("JwtValidationGatewayFilterFactory")
@@ -193,5 +194,45 @@ class JwtValidationGatewayFilterFactoryTest {
 
         assertThat(exchange.response.statusCode).isEqualTo(HttpStatus.UNAUTHORIZED)
         assertThat(captured).isEmpty()
+    }
+
+    @Test
+    fun 유효한_토큰으로_넘긴_뒤_뒷단_호출이_연결_오류로_끝나면_401로_바꾸지_않고_오류를_그대로_전달한다() {
+        val token = buildToken("42", "BUYER")
+        val request = MockServerHttpRequest.get("/api/test")
+            .header("Authorization", "Bearer $token")
+            .build()
+        val exchange = MockServerWebExchange.from(request)
+        val backendError = ConnectException("Connection refused")
+        val failingChain = GatewayFilterChain { Mono.error(backendError) }
+        val errors = mutableListOf<Throwable>()
+
+        factory.apply(config).filter(exchange, failingChain)
+            .doOnError { errors.add(it) }
+            .onErrorComplete()
+            .block()
+
+        assertThat(exchange.response.statusCode).isNotEqualTo(HttpStatus.UNAUTHORIZED)
+        assertThat(errors).containsExactly(backendError)
+    }
+
+    @Test
+    fun 유효한_토큰으로_넘긴_뒤_뒷단_필터가_예외를_던지면_401로_바꾸지_않고_오류를_그대로_전달한다() {
+        val token = buildToken("42", "BUYER")
+        val request = MockServerHttpRequest.get("/api/test")
+            .header("Authorization", "Bearer $token")
+            .build()
+        val exchange = MockServerWebExchange.from(request)
+        val backendError = IllegalStateException("downstream failure")
+        val throwingChain = GatewayFilterChain { throw backendError }
+        val errors = mutableListOf<Throwable>()
+
+        factory.apply(config).filter(exchange, throwingChain)
+            .doOnError { errors.add(it) }
+            .onErrorComplete()
+            .block()
+
+        assertThat(exchange.response.statusCode).isNotEqualTo(HttpStatus.UNAUTHORIZED)
+        assertThat(errors).containsExactly(backendError)
     }
 }
