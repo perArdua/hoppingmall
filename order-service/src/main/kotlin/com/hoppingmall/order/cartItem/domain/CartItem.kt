@@ -5,6 +5,7 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import java.math.BigDecimal
 
 @Entity
@@ -13,6 +14,9 @@ import java.math.BigDecimal
     indexes = [
         Index(name = "idx_cart_items_buyer_id", columnList = "buyerId"),
         Index(name = "idx_cart_items_product_id", columnList = "productId")
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(name = "uk_cart_items_buyer_product", columnNames = ["buyerId", "productId"])
     ]
 )
 class CartItem private constructor(

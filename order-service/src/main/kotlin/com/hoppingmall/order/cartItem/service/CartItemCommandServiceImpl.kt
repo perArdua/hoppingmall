@@ -7,10 +7,13 @@ import com.hoppingmall.order.cartItem.dto.request.CartItemCreateRequest
 import com.hoppingmall.order.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.order.cartItem.dto.response.CartItemResponse
 import com.hoppingmall.order.cartItem.exception.CartItemAccessDeniedException
+import com.hoppingmall.order.cartItem.exception.CartItemConcurrentAddException
 import com.hoppingmall.order.cartItem.exception.CartItemNotFoundException
 import com.hoppingmall.order.cartItem.exception.CartItemProductNotFoundException
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -55,7 +58,14 @@ class CartItemCommandServiceImpl(
             productImageUrl = productImageUrl,
             quantity = quantity
         )
-        return cartItemRepository.save(newCartItem)
+        cartItemRepository.deleteSoftDeleted(buyerId, product.id)
+        return try {
+            cartItemRepository.save(newCartItem)
+        } catch (e: DataIntegrityViolationException) {
+            throw CartItemConcurrentAddException()
+        } catch (e: PessimisticLockingFailureException) {
+            throw CartItemConcurrentAddException()
+        }
     }
 
     override fun updateCartItemQuantity(buyerId: Long, cartItemId: Long, request: CartItemUpdateRequest): CartItemResponse {
