@@ -1,5 +1,6 @@
 package com.hoppingmall.user.service
 
+import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.PasswordCreator
@@ -18,7 +19,8 @@ class UserCommandServiceImpl(
     private val userRepository: UserRepository,
     private val passwordCreator: PasswordCreator,
     private val userDomainService: UserDomainService,
-    private val membershipCommandService: MembershipCommandService
+    private val membershipCommandService: MembershipCommandService,
+    private val refreshTokenService: RefreshTokenService? = null
 ) : UserCommandService {
 
     override fun signUp(request: SignUpRequest): SignUpResponse {
@@ -54,6 +56,7 @@ class UserCommandServiceImpl(
         request.password?.let { newPassword ->
             val encodedPassword = passwordCreator.encode(newPassword)
             user.updatePassword(encodedPassword)
+            refreshTokenService?.delete(userId)
         }
     }
 }
