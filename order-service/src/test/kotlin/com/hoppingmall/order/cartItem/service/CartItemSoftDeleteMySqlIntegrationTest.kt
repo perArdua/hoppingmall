@@ -126,14 +126,17 @@ class CartItemSoftDeleteMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
-    fun 삭제한_장바구니_행은_남은_행과_함께_주문해도_주문_항목에_들어가지_않는다() {
+    fun 삭제한_장바구니_id가_남은_행과_섞이면_ORD004로_거절하고_주문을_만들지_않는다() {
         val removedId = addAndRemove()
         val keptId = add(KEPT_PRODUCT_ID, 1)
 
-        val order = orderCommandService.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(removedId, keptId)))
-
-        assertThat(order.items.map { it.productId }).containsExactly(KEPT_PRODUCT_ID)
-        assertThat(orderedProductIds()).containsExactly(KEPT_PRODUCT_ID)
+        assertThatThrownBy {
+            orderCommandService.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(removedId, keptId)))
+        }.isInstanceOfSatisfying(OrderEmptyItemsException::class.java) {
+            assertThat(it.errorCode.code).isEqualTo("ORD004")
+        }
+        assertThat(orderCount()).isZero()
+        assertThat(orderedProductIds()).isEmpty()
     }
 
     private fun addAndRemove(): Long {
