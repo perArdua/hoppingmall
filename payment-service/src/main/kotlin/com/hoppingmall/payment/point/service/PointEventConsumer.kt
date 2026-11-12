@@ -80,7 +80,7 @@ class PointEventConsumer(
                 aggregateId = savedPoint.id!!.toString(),
                 eventType = "PointEarnedNotificationRequested",
                 eventData = mapOf(
-                    "eventId" to event.eventId,
+                    "eventId" to "point-earned-notification-${event.eventId}",
                     "userId" to event.userId,
                     "type" to NotificationType.POINT_EARNED.toString(),
                     "title" to "포인트가 적립되었습니다",
