@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+import java.util.Optional
 
 @Component
 class JwtValidationGatewayFilterFactory(
@@ -38,19 +39,23 @@ class JwtValidationGatewayFilterFactory(
 
                 val userId = claims.subject
                 val role = claims["role"] as? String ?: "BUYER"
-                userId to role
+                Optional.of(
+                    request.mutate()
+                        .headers { it.remove("x-user-id"); it.remove("x-user-role") }
+                        .header("x-user-id", userId)
+                        .header("x-user-role", role)
+                        .build()
+                )
             }
             .subscribeOn(Schedulers.boundedElastic())
-            .flatMap { (userId, role) ->
-                val modifiedRequest = request.mutate()
-                    .headers { it.remove("x-user-id"); it.remove("x-user-role") }
-                    .header("x-user-id", userId)
-                    .header("x-user-role", role)
-                    .build()
-
-                chain.filter(exchange.mutate().request(modifiedRequest).build())
+            .onErrorReturn(Optional.empty())
+            .flatMap { authenticatedRequest ->
+                if (authenticatedRequest.isPresent) {
+                    chain.filter(exchange.mutate().request(authenticatedRequest.get()).build())
+                } else {
+                    onUnauthorized(exchange)
+                }
             }
-            .onErrorResume { onUnauthorized(exchange) }
         }
     }
 
