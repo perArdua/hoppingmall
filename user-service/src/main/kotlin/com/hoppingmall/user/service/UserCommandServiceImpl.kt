@@ -1,5 +1,6 @@
 package com.hoppingmall.user.service
 
+import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.PasswordCreator
 import com.hoppingmall.user.domain.User
@@ -30,7 +31,7 @@ class UserCommandServiceImpl(
             email = email,
             password = password,
             name = request.name,
-            role = request.role
+            role = Role.BUYER
         )
 
         val saved = userRepository.save(user)

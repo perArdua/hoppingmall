@@ -83,7 +83,7 @@ class UserCommandServiceImplTest {
         assertThat(response.id).isEqualTo(1L)
         assertThat(response.email).isEqualTo("signup@example.com")
         assertThat(response.name).isEqualTo("홍길동")
-        assertThat(response.role).isEqualTo(Role.SELLER)
+        assertThat(response.role).isEqualTo(Role.BUYER)
         verify(userDomainService).validateNewUser(Email(request.email), request.password)
         verify(membershipCommandService).createMembership(1L)
         assertThat(userCaptor.firstValue.email).isEqualTo(Email("signup@example.com"))
