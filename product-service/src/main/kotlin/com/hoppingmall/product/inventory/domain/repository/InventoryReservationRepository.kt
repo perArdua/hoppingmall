@@ -43,6 +43,30 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
         @Param("updatedAt") updatedAt: LocalDateTime
     ): Int
 
+    @Query(
+        value = """
+            SELECT id, product_id, quantity FROM inventory_reservations
+            WHERE reservation_id IN (:reservationIds) AND status = 'RESERVED'
+            ORDER BY id
+            FOR UPDATE
+        """,
+        nativeQuery = true
+    )
+    fun lockCancellable(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE inventory_reservations SET status = 'CANCELLED', updated_at = :updatedAt
+            WHERE id IN (:ids)
+        """,
+        nativeQuery = true
+    )
+    fun cancelByIds(
+        @Param("ids") ids: List<Long>,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
+
     @Query("""
         SELECT r FROM InventoryReservation r
         WHERE r.status = :status

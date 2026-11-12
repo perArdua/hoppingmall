@@ -161,20 +161,14 @@ class InventoryCommandServiceImpl(
     override fun cancelReservations(reservationIds: List<String>) {
         if (reservationIds.isEmpty()) return
 
-        val reservations = inventoryReservationRepository.findByReservationIdIn(reservationIds)
-            .filter { it.status == ReservationStatus.RESERVED }
-        if (reservations.isEmpty()) return
+        val locked = inventoryReservationRepository.lockCancellable(reservationIds)
+        if (locked.isEmpty()) return
 
-        inventoryReservationRepository.batchUpdateStatusByCas(
-            reservationIds = reservations.map { it.reservationId },
-            expectedStatus = ReservationStatus.RESERVED,
-            targetStatus = ReservationStatus.CANCELLED,
-            updatedAt = LocalDateTime.now()
-        )
+        inventoryReservationRepository.cancelByIds(locked.map { (it[0] as Number).toLong() }, LocalDateTime.now())
 
-        val stockToRestore = reservations
-            .groupBy { it.productId }
-            .mapValues { (_, rsv) -> rsv.sumOf { it.quantity } }
+        val stockToRestore = locked
+            .groupBy { (it[1] as Number).toLong() }
+            .mapValues { (_, rows) -> rows.sumOf { (it[2] as Number).toInt() } }
             .toSortedMap()
 
         val inventories = inventoryRepository.findByProductIdInForUpdate(stockToRestore.keys.toList())
