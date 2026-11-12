@@ -17,6 +17,9 @@ class HttpInventoryCommandAdapter(
 
     private val logger = LoggerFactory.getLogger(HttpInventoryCommandAdapter::class.java)
 
+    @Value("\${order.reservation.fence.enabled:false}")
+    private var budgetHeaderEnabled: Boolean = false
+
     private val restTemplate: RestTemplate = restTemplateBuilder
         .connectTimeout(Duration.ofSeconds(2))
         .readTimeout(Duration.ofSeconds(5))
@@ -87,10 +90,21 @@ class HttpInventoryCommandAdapter(
         val response = restTemplate.exchange(
             "$productServiceUrl/internal/api/v1/inventory/batch-reserve",
             org.springframework.http.HttpMethod.POST,
-            org.springframework.http.HttpEntity(requestBody),
+            org.springframework.http.HttpEntity(requestBody, reserveHeaders()),
             responseType
         )
         return response.body ?: throw RuntimeException("배치 재고 예약 응답 없음")
+    }
+
+    private fun reserveHeaders(): org.springframework.http.HttpHeaders {
+        val headers = org.springframework.http.HttpHeaders()
+        if (budgetHeaderEnabled) headers.set(RESERVE_BUDGET_HEADER, RESERVE_BUDGET_MS.toString())
+        return headers
+    }
+
+    companion object {
+        const val RESERVE_BUDGET_HEADER = "X-Reserve-Budget-Ms"
+        const val RESERVE_BUDGET_MS = 5000L
     }
 
     data class ReservationResponse(val reservationId: String = "")
