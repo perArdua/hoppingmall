@@ -1,11 +1,13 @@
 package com.hoppingmall.gateway.filter
 
+import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cloud.gateway.filter.GatewayFilter
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory
 import org.springframework.http.HttpStatus
+import org.springframework.http.server.reactive.ServerHttpRequest
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
@@ -42,7 +44,8 @@ class JwtValidationGatewayFilterFactory(
                     .body
 
                 val userId = claims.subject
-                val role = claims["role"] as? String ?: "BUYER"
+                val role = accessTokenRole(claims)
+                    ?: return@fromCallable Optional.empty<ServerHttpRequest>()
                 Optional.of(
                     request.mutate()
                         .headers { it.remove("x-user-id"); it.remove("x-user-role") }
@@ -63,6 +66,12 @@ class JwtValidationGatewayFilterFactory(
         }
     }
 
+    private fun accessTokenRole(claims: Claims): String? {
+        val type = claims[TOKEN_TYPE_CLAIM]
+        if (type != null && type != ACCESS_TOKEN_TYPE) return null
+        return (claims[ROLE_CLAIM] as? String)?.takeIf { it.isNotBlank() }
+    }
+
     private fun resolveToken(request: org.springframework.http.server.reactive.ServerHttpRequest): String? {
         val bearerToken = request.headers.getFirst("Authorization") ?: return null
         return if (bearerToken.startsWith("Bearer ")) bearerToken.substring(7) else null
@@ -81,5 +90,11 @@ class JwtValidationGatewayFilterFactory(
     private fun onForbidden(exchange: ServerWebExchange): Mono<Void> {
         exchange.response.statusCode = HttpStatus.FORBIDDEN
         return exchange.response.setComplete()
+    }
+
+    companion object {
+        private const val TOKEN_TYPE_CLAIM = "typ"
+        private const val ACCESS_TOKEN_TYPE = "access"
+        private const val ROLE_CLAIM = "role"
     }
 }
