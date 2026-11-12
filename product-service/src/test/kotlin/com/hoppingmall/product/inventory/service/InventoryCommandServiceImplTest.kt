@@ -6,6 +6,7 @@ import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
+import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockException
 import com.hoppingmall.product.inventory.exception.InventoryNotFoundException
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
@@ -26,7 +27,12 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import org.springframework.beans.factory.ObjectProvider
+import org.springframework.cache.Cache
+import org.springframework.cache.CacheManager
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDateTime
 
 @DisplayName("InventoryCommandServiceImpl 추가 테스트")
@@ -42,6 +48,9 @@ class InventoryCommandServiceImplTest {
 
     @Mock
     private lateinit var productRepository: ProductRepository
+
+    @Mock
+    private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
 
     @InjectMocks
     private lateinit var service: InventoryCommandServiceImpl
@@ -187,6 +196,78 @@ class InventoryCommandServiceImplTest {
 
         assertThat(result).hasSize(2)
         assertThat(result).containsKeys(1L, 2L)
+    }
+
+    @Test
+    fun 배치_예약이_트랜잭션_밖에서_성공하면_예약한_상품의_재고_캐시를_바로_지운다() {
+        val cache = stubInventoryCache()
+        stubReservable(1L, 2L)
+
+        service.batchReserveStock(listOf(2L to 5, 1L to 3))
+
+        verify(cache).evict(1L)
+        verify(cache).evict(2L)
+    }
+
+    @Test
+    fun 배치_예약이_트랜잭션_안에서_성공하면_커밋된_뒤에_재고_캐시를_지운다() {
+        val cache = stubInventoryCache()
+        stubReservable(1L, 2L)
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            service.batchReserveStock(listOf(2L to 5, 1L to 3))
+
+            verify(cache, never()).evict(any())
+
+            TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+
+            verify(cache).evict(1L)
+            verify(cache).evict(2L)
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
+    }
+
+    @Test
+    fun 배치_예약이_실패하면_재고_캐시를_지우지_않는다() {
+        val inv1 = Inventory.create(productId = 1L, stockQuantity = 100)
+        val inv2 = Inventory.create(productId = 2L, stockQuantity = 0)
+        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(inv1)
+        whenever(inventoryRepository.findByProductIdForUpdate(2L)).thenReturn(inv2)
+        whenever(inventoryReservationRepository.save(any<InventoryReservation>()))
+            .thenAnswer { it.arguments[0] as InventoryReservation }
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 3, 2L to 5)) }
+            .isInstanceOf(InventoryInsufficientStockException::class.java)
+
+        verify(cacheManagerProvider, never()).getIfAvailable()
+    }
+
+    @Test
+    fun 캐시_매니저가_없어도_배치_예약은_성공한다() {
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(null)
+        stubReservable(1L)
+
+        val result = service.batchReserveStock(listOf(1L to 3))
+
+        assertThat(result).containsKeys(1L)
+    }
+
+    private fun stubInventoryCache(): Cache {
+        val cache = mock<Cache>()
+        val cacheManager = mock<CacheManager>()
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(cacheManager)
+        whenever(cacheManager.getCache("inventory")).thenReturn(cache)
+        return cache
+    }
+
+    private fun stubReservable(vararg productIds: Long) {
+        productIds.forEach { productId ->
+            whenever(inventoryRepository.findByProductIdForUpdate(productId))
+                .thenReturn(Inventory.create(productId = productId, stockQuantity = 100))
+        }
+        whenever(inventoryReservationRepository.save(any<InventoryReservation>()))
+            .thenAnswer { it.arguments[0] as InventoryReservation }
     }
 
     @Test

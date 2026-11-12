@@ -13,10 +13,14 @@ import com.hoppingmall.product.inventory.exception.InventoryNotFoundException
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.exception.ProductNotFoundException
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDateTime
 import kotlin.random.Random
 
@@ -25,7 +29,8 @@ import kotlin.random.Random
 class InventoryCommandServiceImpl(
     private val inventoryRepository: InventoryRepository,
     private val inventoryReservationRepository: InventoryReservationRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val cacheManagerProvider: ObjectProvider<CacheManager>
 ) : InventoryCommandService {
 
     @Value("\${inventory.reservation.ttl-seconds:600}")
@@ -191,6 +196,25 @@ class InventoryCommandServiceImpl(
             reservationMap.values.forEach { cancelReservation(it) }
             throw e
         }
+        evictInventoryCacheAfterCommit(reservationMap.keys)
         return reservationMap
+    }
+
+    private fun evictInventoryCacheAfterCommit(productIds: Collection<Long>) {
+        if (productIds.isEmpty()) return
+        val cache = cacheManagerProvider.getIfAvailable()?.getCache(INVENTORY_CACHE) ?: return
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            productIds.forEach { cache.evict(it) }
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                productIds.forEach { cache.evict(it) }
+            }
+        })
+    }
+
+    companion object {
+        private const val INVENTORY_CACHE = "inventory"
     }
 }
