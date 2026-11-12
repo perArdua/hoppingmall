@@ -22,6 +22,7 @@ class PaymentCancelledCompensationHandler(
     override fun handle(node: JsonNode) {
         val event = objectMapper.treeToValue(node, PaymentCancelledEvent::class.java)
         try {
+            require(event.eventId.isNotBlank()) { "결제 취소 보상 이벤트의 eventId가 비어 있음: orderId=${event.orderId}" }
             val log = compensationEventLogService.saveIfAbsent(
                 eventId = event.eventId,
                 compensationType = "PAYMENT_CANCELLED",
