@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
@@ -32,6 +33,8 @@ import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.SimpleTransactionStatus
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDateTime
 
@@ -52,11 +55,15 @@ class InventoryCommandServiceImplTest {
     @Mock
     private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
 
+    @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
+
     @InjectMocks
     private lateinit var service: InventoryCommandServiceImpl
 
     @BeforeEach
     fun setUp() {
+        lenient().`when`(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
         val field = InventoryCommandServiceImpl::class.java.getDeclaredField("ttlSeconds")
         field.isAccessible = true
         field.set(service, 600L)
@@ -169,6 +176,41 @@ class InventoryCommandServiceImplTest {
     }
 
     @Test
+    fun 단건_예약은_자기_트랜잭션을_열어_커밋한다() {
+        stubReservable(1L)
+
+        val reservationId = service.reserveStock(1L, 3)
+
+        assertThat(reservationId).isNotBlank()
+        verify(transactionManager).getTransaction(any())
+        verify(transactionManager).commit(any())
+        verify(transactionManager, never()).rollback(any())
+    }
+
+    @Test
+    fun 단건_예약이_실패하면_자기_트랜잭션을_롤백한다() {
+        whenever(inventoryRepository.findByProductIdForUpdate(1L))
+            .thenReturn(Inventory.create(productId = 1L, stockQuantity = 0))
+
+        assertThatThrownBy { service.reserveStock(1L, 3) }
+            .isInstanceOf(InventoryInsufficientStockException::class.java)
+
+        verify(transactionManager).rollback(any())
+        verify(transactionManager, never()).commit(any())
+    }
+
+    @Test
+    fun 배치_예약은_상품_수와_상관없이_자기_트랜잭션_하나를_열어_커밋한다() {
+        stubReservable(1L, 2L)
+
+        service.batchReserveStock(listOf(2L to 5, 1L to 3))
+
+        verify(transactionManager).getTransaction(any())
+        verify(transactionManager).commit(any())
+        verify(transactionManager, never()).rollback(any())
+    }
+
+    @Test
     fun 배치_예약_중_실패_시_이전_예약을_모두_취소한다() {
         val inv1 = Inventory.create(productId = 1L, stockQuantity = 100)
         val inv2 = Inventory.create(productId = 2L, stockQuantity = 0)
@@ -199,18 +241,19 @@ class InventoryCommandServiceImplTest {
     }
 
     @Test
-    fun 배치_예약이_트랜잭션_밖에서_성공하면_예약한_상품의_재고_캐시를_바로_지운다() {
+    fun 배치_예약의_자기_트랜잭션에_동기화가_없으면_예약한_상품의_재고_캐시를_바로_지운다() {
         val cache = stubInventoryCache()
         stubReservable(1L, 2L)
 
         service.batchReserveStock(listOf(2L to 5, 1L to 3))
 
+        assertThat(TransactionSynchronizationManager.isSynchronizationActive()).isFalse()
         verify(cache).evict(1L)
         verify(cache).evict(2L)
     }
 
     @Test
-    fun 배치_예약이_트랜잭션_안에서_성공하면_커밋된_뒤에_재고_캐시를_지운다() {
+    fun 배치_예약의_자기_트랜잭션에_동기화가_있으면_커밋된_뒤에_재고_캐시를_지운다() {
         val cache = stubInventoryCache()
         stubReservable(1L, 2L)
         TransactionSynchronizationManager.initSynchronization()
@@ -241,6 +284,8 @@ class InventoryCommandServiceImplTest {
             .isInstanceOf(InventoryInsufficientStockException::class.java)
 
         verify(cacheManagerProvider, never()).getIfAvailable()
+        verify(transactionManager).rollback(any())
+        verify(transactionManager, never()).commit(any())
     }
 
     @Test
