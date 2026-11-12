@@ -67,6 +67,17 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
     )
     fun lockCancellable(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
 
+    @Query(
+        value = """
+            SELECT id, product_id, quantity FROM inventory_reservations
+            WHERE reservation_id IN (:reservationIds) AND status = 'CONFIRMED'
+            ORDER BY id
+            FOR UPDATE
+        """,
+        nativeQuery = true
+    )
+    fun lockConfirmed(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
+
     @Modifying(clearAutomatically = true)
     @Query(
         value = """

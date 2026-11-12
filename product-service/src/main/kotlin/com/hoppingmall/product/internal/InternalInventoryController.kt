@@ -61,6 +61,12 @@ class InternalInventoryController(
         return ResponseEntity.ok().build()
     }
 
+    @PostMapping("/reservations/batch-cancel-confirmed")
+    fun cancelConfirmedReservations(@RequestBody reservationIds: List<String>): ResponseEntity<Void> {
+        inventoryCommandService.cancelConfirmedReservations(reservationIds)
+        return ResponseEntity.ok().build()
+    }
+
     @PostMapping("/batch-reserve")
     fun batchReserveStock(
         @RequestBody items: List<ReserveRequest>,
