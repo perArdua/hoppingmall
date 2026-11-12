@@ -1,6 +1,7 @@
 package com.hoppingmall.settlement.port
 
 import com.hoppingmall.settlement.exception.ServiceCommunicationException
+import com.hoppingmall.settlement.exception.ServiceRequestRejectedException
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
@@ -9,6 +10,7 @@ import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpMethod
 import org.springframework.stereotype.Component
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
 import java.time.Duration
 import java.time.LocalDateTime
@@ -51,6 +53,9 @@ class HttpOrderItemQueryAdapter(
         e: Exception
     ): List<OrderItemInfo> {
         logger.error("CB fallback: order-service 배송완료 주문상품 조회 실패 sellerId=$sellerId", e)
+        if (e is HttpClientErrorException) {
+            throw ServiceRequestRejectedException("order-service 배송완료 주문상품 조회 거절: ${e.message}")
+        }
         throw ServiceCommunicationException("order-service 배송완료 주문상품 조회 실패: ${e.message}")
     }
 }

@@ -15,5 +15,6 @@ enum class SettlementErrorCode(
     SETTLEMENT_ACCESS_DENIED("STL005", "정산에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
     SETTLEMENT_NO_SALES_DATA("STL006", "해당 기간에 정산할 매출 데이터가 없습니다.", HttpStatus.BAD_REQUEST),
     SETTLEMENT_SELLER_NOT_FOUND("STL007", "판매자 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-    SERVICE_COMMUNICATION_ERROR("STL008", "서비스 간 통신 오류가 발생했습니다.", HttpStatus.SERVICE_UNAVAILABLE)
+    SERVICE_COMMUNICATION_ERROR("STL008", "서비스 간 통신 오류가 발생했습니다.", HttpStatus.SERVICE_UNAVAILABLE),
+    SERVICE_REQUEST_REJECTED("STL009", "다른 서비스가 정산 서비스의 요청을 거절했습니다.", HttpStatus.INTERNAL_SERVER_ERROR)
 }
