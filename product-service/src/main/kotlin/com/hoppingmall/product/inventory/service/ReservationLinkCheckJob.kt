@@ -38,6 +38,7 @@ class ReservationLinkCheckJob(
     private val abortedCounter = Counter.builder("inventory.linkcheck.aborted").register(meterRegistry)
     private val floorCounter = Counter.builder("inventory.linkcheck.floor_expired").register(meterRegistry)
     private val failedCycles = Counter.builder("inventory.linkcheck.failed_cycles").register(meterRegistry)
+    private val failedProducts = Counter.builder("inventory.linkcheck.failed_products").register(meterRegistry)
     private val cycles = Counter.builder("inventory.linkcheck.cycles").register(meterRegistry)
     private val oldestAgeMs = AtomicLong(0)
 
@@ -113,11 +114,9 @@ class ReservationLinkCheckJob(
     private fun abort(candidates: List<Pair<String, Long>>, aborted: List<String>): Int {
         if (aborted.isEmpty()) return 0
         val abortedSet = aborted.toSet()
-        var total = 0
-        candidates.filter { it.first in abortedSet }
-            .groupBy({ it.second }, { it.first })
-            .toSortedMap()
-            .forEach { (productId, rids) -> total += expireLocked(productId, rids) }
+        val total = expireByProduct(
+            candidates.filter { it.first in abortedSet }.groupBy({ it.second }, { it.first })
+        )
         abortedCounter.increment(total.toDouble())
         return total
     }
@@ -125,11 +124,21 @@ class ReservationLinkCheckJob(
     private fun expireFloor(now: LocalDateTime): Int {
         val rows = inventoryReservationRepository.findReservedCreatedBefore(now.minusSeconds(floorSeconds), batchSize)
         if (rows.isEmpty()) return 0
-        var total = 0
-        rows.groupBy({ (it[1] as Number).toLong() }, { it[0] as String })
-            .toSortedMap()
-            .forEach { (productId, rids) -> total += expireLocked(productId, rids) }
+        val total = expireByProduct(rows.groupBy({ (it[1] as Number).toLong() }, { it[0] as String }))
         floorCounter.increment(total.toDouble())
+        return total
+    }
+
+    private fun expireByProduct(reservationIdsByProduct: Map<Long, List<String>>): Int {
+        var total = 0
+        reservationIdsByProduct.toSortedMap().forEach { (productId, reservationIds) ->
+            try {
+                total += expireLocked(productId, reservationIds)
+            } catch (e: Exception) {
+                failedProducts.increment()
+                logger.error("링크 확인 만료 처리 실패: productId={}", productId, e)
+            }
+        }
         return total
     }
 
