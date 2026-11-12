@@ -80,6 +80,67 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
         @Param("updatedAt") updatedAt: LocalDateTime
     ): Int
 
+    @Query(
+        value = """
+            SELECT reservation_id FROM inventory_reservations
+            WHERE product_id = :productId AND status = 'RESERVED' AND expires_at < :now
+            ORDER BY expires_at, id LIMIT :limit
+        """,
+        nativeQuery = true
+    )
+    fun findExpiredReservationIds(
+        @Param("productId") productId: Long,
+        @Param("now") now: LocalDateTime,
+        @Param("limit") limit: Int
+    ): List<String>
+
+    @Query(
+        value = """
+            SELECT reservation_id, product_id FROM inventory_reservations
+            WHERE status = 'RESERVED' AND created_at < :cutoff
+            ORDER BY created_at, id LIMIT :limit
+        """,
+        nativeQuery = true
+    )
+    fun findReservedCreatedBefore(
+        @Param("cutoff") cutoff: LocalDateTime,
+        @Param("limit") limit: Int
+    ): List<Array<Any>>
+
+    @Query(
+        value = """
+            SELECT MIN(expires_at) FROM inventory_reservations
+            WHERE status = 'RESERVED' AND expires_at < :now
+        """,
+        nativeQuery = true
+    )
+    fun oldestExpiredExpiresAt(@Param("now") now: LocalDateTime): LocalDateTime?
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE inventory_reservations SET status = 'CLAIMED', expires_at = :until, updated_at = :updatedAt
+            WHERE reservation_id IN (:reservationIds) AND status = 'RESERVED'
+        """,
+        nativeQuery = true
+    )
+    fun claimByReservationIds(
+        @Param("reservationIds") reservationIds: List<String>,
+        @Param("until") until: LocalDateTime,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
+
+    @Query(
+        value = """
+            SELECT id, quantity FROM inventory_reservations
+            WHERE reservation_id IN (:reservationIds) AND status = 'RESERVED'
+            ORDER BY id
+            FOR UPDATE
+        """,
+        nativeQuery = true
+    )
+    fun lockReservedByReservationIds(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
+
     @Query("""
         SELECT r FROM InventoryReservation r
         WHERE r.status = :status

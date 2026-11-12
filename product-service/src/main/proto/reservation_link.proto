@@ -1,0 +1,14 @@
+syntax = "proto3";
+package hoppingmall.reservation;
+option java_package = "com.hoppingmall.reservation.grpc";
+option java_multiple_files = true;
+
+service ReservationLinkService {
+  rpc CheckReservationLinks (ReservationLinkRequest) returns (ReservationLinkResponse);
+}
+
+message ReservationLinkRequest { repeated string reservation_ids = 1; }
+message ReservationLinkResponse {
+  repeated string linked = 1;
+  repeated string aborted = 2;
+}

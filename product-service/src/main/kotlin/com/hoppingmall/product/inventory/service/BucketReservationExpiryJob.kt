@@ -30,6 +30,9 @@ class BucketReservationExpiryJob(
 
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
+    @Value("\${inventory.link-check.enabled:false}")
+    private var linkCheckEnabled: Boolean = false
+
     private val batchSize = DistributionSummary.builder("inventory.expiry.batch.size")
         .description("Reservations expired per chunk transaction")
         .register(meterRegistry)
@@ -44,7 +47,7 @@ class BucketReservationExpiryJob(
 
     @Scheduled(fixedDelayString = "\${inventory.reservation.expiry-interval-ms:60000}")
     fun expireReservations() {
-        if (!expiryEnabled) return
+        if (!expiryEnabled || linkCheckEnabled) return
         val now = LocalDateTime.now()
         val backlog = inventoryReservationRepository.countExpiredGroupByProduct(now)
             .map { row -> (row[0] as Number).toLong() to (row[1] as Number).toLong() }
