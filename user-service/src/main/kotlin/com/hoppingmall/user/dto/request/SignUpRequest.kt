@@ -1,6 +1,5 @@
 package com.hoppingmall.user.dto.request
 
-import com.hoppingmall.user.common.enums.Role
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
@@ -14,7 +13,5 @@ data class SignUpRequest(
     val password: String,
 
     @field:NotBlank(message = "이름은 필수입니다.")
-    val name: String,
-
-    val role: Role? = null
+    val name: String
 )
