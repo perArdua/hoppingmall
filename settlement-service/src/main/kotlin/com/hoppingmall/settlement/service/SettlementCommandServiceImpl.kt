@@ -60,6 +60,9 @@ class SettlementCommandServiceImpl(
         return transactionTemplate.execute {
             if (settlementRepository.existsBySellerIdAndPeriodStartAndPeriodEnd(
                     request.sellerId, request.periodStart, request.periodEnd
+                ) ||
+                settlementRepository.existsBySellerIdAndPeriodStartLessThanEqualAndPeriodEndGreaterThanEqual(
+                    request.sellerId, request.periodEnd, request.periodStart
                 )
             ) {
                 throw SettlementAlreadyExistsException()
