@@ -26,7 +26,8 @@ class SettlementCommandServiceImpl(
     private val orderItemQueryPort: OrderItemQueryPort,
     private val refundQueryPort: RefundQueryPort,
     transactionManager: PlatformTransactionManager,
-    private val settlementSummarySynchronizer: SettlementSummarySynchronizer? = null
+    private val settlementSummarySynchronizer: SettlementSummarySynchronizer? = null,
+    private val settlementSellerLocker: SettlementSellerLocker? = null
 ) : SettlementCommandService {
 
     private val transactionTemplate = TransactionTemplate(transactionManager)
@@ -59,6 +60,7 @@ class SettlementCommandServiceImpl(
         val settlementAmount = totalSalesAmount.subtract(totalRefundAmount).subtract(commissionAmount)
 
         return transactionTemplate.execute {
+            settlementSellerLocker?.lock(request.sellerId)
             if (settlementRepository.existsBySellerIdAndPeriodStartAndPeriodEnd(
                     request.sellerId, request.periodStart, request.periodEnd
                 ) ||

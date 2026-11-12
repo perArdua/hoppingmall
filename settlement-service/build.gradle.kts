@@ -27,6 +27,8 @@ repositories {
 	maven { url = uri("https://packages.confluent.io/maven/") }
 }
 
+extra["testcontainers.version"] = "1.21.4"
+
 dependencies {
 	implementation("com.hoppingmall:hoppingmall-common:0.0.1-SNAPSHOT")
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
@@ -60,6 +62,8 @@ dependencies {
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.springframework.security:spring-security-test")
+	testImplementation("org.testcontainers:testcontainers:1.21.4")
+	testImplementation("org.testcontainers:mysql:1.21.4")
 }
 
 tasks.withType<Test> {
