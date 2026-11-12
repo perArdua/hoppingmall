@@ -43,7 +43,7 @@ class UserControllerTest {
 
     @Test
     fun 회원가입_시_응답을_반환한다() {
-        val request = SignUpRequest("test@example.com", "Password1234", "테스트", Role.SELLER)
+        val request = SignUpRequest("test@example.com", "Password1234", "테스트")
         val expected = SignUpResponse(1L, "test@example.com", "테스트", Role.SELLER)
         whenever(userCommandService.signUp(request)).thenReturn(expected)
 
