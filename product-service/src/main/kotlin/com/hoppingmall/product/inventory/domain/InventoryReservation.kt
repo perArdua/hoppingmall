@@ -11,7 +11,8 @@ import java.util.UUID
     indexes = [
         Index(name = "idx_reservation_id", columnList = "reservationId", unique = true),
         Index(name = "idx_reservation_product_status", columnList = "productId, status"),
-        Index(name = "idx_reservation_expires_status", columnList = "expiresAt, status")
+        Index(name = "idx_reservation_expires_status", columnList = "expiresAt, status"),
+        Index(name = "idx_reservation_product_status_expires", columnList = "productId, status, expiresAt")
     ]
 )
 class InventoryReservation(

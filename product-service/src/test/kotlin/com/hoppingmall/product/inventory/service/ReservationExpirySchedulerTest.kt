@@ -15,10 +15,13 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.data.domain.Pageable
+import org.springframework.test.util.ReflectionTestUtils
 import java.time.LocalDateTime
 
 @DisplayName("ReservationExpiryScheduler")
@@ -114,5 +117,41 @@ class ReservationExpirySchedulerTest {
 
         verify(inventoryReservationRepository, never()).updateStatusByCas(any(), any(), any(), any())
         verify(inventoryRepository, never()).findByProductIdForUpdate(any())
+    }
+
+    @Test
+    fun 꺼져_있으면_만료_예약을_조회하지_않는다() {
+        ReflectionTestUtils.setField(scheduler, "expiryEnabled", false)
+
+        scheduler.expireReservations()
+
+        verify(inventoryReservationRepository, never()).findExpiredReservations(any(), any(), any())
+        verify(inventoryRepository, never()).findByProductIdForUpdate(any())
+    }
+
+    @Test
+    fun 설정이_없으면_한_주기에_100건까지_조회한다() {
+        whenever(inventoryReservationRepository.findExpiredReservations(any(), any(), any())).thenReturn(emptyList())
+
+        scheduler.expireReservations()
+
+        assertThat(capturedLimit().pageSize).isEqualTo(100)
+        assertThat(capturedLimit().pageNumber).isEqualTo(0)
+    }
+
+    @Test
+    fun 조회_상한을_설정한_값으로_조회한다() {
+        ReflectionTestUtils.setField(scheduler, "expiryLimit", 7)
+        whenever(inventoryReservationRepository.findExpiredReservations(any(), any(), any())).thenReturn(emptyList())
+
+        scheduler.expireReservations()
+
+        assertThat(capturedLimit().pageSize).isEqualTo(7)
+    }
+
+    private fun capturedLimit(): Pageable {
+        val limit = argumentCaptor<Pageable>()
+        verify(inventoryReservationRepository).findExpiredReservations(eq(ReservationStatus.RESERVED), any(), limit.capture())
+        return limit.firstValue
     }
 }

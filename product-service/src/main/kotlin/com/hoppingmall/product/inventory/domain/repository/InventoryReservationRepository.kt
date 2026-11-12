@@ -78,4 +78,41 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
         @Param("now") now: LocalDateTime,
         limit: Pageable
     ): List<InventoryReservation>
+
+    @Query(
+        value = """
+            SELECT product_id, COUNT(*) FROM inventory_reservations
+            WHERE status = 'RESERVED' AND expires_at < :now
+            GROUP BY product_id
+        """,
+        nativeQuery = true
+    )
+    fun countExpiredGroupByProduct(@Param("now") now: LocalDateTime): List<Array<Any>>
+
+    @Query(
+        value = """
+            SELECT id, quantity FROM inventory_reservations
+            WHERE product_id = :productId AND status = 'RESERVED' AND expires_at < :now
+            ORDER BY expires_at, id LIMIT :limit
+        """,
+        nativeQuery = true
+    )
+    fun findExpiredChunk(
+        @Param("productId") productId: Long,
+        @Param("now") now: LocalDateTime,
+        @Param("limit") limit: Int
+    ): List<Array<Any>>
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE inventory_reservations SET status = 'EXPIRED', updated_at = :updatedAt
+            WHERE id IN (:ids) AND status = 'RESERVED'
+        """,
+        nativeQuery = true
+    )
+    fun expireByIds(
+        @Param("ids") ids: List<Long>,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
 }

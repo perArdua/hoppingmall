@@ -4,6 +4,8 @@ import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
 import org.springframework.data.domain.PageRequest
 import org.springframework.scheduling.annotation.Scheduled
@@ -13,19 +15,28 @@ import java.time.LocalDateTime
 
 @Service
 @Profile("!test")
+@ConditionalOnProperty(name = ["inventory.mode"], havingValue = "single", matchIfMissing = true)
 class ReservationExpiryScheduler(
     private val inventoryReservationRepository: InventoryReservationRepository,
     private val inventoryRepository: InventoryRepository
 ) {
     private val logger = LoggerFactory.getLogger(ReservationExpiryScheduler::class.java)
 
+    @Value("\${inventory.expiry.enabled:true}")
+    private var expiryEnabled: Boolean = true
+
+    @Value("\${inventory.expiry.limit:100}")
+    private var expiryLimit: Int = 100
+
     @Scheduled(fixedDelayString = "\${inventory.reservation.expiry-interval-ms:60000}")
     @Transactional
     fun expireReservations() {
+        if (!expiryEnabled) return
+
         val expiredReservations = inventoryReservationRepository.findExpiredReservations(
             status = ReservationStatus.RESERVED,
             now = LocalDateTime.now(),
-            limit = PageRequest.of(0, 100)
+            limit = PageRequest.of(0, expiryLimit)
         )
 
         if (expiredReservations.isEmpty()) return
