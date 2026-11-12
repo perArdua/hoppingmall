@@ -11,6 +11,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
@@ -181,6 +182,34 @@ class OrderCommandServiceImplTest {
             })
         verify(orderRepository, never()).save(any<Order>())
         verify(cartItemRepository, never()).deleteAllById(any())
+    }
+
+    @Test
+    fun 재고_서비스가_429를_응답하면_ORD008_혼잡_예외로_바꾼다() {
+        stubReservableCart()
+        whenever(inventoryCommandPort.batchReserveStock(any()))
+            .thenThrow(HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "INV005", HttpHeaders.EMPTY, ByteArray(0), null))
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
+            .isInstanceOf(OrderBusyException::class.java)
+            .extracting { (it as OrderBusyException).errorCode }
+            .satisfies({ errorCode ->
+                assertThat(errorCode.code).isEqualTo("ORD008")
+                assertThat(errorCode.status).isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
+            })
+        verify(orderRepository, never()).save(any<Order>())
+        verify(cartItemRepository, never()).deleteAllById(any())
+    }
+
+    @Test
+    fun 재고_서비스의_409는_그대로_전파한다() {
+        stubReservableCart()
+        val conflict = HttpClientErrorException.create(HttpStatus.CONFLICT, "INV004", HttpHeaders.EMPTY, ByteArray(0), null)
+        whenever(inventoryCommandPort.batchReserveStock(any())).thenThrow(conflict)
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
+            .isSameAs(conflict)
+        verify(orderRepository, never()).save(any<Order>())
     }
 
     @Test
