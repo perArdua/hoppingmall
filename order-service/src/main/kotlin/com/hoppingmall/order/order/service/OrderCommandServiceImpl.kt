@@ -14,6 +14,7 @@ import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
@@ -98,6 +99,8 @@ class OrderCommandServiceImpl(
             inventoryCommandPort.batchReserveStock(items)
         } catch (e: HttpClientErrorException.BadRequest) {
             throw OrderOutOfStockException()
+        } catch (e: HttpClientErrorException.TooManyRequests) {
+            throw OrderBusyException()
         }
 
     override fun cancelOrder(buyerId: Long, orderId: Long): OrderResponse {

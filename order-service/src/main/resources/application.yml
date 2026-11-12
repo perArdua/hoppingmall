@@ -123,6 +123,10 @@ resilience4j:
         baseConfig: default
       inventory-command:
         baseConfig: default
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException$NotFound
+          - org.springframework.web.client.HttpClientErrorException$BadRequest
+          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
   retry:
     retryAspectOrder: 1
     configs:
