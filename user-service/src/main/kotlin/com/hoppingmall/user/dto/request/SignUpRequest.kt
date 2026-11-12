@@ -16,5 +16,5 @@ data class SignUpRequest(
     @field:NotBlank(message = "이름은 필수입니다.")
     val name: String,
 
-    val role: Role
+    val role: Role? = null
 )
