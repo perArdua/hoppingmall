@@ -148,6 +148,7 @@ class InventoryCommandServiceImpl(
             .mapValues { (_, rows) -> rows.sumOf { (it[2] as Number).toInt() } }
             .toSortedMap()
 
+        evictInventoryCacheAfterCommit(stockToRestore.keys)
         if (bucketStockService.enabled) {
             stockToRestore.forEach { (productId, quantity) -> bucketStockService.restore(productId, quantity) }
             return
