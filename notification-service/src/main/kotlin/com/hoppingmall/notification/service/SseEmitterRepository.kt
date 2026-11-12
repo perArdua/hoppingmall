@@ -3,6 +3,7 @@ package com.hoppingmall.notification.service
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Repository
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -14,6 +15,8 @@ class SseEmitterRepository(
 
     companion object {
         const val DEFAULT_MAX_CONNECTIONS_PER_USER = 3
+        const val EVICTED_EVENT_NAME = "evicted"
+        const val EVICTED_EVENT_DATA = "max-connections-exceeded"
     }
 
     private val emitters = ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>>()
@@ -32,8 +35,17 @@ class SseEmitterRepository(
                 }
             }
         }
-        evicted.forEach { it.complete() }
+        evicted.forEach { evict(it) }
         return emitter
+    }
+
+    private fun evict(emitter: SseEmitter) {
+        try {
+            emitter.send(SseEmitter.event().name(EVICTED_EVENT_NAME).data(EVICTED_EVENT_DATA))
+        } catch (e: IOException) {
+        } catch (e: IllegalStateException) {
+        }
+        emitter.complete()
     }
 
     fun findByUserId(userId: Long): List<SseEmitter> =
