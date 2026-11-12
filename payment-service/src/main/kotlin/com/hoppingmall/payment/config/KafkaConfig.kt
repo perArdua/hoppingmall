@@ -3,8 +3,8 @@ package com.hoppingmall.payment.config
 import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.common.config.kafka.BusinessContextConsumerInterceptor
 import com.hoppingmall.common.config.kafka.BusinessContextProducerInterceptor
-import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.service.DLQCommandService
+import com.hoppingmall.payment.payment.service.PaymentCompensationConsumer
 import io.confluent.kafka.serializers.KafkaAvroSerializer
 import io.confluent.kafka.serializers.subject.TopicRecordNameStrategy
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -28,7 +28,8 @@ import java.util.UUID
 @Configuration
 @Profile("!test")
 class KafkaConfig(
-    @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService
+    @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService,
+    @org.springframework.context.annotation.Lazy private val paymentCompensationConsumer: PaymentCompensationConsumer
 ) {
     @Value("\${kafka.consumer.max-poll-interval-ms:300000}")
     private var maxPollIntervalMs: Int = 300_000
@@ -134,20 +135,7 @@ class KafkaConfig(
         factory.setConcurrency(4)
 
         val errorHandler = DefaultErrorHandler(
-            { record, exception ->
-                log.error("Kafka 메시지 처리 실패 (DLQ): topic={}, offset={}, error={}",
-                    record.topic(), record.offset(), exception.message)
-                val deadLetterMessage = DeadLetterMessage(
-                    originalTopic = record.topic(),
-                    originalPartition = record.partition(),
-                    originalOffset = record.offset(),
-                    originalKey = record.key()?.toString(),
-                    originalValue = record.value()?.toString(),
-                    exception = exception.message,
-                    timestamp = System.currentTimeMillis()
-                )
-                dlqCommandService.saveDLQMessage(deadLetterMessage)
-            },
+            PaymentKafkaRecordRecoverer(dlqCommandService, paymentCompensationConsumer),
             FixedBackOff(1000L, 3)
         )
         errorHandler.addNotRetryableExceptions(

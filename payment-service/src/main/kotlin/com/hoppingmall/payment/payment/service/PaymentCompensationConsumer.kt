@@ -30,6 +30,12 @@ class PaymentCompensationConsumer(
         }
     }
 
+    fun handleRetriesExhausted(message: String) {
+        val node = runCatching { objectMapper.readTree(message) }.getOrNull() ?: return
+        val eventType = node.get("eventType")?.asText() ?: return
+        compensationEventHandlerRegistry.getHandler(eventType)?.onRetriesExhausted(node)
+    }
+
     @KafkaListener(topics = [KafkaTopics.PAYMENT_REVERSAL], groupId = "payment-compensation-service")
     fun handlePaymentReversal(message: String) {
         val node = objectMapper.readTree(message)
