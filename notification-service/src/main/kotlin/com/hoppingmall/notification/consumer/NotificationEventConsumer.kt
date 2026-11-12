@@ -16,6 +16,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Service
 @Transactional
@@ -71,10 +73,24 @@ class NotificationEventConsumer(
                 )
             )
 
-            cacheManager.getCache("unread-count")?.evict(userId)
-            publishSseEvent(saved)
+            evictUnreadCountAndPublishAfterCommit(saved)
             log.info("알림 처리 완료: userId={}, type={}, title={}", userId, type, title)
         }
+    }
+
+    private fun evictUnreadCountAndPublishAfterCommit(notification: Notification) {
+        val cache = cacheManager.getCache("unread-count")
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            cache?.evict(notification.userId)
+            publishSseEvent(notification)
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                cache?.evict(notification.userId)
+                publishSseEvent(notification)
+            }
+        })
     }
 
     private fun publishSseEvent(notification: Notification) {
