@@ -49,6 +49,7 @@ class BucketStockService(
 
     init {
         require(bucketCount > 0) { "inventory.bucket.count must be positive" }
+        require(enabled || mode.equals(MODE_SINGLE, ignoreCase = true)) { "inventory.mode must be single or bucket: '$mode'" }
     }
 
     fun initBuckets(productId: Long, total: Int) {
@@ -154,6 +155,7 @@ class BucketStockService(
     }
 
     companion object {
+        const val MODE_SINGLE = "single"
         const val MODE_BUCKET = "bucket"
     }
 }
