@@ -205,13 +205,18 @@ class OrderSagaConsumer(
                 return@execute null
             }
 
-            if (order.isCancellable()) {
-                order.updateStatus(OrderStatus.CANCELLED)
-                orderRepository.save(order)
-            }
-
             val log = SagaEventLog(eventId = eventId, eventType = "PAYMENT_COMPENSATION", orderId = orderId)
             log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
+
+            if (!order.isCancellable()) {
+                log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+                sagaEventLogRepository.save(log)
+                logger.warn("취소할 수 없는 주문의 결제 보상, 예약 취소 생략: orderId=$orderId, status=${order.status}")
+                return@execute null
+            }
+
+            order.updateStatus(OrderStatus.CANCELLED)
+            orderRepository.save(order)
             sagaEventLogRepository.save(log)
 
             orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }
