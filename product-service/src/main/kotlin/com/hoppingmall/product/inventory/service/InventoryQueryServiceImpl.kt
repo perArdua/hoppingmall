@@ -10,7 +10,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class InventoryQueryServiceImpl(
-    private val inventoryRepository: InventoryRepository
+    private val inventoryRepository: InventoryRepository,
+    private val bucketStockService: BucketStockService
 ) : InventoryQueryService {
 
     @Cacheable(cacheNames = ["inventory"], key = "#productId", sync = true)
@@ -18,6 +19,8 @@ class InventoryQueryServiceImpl(
         val inventory = inventoryRepository.findByProductId(productId)
             ?: throw InventoryNotFoundException()
 
-        return InventoryResponse.from(inventory)
+        val response = InventoryResponse.from(inventory)
+        if (!bucketStockService.enabled) return response
+        return response.copy(stockQuantity = bucketStockService.totalStock(productId))
     }
 }

@@ -33,6 +33,7 @@ class InventoryCommandServiceImpl(
     private val inventoryRepository: InventoryRepository,
     private val inventoryReservationRepository: InventoryReservationRepository,
     private val productRepository: ProductRepository,
+    private val bucketStockService: BucketStockService,
     private val cacheManagerProvider: ObjectProvider<CacheManager>,
     transactionManager: PlatformTransactionManager
 ) : InventoryCommandService {
@@ -65,6 +66,9 @@ class InventoryCommandServiceImpl(
             stockQuantity = request.stockQuantity
         )
         val savedInventory = inventoryRepository.save(inventory)
+        if (bucketStockService.enabled) {
+            bucketStockService.initBuckets(request.productId, request.stockQuantity)
+        }
         return InventoryResponse.from(savedInventory)
     }
 
@@ -74,11 +78,18 @@ class InventoryCommandServiceImpl(
             ?: throw InventoryNotFoundException()
 
         inventory.stockQuantity = request.stockQuantity
+        if (bucketStockService.enabled) {
+            bucketStockService.redistribute(productId, request.stockQuantity)
+        }
         return InventoryResponse.from(inventory)
     }
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun decreaseStock(productId: Long, quantity: Int) {
+        if (bucketStockService.enabled) {
+            bucketStockService.decrease(productId, quantity)
+            return
+        }
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
             ?: throw InventoryNotFoundException()
 
@@ -87,16 +98,13 @@ class InventoryCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun increaseStock(productId: Long, quantity: Int) {
-        val inventory = inventoryRepository.findByProductIdForUpdate(productId)
-            ?: throw InventoryNotFoundException()
-
-        inventory.increaseStock(quantity)
+        restoreStock(productId, quantity)
     }
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun reserveStock(productId: Long, quantity: Int): String =
-        inReserveTransaction { reserveOne(productId, quantity) }
+        inReserveTransaction { lockAll -> reserveOne(productId, quantity, lockAll) }
 
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         maybeInjectChaos("confirmReservations")
@@ -159,6 +167,11 @@ class InventoryCommandServiceImpl(
             .mapValues { (_, rows) -> rows.sumOf { (it[2] as Number).toInt() } }
             .toSortedMap()
 
+        if (bucketStockService.enabled) {
+            stockToRestore.forEach { (productId, quantity) -> bucketStockService.restore(productId, quantity) }
+            return
+        }
+
         val inventories = inventoryRepository.findByProductIdInForUpdate(stockToRestore.keys.toList())
             .associateBy { it.productId }
 
@@ -169,37 +182,62 @@ class InventoryCommandServiceImpl(
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
-        inReserveTransaction { batchReserveInTransaction(items) }
+        inReserveTransaction { lockAll -> batchReserveInTransaction(items, lockAll) }
 
-    private fun batchReserveInTransaction(items: List<Pair<Long, Int>>): Map<Long, String> {
+    private fun batchReserveInTransaction(items: List<Pair<Long, Int>>, lockAll: Boolean): Map<Long, String> {
         val sorted = items.sortedBy { it.first }
         val reservationMap = mutableMapOf<Long, String>()
         try {
             sorted.forEach { (productId, quantity) ->
-                val reservationId = reserveOne(productId, quantity)
+                val reservationId = reserveOne(productId, quantity, lockAll)
                 reservationMap[productId] = reservationId
             }
         } catch (e: Exception) {
-            reservationMap.values.forEach { cancelReservation(it) }
+            if (!bucketStockService.enabled) {
+                reservationMap.values.forEach { cancelReservation(it) }
+            }
             throw e
         }
         evictInventoryCacheAfterCommit(reservationMap.keys)
         return reservationMap
     }
 
-    private fun <T : Any> inReserveTransaction(block: () -> T): T =
-        reserveTransaction.execute { block() }!!
+    private fun <T : Any> inReserveTransaction(block: (Boolean) -> T): T {
+        try {
+            return reserveTransaction.execute { block(false) }!!
+        } catch (e: BucketWalkExhaustedException) {
+            bucketStockService.recordRestart()
+            return reserveTransaction.execute { block(true) }!!
+        }
+    }
 
-    private fun reserveOne(productId: Long, quantity: Int): String {
+    private fun reserveOne(productId: Long, quantity: Int, lockAll: Boolean): String {
         maybeInjectChaos("reserveStock")
         val reservation = InventoryReservation.create(productId, quantity, ttlSeconds)
-        val inventory = inventoryRepository.findByProductIdForUpdate(productId)
-            ?: throw InventoryNotFoundException()
+        if (bucketStockService.enabled && lockAll) {
+            bucketStockService.reserveLockingAll(productId, quantity)
+        } else if (bucketStockService.enabled) {
+            bucketStockService.reserve(productId, quantity, reservation.reservationId)
+        } else {
+            val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+                ?: throw InventoryNotFoundException()
 
-        inventory.decreaseStock(quantity)
+            inventory.decreaseStock(quantity)
+        }
 
         inventoryReservationRepository.save(reservation)
         return reservation.reservationId
+    }
+
+    private fun restoreStock(productId: Long, quantity: Int) {
+        if (bucketStockService.enabled) {
+            bucketStockService.restore(productId, quantity)
+            return
+        }
+        val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+            ?: throw InventoryNotFoundException()
+
+        inventory.increaseStock(quantity)
     }
 
     private fun evictInventoryCacheAfterCommit(productIds: Collection<Long>) {
