@@ -1,6 +1,7 @@
 package com.hoppingmall.common
 
 import org.slf4j.LoggerFactory
+import org.springframework.data.mapping.PropertyReferenceException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -12,6 +13,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.multipart.MaxUploadSizeExceededException
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
@@ -46,6 +48,12 @@ class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.failure(CommonErrorCode.INVALID_INPUT))
     }
 
+    @ExceptionHandler(PropertyReferenceException::class)
+    fun handleInvalidSortProperty(ex: PropertyReferenceException): ResponseEntity<ApiResponse<Unit>> {
+        log.warn("InvalidSortProperty: {}", ex.message)
+        return ResponseEntity.badRequest().body(ApiResponse.failure(CommonErrorCode.INVALID_INPUT))
+    }
+
     @ExceptionHandler(NoResourceFoundException::class, NoHandlerFoundException::class)
     fun handleNotFound(ex: Exception): ResponseEntity<ApiResponse<Unit>> {
         log.debug("NotFound: {}", ex.message)
@@ -67,6 +75,13 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE.status)
             .headers(ex.headers)
             .body(ApiResponse.failure(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE))
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException::class)
+    fun handlePayloadTooLarge(ex: MaxUploadSizeExceededException): ResponseEntity<ApiResponse<Unit>> {
+        log.warn("PayloadTooLarge: {}", ex.message)
+        return ResponseEntity.status(CommonErrorCode.PAYLOAD_TOO_LARGE.status)
+            .body(ApiResponse.failure(CommonErrorCode.PAYLOAD_TOO_LARGE))
     }
 
     @ExceptionHandler(Exception::class)
