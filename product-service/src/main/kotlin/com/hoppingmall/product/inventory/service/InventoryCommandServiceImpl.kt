@@ -113,40 +113,18 @@ class InventoryCommandServiceImpl(
         maybeInjectChaos("confirmReservations")
         if (reservationIds.isEmpty()) return true
 
-        val now = LocalDateTime.now()
-        val updatedCount = inventoryReservationRepository.batchUpdateStatusByCas(
+        val updatedCount = inventoryReservationRepository.batchConfirmByCas(
             reservationIds = reservationIds,
-            expectedStatus = ReservationStatus.RESERVED,
-            targetStatus = ReservationStatus.CONFIRMED,
-            updatedAt = now
+            expectedStatuses = CONFIRMABLE,
+            updatedAt = LocalDateTime.now()
         )
+        if (updatedCount == reservationIds.size) return true
 
-        if (updatedCount != reservationIds.size) {
-            val reservations = inventoryReservationRepository.findByReservationIdIn(reservationIds)
-            val allConfirmed = reservations.size == reservationIds.size &&
-                reservations.all { it.status == ReservationStatus.CONFIRMED }
-            if (allConfirmed) {
-                return true
-            }
-
-            if (updatedCount > 0) {
-                inventoryReservationRepository.batchUpdateStatusByCas(
-                    reservationIds = reservationIds,
-                    expectedStatus = ReservationStatus.CONFIRMED,
-                    targetStatus = ReservationStatus.CANCELLED,
-                    updatedAt = now
-                )
-                reservationIds.mapNotNull { rsvId -> inventoryReservationRepository.findByReservationId(rsvId) }
-                    .filter { it.status == ReservationStatus.CANCELLED }
-                    .sortedBy { it.productId }
-                    .forEach { reservation ->
-                        val inventory = inventoryRepository.findByProductIdForUpdate(reservation.productId) ?: return@forEach
-                        inventory.increaseStock(reservation.quantity)
-                    }
-            }
-            throw ReservationConfirmFailedException()
-        }
-        return true
+        val reservations = inventoryReservationRepository.findByReservationIdIn(reservationIds)
+        val allConfirmed = reservations.size == reservationIds.size &&
+            reservations.all { it.status == ReservationStatus.CONFIRMED }
+        if (allConfirmed) return true
+        throw ReservationConfirmFailedException()
     }
 
     override fun cancelReservation(reservationId: String) {
@@ -264,5 +242,6 @@ class InventoryCommandServiceImpl(
 
     companion object {
         private const val INVENTORY_CACHE = "inventory"
+        private val CONFIRMABLE = listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)
     }
 }
