@@ -15,7 +15,7 @@ class ProductSearchRepositoryImpl(
     private val datasourceUrl: String
 ) : ProductSearchRepository {
 
-    private val useFullText: Boolean = datasourceUrl.contains("mysql", ignoreCase = true)
+    private val useFullText: Boolean = datasourceUrl.startsWith("jdbc:mysql:", ignoreCase = true)
 
     override fun searchProducts(
         keyword: String?,

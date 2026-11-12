@@ -1,9 +1,11 @@
 package com.hoppingmall.product.wishlist.service
 
+import com.hoppingmall.product.wishlist.domain.Wishlist
 import com.hoppingmall.product.wishlist.domain.repository.WishlistRepository
 import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
+import org.springframework.data.mapping.PropertyPath
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -13,8 +15,10 @@ class WishlistQueryServiceImpl(
     private val wishlistRepository: WishlistRepository
 ) : WishlistQueryService {
 
-    override fun getWishlists(buyerId: Long, pageable: Pageable): Slice<WishlistResponse> =
-        wishlistRepository.findByBuyerIdWithProduct(buyerId, pageable)
+    override fun getWishlists(buyerId: Long, pageable: Pageable): Slice<WishlistResponse> {
+        pageable.sort.forEach { PropertyPath.from(it.property, Wishlist::class.java) }
+        return wishlistRepository.findByBuyerIdWithProduct(buyerId, pageable)
+    }
 
     override fun isWishlisted(buyerId: Long, productId: Long): Boolean =
         wishlistRepository.existsByBuyerIdAndProductId(buyerId, productId)
