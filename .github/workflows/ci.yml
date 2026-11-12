@@ -39,6 +39,7 @@ jobs:
               - 'notification-service/**'
               - 'hoppingmall-common/**'
               - 'hoppingmall-dlq/**'
+              - 'hoppingmall-cache/**'
               - '.github/workflows/**'
             order_service:
               - 'order-service/**'
@@ -52,6 +53,7 @@ jobs:
               - 'hoppingmall-common/**'
               - 'hoppingmall-dlq/**'
               - 'hoppingmall-outbox/**'
+              - 'hoppingmall-cache/**'
               - '.github/workflows/**'
             product_service:
               - 'product-service/**'
