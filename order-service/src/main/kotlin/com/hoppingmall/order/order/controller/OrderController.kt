@@ -6,6 +6,8 @@ import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.dto.response.OrderResponse
+import com.hoppingmall.order.order.enum.OrderStatus
+import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.service.OrderCommandService
 import com.hoppingmall.order.order.service.OrderQueryService
 import jakarta.validation.Valid
@@ -72,8 +74,16 @@ class OrderController(
         @PathVariable orderId: Long,
         @Valid @RequestBody request: OrderStatusUpdateRequest
     ): ResponseEntity<ApiResponse<OrderResponse>> {
-        val isAdmin = userPrincipal.getRole() == "ADMIN"
-        val order = orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), isAdmin)
+        if (request.status !in SHIPPING_STATUSES) {
+            throw OrderInvalidStatusException()
+        }
+        val canChangeAnyOrder = userPrincipal.getRole() in SHIPPING_MANAGER_ROLES
+        val order = orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), canChangeAnyOrder)
         return ResponseEntity.ok(ApiResponse.success(order))
+    }
+
+    companion object {
+        private val SHIPPING_STATUSES = setOf(OrderStatus.SHIPPED, OrderStatus.DELIVERED)
+        private val SHIPPING_MANAGER_ROLES = setOf("SELLER", "ADMIN")
     }
 }

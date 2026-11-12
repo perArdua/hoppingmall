@@ -5,6 +5,7 @@ import com.hoppingmall.common.config.InternalTokenFilter
 import com.hoppingmall.common.config.GatewayHeaderAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.web.SecurityFilterChain
@@ -25,5 +26,6 @@ class SecurityConfig(
         auth: org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry
     ) {
         auth.requestMatchers("/ops/**", "/api/v1/admin/**").hasRole("ADMIN")
+        auth.requestMatchers(HttpMethod.PATCH, "/api/v1/orders/*/status").hasAnyRole("SELLER", "ADMIN")
     }
 }
