@@ -9,6 +9,7 @@ import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
+import com.hoppingmall.product.inventory.exception.InventoryInvalidQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryNotFoundException
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
@@ -104,10 +105,12 @@ class InventoryCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    override fun reserveStock(productId: Long, quantity: Int): String =
-        withReserveGate(listOf(productId)) {
+    override fun reserveStock(productId: Long, quantity: Int): String {
+        requirePositiveQuantity(quantity)
+        return withReserveGate(listOf(productId)) {
             inReserveTransaction { lockAll -> reserveOne(productId, quantity, lockAll) }
         }
+    }
 
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         maybeInjectChaos("confirmReservations")
@@ -171,10 +174,16 @@ class InventoryCommandServiceImpl(
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
-        withReserveGate(items.map { it.first }) {
+    override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
+        items.forEach { (_, quantity) -> requirePositiveQuantity(quantity) }
+        return withReserveGate(items.map { it.first }) {
             inReserveTransaction { lockAll -> batchReserveInTransaction(items, lockAll) }
         }
+    }
+
+    private fun requirePositiveQuantity(quantity: Int) {
+        if (quantity <= 0) throw InventoryInvalidQuantityException()
+    }
 
     private fun batchReserveInTransaction(items: List<Pair<Long, Int>>, lockAll: Boolean): Map<Long, String> {
         val sorted = items.sortedBy { it.first }
