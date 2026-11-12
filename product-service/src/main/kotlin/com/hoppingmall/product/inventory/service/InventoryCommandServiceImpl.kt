@@ -34,6 +34,7 @@ class InventoryCommandServiceImpl(
     private val inventoryReservationRepository: InventoryReservationRepository,
     private val productRepository: ProductRepository,
     private val bucketStockService: BucketStockService,
+    private val reservationGate: InventoryReservationGate,
     private val cacheManagerProvider: ObjectProvider<CacheManager>,
     transactionManager: PlatformTransactionManager
 ) : InventoryCommandService {
@@ -104,7 +105,9 @@ class InventoryCommandServiceImpl(
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun reserveStock(productId: Long, quantity: Int): String =
-        inReserveTransaction { lockAll -> reserveOne(productId, quantity, lockAll) }
+        withReserveGate(listOf(productId)) {
+            inReserveTransaction { lockAll -> reserveOne(productId, quantity, lockAll) }
+        }
 
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         maybeInjectChaos("confirmReservations")
@@ -182,7 +185,9 @@ class InventoryCommandServiceImpl(
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
-        inReserveTransaction { lockAll -> batchReserveInTransaction(items, lockAll) }
+        withReserveGate(items.map { it.first }) {
+            inReserveTransaction { lockAll -> batchReserveInTransaction(items, lockAll) }
+        }
 
     private fun batchReserveInTransaction(items: List<Pair<Long, Int>>, lockAll: Boolean): Map<Long, String> {
         val sorted = items.sortedBy { it.first }
@@ -201,6 +206,9 @@ class InventoryCommandServiceImpl(
         evictInventoryCacheAfterCommit(reservationMap.keys)
         return reservationMap
     }
+
+    private fun <T> withReserveGate(productIds: List<Long>, block: () -> T): T =
+        if (bucketStockService.enabled) reservationGate.withPermits(productIds, block) else block()
 
     private fun <T : Any> inReserveTransaction(block: (Boolean) -> T): T {
         try {
