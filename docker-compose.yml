@@ -5,7 +5,7 @@ services:
     image: mysql:8.0
     container_name: mysql
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
     command: >
@@ -29,7 +29,7 @@ services:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: zookeeper
     ports:
-      - "2181:2181"
+      - "127.0.0.1:2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -38,8 +38,8 @@ services:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:29092:29092"
     depends_on:
       - zookeeper
     environment:
@@ -63,7 +63,7 @@ services:
     image: confluentinc/cp-schema-registry:7.6.0
     container_name: schema-registry
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     depends_on:
       - kafka
     environment:
@@ -75,8 +75,8 @@ services:
     image: redis:7.2-alpine
     container_name: redis-node-1
     ports:
-      - "7001:7001"
-      - "17001:17001"
+      - "127.0.0.1:7001:7001"
+      - "127.0.0.1:17001:17001"
     command: >
       redis-server
       --port 7001
@@ -97,8 +97,8 @@ services:
     image: redis:7.2-alpine
     container_name: redis-node-2
     ports:
-      - "7002:7002"
-      - "17002:17002"
+      - "127.0.0.1:7002:7002"
+      - "127.0.0.1:17002:17002"
     command: >
       redis-server
       --port 7002
@@ -119,8 +119,8 @@ services:
     image: redis:7.2-alpine
     container_name: redis-node-3
     ports:
-      - "7003:7003"
-      - "17003:17003"
+      - "127.0.0.1:7003:7003"
+      - "127.0.0.1:17003:17003"
     command: >
       redis-server
       --port 7003
@@ -141,8 +141,8 @@ services:
     image: redis:7.2-alpine
     container_name: redis-node-4
     ports:
-      - "7004:7004"
-      - "17004:17004"
+      - "127.0.0.1:7004:7004"
+      - "127.0.0.1:17004:17004"
     command: >
       redis-server
       --port 7004
@@ -163,8 +163,8 @@ services:
     image: redis:7.2-alpine
     container_name: redis-node-5
     ports:
-      - "7005:7005"
-      - "17005:17005"
+      - "127.0.0.1:7005:7005"
+      - "127.0.0.1:17005:17005"
     command: >
       redis-server
       --port 7005
@@ -185,8 +185,8 @@ services:
     image: redis:7.2-alpine
     container_name: redis-node-6
     ports:
-      - "7006:7006"
-      - "17006:17006"
+      - "127.0.0.1:7006:7006"
+      - "127.0.0.1:17006:17006"
     command: >
       redis-server
       --port 7006
@@ -235,9 +235,9 @@ services:
     container_name: tempo
     command: ["-config.file=/etc/tempo/tempo.yml"]
     ports:
-      - "3200:3200"
-      - "4317:4317"
-      - "4318:4318"
+      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
     volumes:
       - ./docker/tempo.yml:/etc/tempo/tempo.yml
       - tempo-data:/tmp/tempo
@@ -246,7 +246,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
@@ -257,7 +257,7 @@ services:
     image: grafana/loki:2.9.0
     container_name: loki
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     volumes:
       - ./docker/loki.yml:/etc/loki/local-config.yaml
       - loki-data:/loki
@@ -268,7 +268,7 @@ services:
     container_name: mimir
     command: ["--config.file=/etc/mimir/mimir.yml"]
     ports:
-      - "9009:9009"
+      - "127.0.0.1:9009:9009"
     volumes:
       - ./docker/mimir.yml:/etc/mimir/mimir.yml
       - mimir-data:/data/mimir
@@ -287,7 +287,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -320,7 +320,7 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
     ports:
-      - "8091:8081"
+      - "127.0.0.1:8091:8081"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
       interval: 30s
@@ -344,8 +344,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
-      - "8082:8082"
-      - "9082:9082"
+      - "127.0.0.1:8082:8082"
+      - "127.0.0.1:9082:9082"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
       interval: 30s
@@ -369,8 +369,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
-      - "8083:8083"
-      - "9093:9093"
+      - "127.0.0.1:8083:8083"
+      - "127.0.0.1:9093:9093"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
       interval: 30s
@@ -396,8 +396,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
-      - "8084:8084"
-      - "9094:9094"
+      - "127.0.0.1:8084:8084"
+      - "127.0.0.1:9094:9094"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
       interval: 30s
@@ -423,8 +423,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
-      - "8085:8085"
-      - "9095:9095"
+      - "127.0.0.1:8085:8085"
+      - "127.0.0.1:9095:9095"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8085/actuator/health"]
       interval: 30s
@@ -446,7 +446,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-docker-internal-token-2026}
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
       interval: 30s
@@ -468,7 +468,7 @@ services:
       CONSISTENCY_DB_USERNAME: root
       CONSISTENCY_DB_PASSWORD: root
     ports:
-      - "8087:8087"
+      - "127.0.0.1:8087:8087"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8087/actuator/health"]
       interval: 30s
@@ -502,7 +502,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8000/actuator/health"]
       interval: 30s
@@ -517,7 +517,7 @@ services:
     depends_on:
       - kafka
     ports:
-      - "9308:9308"
+      - "127.0.0.1:9308:9308"
 
   redis-exporter:
     image: oliver006/redis_exporter:latest
@@ -529,7 +529,7 @@ services:
       redis-cluster-init:
         condition: service_started
     ports:
-      - "9121:9121"
+      - "127.0.0.1:9121:9121"
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -545,7 +545,7 @@ services:
       - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -556,7 +556,7 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
   seed-runner:
     image: mysql:8.0
