@@ -160,6 +160,19 @@ class SingleReservationExpiryCacheMySqlIntegrationTest : ReservationExpiryCacheS
         assertThat(evictions).containsExactly(Eviction(PRODUCT_A, 80))
     }
 
+    @Test
+    fun 만료_스케줄러의_캐시_삭제는_상품마다_복원이_커밋된_뒤에_실행된다() {
+        seedStock(PRODUCT_A, 80)
+        seedStock(PRODUCT_B, 40)
+        val reservations = inventoryCommandService.batchReserveStock(listOf(PRODUCT_A to 3, PRODUCT_B to 5))
+        makeExpired(*reservations.values.toTypedArray())
+        val evictions = recordInventoryEvictions()
+
+        transactionTemplate.execute { scheduler().expireReservations() }
+
+        assertThat(evictions).containsExactlyInAnyOrder(Eviction(PRODUCT_A, 80), Eviction(PRODUCT_B, 40))
+    }
+
     private fun scheduler() = wired(ReservationExpiryScheduler(inventoryReservationRepository, inventoryRepository))
 
     private fun seedStock(productId: Long, total: Int) {

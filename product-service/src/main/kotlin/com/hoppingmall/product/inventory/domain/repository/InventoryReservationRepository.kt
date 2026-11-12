@@ -15,7 +15,7 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
 
     fun findByReservationIdIn(reservationIds: List<String>): List<InventoryReservation>
 
-    @Modifying(clearAutomatically = true)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
         UPDATE InventoryReservation r
         SET r.status = :targetStatus, r.updatedAt = :updatedAt
