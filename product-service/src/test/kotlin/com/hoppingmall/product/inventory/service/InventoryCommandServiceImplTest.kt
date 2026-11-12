@@ -386,10 +386,9 @@ class InventoryCommandServiceImplTest {
         )
 
         whenever(
-            inventoryReservationRepository.batchUpdateStatusByCas(
+            inventoryReservationRepository.batchConfirmByCas(
                 reservationIds = eq(reservationIds),
-                expectedStatus = eq(ReservationStatus.RESERVED),
-                targetStatus = eq(ReservationStatus.CONFIRMED),
+                expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 updatedAt = any()
             )
         ).thenReturn(0)
@@ -401,7 +400,7 @@ class InventoryCommandServiceImplTest {
     }
 
     @Test
-    fun 확정_실패_시_이미_확정된_예약을_롤백하고_재고를_원복한다() {
+    fun 확정_실패_시_예외를_던지고_되돌리지_않는다() {
         val reservationIds = listOf("rsv-1", "rsv-2")
         val r1 = InventoryReservation(
             reservationId = "rsv-1", productId = 1L, quantity = 3,
@@ -409,30 +408,42 @@ class InventoryCommandServiceImplTest {
         )
 
         whenever(
-            inventoryReservationRepository.batchUpdateStatusByCas(
+            inventoryReservationRepository.batchConfirmByCas(
                 reservationIds = eq(reservationIds),
-                expectedStatus = eq(ReservationStatus.RESERVED),
-                targetStatus = eq(ReservationStatus.CONFIRMED),
+                expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 updatedAt = any()
             )
         ).thenReturn(1)
         whenever(inventoryReservationRepository.findByReservationIdIn(reservationIds)).thenReturn(listOf(r1))
-        whenever(
-            inventoryReservationRepository.batchUpdateStatusByCas(
-                reservationIds = eq(reservationIds),
-                expectedStatus = eq(ReservationStatus.CONFIRMED),
-                targetStatus = eq(ReservationStatus.CANCELLED),
-                updatedAt = any()
-            )
-        ).thenReturn(1)
-        whenever(inventoryReservationRepository.findByReservationId("rsv-1")).thenReturn(r1)
-        whenever(inventoryReservationRepository.findByReservationId("rsv-2")).thenReturn(null)
-        val inventory = Inventory.create(productId = 1L, stockQuantity = 0)
-        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(inventory)
 
         assertThatThrownBy { service.confirmReservations(reservationIds) }
             .isInstanceOf(ReservationConfirmFailedException::class.java)
 
-        assertThat(inventory.stockQuantity).isEqualTo(3)
+        verify(inventoryReservationRepository, never()).batchUpdateStatusByCas(any(), any(), any(), any())
+        verify(inventoryReservationRepository, never()).findByReservationId(any())
+        verify(inventoryRepository, never()).findByProductIdForUpdate(any())
+        verify(inventoryRepository, never()).findByProductIdInForUpdate(any())
+    }
+
+    @Test
+    fun CLAIMED_예약도_확정_가능_범위에_포함된다() {
+        val reservationIds = listOf("rsv-1", "rsv-2")
+
+        whenever(
+            inventoryReservationRepository.batchConfirmByCas(
+                reservationIds = eq(reservationIds),
+                expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
+                updatedAt = any()
+            )
+        ).thenReturn(2)
+
+        val result = service.confirmReservations(reservationIds)
+
+        assertThat(result).isTrue()
+        verify(inventoryReservationRepository).batchConfirmByCas(
+            eq(reservationIds),
+            eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
+            any()
+        )
     }
 }

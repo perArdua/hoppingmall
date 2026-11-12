@@ -4,5 +4,6 @@ enum class ReservationStatus {
     RESERVED,
     CONFIRMED,
     CANCELLED,
-    EXPIRED
+    EXPIRED,
+    CLAIMED
 }

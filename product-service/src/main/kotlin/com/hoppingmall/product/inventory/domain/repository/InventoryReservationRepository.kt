@@ -43,10 +43,23 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
         @Param("updatedAt") updatedAt: LocalDateTime
     ): Int
 
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        UPDATE InventoryReservation r
+        SET r.status = com.hoppingmall.product.inventory.enums.ReservationStatus.CONFIRMED, r.updatedAt = :updatedAt
+        WHERE r.reservationId IN :reservationIds
+        AND r.status IN :expectedStatuses
+    """)
+    fun batchConfirmByCas(
+        @Param("reservationIds") reservationIds: List<String>,
+        @Param("expectedStatuses") expectedStatuses: List<ReservationStatus>,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
+
     @Query(
         value = """
             SELECT id, product_id, quantity FROM inventory_reservations
-            WHERE reservation_id IN (:reservationIds) AND status = 'RESERVED'
+            WHERE reservation_id IN (:reservationIds) AND status IN ('RESERVED', 'CLAIMED')
             ORDER BY id
             FOR UPDATE
         """,

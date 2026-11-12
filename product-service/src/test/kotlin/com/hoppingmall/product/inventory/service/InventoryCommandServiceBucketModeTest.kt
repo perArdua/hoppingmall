@@ -240,10 +240,9 @@ class InventoryCommandServiceBucketModeTest {
         val ids = listOf(first.reservationId, second.reservationId)
 
         whenever(
-            inventoryReservationRepository.batchUpdateStatusByCas(
+            inventoryReservationRepository.batchConfirmByCas(
                 eq(ids),
-                eq(ReservationStatus.RESERVED),
-                eq(ReservationStatus.CONFIRMED),
+                eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 any()
             )
         ).thenReturn(1)

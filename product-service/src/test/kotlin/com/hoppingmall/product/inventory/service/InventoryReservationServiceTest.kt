@@ -97,10 +97,9 @@ class InventoryReservationServiceTest {
         val reservationIds = listOf("rsv-1", "rsv-2")
 
         whenever(
-            inventoryReservationRepository.batchUpdateStatusByCas(
+            inventoryReservationRepository.batchConfirmByCas(
                 reservationIds = eq(reservationIds),
-                expectedStatus = eq(ReservationStatus.RESERVED),
-                targetStatus = eq(ReservationStatus.CONFIRMED),
+                expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 updatedAt = any()
             )
         ).thenReturn(2)
@@ -115,10 +114,9 @@ class InventoryReservationServiceTest {
         val reservationIds = listOf("rsv-1", "rsv-2")
 
         whenever(
-            inventoryReservationRepository.batchUpdateStatusByCas(
+            inventoryReservationRepository.batchConfirmByCas(
                 reservationIds = eq(reservationIds),
-                expectedStatus = eq(ReservationStatus.RESERVED),
-                targetStatus = eq(ReservationStatus.CONFIRMED),
+                expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 updatedAt = any()
             )
         ).thenReturn(1)
@@ -132,7 +130,7 @@ class InventoryReservationServiceTest {
         val result = service.confirmReservations(emptyList())
 
         assertThat(result).isTrue()
-        verify(inventoryReservationRepository, never()).batchUpdateStatusByCas(any(), any(), any(), any())
+        verify(inventoryReservationRepository, never()).batchConfirmByCas(any(), any(), any())
     }
 
     @Test
