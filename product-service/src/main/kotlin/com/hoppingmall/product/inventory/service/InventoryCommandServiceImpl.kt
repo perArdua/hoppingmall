@@ -137,8 +137,16 @@ class InventoryCommandServiceImpl(
         cancelLocked(reservationIds)
     }
 
+    override fun cancelConfirmedReservations(reservationIds: List<String>) {
+        if (reservationIds.isEmpty()) return
+        cancelLockedRows(inventoryReservationRepository.lockConfirmed(reservationIds))
+    }
+
     private fun cancelLocked(reservationIds: List<String>) {
-        val locked = inventoryReservationRepository.lockCancellable(reservationIds)
+        cancelLockedRows(inventoryReservationRepository.lockCancellable(reservationIds))
+    }
+
+    private fun cancelLockedRows(locked: List<Array<Any>>) {
         if (locked.isEmpty()) return
 
         inventoryReservationRepository.cancelByIds(locked.map { (it[0] as Number).toLong() }, LocalDateTime.now())
