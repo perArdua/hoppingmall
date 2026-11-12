@@ -19,7 +19,11 @@ class JwtValidationGatewayFilterFactory(
 
     private val key = Keys.hmacShaKeyFor(secret.toByteArray())
 
-    class Config
+    class Config {
+        var requiredRole: String? = null
+    }
+
+    override fun shortcutFieldOrder(): List<String> = listOf("requiredRole")
 
     override fun apply(config: Config): GatewayFilter {
         return GatewayFilter { exchange, chain ->
@@ -50,10 +54,10 @@ class JwtValidationGatewayFilterFactory(
             .subscribeOn(Schedulers.boundedElastic())
             .onErrorReturn(Optional.empty())
             .flatMap { authenticatedRequest ->
-                if (authenticatedRequest.isPresent) {
-                    chain.filter(exchange.mutate().request(authenticatedRequest.get()).build())
-                } else {
-                    onUnauthorized(exchange)
+                when {
+                    authenticatedRequest.isEmpty -> onUnauthorized(exchange)
+                    !hasRequiredRole(authenticatedRequest.get(), config) -> onForbidden(exchange)
+                    else -> chain.filter(exchange.mutate().request(authenticatedRequest.get()).build())
                 }
             }
         }
@@ -64,8 +68,18 @@ class JwtValidationGatewayFilterFactory(
         return if (bearerToken.startsWith("Bearer ")) bearerToken.substring(7) else null
     }
 
+    private fun hasRequiredRole(request: org.springframework.http.server.reactive.ServerHttpRequest, config: Config): Boolean {
+        val requiredRole = config.requiredRole ?: return true
+        return request.headers.getFirst("x-user-role") == requiredRole
+    }
+
     private fun onUnauthorized(exchange: ServerWebExchange): Mono<Void> {
         exchange.response.statusCode = HttpStatus.UNAUTHORIZED
+        return exchange.response.setComplete()
+    }
+
+    private fun onForbidden(exchange: ServerWebExchange): Mono<Void> {
+        exchange.response.statusCode = HttpStatus.FORBIDDEN
         return exchange.response.setComplete()
     }
 }
