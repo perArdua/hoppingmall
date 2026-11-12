@@ -40,6 +40,8 @@ dependencies {
 	testImplementation("io.micrometer:micrometer-core")
 	testImplementation("org.springframework.kafka:spring-kafka")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+	testImplementation("org.jetbrains.kotlin:kotlin-reflect")
+	testRuntimeOnly("com.h2database:h2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

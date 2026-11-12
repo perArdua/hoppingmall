@@ -1,12 +1,16 @@
 package com.hoppingmall.dlq.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.event.AvroEventConverter
 import com.hoppingmall.dlq.archival.DLQArchivalService
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.domain.DLQMessageContentHash
 import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
 import com.hoppingmall.dlq.metrics.DLQMetrics
 import com.hoppingmall.dlq.publisher.DLQMessagePublisher
+import com.hoppingmall.dlq.publisher.NoOpDLQMessagePublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
@@ -20,7 +24,8 @@ class DLQCommandService(
     private val dlqMessageRepository: DLQMessageRepository,
     private val dlqMessagePublisher: DLQMessagePublisher,
     private val dlqMetrics: DLQMetrics,
-    private val dlqArchivalService: DLQArchivalService
+    private val dlqArchivalService: DLQArchivalService,
+    private val avroEventConverter: AvroEventConverter? = null
 ) {
 
     private val logger = LoggerFactory.getLogger(DLQCommandService::class.java)
@@ -28,7 +33,11 @@ class DLQCommandService(
     private val processingMessages = ConcurrentHashMap<String, Boolean>()
 
     companion object {
-        private const val MAX_RETRY_COUNT = 3
+        const val MAX_RETRY_COUNT = 3
+        private const val EXHAUSTED_BATCH_SIZE = 100
+        private const val EVENT_TYPE_FIELD = "eventType"
+        private const val NO_PUBLISHER_NOTE = "재발행 수단 없음 (Kafka 재발행기 미설정)"
+        private val objectMapper = ObjectMapper()
     }
 
     fun saveDLQMessage(deadLetterMessage: DeadLetterMessage) {
@@ -45,6 +54,19 @@ class DLQCommandService(
                 return
             }
 
+            val contentHash = DLQMessageContentHash.of(
+                deadLetterMessage.originalTopic,
+                deadLetterMessage.originalKey,
+                deadLetterMessage.originalValue
+            )
+            val sameContent = dlqMessageRepository.findFirstByOriginalTopicAndContentHashOrderByIdDesc(
+                deadLetterMessage.originalTopic, contentHash
+            )
+            if (sameContent != null) {
+                handleRepeatedFailure(sameContent, deadLetterMessage)
+                return
+            }
+
             val dlqMessage = DLQMessage(
                 originalTopic = deadLetterMessage.originalTopic,
                 originalPartition = deadLetterMessage.originalPartition,
@@ -52,7 +74,8 @@ class DLQCommandService(
                 originalKey = deadLetterMessage.originalKey,
                 originalValue = deadLetterMessage.originalValue,
                 exceptionMessage = deadLetterMessage.exception,
-                errorTimestamp = deadLetterMessage.timestamp
+                errorTimestamp = deadLetterMessage.timestamp,
+                contentHash = contentHash
             )
 
             if (dlqMessage.isNonRetryableException()) {
@@ -60,6 +83,15 @@ class DLQCommandService(
                 dlqMessageRepository.save(dlqMessage)
                 logger.info("비재시도 에러로 즉시 FAILED 처리: topic={}, error={}",
                     deadLetterMessage.originalTopic, deadLetterMessage.exception)
+                return
+            }
+
+            if (dlqMessagePublisher is NoOpDLQMessagePublisher) {
+                dlqMessage.markAsFailed(NO_PUBLISHER_NOTE)
+                dlqMessageRepository.save(dlqMessage)
+                dlqMetrics.recordDlqSaved(deadLetterMessage.originalTopic)
+                logger.warn("재발행 수단이 없어 DLQ 메시지를 FAILED로 저장: topic={}, offset={}",
+                    deadLetterMessage.originalTopic, deadLetterMessage.originalOffset)
                 return
             }
 
@@ -95,10 +127,27 @@ class DLQCommandService(
                 return false
             }
 
+            if (dlqMessagePublisher is NoOpDLQMessagePublisher) {
+                dlqMessage.markAsFailed(NO_PUBLISHER_NOTE)
+                dlqMessageRepository.save(dlqMessage)
+                logger.warn("재발행 수단이 없어 DLQ 메시지를 FAILED로 전환: id={}", dlqMessageId)
+                return false
+            }
+
             if (dlqMessage.retryCount >= MAX_RETRY_COUNT) {
                 dlqMessage.markAsFailed("최대 재시도 횟수 초과")
                 dlqMessageRepository.save(dlqMessage)
                 logger.warn("최대 재시도 횟수 초과: id={}, retryCount={}", dlqMessageId, dlqMessage.retryCount)
+                return false
+            }
+
+            val originalValue = try {
+                reconstructOriginalMessage(dlqMessage)
+            } catch (e: UnrepublishableMessageException) {
+                dlqMessage.markAsFailed("재발행 불가: ${e.message}")
+                dlqMessageRepository.save(dlqMessage)
+                dlqMetrics.recordDlqRetryFailed()
+                logger.warn("DLQ 메시지 재발행 불가로 FAILED 처리: id={}, reason={}", dlqMessageId, e.message)
                 return false
             }
 
@@ -107,7 +156,6 @@ class DLQCommandService(
             dlqMessage.incrementRetry()
             dlqMessageRepository.save(dlqMessage)
 
-            val originalValue = reconstructOriginalMessage(dlqMessage)
             val published = dlqMessagePublisher.publish(
                 dlqMessage.originalTopic,
                 dlqMessage.originalKey ?: "",
@@ -120,9 +168,15 @@ class DLQCommandService(
                 dlqMetrics.recordDlqRetrySuccess()
                 logger.info("DLQ 메시지 재처리 성공: id={}, topic={}", dlqMessageId, dlqMessage.originalTopic)
             } else {
-                dlqMessage.scheduleNextRetry()
+                dlqMetrics.recordDlqRetryFailed()
+                if (dlqMessage.retryCount >= MAX_RETRY_COUNT) {
+                    dlqMessage.markAsFailed("최대 재시도 후 재발행 실패")
+                } else {
+                    dlqMessage.scheduleNextRetry()
+                }
                 dlqMessageRepository.save(dlqMessage)
-                logger.warn("DLQ 메시지 재발행 불가 (Publisher 미설정): id={}", dlqMessageId)
+                logger.warn("DLQ 메시지 재발행 실패: id={}, retryCount={}, status={}",
+                    dlqMessageId, dlqMessage.retryCount, dlqMessage.status)
             }
 
             published
@@ -149,6 +203,18 @@ class DLQCommandService(
         } finally {
             processingMessages.remove(messageKey)
         }
+    }
+
+    fun failExhaustedMessages(): Int {
+        val exhausted = dlqMessageRepository.findByStatusAndRetryCountGreaterThanEqual(
+            DLQStatus.PENDING, MAX_RETRY_COUNT, PageRequest.of(0, EXHAUSTED_BATCH_SIZE)
+        )
+        if (exhausted.isEmpty()) return 0
+
+        exhausted.forEach { it.markAsFailed("최대 재시도 횟수 초과") }
+        dlqMessageRepository.saveAll(exhausted)
+        logger.warn("재시도를 다 쓴 DLQ 메시지를 FAILED로 전환: {} 건", exhausted.size)
+        return exhausted.size
     }
 
     fun retryDLQMessagesByTopic(topic: String, maxCount: Int = 50): Map<String, Any> {
@@ -198,17 +264,42 @@ class DLQCommandService(
     }
 
     fun reconstructOriginalMessage(dlqMessage: DLQMessage): Any? {
+        val value = dlqMessage.originalValue ?: return null
+        val converter = avroEventConverter ?: return value
+        val eventType = readEventType(value)
+            ?: throw UnrepublishableMessageException("$EVENT_TYPE_FIELD 없음")
         return try {
-            dlqMessage.originalValue?.let { value ->
-                when {
-                    value.startsWith("{") && value.endsWith("}") -> value
-                    value.startsWith("[") && value.endsWith("]") -> value
-                    else -> value
-                }
-            }
+            converter.convertJsonToAvro(eventType, value)
         } catch (e: Exception) {
-            logger.warn("원본 메시지 복원 실패, 문자열로 처리: id={}, error={}", dlqMessage.id, e.message)
-            dlqMessage.originalValue
+            throw UnrepublishableMessageException("Avro 변환 실패 ($EVENT_TYPE_FIELD=$eventType): ${e.message}")
         }
     }
+
+    private fun handleRepeatedFailure(existing: DLQMessage, deadLetterMessage: DeadLetterMessage) {
+        if (existing.status != DLQStatus.PROCESSED) {
+            logger.warn("같은 내용의 DLQ 메시지가 이미 있음: id={}, status={}, topic={}, offset={}",
+                existing.id, existing.status, deadLetterMessage.originalTopic, deadLetterMessage.originalOffset)
+            return
+        }
+
+        existing.reopenAfterRepublishFailure(deadLetterMessage.exception, deadLetterMessage.timestamp)
+        if (existing.retryCount >= MAX_RETRY_COUNT) {
+            existing.markAsFailed("재발행 뒤 다시 실패, 최대 재시도 횟수 초과")
+        } else if (existing.isNonRetryableException()) {
+            existing.markAsFailed("재발행 뒤 비재시도 에러: ${deadLetterMessage.exception}")
+        }
+        dlqMessageRepository.save(existing)
+        dlqMetrics.recordDlqSaved(deadLetterMessage.originalTopic)
+        logger.warn("재발행한 DLQ 메시지가 다시 실패: id={}, retryCount={}, status={}",
+            existing.id, existing.retryCount, existing.status)
+    }
+
+    private fun readEventType(value: String): String? {
+        val node = runCatching { objectMapper.readTree(value) }.getOrNull() ?: return null
+        if (!node.isObject) return null
+        val eventType = node.path(EVENT_TYPE_FIELD)
+        return if (eventType.isTextual && eventType.asText().isNotBlank()) eventType.asText() else null
+    }
 }
+
+private class UnrepublishableMessageException(message: String) : RuntimeException(message)

@@ -10,7 +10,8 @@ import jakarta.persistence.*
         Index(name = "idx_dlq_topic", columnList = "original_topic"),
         Index(name = "idx_dlq_status", columnList = "status"),
         Index(name = "idx_dlq_created_at", columnList = "created_at"),
-        Index(name = "idx_dlq_next_retry_at", columnList = "status, next_retry_at")
+        Index(name = "idx_dlq_next_retry_at", columnList = "status, next_retry_at"),
+        Index(name = "idx_dlq_topic_content_hash", columnList = "original_topic, content_hash")
     ]
 )
 class DLQMessage(
@@ -30,10 +31,10 @@ class DLQMessage(
     val originalValue: String?,
 
     @Column(name = "exception_message", columnDefinition = "TEXT")
-    val exceptionMessage: String?,
+    var exceptionMessage: String?,
 
     @Column(name = "error_timestamp", nullable = false)
-    val errorTimestamp: Long,
+    var errorTimestamp: Long,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -55,7 +56,10 @@ class DLQMessage(
     var nextRetryAt: Long? = null,
 
     @Column(name = "archived_at")
-    var archivedAt: Long? = null
+    var archivedAt: Long? = null,
+
+    @Column(name = "content_hash", length = 64)
+    var contentHash: String? = null
 
 ) : BaseEntity() {
 
@@ -75,6 +79,15 @@ class DLQMessage(
     fun markAsFailed(notes: String? = null) {
         this.status = DLQStatus.FAILED
         this.notes = notes
+    }
+
+    fun reopenAfterRepublishFailure(exceptionMessage: String?, errorTimestamp: Long) {
+        this.exceptionMessage = exceptionMessage
+        this.errorTimestamp = errorTimestamp
+        this.processedAt = null
+        this.status = DLQStatus.PENDING
+        this.nextRetryAt = calculateNextRetryAt(this.retryCount)
+        this.notes = "재발행 뒤 다시 실패"
     }
 
     fun markAsArchived() {

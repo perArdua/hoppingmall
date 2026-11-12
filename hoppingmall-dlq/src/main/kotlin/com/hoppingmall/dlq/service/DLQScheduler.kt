@@ -18,16 +18,17 @@ class DLQScheduler(
     private val logger = LoggerFactory.getLogger(DLQScheduler::class.java)
 
     companion object {
-        private const val MAX_RETRY_COUNT = 3
         private const val AUTO_RETRY_BATCH_SIZE = 20
     }
 
     @Scheduled(fixedDelayString = "\${dlq.retry.scheduler-interval-ms:30000}")
     fun autoRetryPendingMessages() {
+        dlqCommandService.failExhaustedMessages()
+
         val now = System.currentTimeMillis()
         val pageable = PageRequest.of(0, AUTO_RETRY_BATCH_SIZE)
         val retryableMessages = dlqMessageRepository.findAutoRetryableMessages(
-            DLQStatus.PENDING, MAX_RETRY_COUNT, now, pageable
+            DLQStatus.PENDING, DLQCommandService.MAX_RETRY_COUNT, now, pageable
         )
 
         if (retryableMessages.isEmpty) return
