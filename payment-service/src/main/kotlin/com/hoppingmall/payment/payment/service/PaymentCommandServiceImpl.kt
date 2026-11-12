@@ -123,6 +123,10 @@ class PaymentCommandServiceImpl(
         )
         val cancelledPayment = paymentRepository.save(payment)
 
+        if (cancelledPayment.couponId != null) {
+            couponCommandService.restoreCouponByOrder(cancelledPayment.orderId)
+        }
+
         paymentMetrics.recordPaymentCancelled()
         paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
         paymentNotificationService.publishPaymentCancelledNotification(cancelledPayment)
