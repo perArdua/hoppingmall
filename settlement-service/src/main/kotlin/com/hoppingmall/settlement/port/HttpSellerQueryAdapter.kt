@@ -1,6 +1,7 @@
 package com.hoppingmall.settlement.port
 
 import com.hoppingmall.settlement.exception.ServiceCommunicationException
+import com.hoppingmall.settlement.exception.ServiceRequestRejectedException
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
@@ -41,6 +42,9 @@ class HttpSellerQueryAdapter(
 
     private fun findByUserIdFallback(userId: Long, e: Exception): SellerInfo? {
         logger.error("CB fallback: user-service 판매자 조회 실패 userId=$userId", e)
+        if (e is HttpClientErrorException) {
+            throw ServiceRequestRejectedException("user-service 판매자 조회 거절: ${e.message}")
+        }
         throw ServiceCommunicationException("user-service 판매자 조회 실패: ${e.message}")
     }
 
