@@ -7,6 +7,7 @@ import com.hoppingmall.product.inventory.domain.repository.InventoryReservationR
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.enums.ReservationStatus
+import com.hoppingmall.product.inventory.exception.InventoryBusyException
 import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockException
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
@@ -55,6 +56,9 @@ class InventoryCommandServiceBucketModeTest {
     private lateinit var bucketStockService: BucketStockService
 
     @Mock
+    private lateinit var reservationGate: InventoryReservationGate
+
+    @Mock
     private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
 
     @Mock
@@ -67,6 +71,10 @@ class InventoryCommandServiceBucketModeTest {
     fun setUp() {
         lenient().`when`(transactionManager.getTransaction(any())).thenAnswer { SimpleTransactionStatus() }
         lenient().`when`(bucketStockService.enabled).thenReturn(true)
+        lenient().`when`(reservationGate.withPermits<Any>(any(), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            (it.arguments[1] as () -> Any).invoke()
+        }
         lenient().`when`(inventoryReservationRepository.save(any<InventoryReservation>())).thenAnswer { it.arguments[0] }
         val field = InventoryCommandServiceImpl::class.java.getDeclaredField("ttlSeconds")
         field.isAccessible = true
@@ -74,14 +82,31 @@ class InventoryCommandServiceBucketModeTest {
     }
 
     @Test
-    fun 예약은_버킷_탐색으로_차감하고_재고_행을_잠그지_않는다() {
+    fun 예약은_세마포어_안에서_버킷_탐색으로_차감하고_재고_행을_잠그지_않는다() {
         val reservationId = service.reserveStock(1L, 2)
 
+        verify(reservationGate).withPermits<Any>(eq(listOf(1L)), any())
         verify(bucketStockService).reserve(eq(1L), eq(2), eq(reservationId))
         verify(bucketStockService, never()).reserveLockingAll(any(), any())
         verify(bucketStockService, never()).recordRestart()
         verify(inventoryRepository, never()).findByProductIdForUpdate(any())
         verify(transactionManager, times(1)).getTransaction(any())
+    }
+
+    @Test
+    fun 세마포어가_가득_차면_트랜잭션을_시작하지_않고_429를_던진다() {
+        whenever(reservationGate.withPermits<Any>(any(), any())).thenThrow(InventoryBusyException())
+
+        assertThatThrownBy { service.reserveStock(1L, 1) }
+            .isInstanceOf(InventoryBusyException::class.java)
+        verify(transactionManager, never()).getTransaction(any())
+    }
+
+    @Test
+    fun 배치_예약은_모든_상품의_허가를_얻은_뒤에_트랜잭션을_시작한다() {
+        service.batchReserveStock(listOf(2L to 1, 1L to 3))
+
+        verify(reservationGate).withPermits<Any>(eq(listOf(2L, 1L)), any())
     }
 
     @Test

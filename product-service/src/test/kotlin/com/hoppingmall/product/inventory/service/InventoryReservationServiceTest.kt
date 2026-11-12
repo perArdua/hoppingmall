@@ -48,6 +48,9 @@ class InventoryReservationServiceTest {
     private lateinit var bucketStockService: BucketStockService
 
     @Mock
+    private lateinit var reservationGate: InventoryReservationGate
+
+    @Mock
     private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
 
     @Mock
