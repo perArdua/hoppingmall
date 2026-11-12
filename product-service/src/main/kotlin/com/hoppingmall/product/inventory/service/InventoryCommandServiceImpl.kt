@@ -18,9 +18,12 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 import kotlin.random.Random
 
@@ -30,8 +33,11 @@ class InventoryCommandServiceImpl(
     private val inventoryRepository: InventoryRepository,
     private val inventoryReservationRepository: InventoryReservationRepository,
     private val productRepository: ProductRepository,
-    private val cacheManagerProvider: ObjectProvider<CacheManager>
+    private val cacheManagerProvider: ObjectProvider<CacheManager>,
+    transactionManager: PlatformTransactionManager
 ) : InventoryCommandService {
+
+    private val reserveTransaction = TransactionTemplate(transactionManager)
 
     @Value("\${inventory.reservation.ttl-seconds:600}")
     private var ttlSeconds: Long = 600
@@ -88,17 +94,9 @@ class InventoryCommandServiceImpl(
     }
 
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
-    override fun reserveStock(productId: Long, quantity: Int): String {
-        maybeInjectChaos("reserveStock")
-        val inventory = inventoryRepository.findByProductIdForUpdate(productId)
-            ?: throw InventoryNotFoundException()
-
-        inventory.decreaseStock(quantity)
-
-        val reservation = InventoryReservation.create(productId, quantity, ttlSeconds)
-        inventoryReservationRepository.save(reservation)
-        return reservation.reservationId
-    }
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    override fun reserveStock(productId: Long, quantity: Int): String =
+        inReserveTransaction { reserveOne(productId, quantity) }
 
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         maybeInjectChaos("confirmReservations")
@@ -184,12 +182,16 @@ class InventoryCommandServiceImpl(
         }
     }
 
-    override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
+        inReserveTransaction { batchReserveInTransaction(items) }
+
+    private fun batchReserveInTransaction(items: List<Pair<Long, Int>>): Map<Long, String> {
         val sorted = items.sortedBy { it.first }
         val reservationMap = mutableMapOf<Long, String>()
         try {
             sorted.forEach { (productId, quantity) ->
-                val reservationId = reserveStock(productId, quantity)
+                val reservationId = reserveOne(productId, quantity)
                 reservationMap[productId] = reservationId
             }
         } catch (e: Exception) {
@@ -198,6 +200,21 @@ class InventoryCommandServiceImpl(
         }
         evictInventoryCacheAfterCommit(reservationMap.keys)
         return reservationMap
+    }
+
+    private fun <T : Any> inReserveTransaction(block: () -> T): T =
+        reserveTransaction.execute { block() }!!
+
+    private fun reserveOne(productId: Long, quantity: Int): String {
+        maybeInjectChaos("reserveStock")
+        val reservation = InventoryReservation.create(productId, quantity, ttlSeconds)
+        val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+            ?: throw InventoryNotFoundException()
+
+        inventory.decreaseStock(quantity)
+
+        inventoryReservationRepository.save(reservation)
+        return reservation.reservationId
     }
 
     private fun evictInventoryCacheAfterCommit(productIds: Collection<Long>) {

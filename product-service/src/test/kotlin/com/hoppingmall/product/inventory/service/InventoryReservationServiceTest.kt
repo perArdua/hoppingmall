@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
@@ -25,6 +26,8 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.cache.CacheManager
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.SimpleTransactionStatus
 import java.time.LocalDateTime
 
 @DisplayName("InventoryCommandServiceImpl")
@@ -44,11 +47,15 @@ class InventoryReservationServiceTest {
     @Mock
     private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
 
+    @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
+
     @InjectMocks
     private lateinit var service: InventoryCommandServiceImpl
 
     @BeforeEach
     fun setUp() {
+        lenient().`when`(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
         val field = InventoryCommandServiceImpl::class.java.getDeclaredField("ttlSeconds")
         field.isAccessible = true
         field.set(service, 600L)
