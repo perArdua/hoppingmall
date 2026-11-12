@@ -63,6 +63,25 @@ class PaymentCancellationRequestedHandler(
         }
     }
 
+    override fun onRetriesExhausted(node: JsonNode) {
+        val eventId = node.get("eventId")?.asText() ?: return
+        val orderId = node.get("orderId")?.asLong() ?: return
+
+        val log = compensationEventLogService.saveIfAbsent(
+            eventId = eventId,
+            compensationType = "PAYMENT_CANCELLATION_REQUESTED",
+            paymentId = 0L,
+            orderId = orderId
+        )
+        if (log.isCompleted()) {
+            return
+        }
+
+        publishFailedEvent(eventId, orderId, "결제 취소 처리 중 오류")
+        compensationEventLogService.markCompleted(eventId)
+        logger.warn("결제 취소 재시도 소진으로 취소 실패 처리: orderId=$orderId, eventId=$eventId")
+    }
+
     private fun publishCompletedEvent(eventId: String, orderId: Long, paymentId: Long) {
         transactionalEventPublisher.publishEvent(
             aggregateType = "Payment",

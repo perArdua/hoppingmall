@@ -5,4 +5,5 @@ import com.fasterxml.jackson.databind.JsonNode
 interface CompensationEventHandler {
     fun supports(eventType: String): Boolean
     fun handle(node: JsonNode)
+    fun onRetriesExhausted(node: JsonNode) {}
 }
