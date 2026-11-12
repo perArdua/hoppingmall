@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
@@ -41,6 +42,9 @@ class ReservationLinkCheckJob(
     private val failedProducts = Counter.builder("inventory.linkcheck.failed_products").register(meterRegistry)
     private val cycles = Counter.builder("inventory.linkcheck.cycles").register(meterRegistry)
     private val oldestAgeMs = AtomicLong(0)
+
+    @Autowired
+    private var inventoryCacheEvictor: InventoryCacheEvictor? = null
 
     init {
         require(bucketStockService.enabled) { "inventory.link-check.enabled requires inventory.mode=bucket" }
@@ -148,6 +152,7 @@ class ReservationLinkCheckJob(
             if (locked.isEmpty()) return@execute 0
             inventoryReservationRepository.expireByIds(locked.map { (it[0] as Number).toLong() }, LocalDateTime.now())
             bucketStockService.restore(productId, locked.sumOf { (it[1] as Number).toInt() })
+            inventoryCacheEvictor?.evictAfterCommit(productId)
             locked.size
         } ?: 0
 
