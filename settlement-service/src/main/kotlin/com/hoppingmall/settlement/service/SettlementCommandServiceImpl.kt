@@ -25,7 +25,8 @@ class SettlementCommandServiceImpl(
     private val settlementItemRepository: SettlementItemRepository,
     private val orderItemQueryPort: OrderItemQueryPort,
     private val refundQueryPort: RefundQueryPort,
-    transactionManager: PlatformTransactionManager
+    transactionManager: PlatformTransactionManager,
+    private val settlementSummarySynchronizer: SettlementSummarySynchronizer? = null
 ) : SettlementCommandService {
 
     private val transactionTemplate = TransactionTemplate(transactionManager)
@@ -92,6 +93,7 @@ class SettlementCommandServiceImpl(
                 )
             }
             settlementItemRepository.saveAll(settlementItems)
+            settlementSummarySynchronizer?.sync(settlement)
 
             SettlementResponse.from(settlement)
         }!!
@@ -101,6 +103,7 @@ class SettlementCommandServiceImpl(
     override fun confirmSettlement(settlementId: Long): SettlementResponse {
         val settlement = settlementRepository.findByIdOrNull(settlementId) ?: throw SettlementNotFoundException() 
         settlement.confirm()
+        settlementSummarySynchronizer?.sync(settlement)
         return SettlementResponse.from(settlement)
     }
 
@@ -108,6 +111,7 @@ class SettlementCommandServiceImpl(
     override fun paySettlement(settlementId: Long): SettlementResponse {
         val settlement = settlementRepository.findByIdOrNull(settlementId) ?: throw SettlementNotFoundException() 
         settlement.pay()
+        settlementSummarySynchronizer?.sync(settlement)
         return SettlementResponse.from(settlement)
     }
 }
