@@ -84,6 +84,7 @@ jobs:
               - 'hoppingmall-dlq/**'
               - 'hoppingmall-idempotency/**'
               - 'hoppingmall-outbox/**'
+              - '.github/workflows/**'
 
       - name: 실행 매트릭스 생성
         id: matrices
