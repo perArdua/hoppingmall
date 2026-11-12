@@ -116,7 +116,11 @@ class PaymentCommandServiceImpl(
     }
 
     private fun executeCancelPayment(payment: Payment): PaymentResponse {
-        payment.updateStatus(PaymentStatus.CANCELLED)
+        payment.updateStatus(
+            newStatus = PaymentStatus.CANCELLED,
+            transactionId = payment.transactionId,
+            completedAt = payment.completedAt
+        )
         val cancelledPayment = paymentRepository.save(payment)
 
         paymentMetrics.recordPaymentCancelled()

@@ -10,6 +10,7 @@ import com.hoppingmall.payment.refund.domain.RefundEventLog
 import com.hoppingmall.payment.refund.domain.repository.RefundEventLogRepository
 import com.hoppingmall.payment.refund.dto.event.RefundCompletedEvent
 import com.hoppingmall.payment.refund.dto.event.RefundItemEvent
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
@@ -20,6 +21,7 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import java.math.BigDecimal
+import java.time.LocalDateTime
 import java.util.*
 
 @DisplayName("RefundLocalOperationService")
@@ -102,6 +104,29 @@ class RefundLocalOperationServiceTest {
             orderId = event.orderId
         )
         verify(refundEventLogRepository).save(eventLog)
+    }
+
+    @Test
+    fun 전체_환불로_결제가_REFUNDED가_되어도_거래_ID와_완료_시각은_유지된다() {
+        val event = fullRefundEvent(couponId = null)
+        val eventLog = newEventLog()
+        val completedAt = LocalDateTime.of(2026, 11, 13, 10, 0, 0)
+        val payment = Payment.create(
+            orderId = 100L,
+            userId = 300L,
+            amount = BigDecimal("50000"),
+            method = PaymentMethod.CREDIT_CARD
+        )
+        payment.updateStatus(newStatus = PaymentStatus.SUCCESS, transactionId = "txn-refund-1", completedAt = completedAt)
+
+        whenever(paymentRepository.findById(event.paymentId)).thenReturn(Optional.of(payment))
+        whenever(refundEventLogRepository.save(any<RefundEventLog>())).thenReturn(eventLog)
+
+        service.execute(event, eventLog)
+
+        assertThat(payment.status).isEqualTo(PaymentStatus.REFUNDED)
+        assertThat(payment.transactionId).isEqualTo("txn-refund-1")
+        assertThat(payment.completedAt).isEqualTo(completedAt)
     }
 
     @Test
