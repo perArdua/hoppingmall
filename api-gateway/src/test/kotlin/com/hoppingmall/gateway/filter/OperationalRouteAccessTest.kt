@@ -118,15 +118,28 @@ class OperationalRouteAccessTest {
         assertThat(received).isEmpty()
     }
 
-    @Test
-    fun 서비스_이름이_없는_기존_DLQ_관리_경로는_그대로_payment로_간다() {
+    @ParameterizedTest
+    @ValueSource(strings = ["ADMIN", "SELLER", "BUYER"])
+    fun 서비스_이름이_없는_옛_DLQ_관리_경로는_라우트가_없어_뒷단에_닿지_않는다(role: String) {
         webTestClient.get()
             .uri("/api/v1/admin/dlq/stats")
-            .header("Authorization", "Bearer ${token("ADMIN")}")
+            .header("Authorization", "Bearer ${token(role)}")
             .exchange()
-            .expectStatus().isOk
+            .expectStatus().isNotFound
 
-        assertThat(received).containsExactly("payment GET /api/v1/admin/dlq/stats")
+        assertThat(received).isEmpty()
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["BUYER", "SELLER"])
+    fun ADMIN이_아니면_payment_DLQ_관리_경로도_403이고_뒷단에_닿지_않는다(role: String) {
+        webTestClient.get()
+            .uri("/api/v1/admin/dlq/payment/stats")
+            .header("Authorization", "Bearer ${token(role)}")
+            .exchange()
+            .expectStatus().isForbidden
+
+        assertThat(received).isEmpty()
     }
 
     @Test

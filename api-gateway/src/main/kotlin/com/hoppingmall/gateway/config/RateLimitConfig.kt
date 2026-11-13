@@ -15,6 +15,7 @@ class RateLimitConfig {
         RateLimitPolicy("coupon-issue", "/api/v1/coupons/*/issue", "POST", RateLimitKeyType.USER_ID, 5, Duration.ofMinutes(1)),
         RateLimitPolicy("search", "/api/v1/products/search", "GET", RateLimitKeyType.USER_ID, 60, Duration.ofMinutes(1)),
         RateLimitPolicy("upload", "/api/v1/products/images/upload", "POST", RateLimitKeyType.USER_ID, 20, Duration.ofMinutes(1)),
+        RateLimitPolicy("file-upload", "/api/v1/files/upload", "POST", RateLimitKeyType.USER_ID, 20, Duration.ofMinutes(1)),
         RateLimitPolicy("create-order", "/api/v1/orders", "POST", RateLimitKeyType.USER_ID, 5, Duration.ofMinutes(1)),
         RateLimitPolicy("create-payment", "/api/v1/payments", "POST", RateLimitKeyType.USER_ID, 10, Duration.ofMinutes(1)),
         RateLimitPolicy("create-refund", "/api/v1/refunds", "POST", RateLimitKeyType.USER_ID, 5, Duration.ofMinutes(1)),

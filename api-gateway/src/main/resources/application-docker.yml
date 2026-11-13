@@ -177,13 +177,6 @@ spring:
           filters:
             - JwtValidation
 
-        - id: payment-service-admin-dlq
-          uri: http://payment-service:8085
-          predicates:
-            - Path=/api/v1/admin/dlq/**
-          filters:
-            - JwtValidation
-
         - id: user-service
           uri: http://user-service:8082
           predicates:
