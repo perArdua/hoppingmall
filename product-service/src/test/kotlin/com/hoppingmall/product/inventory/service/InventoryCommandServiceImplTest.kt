@@ -326,7 +326,8 @@ class InventoryCommandServiceImplTest {
         val inv1 = Inventory.create(productId = 1L, stockQuantity = 0)
         val inv2 = Inventory.create(productId = 2L, stockQuantity = 0)
 
-        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1", "rsv-2")))
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("rsv-1", "rsv-2"))).thenReturn(listOf(10L, 11L))
+        whenever(inventoryReservationRepository.lockCancellable(listOf(10L, 11L)))
             .thenReturn(listOf(lockedRow(10L, 1L, 3), lockedRow(11L, 2L, 5)))
         whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L, 2L)))
             .thenReturn(listOf(inv1, inv2))
@@ -342,7 +343,8 @@ class InventoryCommandServiceImplTest {
     fun 잠근_시점에_RESERVED인_예약의_수량만_복원한다() {
         val inventory = Inventory.create(productId = 1L, stockQuantity = 0)
 
-        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1", "rsv-2", "rsv-3")))
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("rsv-1", "rsv-2", "rsv-3"))).thenReturn(listOf(10L, 11L, 12L))
+        whenever(inventoryReservationRepository.lockCancellable(listOf(10L, 11L, 12L)))
             .thenReturn(listOf(lockedRow(10L, 1L, 3), lockedRow(12L, 1L, 4)))
         whenever(inventoryRepository.findByProductIdInForUpdate(listOf(1L)))
             .thenReturn(listOf(inventory))
@@ -355,7 +357,8 @@ class InventoryCommandServiceImplTest {
 
     @Test
     fun 잠글_RESERVED_예약이_없으면_취소를_건너뛴다() {
-        whenever(inventoryReservationRepository.lockCancellable(listOf("rsv-1", "rsv-2")))
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("rsv-1", "rsv-2"))).thenReturn(listOf(10L, 11L))
+        whenever(inventoryReservationRepository.lockCancellable(listOf(10L, 11L)))
             .thenReturn(emptyList())
 
         service.cancelReservations(listOf("rsv-1", "rsv-2"))
@@ -369,6 +372,38 @@ class InventoryCommandServiceImplTest {
         service.cancelReservations(emptyList())
 
         verify(inventoryReservationRepository, never()).lockCancellable(any())
+    }
+
+    @Test
+    fun 있는_예약이_하나도_없으면_예약_행을_잠그지_않고_취소를_건너뛴다() {
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("rsv-unknown"))).thenReturn(emptyList())
+
+        service.cancelReservations(listOf("rsv-unknown"))
+
+        verify(inventoryReservationRepository, never()).lockCancellable(any())
+        verify(inventoryReservationRepository, never()).cancelByIds(any(), any())
+    }
+
+    @Test
+    fun 있는_확정_예약이_하나도_없으면_예약_행을_잠그지_않고_확정_취소를_건너뛴다() {
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("rsv-unknown"))).thenReturn(emptyList())
+
+        service.cancelConfirmedReservations(listOf("rsv-unknown"))
+
+        verify(inventoryReservationRepository, never()).lockConfirmed(any())
+        verify(inventoryReservationRepository, never()).cancelByIds(any(), any())
+    }
+
+    @Test
+    fun 있는_예약이_하나도_없으면_확정_갱신_없이_예외를_던진다() {
+        val reservationIds = listOf("rsv-unknown")
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)).thenReturn(emptyList())
+        whenever(inventoryReservationRepository.findByReservationIdIn(reservationIds)).thenReturn(emptyList())
+
+        assertThatThrownBy { service.confirmReservations(reservationIds) }
+            .isInstanceOf(ReservationConfirmFailedException::class.java)
+
+        verify(inventoryReservationRepository, never()).batchConfirmByCas(any(), any(), any())
     }
 
     private fun lockedRow(id: Long, productId: Long, quantity: Int): Array<Any> = arrayOf(id, productId, quantity)
@@ -385,9 +420,10 @@ class InventoryCommandServiceImplTest {
             status = ReservationStatus.CONFIRMED, expiresAt = LocalDateTime.now().plusMinutes(10)
         )
 
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)).thenReturn(listOf(1L, 2L))
         whenever(
             inventoryReservationRepository.batchConfirmByCas(
-                reservationIds = eq(reservationIds),
+                ids = eq(listOf(1L, 2L)),
                 expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 updatedAt = any()
             )
@@ -407,9 +443,10 @@ class InventoryCommandServiceImplTest {
             status = ReservationStatus.CANCELLED, expiresAt = LocalDateTime.now().plusMinutes(10)
         )
 
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)).thenReturn(listOf(1L, 2L))
         whenever(
             inventoryReservationRepository.batchConfirmByCas(
-                reservationIds = eq(reservationIds),
+                ids = eq(listOf(1L, 2L)),
                 expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 updatedAt = any()
             )
@@ -429,9 +466,10 @@ class InventoryCommandServiceImplTest {
     fun CLAIMED_예약도_확정_가능_범위에_포함된다() {
         val reservationIds = listOf("rsv-1", "rsv-2")
 
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)).thenReturn(listOf(1L, 2L))
         whenever(
             inventoryReservationRepository.batchConfirmByCas(
-                reservationIds = eq(reservationIds),
+                ids = eq(listOf(1L, 2L)),
                 expectedStatuses = eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 updatedAt = any()
             )
@@ -441,7 +479,7 @@ class InventoryCommandServiceImplTest {
 
         assertThat(result).isTrue()
         verify(inventoryReservationRepository).batchConfirmByCas(
-            eq(reservationIds),
+            eq(listOf(1L, 2L)),
             eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
             any()
         )

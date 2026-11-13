@@ -129,8 +129,9 @@ class InventoryCommandServiceImpl(
         maybeInjectChaos("confirmReservations")
         if (reservationIds.isEmpty()) return true
 
-        val updatedCount = inventoryReservationRepository.batchConfirmByCas(
-            reservationIds = reservationIds,
+        val ids = inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)
+        val updatedCount = if (ids.isEmpty()) 0 else inventoryReservationRepository.batchConfirmByCas(
+            ids = ids,
             expectedStatuses = CONFIRMABLE,
             updatedAt = LocalDateTime.now()
         )
@@ -155,11 +156,15 @@ class InventoryCommandServiceImpl(
 
     override fun cancelConfirmedReservations(reservationIds: List<String>) {
         if (reservationIds.isEmpty()) return
-        cancelLockedRows(inventoryReservationRepository.lockConfirmed(reservationIds))
+        val ids = inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)
+        if (ids.isEmpty()) return
+        cancelLockedRows(inventoryReservationRepository.lockConfirmed(ids))
     }
 
     private fun cancelLocked(reservationIds: List<String>) {
-        cancelLockedRows(inventoryReservationRepository.lockCancellable(reservationIds))
+        val ids = inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)
+        if (ids.isEmpty()) return
+        cancelLockedRows(inventoryReservationRepository.lockCancellable(ids))
     }
 
     private fun cancelLockedRows(locked: List<Array<Any>>) {
