@@ -282,7 +282,7 @@ class AvroEventConverterTest {
     }
 
     @Test
-    fun LONG_타입_필드에_null이_오면_기본값_0을_사용한다() {
+    fun 기본값이_없는_LONG_타입_필드에_null이_오면_변환에_실패한다() {
         val json = objectMapper.writeValueAsString(
             mapOf(
                 "eventId" to "evt-012",
@@ -294,9 +294,9 @@ class AvroEventConverterTest {
             )
         )
 
-        val record = converter.convertJsonToAvro("PaymentFailedEvent", json)
-
-        assertThat(record.get("paymentId")).isEqualTo(0L)
+        assertThatThrownBy {
+            converter.convertJsonToAvro("PaymentFailedEvent", json)
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -346,7 +346,7 @@ class AvroEventConverterTest {
     }
 
     @Test
-    fun STRING_타입_필드에_null이_오면_빈_문자열을_사용한다() {
+    fun STRING_타입_필드에_null이_오면_기본값이_있을_때만_기본값을_쓴다() {
         val json = objectMapper.writeValueAsString(
             mapOf(
                 "eventId" to "evt-015",
@@ -357,10 +357,20 @@ class AvroEventConverterTest {
                 "reason" to null
             )
         )
+        val withAmount = objectMapper.writeValueAsString(
+            mapOf(
+                "eventId" to "evt-015",
+                "paymentId" to 1,
+                "orderId" to 10,
+                "userId" to 100,
+                "amount" to "30000",
+                "reason" to null
+            )
+        )
 
-        val record = converter.convertJsonToAvro("PaymentFailedEvent", json)
-
-        assertThat(record.get("amount").toString()).isEqualTo("")
-        assertThat(record.get("reason").toString()).isEqualTo("")
+        assertThatThrownBy {
+            converter.convertJsonToAvro("PaymentFailedEvent", json)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(converter.convertJsonToAvro("PaymentFailedEvent", withAmount).get("reason").toString()).isEqualTo("")
     }
 }
