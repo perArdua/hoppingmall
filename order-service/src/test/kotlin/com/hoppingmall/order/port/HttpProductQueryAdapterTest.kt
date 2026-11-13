@@ -1,6 +1,7 @@
 package com.hoppingmall.order.port
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -13,6 +14,9 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import org.springframework.boot.web.client.RestTemplateBuilder
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
 import java.math.BigDecimal
 
@@ -100,21 +104,19 @@ class HttpProductQueryAdapterTest {
         )
         method.isAccessible = true
 
-        val result = method.invoke(adapter, 1L, RuntimeException("fail"))
+        val result = method.invoke(adapter, 1L, HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY, ByteArray(0), null))
 
         assertThat(result).isNull()
     }
 
     @Test
-    fun 목록조회_CB_폴백_시_빈_목록을_반환한다() {
+    fun 목록조회_CB_폴백_시_조회_불가_예외를_던진다() {
         val method = HttpProductQueryAdapter::class.java.getDeclaredMethod(
             "findProductsByIdsFallback", List::class.java, Exception::class.java
         )
         method.isAccessible = true
 
-        @Suppress("UNCHECKED_CAST")
-        val result = method.invoke(adapter, listOf(1L, 2L), RuntimeException("fail")) as List<ProductInfo>
-
-        assertThat(result).isEmpty()
+        assertThatThrownBy { method.invoke(adapter, listOf(1L, 2L), RuntimeException("fail")) }
+            .hasCauseInstanceOf(ProductQueryUnavailableException::class.java)
     }
 }
