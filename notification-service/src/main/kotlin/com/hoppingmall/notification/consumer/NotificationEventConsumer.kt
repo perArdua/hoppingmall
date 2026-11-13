@@ -32,7 +32,7 @@ class NotificationEventConsumer(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @KafkaListener(topics = [KafkaTopics.NOTIFICATION], groupId = "notification-service")
+    @KafkaListener(topics = [KafkaTopics.NOTIFICATION], groupId = CONSUMER_GROUP)
     @Suppress("UNCHECKED_CAST")
     fun handleNotificationEvent(
         record: ConsumerRecord<String, Any>
@@ -121,6 +121,7 @@ class NotificationEventConsumer(
     }
 
     companion object {
+        const val CONSUMER_GROUP = "notification-service"
         const val DISCARDED_METRIC = "notification.event.discarded"
     }
 }
