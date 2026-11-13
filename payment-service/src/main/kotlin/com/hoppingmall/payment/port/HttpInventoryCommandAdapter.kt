@@ -26,9 +26,18 @@ class HttpInventoryCommandAdapter(
 
     @CircuitBreaker(name = "inventory-command")
     override fun increaseStock(productId: Long, quantity: Int) {
+        post(productId, quantity, null)
+    }
+
+    @CircuitBreaker(name = "inventory-command")
+    override fun increaseStock(productId: Long, quantity: Int, requestKey: String) {
+        post(productId, quantity, requestKey)
+    }
+
+    private fun post(productId: Long, quantity: Int, requestKey: String?) {
         restTemplate.postForEntity(
             "$productServiceUrl/internal/api/v1/inventory/$productId/increase?quantity=$quantity",
-            null,
+            requestKeyEntity(requestKey),
             Void::class.java
         )
     }

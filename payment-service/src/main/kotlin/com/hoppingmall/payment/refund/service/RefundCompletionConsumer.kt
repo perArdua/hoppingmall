@@ -47,7 +47,8 @@ class RefundCompletionConsumer(
             RefundItemEvent(
                 productId = itemNode.get("productId").asLong(),
                 quantity = itemNode.get("quantity").asInt(),
-                refundPrice = BigDecimal(itemNode.get("refundPrice").asText())
+                refundPrice = BigDecimal(itemNode.get("refundPrice").asText()),
+                orderItemId = itemNode.get("orderItemId")?.takeIf { !it.isNull }?.asLong()
             )
         } ?: emptyList()
 
@@ -106,7 +107,12 @@ class RefundCompletionConsumer(
         runStepOnce(event.eventId, eventLog, RefundEventLog.INVENTORY_RESTORED) {
             event.items.forEachIndexed { index, item ->
                 runStepOnce(event.eventId, eventLog, RefundEventLog.inventoryItemStep(index)) {
-                    inventoryCommandPort.increaseStock(item.productId, item.quantity)
+                    val requestKey = inventoryRequestKey(event.refundId, item)
+                    if (requestKey == null) {
+                        inventoryCommandPort.increaseStock(item.productId, item.quantity)
+                    } else {
+                        inventoryCommandPort.increaseStock(item.productId, item.quantity, requestKey)
+                    }
                 }
             }
         }
@@ -114,11 +120,17 @@ class RefundCompletionConsumer(
         runStepOnce(event.eventId, eventLog, RefundEventLog.STATS_UPDATED) {
             event.items.forEachIndexed { index, item ->
                 runStepOnce(event.eventId, eventLog, RefundEventLog.statsItemStep(index)) {
-                    productStatisticsPort.incrementRefundStats(
-                        item.productId,
-                        item.quantity.toLong(),
-                        item.refundPrice
-                    )
+                    val requestKey = inventoryRequestKey(event.refundId, item)?.let { "$it$STATS_REQUEST_KEY_SUFFIX" }
+                    if (requestKey == null) {
+                        productStatisticsPort.incrementRefundStats(item.productId, item.quantity.toLong(), item.refundPrice)
+                    } else {
+                        productStatisticsPort.incrementRefundStats(
+                            item.productId,
+                            item.quantity.toLong(),
+                            item.refundPrice,
+                            requestKey
+                        )
+                    }
                 }
             }
         }
@@ -140,5 +152,12 @@ class RefundCompletionConsumer(
             refundLocalOperationService.markStepAndSave(event.eventId, RefundEventLog.ORDER_CANCELLED)
             eventLog.markStepCompleted(RefundEventLog.ORDER_CANCELLED)
         }
+    }
+
+    private fun inventoryRequestKey(refundId: Long, item: RefundItemEvent): String? =
+        item.orderItemId?.let { "refund-$refundId-item-$it" }
+
+    companion object {
+        private const val STATS_REQUEST_KEY_SUFFIX = "-stat"
     }
 }

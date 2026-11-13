@@ -214,7 +214,8 @@ class RefundCommandServiceImpl(
                     RefundItemEvent(
                         productId = item.productId,
                         quantity = item.quantity,
-                        refundPrice = item.refundPrice
+                        refundPrice = item.refundPrice,
+                        orderItemId = item.orderItemId
                     )
                 }
             )

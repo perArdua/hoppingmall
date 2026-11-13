@@ -18,7 +18,8 @@
       "fields": [
         {"name": "productId", "type": "long"},
         {"name": "quantity", "type": "int"},
-        {"name": "refundPrice", "type": "string"}
+        {"name": "refundPrice", "type": "string"},
+        {"name": "orderItemId", "type": ["null", "long"], "default": null}
       ]
     }}, "default": []},
     {"name": "eventType", "type": "string", "default": ""}
