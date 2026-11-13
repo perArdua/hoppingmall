@@ -14,6 +14,7 @@ import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import org.assertj.core.api.Assertions.assertThat
@@ -67,6 +68,9 @@ class OrderCreateProductUnavailableTest {
     @Mock
     private lateinit var transactionTemplate: TransactionTemplate
 
+    @Mock
+    private lateinit var refundRepository: RefundRepository
+
     private lateinit var service: OrderCommandServiceImpl
 
     private val handler = GlobalExceptionHandler()
@@ -76,7 +80,7 @@ class OrderCreateProductUnavailableTest {
         service = OrderCommandServiceImpl(
             orderRepository, orderItemRepository, cartItemRepository,
             productQueryPort, inventoryCommandPort, paymentCommandPort,
-            transactionalEventPublisher, orderMetrics, transactionTemplate
+            transactionalEventPublisher, orderMetrics, transactionTemplate, refundRepository
         )
         whenever(cartItemRepository.findAllById(listOf(CART_ITEM_ID))).thenReturn(listOf(cartItem()))
     }

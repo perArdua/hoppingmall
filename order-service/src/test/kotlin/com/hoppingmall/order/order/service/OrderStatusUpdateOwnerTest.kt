@@ -12,6 +12,7 @@ import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -63,6 +64,9 @@ class OrderStatusUpdateOwnerTest {
     @Mock
     private lateinit var transactionTemplate: TransactionTemplate
 
+    @Mock
+    private lateinit var refundRepository: RefundRepository
+
     private lateinit var service: OrderCommandServiceImpl
 
     @BeforeEach
@@ -70,7 +74,7 @@ class OrderStatusUpdateOwnerTest {
         service = OrderCommandServiceImpl(
             orderRepository, orderItemRepository, cartItemRepository,
             productQueryPort, inventoryCommandPort, paymentCommandPort,
-            transactionalEventPublisher, orderMetrics, transactionTemplate
+            transactionalEventPublisher, orderMetrics, transactionTemplate, refundRepository
         )
     }
 
