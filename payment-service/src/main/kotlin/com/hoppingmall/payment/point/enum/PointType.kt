@@ -4,5 +4,6 @@ enum class PointType {
     EARN,
     USE,
     EXPIRE,
-    REFUND
+    REFUND,
+    RECLAIM
 }

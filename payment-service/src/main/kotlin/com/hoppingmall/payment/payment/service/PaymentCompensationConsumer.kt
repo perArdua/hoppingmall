@@ -50,8 +50,13 @@ class PaymentCompensationConsumer(
 
         val eventId = node.get("eventId")?.asText() ?: return
         val orderId = node.get("orderId")?.asLong() ?: return
-        val paymentId = node.get("paymentId")?.asLong() ?: return
         val userId = node.get("userId")?.asLong() ?: return
+        val paymentId = node.get("paymentId")?.asLong()?.takeIf { it > 0 }
+            ?: paymentCommandService.findPaymentIdByOrderId(orderId)
+        if (paymentId == null) {
+            logger.warn("역보상 메시지에 결제 ID가 없고 그 주문의 결제도 없어 역보상 생략: eventId=$eventId, orderId=$orderId")
+            return
+        }
 
         try {
             val log = compensationEventLogService.saveIfAbsent(

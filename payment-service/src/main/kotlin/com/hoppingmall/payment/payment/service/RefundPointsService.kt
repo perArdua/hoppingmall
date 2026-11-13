@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.payment.service
 
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
+import com.hoppingmall.payment.payment.exception.EarnHistoryNotYetRecordedException
 import com.hoppingmall.payment.point.domain.PointHistory
 import com.hoppingmall.payment.point.domain.PointHistoryRepository
 import com.hoppingmall.payment.point.domain.PointRepository
@@ -60,16 +61,17 @@ class RefundPointsService(
 
     private fun findEarnHistory(paymentId: Long): PointHistory? {
         val earnHistory = pointHistoryRepository.findByPaymentIdAndType(paymentId, PointType.EARN)
-        if (earnHistory == null) {
-            check(!isEarnRequested(paymentId)) { "적립 이력이 아직 없어 포인트를 회수할 수 없음: paymentId=$paymentId" }
+        if (earnHistory == null && isEarnRequested(paymentId)) {
+            throw EarnHistoryNotYetRecordedException(paymentId)
         }
         return earnHistory
     }
 
     private fun remainingEarned(paymentId: Long, earnHistory: PointHistory): BigDecimal {
-        val reclaimed = pointHistoryRepository.findAllByPaymentIdAndType(paymentId, PointType.REFUND)
+        val legacyReclaims = pointHistoryRepository.findAllByPaymentIdAndType(paymentId, PointType.REFUND)
             .filter { it.eventId == cancelEventId(paymentId) || it.eventId?.startsWith(refundEventIdPrefix(paymentId)) == true }
-            .sumOf { it.amount }
+        val reclaimed = (pointHistoryRepository.findAllByPaymentIdAndType(paymentId, PointType.RECLAIM) + legacyReclaims)
+            .sumOf { it.amount.abs() }
         return earnHistory.amount.subtract(reclaimed).max(BigDecimal.ZERO)
     }
 
@@ -84,8 +86,8 @@ class RefundPointsService(
         pointHistoryRepository.save(
             PointHistory(
                 userId = userId,
-                amount = reclaimed,
-                type = PointType.REFUND,
+                amount = reclaimed.negate(),
+                type = PointType.RECLAIM,
                 reason = if (shortfall > BigDecimal.ZERO) "$reason (잔액 부족으로 ${shortfall.toPlainString()} 미회수)" else reason,
                 paymentId = paymentId,
                 eventId = eventId

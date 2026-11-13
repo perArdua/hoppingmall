@@ -148,14 +148,14 @@ class CouponRefundPointReclaimMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     private fun reclaimedAmount(eventId: String): BigDecimal? =
         jdbcTemplate.queryForList(
-            "SELECT amount FROM point_histories WHERE event_id = ? AND type = 'REFUND'",
+            "SELECT -amount FROM point_histories WHERE event_id = ? AND type = 'RECLAIM'",
             BigDecimal::class.java,
             eventId
         ).firstOrNull()
 
     private fun totalReclaimed(payment: Payment): BigDecimal =
         jdbcTemplate.queryForObject(
-            "SELECT COALESCE(SUM(amount), 0) FROM point_histories WHERE payment_id = ? AND type = 'REFUND'",
+            "SELECT COALESCE(SUM(-amount), 0) FROM point_histories WHERE payment_id = ? AND type = 'RECLAIM'",
             BigDecimal::class.java,
             payment.id
         )!!

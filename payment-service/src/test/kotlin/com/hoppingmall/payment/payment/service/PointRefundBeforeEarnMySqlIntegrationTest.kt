@@ -93,7 +93,7 @@ class PointRefundBeforeEarnMySqlIntegrationTest : MySqlJpaTestSupport() {
         assertThat(balanceOf(USER_ID)).isEqualByComparingTo(BigDecimal.ZERO)
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM point_histories WHERE payment_id = ? AND type = 'REFUND'",
+                "SELECT COUNT(*) FROM point_histories WHERE payment_id = ? AND type = 'RECLAIM'",
                 Long::class.java,
                 payment.id
             )
@@ -127,7 +127,7 @@ class PointRefundBeforeEarnMySqlIntegrationTest : MySqlJpaTestSupport() {
         assertThat(compensationStatus("reversal-${payment.transactionId}")).isEqualTo("COMPLETED")
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM point_histories WHERE payment_id = ? AND type = 'REFUND'",
+                "SELECT COUNT(*) FROM point_histories WHERE payment_id = ? AND type = 'RECLAIM'",
                 Long::class.java,
                 payment.id
             )
