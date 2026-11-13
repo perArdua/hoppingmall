@@ -58,7 +58,7 @@ class OperationalRouteConfigurationTest {
 
     @ParameterizedTest
     @MethodSource("dlqRoutes")
-    fun 서비스별_DLQ_관리_라우트는_그_서비스로_가고_ADMIN만_통과시키며_기존_DLQ_라우트보다_먼저_맞춰진다(
+    fun 서비스별_DLQ_관리_라우트는_그_서비스로_가고_ADMIN만_통과시킨다(
         file: String,
         service: String,
         serviceRoute: String
@@ -73,7 +73,15 @@ class OperationalRouteConfigurationTest {
             "JwtValidation=ADMIN",
             "RewritePath=/api/v1/admin/dlq/$service/(?<segment>.*), /api/v1/admin/dlq/\$\\{segment}"
         )
-        assertThat(index).isLessThan(source.routeIndex("payment-service-admin-dlq"))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["application.yml", "application-docker.yml", "application-k8s.yml"])
+    fun 서비스_이름이_없는_옛_DLQ_관리_라우트는_없다(file: String) {
+        val source = load(file)
+
+        assertThat(source.routeIndex("payment-service-admin-dlq")).isEqualTo(-1)
+        assertThat(source.routeIndexByPath("/api/v1/admin/dlq/**")).isEqualTo(-1)
     }
 
     @ParameterizedTest
