@@ -17,6 +17,7 @@ import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
+import com.hoppingmall.order.order.exception.OrderPartiallyRefundedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
@@ -29,6 +30,8 @@ import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.port.ProductQueryUnavailableException
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
+import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -48,7 +51,8 @@ class OrderCommandServiceImpl(
     private val paymentCommandPort: PaymentCommandPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val orderMetrics: OrderMetrics,
-    private val transactionTemplate: TransactionTemplate
+    private val transactionTemplate: TransactionTemplate,
+    private val refundRepository: RefundRepository
 ) : OrderCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -179,6 +183,9 @@ class OrderCommandServiceImpl(
                     val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException()
                     if (target.status != expectedStatus) {
                         throw OrderInvalidStatusException()
+                    }
+                    if (refundRepository.existsByOrderIdAndStatusAndDeletedAtIsNull(orderId, RefundStatus.COMPLETED)) {
+                        throw OrderPartiallyRefundedException()
                     }
                     target.requestCancellation()
                     transactionalEventPublisher.publishEvent(
