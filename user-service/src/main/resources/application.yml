@@ -76,7 +76,7 @@ jwt:
 
 internal:
   service:
-    token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
+    token: ${INTERNAL_SERVICE_TOKEN}
 
 grpc:
   server:
