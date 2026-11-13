@@ -8,6 +8,7 @@ import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
 import com.hoppingmall.dlq.metrics.DLQMetrics
 import com.hoppingmall.dlq.publisher.DLQMessagePublisher
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
@@ -27,6 +28,11 @@ class DLQCommandServiceTest {
     private val dlqMetrics: DLQMetrics = mock()
     private val dlqArchivalService: DLQArchivalService = mock()
     private val dlqCommandService = DLQCommandService(dlqMessageRepository, dlqMessagePublisher, dlqMetrics, dlqArchivalService)
+
+    @BeforeEach
+    fun setUp() {
+        whenever(dlqMessageRepository.claimForRetry(any(), any(), any(), any())).thenReturn(1)
+    }
 
     @Nested
     @DisplayName("saveDLQMessage")
