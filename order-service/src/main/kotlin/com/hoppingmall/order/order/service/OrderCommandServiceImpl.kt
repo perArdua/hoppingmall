@@ -258,10 +258,15 @@ class OrderCommandServiceImpl(
 
     @Transactional
     override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
+        orderRepository.lockById(orderId)
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
         if (!isAdmin) {
             throw OrderAccessDeniedException()
+        }
+
+        if (request.status == OrderStatus.SHIPPED && orderRepository.isHeldBySagaTimeout(orderId)) {
+            throw OrderInvalidStatusException()
         }
 
         order.updateStatus(request.status)

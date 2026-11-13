@@ -9,7 +9,8 @@ import java.time.LocalDateTime
     name = "saga_event_logs",
     indexes = [
         Index(name = "idx_saga_event_id", columnList = "eventId", unique = true),
-        Index(name = "idx_saga_timeout", columnList = "timedOut, timeoutAt")
+        Index(name = "idx_saga_timeout", columnList = "timedOut, timeoutAt"),
+        Index(name = "idx_saga_order_id", columnList = "orderId")
     ]
 )
 class SagaEventLog(
@@ -72,6 +73,7 @@ class SagaEventLog(
         const val REMOTE_COMPLETED = "REMOTE_COMPLETED"
         const val TIMED_OUT = "TIMED_OUT"
         const val TIMEOUT_CLAIMED = "TIMEOUT_CLAIMED"
+        const val RESTORE_CONFIRMED = "RESTORE_CONFIRMED"
         const val DEFAULT_TIMEOUT_MINUTES = 5L
     }
 }

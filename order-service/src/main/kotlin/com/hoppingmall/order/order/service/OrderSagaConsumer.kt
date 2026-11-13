@@ -75,7 +75,8 @@ class OrderSagaConsumer(
                         eventId = eventId,
                         eventType = "PAYMENT_COMPLETED",
                         orderId = event.orderId,
-                        paymentId = event.paymentId
+                        paymentId = event.paymentId,
+                        paymentAmount = event.amount
                     )
                 log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
                 log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
@@ -93,7 +94,8 @@ class OrderSagaConsumer(
                 eventId = eventId,
                 eventType = "PAYMENT_COMPLETED",
                 orderId = event.orderId,
-                paymentId = event.paymentId
+                paymentId = event.paymentId,
+                paymentAmount = event.amount
             )
             log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
             sagaEventLogRepository.save(log)
@@ -228,6 +230,7 @@ class OrderSagaConsumer(
                     "eventId" to "reversal-${event.transactionId}",
                     "orderId" to event.orderId,
                     "paymentId" to event.paymentId,
+                    "amount" to event.amount.toPlainString(),
                     "userId" to event.userId,
                     "reason" to "INVENTORY_CONFIRM_FAILED"
                 ),
@@ -254,6 +257,17 @@ class OrderSagaConsumer(
         if (reservationIds.isEmpty()) return
         inventoryCommandPort.cancelReservations(reservationIds)
         inventoryCommandPort.cancelConfirmedReservations(reservationIds)
+    }
+
+    private fun restoreCancelledPaidOrder(orderId: Long, reservationIds: List<String>) {
+        if (reservationIds.isNotEmpty()) {
+            inventoryCommandPort.cancelReservations(reservationIds)
+            inventoryCommandPort.cancelConfirmedReservations(reservationIds)
+            return
+        }
+        orderItemRepository.findByOrderId(orderId).forEach { item ->
+            inventoryCommandPort.increaseStock(item.productId, item.quantity)
+        }
     }
 
     private fun reconstructReservationIds(orderId: Long): List<String>? {
@@ -283,7 +297,7 @@ class OrderSagaConsumer(
         val startTime = System.currentTimeMillis()
 
         val reservationIds = if (existingLog == null || !existingLog.isStepCompleted(SagaEventLog.LOCAL_COMPLETED)) {
-            executeCompensationLocalPhase(eventId, orderId)
+            executeCompensationLocalPhase(eventId, orderId, eventType)
         } else {
             reconstructReservationIds(orderId)
         }
@@ -293,8 +307,9 @@ class OrderSagaConsumer(
         executeCompensationRemotePhase(eventId, orderId, reservationIds, startTime)
     }
 
-    private fun executeCompensationLocalPhase(eventId: String, orderId: Long): List<String>? {
+    private fun executeCompensationLocalPhase(eventId: String, orderId: Long, eventType: String?): List<String>? {
         return transactionTemplate.execute {
+            orderRepository.lockById(orderId)
             val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=$orderId")
@@ -309,6 +324,17 @@ class OrderSagaConsumer(
                 sagaEventLogRepository.save(log)
                 logger.info("취소 요청 중인 주문의 결제 보상은 취소 결과 처리에 맡김: orderId=$orderId")
                 return@execute null
+            }
+
+            if (eventType == PAYMENT_CANCELLED && order.status in CANCELLED_PAYMENT_ALIGNABLE_STATUSES) {
+                order.updateStatus(OrderStatus.CANCEL_REQUESTED)
+                order.updateStatus(OrderStatus.CANCELLED)
+                orderRepository.save(order)
+                log.markStepCompleted(SagaEventLog.RESTORE_CONFIRMED)
+                sagaEventLogRepository.save(log)
+                publishCancellationNotification(eventId, orderId, order.buyerId)
+                logger.warn("결제가 취소된 결제 완료 주문, 주문 취소 + 확정 재고 복원: orderId=$orderId")
+                return@execute orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }.distinct()
             }
 
             if (!order.isCancellable()) {
@@ -326,8 +352,31 @@ class OrderSagaConsumer(
         }
     }
 
+    private fun publishCancellationNotification(eventId: String, orderId: Long, buyerId: Long) {
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Order",
+            aggregateId = orderId.toString(),
+            eventType = "OrderCancellationNotificationRequested",
+            eventData = mapOf(
+                "eventType" to "OrderCancellationNotificationRequested",
+                "eventId" to "notif-cancel-$eventId",
+                "userId" to buyerId,
+                "type" to "PAYMENT_CANCELLED",
+                "title" to "주문이 취소되었습니다",
+                "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다."
+            ),
+            topic = KafkaTopics.NOTIFICATION,
+            partitionKey = orderId.toString()
+        )
+    }
+
     private fun executeCompensationRemotePhase(eventId: String, orderId: Long, reservationIds: List<String>, startTime: Long) {
-        reservationIds.forEach { inventoryCommandPort.cancelReservation(it) }
+        val restoreConfirmed = sagaEventLogRepository.findByEventId(eventId)?.isStepCompleted(SagaEventLog.RESTORE_CONFIRMED) == true
+        if (restoreConfirmed) {
+            restoreCancelledPaidOrder(orderId, reservationIds)
+        } else {
+            reservationIds.forEach { inventoryCommandPort.cancelReservation(it) }
+        }
 
         transactionTemplate.execute {
             val log = sagaEventLogRepository.findByEventId(eventId)!!
@@ -338,5 +387,10 @@ class OrderSagaConsumer(
         sagaCompensationMetrics.recordSuccess()
         sagaCompensationMetrics.recordRecoveryTime(System.currentTimeMillis() - startTime)
         logger.info("결제 보상 처리 완료 (예약 취소 + 주문 CANCELLED): orderId=$orderId")
+    }
+
+    companion object {
+        private const val PAYMENT_CANCELLED = "PaymentCancelled"
+        private val CANCELLED_PAYMENT_ALIGNABLE_STATUSES = setOf(OrderStatus.PAID, OrderStatus.CANCEL_FAILED)
     }
 }
