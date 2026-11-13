@@ -75,6 +75,7 @@ class PaymentCompensationConsumerAvroRoundTripTest {
                 "eventId" to "reversal-tx-1",
                 "orderId" to 200L,
                 "paymentId" to 100L,
+                "amount" to "10000",
                 "userId" to 1L,
                 "reason" to "RESERVATION_EXPIRED"
             )
