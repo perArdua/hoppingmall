@@ -454,7 +454,6 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
     ports:
