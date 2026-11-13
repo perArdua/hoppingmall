@@ -38,6 +38,7 @@ class ReservationLinkCheckJob(
     private val linkedCounter = Counter.builder("inventory.linkcheck.linked").register(meterRegistry)
     private val abortedCounter = Counter.builder("inventory.linkcheck.aborted").register(meterRegistry)
     private val floorCounter = Counter.builder("inventory.linkcheck.floor_expired").register(meterRegistry)
+    private val claimedFloorCounter = Counter.builder("inventory.linkcheck.claimed_floor_expired").register(meterRegistry)
     private val failedCycles = Counter.builder("inventory.linkcheck.failed_cycles").register(meterRegistry)
     private val failedProducts = Counter.builder("inventory.linkcheck.failed_products").register(meterRegistry)
     private val cycles = Counter.builder("inventory.linkcheck.cycles").register(meterRegistry)
@@ -63,6 +64,7 @@ class ReservationLinkCheckJob(
         val started = System.currentTimeMillis()
         updateOldestAge(now)
         val floor = expireFloor(now)
+        expireClaimedFloor(now)
         var linkedTotal = 0
         var abortedTotal = 0
         var batches = 0
@@ -136,14 +138,26 @@ class ReservationLinkCheckJob(
         return total
     }
 
+    private fun expireClaimedFloor(now: LocalDateTime) {
+        val rows = inventoryReservationRepository.findClaimedExpiredBefore(now, batchSize)
+        if (rows.isEmpty()) return
+        val total = expireByProduct(
+            rows.groupBy({ (it[1] as Number).toLong() }, { it[0] as String }),
+            expire = ::expireClaimedLocked
+        )
+        claimedFloorCounter.increment(total.toDouble())
+        if (total > 0) logger.warn("선점 기한이 지난 CLAIMED 예약 만료: n={}", total)
+    }
+
     private fun expireByProduct(
         reservationIdsByProduct: Map<Long, List<String>>,
-        failedProductIds: MutableSet<Long> = mutableSetOf()
+        failedProductIds: MutableSet<Long> = mutableSetOf(),
+        expire: (Long, List<String>) -> Int = ::expireLocked
     ): Int {
         var total = 0
         reservationIdsByProduct.toSortedMap().forEach { (productId, reservationIds) ->
             try {
-                total += expireLocked(productId, reservationIds)
+                total += expire(productId, reservationIds)
             } catch (e: Exception) {
                 failedProductIds.add(productId)
                 failedProducts.increment()
@@ -158,6 +172,16 @@ class ReservationLinkCheckJob(
             val locked = inventoryReservationRepository.lockReservedByReservationIds(reservationIds)
             if (locked.isEmpty()) return@execute 0
             inventoryReservationRepository.expireByIds(locked.map { (it[0] as Number).toLong() }, LocalDateTime.now())
+            bucketStockService.restore(productId, locked.sumOf { (it[1] as Number).toInt() })
+            inventoryCacheEvictor?.evictAfterCommit(productId)
+            locked.size
+        } ?: 0
+
+    private fun expireClaimedLocked(productId: Long, reservationIds: List<String>): Int =
+        transactionTemplate.execute {
+            val locked = inventoryReservationRepository.lockClaimedByReservationIds(reservationIds)
+            if (locked.isEmpty()) return@execute 0
+            inventoryReservationRepository.expireClaimedByIds(locked.map { (it[0] as Number).toLong() }, LocalDateTime.now())
             bucketStockService.restore(productId, locked.sumOf { (it[1] as Number).toInt() })
             inventoryCacheEvictor?.evictAfterCommit(productId)
             locked.size

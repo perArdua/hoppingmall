@@ -152,6 +152,43 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
     )
     fun lockReservedByReservationIds(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
 
+    @Query(
+        value = """
+            SELECT reservation_id, product_id FROM inventory_reservations
+            WHERE status = 'CLAIMED' AND expires_at < :now
+            ORDER BY expires_at, id LIMIT :limit
+        """,
+        nativeQuery = true
+    )
+    fun findClaimedExpiredBefore(
+        @Param("now") now: LocalDateTime,
+        @Param("limit") limit: Int
+    ): List<Array<Any>>
+
+    @Query(
+        value = """
+            SELECT id, quantity FROM inventory_reservations
+            WHERE reservation_id IN (:reservationIds) AND status = 'CLAIMED'
+            ORDER BY id
+            FOR UPDATE
+        """,
+        nativeQuery = true
+    )
+    fun lockClaimedByReservationIds(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE inventory_reservations SET status = 'EXPIRED', updated_at = :updatedAt
+            WHERE id IN (:ids) AND status = 'CLAIMED'
+        """,
+        nativeQuery = true
+    )
+    fun expireClaimedByIds(
+        @Param("ids") ids: List<Long>,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
+
     @Query("""
         SELECT r FROM InventoryReservation r
         WHERE r.status = :status
