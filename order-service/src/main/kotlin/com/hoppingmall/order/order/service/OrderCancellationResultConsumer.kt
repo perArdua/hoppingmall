@@ -50,6 +50,10 @@ class OrderCancellationResultConsumer(
             return
         }
 
+        completeCancellation(eventId, orderId, existingLog)
+    }
+
+    private fun completeCancellation(eventId: String, orderId: Long, existingLog: SagaEventLog?) {
         val log = if (existingLog == null || !existingLog.isStepCompleted(SagaEventLog.LOCAL_COMPLETED)) {
             executeCompletedLocalPhase(eventId, orderId, existingLog) ?: return
         } else {
