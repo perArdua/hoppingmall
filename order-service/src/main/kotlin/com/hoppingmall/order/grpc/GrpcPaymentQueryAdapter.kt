@@ -25,8 +25,8 @@ class GrpcPaymentQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcPaymentQueryAdapter::class.java)
 
-    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByOrderIdFallback")
-    @Retry(name = "payment-query")
+    @CircuitBreaker(name = "payment-query")
+    @Retry(name = "payment-query-grpc", fallbackMethod = "findByOrderIdFallback")
     override fun findByOrderId(orderId: Long): PaymentInfo? {
         val response = stub.findPaymentByOrderId(
             PaymentOrderIdRequest.newBuilder().setOrderId(orderId).build()
@@ -35,7 +35,7 @@ class GrpcPaymentQueryAdapter(
     }
 
     @CircuitBreaker(name = "payment-query", fallbackMethod = "findByOrderIdOrThrowIfUnavailableFallback")
-    @Retry(name = "payment-query")
+    @Retry(name = "payment-query-grpc")
     override fun findByOrderIdOrThrowIfUnavailable(orderId: Long): PaymentInfo? =
         try {
             stub.findPaymentByOrderId(
@@ -46,8 +46,8 @@ class GrpcPaymentQueryAdapter(
             null
         }
 
-    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByIdFallback")
-    @Retry(name = "payment-query")
+    @CircuitBreaker(name = "payment-query")
+    @Retry(name = "payment-query-grpc", fallbackMethod = "findByIdFallback")
     override fun findById(paymentId: Long): PaymentInfo? {
         val response = stub.findPaymentById(
             PaymentIdRequest.newBuilder().setPaymentId(paymentId).build()

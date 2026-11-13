@@ -20,6 +20,8 @@ repositories {
 	maven { url = uri("https://packages.confluent.io/maven/") }
 }
 
+extra["testcontainers.version"] = "1.21.4"
+
 dependencyManagement {
 	imports {
 		mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.0")
@@ -41,7 +43,9 @@ dependencies {
 	testImplementation("org.springframework.kafka:spring-kafka")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.jetbrains.kotlin:kotlin-reflect")
+	testImplementation("org.testcontainers:mysql:1.21.4")
 	testRuntimeOnly("com.h2database:h2")
+	testRuntimeOnly("com.mysql:mysql-connector-j")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
