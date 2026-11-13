@@ -229,7 +229,7 @@ class OrderSagaConsumer(
                     "orderId" to event.orderId,
                     "paymentId" to event.paymentId,
                     "userId" to event.userId,
-                    "reason" to "RESERVATION_EXPIRED"
+                    "reason" to "INVENTORY_CONFIRM_FAILED"
                 ),
                 topic = KafkaTopics.PAYMENT_REVERSAL,
                 partitionKey = event.orderId.toString()
@@ -243,7 +243,7 @@ class OrderSagaConsumer(
         if (compensated) {
             sagaCompensationMetrics.recordSuccess()
             sagaCompensationMetrics.recordRecoveryTime(System.currentTimeMillis() - startTime)
-            logger.warn("예약 만료로 주문 취소 + 결제 역보상 요청: orderId=${event.orderId}")
+            logger.warn("재고 확정 실패로 주문 취소 + 결제 역보상 요청: orderId=${event.orderId}")
         }
     }
 
