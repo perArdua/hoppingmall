@@ -51,9 +51,6 @@ management:
       probability: 0.0
     enabled: false
 
-jwt:
-  secret: ${JWT_SECRET}
-
 internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN}
