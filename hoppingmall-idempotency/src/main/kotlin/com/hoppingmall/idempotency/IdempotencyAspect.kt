@@ -1,6 +1,8 @@
 package com.hoppingmall.idempotency
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.ObjectReader
 import com.hoppingmall.common.config.GatewayHeaderAuthenticationFilter
 import jakarta.servlet.http.HttpServletRequest
 import org.aspectj.lang.ProceedingJoinPoint
@@ -29,6 +31,9 @@ class IdempotencyAspect(
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    private val replayReader: ObjectReader = objectMapper.readerFor(Any::class.java)
+        .with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
 
     @Value("\${idempotency.lock-timeout-seconds:0}")
     private var lockTimeoutOverrideSeconds: Long = 0
@@ -97,7 +102,7 @@ class IdempotencyAspect(
     }
 
     private fun buildCachedResponse(record: IdempotencyRecord): ResponseEntity<Any> {
-        val body = objectMapper.readValue(record.responseBody, Any::class.java)
+        val body = replayReader.readValue<Any>(record.responseBody)
         return ResponseEntity.status(record.responseStatus).body(body)
     }
 
