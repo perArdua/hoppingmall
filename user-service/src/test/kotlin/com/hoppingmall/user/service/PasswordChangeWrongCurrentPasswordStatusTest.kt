@@ -110,7 +110,7 @@ class PasswordChangeWrongCurrentPasswordStatusTest {
     }
 
     @Test
-    fun 로그인에서_비밀번호가_틀리면_그대로_401_P002다() {
+    fun 로그인에서_비밀번호가_틀리면_로그인_실패와_같은_401_U002다() {
         whenever(userRepository.findByEmail(Email("change@example.com"))).thenReturn(user)
         val userQueryService = UserQueryServiceImpl(userRepository, PasswordVerifier(passwordEncoder))
 
@@ -119,7 +119,7 @@ class PasswordChangeWrongCurrentPasswordStatusTest {
         }
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.UNAUTHORIZED)
-        assertThat(response.body!!.code).isEqualTo("P002")
+        assertThat(response.body!!.code).isEqualTo("U002")
     }
 
     private fun responseOf(action: () -> Unit): ResponseEntity<ApiResponse<Unit>> {
