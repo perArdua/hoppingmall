@@ -25,8 +25,8 @@ class HttpPaymentQueryAdapter(
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
-    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByOrderIdFallback")
-    @Retry(name = "payment-query")
+    @CircuitBreaker(name = "payment-query")
+    @Retry(name = "payment-query", fallbackMethod = "findByOrderIdFallback")
     override fun findByOrderId(orderId: Long): PaymentInfo? {
         return restTemplate.getForObject(
             "$paymentServiceUrl/internal/api/v1/payments/by-order/$orderId",
@@ -46,8 +46,8 @@ class HttpPaymentQueryAdapter(
             null
         }
 
-    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByIdFallback")
-    @Retry(name = "payment-query")
+    @CircuitBreaker(name = "payment-query")
+    @Retry(name = "payment-query", fallbackMethod = "findByIdFallback")
     override fun findById(paymentId: Long): PaymentInfo? {
         return restTemplate.getForObject(
             "$paymentServiceUrl/internal/api/v1/payments/$paymentId",
