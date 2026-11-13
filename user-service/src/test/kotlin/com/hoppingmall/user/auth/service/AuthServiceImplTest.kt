@@ -5,6 +5,7 @@ import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
 import com.hoppingmall.user.common.enums.Role
+import com.hoppingmall.user.config.ratelimit.NoOpLoginAttemptLimiter
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
 import com.hoppingmall.user.exception.user.UserNotFoundException
@@ -59,7 +60,8 @@ class AuthServiceImplTest {
                 refreshExpirationMs = 86400000
             },
             userRepository = userRepository,
-            accessTokenBlacklistRepository = accessTokenBlacklistRepository
+            accessTokenBlacklistRepository = accessTokenBlacklistRepository,
+            loginAttemptLimiter = NoOpLoginAttemptLimiter()
         )
     }
 

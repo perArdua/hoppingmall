@@ -10,6 +10,7 @@ import com.hoppingmall.user.auth.service.RefreshTokenServiceImpl
 import com.hoppingmall.user.common.vo.PasswordCreator
 import com.hoppingmall.user.common.vo.PasswordPolicy
 import com.hoppingmall.user.common.vo.PasswordVerifier
+import com.hoppingmall.user.config.ratelimit.NoOpLoginAttemptLimiter
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
@@ -90,7 +91,8 @@ class PasswordChangeRefreshTokenRevocationTest {
             refreshTokenService = refreshTokenService,
             jwtProperties = jwtProperties,
             userRepository = userRepository,
-            accessTokenBlacklistRepository = accessTokenBlacklistRepository
+            accessTokenBlacklistRepository = accessTokenBlacklistRepository,
+            loginAttemptLimiter = NoOpLoginAttemptLimiter()
         )
         userCommandService = UserCommandServiceImpl(
             userRepository = userRepository,
