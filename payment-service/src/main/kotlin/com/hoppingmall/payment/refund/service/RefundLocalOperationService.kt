@@ -73,8 +73,11 @@ class RefundLocalOperationService(
                 refundAmount = event.refundAmount,
                 isFullRefund = event.isFullRefund
             )
-            refundedPayment?.let {
-                paymentEventService.publishMembershipRefundRevertEvent(it, event.refundId, event.refundAmount)
+            val refundCounted = paymentRepository.addRefundedAmountUnlessCancelled(event.paymentId, event.refundAmount) > 0
+            if (refundCounted) {
+                refundedPayment?.let {
+                    paymentEventService.publishMembershipRefundRevertEvent(it, event.refundId, event.refundAmount)
+                }
             }
             paymentNotificationService.publishRefundCompletedNotification(
                 refundId = event.refundId,

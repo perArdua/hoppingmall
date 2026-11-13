@@ -6,9 +6,11 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import java.math.BigDecimal
 
 @Repository
 interface PaymentRepository : JpaRepository<Payment, Long> {
@@ -18,6 +20,13 @@ interface PaymentRepository : JpaRepository<Payment, Long> {
     @Query("SELECT p FROM Payment p WHERE p.id = :id")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findByIdForUpdate(@Param("id") id: Long): Payment?
+
+    @Modifying
+    @Query(
+        value = "UPDATE payments SET refunded_amount = COALESCE(refunded_amount, 0) + :amount WHERE id = :id AND status <> 'CANCELLED'",
+        nativeQuery = true
+    )
+    fun addRefundedAmountUnlessCancelled(@Param("id") id: Long, @Param("amount") amount: BigDecimal): Int
 
     fun findByUserId(userId: Long, pageable: Pageable): Slice<Payment>
 
