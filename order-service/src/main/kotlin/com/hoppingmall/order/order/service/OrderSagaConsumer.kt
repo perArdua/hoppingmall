@@ -258,11 +258,7 @@ class OrderSagaConsumer(
     }
 
     private fun executeCompensationRemotePhase(eventId: String, orderId: Long, reservationIds: List<String>, startTime: Long) {
-        try {
-            reservationIds.forEach { inventoryCommandPort.cancelReservation(it) }
-        } catch (e: Exception) {
-            logger.error("보상 예약 취소 실패: orderId=$orderId", e)
-        }
+        reservationIds.forEach { inventoryCommandPort.cancelReservation(it) }
 
         transactionTemplate.execute {
             val log = sagaEventLogRepository.findByEventId(eventId)!!
