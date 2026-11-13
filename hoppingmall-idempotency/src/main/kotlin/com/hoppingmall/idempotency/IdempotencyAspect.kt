@@ -1,6 +1,8 @@
 package com.hoppingmall.idempotency
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.config.GatewayHeaderAuthenticationFilter
+import jakarta.servlet.http.HttpServletRequest
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect
@@ -12,6 +14,9 @@ import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
 import org.springframework.web.context.request.RequestContextHolder
 import org.springframework.web.context.request.ServletRequestAttributes
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.concurrent.TimeUnit
 
 @Aspect
@@ -36,14 +41,15 @@ class IdempotencyAspect(
         val request = requestAttributes.request
         val key = request.getHeader(IDEMPOTENCY_KEY_HEADER)
             ?: throw IdempotencyKeyMissingException()
+        val scopedKey = scopedKey(request, key)
 
-        val existing = idempotencyService.findByKey(key)
+        val existing = idempotencyService.findByKey(scopedKey)
         if (existing != null) {
             log.info("멱등성 캐시 히트: key={}, endpoint={}", key, existing.endpoint)
             return buildCachedResponse(existing)
         }
 
-        val lockKey = "idempotency:$key"
+        val lockKey = "idempotency:$scopedKey"
         val lock = redissonClient.getLock(lockKey)
 
         if (!lock.tryLock(0, lockTimeoutSeconds(idempotent), TimeUnit.SECONDS)) {
@@ -51,7 +57,7 @@ class IdempotencyAspect(
         }
 
         try {
-            val existingAfterLock = idempotencyService.findByKey(key)
+            val existingAfterLock = idempotencyService.findByKey(scopedKey)
             if (existingAfterLock != null) {
                 log.info("멱등성 캐시 히트 (락 후): key={}", key)
                 return buildCachedResponse(existingAfterLock)
@@ -61,7 +67,7 @@ class IdempotencyAspect(
 
             if (result is ResponseEntity<*> && result.statusCode.is2xxSuccessful) {
                 idempotencyService.save(
-                    key = key,
+                    key = scopedKey,
                     httpMethod = request.method,
                     endpoint = request.requestURI,
                     responseStatus = result.statusCode.value(),
@@ -79,6 +85,17 @@ class IdempotencyAspect(
         }
     }
 
+    private fun scopedKey(request: HttpServletRequest, key: String): String {
+        val requester = request.getHeader(GatewayHeaderAuthenticationFilter.USER_ID_HEADER)
+            ?.trim()
+            ?.toLongOrNull()
+            ?.toString()
+            ?: ANONYMOUS_REQUESTER
+        val scope = listOf(requester, request.method, request.requestURI, key).joinToString(SCOPE_DELIMITER)
+        val digest = MessageDigest.getInstance(SCOPE_HASH_ALGORITHM).digest(scope.toByteArray(StandardCharsets.UTF_8))
+        return HexFormat.of().formatHex(digest)
+    }
+
     private fun buildCachedResponse(record: IdempotencyRecord): ResponseEntity<Any> {
         val body = objectMapper.readValue(record.responseBody, Any::class.java)
         return ResponseEntity.status(record.responseStatus).body(body)
@@ -89,5 +106,8 @@ class IdempotencyAspect(
 
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+        private const val ANONYMOUS_REQUESTER = "anonymous"
+        private const val SCOPE_DELIMITER = "\n"
+        private const val SCOPE_HASH_ALGORITHM = "SHA-256"
     }
 }
