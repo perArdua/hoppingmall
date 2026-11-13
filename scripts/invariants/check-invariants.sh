@@ -7,7 +7,6 @@ SQL_FILE="${SQL_FILE:-$SCRIPT_DIR/invariants.sql}"
 MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-root}"
-MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
 
 PENDING_MAX_MINUTES="${PENDING_MAX_MINUTES:-10}"
 PAYING_MAX_MINUTES="${PAYING_MAX_MINUTES:-15}"
@@ -28,6 +27,8 @@ for arg in "$@"; do
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
+
+MYSQL_PASSWORD="${MYSQL_PASSWORD:?MYSQL_PASSWORD 환경 변수를 설정하세요}"
 
 run_mysql() {
   MYSQL_PWD="$MYSQL_PASSWORD" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --protocol=TCP --init-command="SET time_zone = '$DATA_TIME_ZONE'" "$@"
