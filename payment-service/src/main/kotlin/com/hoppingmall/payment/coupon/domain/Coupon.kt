@@ -7,6 +7,8 @@ import jakarta.persistence.*
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "coupons")
@@ -18,7 +20,8 @@ class Coupon private constructor(
     val code: String,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     val discountType: DiscountType,
 
     @Column(nullable = false, precision = 10, scale = 2)
@@ -43,7 +46,8 @@ class Coupon private constructor(
     val validTo: LocalDateTime,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: CouponStatus = CouponStatus.ACTIVE,
 
     @Version

@@ -7,6 +7,8 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -27,7 +29,8 @@ class CompensationEventLog(
     val orderId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: CompensationEventLogStatus = CompensationEventLogStatus.PENDING
 ) : BaseEntity() {
 

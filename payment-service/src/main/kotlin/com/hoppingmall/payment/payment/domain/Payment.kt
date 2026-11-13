@@ -7,6 +7,8 @@ import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -27,11 +29,13 @@ class Payment private constructor(
     val amount: BigDecimal,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     val method: PaymentMethod,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: PaymentStatus = PaymentStatus.PENDING,
 
     @Column(nullable = false, precision = 10, scale = 2)
