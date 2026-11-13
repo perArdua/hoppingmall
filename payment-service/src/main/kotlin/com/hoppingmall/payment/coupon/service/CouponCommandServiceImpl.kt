@@ -85,6 +85,7 @@ class CouponCommandServiceImpl(
     }
 
     @CacheEvict(cacheNames = ["coupon:available"], allEntries = true)
+    @Transactional(timeout = ISSUE_TRANSACTION_TIMEOUT_SECONDS)
     override fun issueCoupon(userId: Long, couponId: Long): UserCouponResponse {
         var result = couponStockRedisRepository.tryReserve(couponId, userId)
 
@@ -206,5 +207,9 @@ class CouponCommandServiceImpl(
             userCoupon.restore()
             userCouponRepository.save(userCoupon)
         }
+    }
+
+    companion object {
+        const val ISSUE_TRANSACTION_TIMEOUT_SECONDS = 30
     }
 }

@@ -28,6 +28,11 @@ class CouponCompensationProcessor(
                     "쿠폰 재고 보상 멱등 스킵 (이미 복원됨): couponId={}, userId={}",
                     event.couponId, event.userId
                 )
+            CouponRestoreResult.NotReserved ->
+                log.info(
+                    "쿠폰 재고 보상 스킵 (발급 집합에 없어 재고를 올리지 않음): couponId={}, userId={}",
+                    event.couponId, event.userId
+                )
         }
         metrics.recordAsyncConsumed()
         return result
