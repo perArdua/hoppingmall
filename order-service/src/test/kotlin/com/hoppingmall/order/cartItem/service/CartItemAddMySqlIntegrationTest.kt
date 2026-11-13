@@ -143,7 +143,7 @@ class CartItemAddMySqlIntegrationTest : MySqlJpaTestSupport() {
         assertThat(failed).hasSize(1)
         val errorCode = (failed.single() as BusinessException).errorCode
         assertThat(errorCode.status).isEqualTo(HttpStatus.CONFLICT)
-        assertThat(errorCode.code).isEqualTo("C004")
+        assertThat(errorCode.code).isEqualTo("CART004")
         assertThat(rows()).containsExactly(listOf(succeeded.single().quantity, true))
     }
 
