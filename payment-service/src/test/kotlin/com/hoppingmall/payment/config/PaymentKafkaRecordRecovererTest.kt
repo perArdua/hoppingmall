@@ -14,7 +14,6 @@ import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.service.CompensationEventLogService
 import com.hoppingmall.payment.payment.service.PaymentCommandService
 import com.hoppingmall.payment.payment.service.PaymentCompensationConsumer
-import com.hoppingmall.payment.payment.service.RefundPointsService
 import com.hoppingmall.payment.payment.service.strategy.CompensationEventHandlerRegistry
 import com.hoppingmall.payment.payment.service.strategy.PaymentCancellationRequestedHandler
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -62,9 +61,6 @@ class PaymentKafkaRecordRecovererTest {
     @Mock
     private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
-    @Mock
-    private lateinit var refundPointsService: RefundPointsService
-
     private val logs = mutableMapOf<String, CompensationEventLog>()
 
     private lateinit var consumer: PaymentCompensationConsumer
@@ -93,7 +89,7 @@ class PaymentKafkaRecordRecovererTest {
         )
         consumer = PaymentCompensationConsumer(
             compensationEventLogService,
-            refundPointsService,
+            paymentCommandService,
             CompensationEventHandlerRegistry(listOf(handler)),
             ObjectMapper()
         )

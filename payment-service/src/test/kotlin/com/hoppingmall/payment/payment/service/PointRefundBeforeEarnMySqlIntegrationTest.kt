@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager
 import org.springframework.context.annotation.Import
@@ -101,11 +102,12 @@ class PointRefundBeforeEarnMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
-    fun 역보상_회수도_적립_이력이_아직_없으면_완료로_기록되지_않고_적립_뒤_다시_처리되면_잔액이_0이다() {
+    fun 역보상은_적립_이력이_아직_없어도_포인트를_직접_회수하지_않고_결제_취소를_요청한_뒤_완료로_기록한다() {
         val payment = savedSucceededPayment(BigDecimal("1000"), "tx-549-3")
+        val paymentCommandService = mock<PaymentCommandService>()
         val consumer = PaymentCompensationConsumer(
             compensationEventLogService,
-            refundPointsService,
+            paymentCommandService,
             mock<CompensationEventHandlerRegistry>(),
             objectMapper
         )
@@ -119,17 +121,17 @@ class PointRefundBeforeEarnMySqlIntegrationTest : MySqlJpaTestSupport() {
             )
         )
 
-        val first = runCatching { consumer.handlePaymentReversal(message) }
-        val statusAfterFirst = compensationStatus("reversal-${payment.transactionId}")
-        earn(payment, BigDecimal("30"))
         consumer.handlePaymentReversal(message)
 
-        assertThat(first.isFailure)
-            .describedAs("적립 이력이 없을 때 역보상 처리 결과=%s", first)
-            .isTrue()
-        assertThat(statusAfterFirst).isEqualTo("PENDING")
-        assertThat(balanceOf(USER_ID)).isEqualByComparingTo(BigDecimal.ZERO)
+        verify(paymentCommandService).cancelPaymentInternal(payment.id!!)
         assertThat(compensationStatus("reversal-${payment.transactionId}")).isEqualTo("COMPLETED")
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM point_histories WHERE payment_id = ? AND type = 'REFUND'",
+                Long::class.java,
+                payment.id
+            )
+        ).isEqualTo(0L)
     }
 
     @Test

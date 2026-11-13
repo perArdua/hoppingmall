@@ -32,7 +32,7 @@ class PaymentCompensationConsumerAvroRoundTripTest {
     private lateinit var compensationEventLogService: CompensationEventLogService
 
     @Mock
-    private lateinit var refundPointsService: RefundPointsService
+    private lateinit var paymentCommandService: PaymentCommandService
 
     @Mock
     private lateinit var compensationEventHandlerRegistry: CompensationEventHandlerRegistry
@@ -44,7 +44,7 @@ class PaymentCompensationConsumerAvroRoundTripTest {
     fun setUp() {
         consumer = PaymentCompensationConsumer(
             compensationEventLogService,
-            refundPointsService,
+            paymentCommandService,
             compensationEventHandlerRegistry,
             objectMapper
         )
@@ -67,7 +67,7 @@ class PaymentCompensationConsumerAvroRoundTripTest {
     }
 
     @Test
-    fun 직렬화_경로를_거친_역보상_요청은_포인트_환불을_수행한다() {
+    fun 직렬화_경로를_거친_역보상_요청은_결제를_취소한다() {
         val message = roundTrip(
             "PaymentReversalRequested",
             mapOf(
@@ -91,7 +91,7 @@ class PaymentCompensationConsumerAvroRoundTripTest {
 
         consumer.handlePaymentReversal(message)
 
-        verify(refundPointsService).refundPoints(1L, 100L)
+        verify(paymentCommandService).cancelPaymentInternal(100L)
         verify(compensationEventLogService).markCompleted("reversal-tx-1")
     }
 }

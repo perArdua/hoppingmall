@@ -58,6 +58,9 @@ class PaymentCompensationEventReadTest {
     @Mock
     private lateinit var refundPointsService: RefundPointsService
 
+    @Mock
+    private lateinit var paymentCommandService: PaymentCommandService
+
     private val registryScope = "payment-compensation-read"
     private val productionObjectMapper: ObjectMapper = loadProductionObjectMapper()
     private val savedOutboxEvents = mutableListOf<OutboxEvent>()
@@ -92,7 +95,7 @@ class PaymentCompensationEventReadTest {
                 PaymentCancelledCompensationHandler(compensationEventLogService, refundPointsService, productionObjectMapper)
             )
         )
-        consumer = PaymentCompensationConsumer(compensationEventLogService, refundPointsService, registry, productionObjectMapper)
+        consumer = PaymentCompensationConsumer(compensationEventLogService, paymentCommandService, registry, productionObjectMapper)
     }
 
     @AfterEach

@@ -2,6 +2,8 @@ package com.hoppingmall.payment.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
+import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import com.hoppingmall.payment.payment.service.strategy.CompensationEventHandlerRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
@@ -10,7 +12,7 @@ import org.springframework.stereotype.Service
 @Service
 class PaymentCompensationConsumer(
     private val compensationEventLogService: CompensationEventLogService,
-    private val refundPointsService: RefundPointsService,
+    private val paymentCommandService: PaymentCommandService,
     private val compensationEventHandlerRegistry: CompensationEventHandlerRegistry,
     private val objectMapper: ObjectMapper
 ) {
@@ -63,10 +65,16 @@ class PaymentCompensationConsumer(
                 return
             }
 
-            refundPointsService.refundPoints(userId, paymentId)
+            try {
+                paymentCommandService.cancelPaymentInternal(paymentId)
+            } catch (e: PaymentInvalidStateException) {
+                logger.warn("취소할 수 없는 상태의 결제라 역보상 취소 생략: orderId=$orderId, paymentId=$paymentId")
+            } catch (e: PaymentNotFoundException) {
+                logger.warn("결제를 찾을 수 없어 역보상 취소 생략: orderId=$orderId, paymentId=$paymentId")
+            }
             compensationEventLogService.markCompleted(eventId)
 
-            logger.info("결제 역보상 처리 완료: orderId=$orderId, paymentId=$paymentId")
+            logger.info("결제 역보상 처리 완료: orderId=$orderId, paymentId=$paymentId, userId=$userId")
         } catch (e: Exception) {
             logger.error("결제 역보상 처리 실패: $eventId, 오류: ${e.message}")
             throw e
