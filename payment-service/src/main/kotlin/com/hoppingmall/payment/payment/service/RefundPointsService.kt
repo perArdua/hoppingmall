@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.payment.service
 
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
+import com.hoppingmall.payment.payment.exception.EarnHistoryNotYetRecordedException
 import com.hoppingmall.payment.point.domain.PointHistory
 import com.hoppingmall.payment.point.domain.PointHistoryRepository
 import com.hoppingmall.payment.point.domain.PointRepository
@@ -60,8 +61,8 @@ class RefundPointsService(
 
     private fun findEarnHistory(paymentId: Long): PointHistory? {
         val earnHistory = pointHistoryRepository.findByPaymentIdAndType(paymentId, PointType.EARN)
-        if (earnHistory == null) {
-            check(!isEarnRequested(paymentId)) { "적립 이력이 아직 없어 포인트를 회수할 수 없음: paymentId=$paymentId" }
+        if (earnHistory == null && isEarnRequested(paymentId)) {
+            throw EarnHistoryNotYetRecordedException(paymentId)
         }
         return earnHistory
     }
