@@ -5,6 +5,7 @@ import com.hoppingmall.dlq.domain.DLQStatus
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -82,6 +83,21 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
         @Param("now") now: Long,
         pageable: Pageable
     ): Page<DLQMessage>
+
+    @Modifying
+    @Query("""
+        UPDATE DLQMessage d
+        SET d.status = :claimedStatus
+        WHERE d.id = :id
+        AND d.status = :expectedStatus
+        AND d.retryCount = :expectedRetryCount
+    """)
+    fun claimForRetry(
+        @Param("id") id: Long,
+        @Param("expectedStatus") expectedStatus: DLQStatus,
+        @Param("expectedRetryCount") expectedRetryCount: Int,
+        @Param("claimedStatus") claimedStatus: DLQStatus
+    ): Int
 
     fun findFirstByOriginalTopicAndContentHashOrderByIdDesc(
         originalTopic: String,

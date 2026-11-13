@@ -151,6 +151,14 @@ class DLQCommandService(
                 return false
             }
 
+            val claimed = dlqMessageRepository.claimForRetry(
+                dlqMessageId, DLQStatus.PENDING, dlqMessage.retryCount, DLQStatus.RETRYING
+            )
+            if (claimed == 0) {
+                logger.info("다른 인스턴스가 먼저 집은 DLQ 메시지: id={}", dlqMessageId)
+                return false
+            }
+
             logger.info("DLQ 메시지 재처리 시작: id={}, topic={}", dlqMessageId, dlqMessage.originalTopic)
 
             dlqMessage.incrementRetry()
