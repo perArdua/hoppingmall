@@ -84,6 +84,7 @@ class StatisticsEventConsumerTest {
         )
 
         whenever(statisticsEventLogRepository.existsByEventId("evt-1")).thenReturn(false)
+        whenever(statisticsEventLogRepository.existsByEventId("txn-1")).thenReturn(true)
         whenever(orderItemQueryPort.findByOrderId(10L)).thenReturn(items)
         whenever(statisticsEventLogRepository.save(any<StatisticsEventLog>())).thenAnswer { it.arguments[0] }
 
