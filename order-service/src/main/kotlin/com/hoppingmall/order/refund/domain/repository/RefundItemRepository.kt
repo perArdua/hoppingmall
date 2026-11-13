@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import java.math.BigDecimal
 
 @Repository
 interface RefundItemRepository : JpaRepository<RefundItem, Long> {
@@ -15,7 +16,8 @@ interface RefundItemRepository : JpaRepository<RefundItem, Long> {
     @Query(
         value = """
             SELECT ri.order_item_id AS orderItemId,
-                   COALESCE(SUM(ri.quantity), 0) AS totalRefundedQuantity
+                   COALESCE(SUM(ri.quantity), 0) AS totalRefundedQuantity,
+                   COALESCE(SUM(ri.refund_price), 0) AS totalRefundedAmount
             FROM refund_items ri
             JOIN refunds r ON ri.refund_id = r.id
             WHERE r.order_id = :orderId
@@ -48,4 +50,5 @@ interface RefundItemRepository : JpaRepository<RefundItem, Long> {
 interface RefundedQuantityProjection {
     val orderItemId: Long
     val totalRefundedQuantity: Long
+    val totalRefundedAmount: BigDecimal
 }
