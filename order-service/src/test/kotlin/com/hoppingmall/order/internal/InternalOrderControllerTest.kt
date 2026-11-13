@@ -3,10 +3,8 @@ package com.hoppingmall.order.internal
 import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
-import com.hoppingmall.order.refund.domain.Refund
-import com.hoppingmall.order.refund.domain.repository.RefundRepository
-import com.hoppingmall.order.refund.enum.RefundReason
-import com.hoppingmall.order.refund.enum.RefundStatus
+import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
+import com.hoppingmall.order.refund.domain.repository.SettlementRefundProjection
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -38,7 +36,7 @@ class InternalOrderControllerTest {
     private lateinit var shippingRepository: ShippingRepository
 
     @Mock
-    private lateinit var refundRepository: RefundRepository
+    private lateinit var refundItemRepository: RefundItemRepository
 
     @InjectMocks
     private lateinit var controller: InternalOrderController
@@ -239,22 +237,13 @@ class InternalOrderControllerTest {
         val startDate = LocalDateTime.of(2026, 1, 1, 0, 0)
         val endDate = LocalDateTime.of(2026, 1, 31, 23, 59, 59)
 
-        val refund = Refund.create(
-            orderId = 10L,
-            paymentId = 20L,
-            buyerId = 30L,
-            sellerId = sellerId,
-            reason = RefundReason.CHANGE_OF_MIND,
-            reasonDetail = null,
-            refundAmount = BigDecimal("5000"),
-            isFullRefund = false
-        )
-        refund.approve(100L)
-        refund.complete()
-        ReflectionTestUtils.setField(refund, "id", 1L)
+        val refund = object : SettlementRefundProjection {
+            override val refundId = 1L
+            override val saleAmount = BigDecimal("5000")
+        }
 
-        whenever(refundRepository.findBySellerIdAndStatusAndCompletedAtBetween(
-            sellerId, RefundStatus.COMPLETED, startDate, endDate
+        whenever(refundItemRepository.findSettlementRefundsBySellerAndPeriod(
+            sellerId, startDate, endDate
         )).thenReturn(listOf(refund))
 
         val response = controller.getCompletedRefunds(sellerId, startDate, endDate)
@@ -271,8 +260,8 @@ class InternalOrderControllerTest {
         val startDate = LocalDateTime.of(2026, 1, 1, 0, 0)
         val endDate = LocalDateTime.of(2026, 1, 31, 23, 59, 59)
 
-        whenever(refundRepository.findBySellerIdAndStatusAndCompletedAtBetween(
-            sellerId, RefundStatus.COMPLETED, startDate, endDate
+        whenever(refundItemRepository.findSettlementRefundsBySellerAndPeriod(
+            sellerId, startDate, endDate
         )).thenReturn(emptyList())
 
         val response = controller.getCompletedRefunds(sellerId, startDate, endDate)
