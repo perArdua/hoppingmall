@@ -96,13 +96,17 @@ class SagaTimeoutScheduler(
     }
 
     private fun restoreReservationsBeforeCancel(sagaId: Long, orderId: Long) {
-        val saga = sagaEventLogRepository.findByIdOrNull(sagaId) ?: return
-        if (saga.isTimedOut() || saga.isFullyCompleted()) return
-        val order = orderRepository.findByIdOrNull(orderId) ?: return
-        if (order.status != OrderStatus.PAID || !order.isCancellable()) return
-        val reservationIds = orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }.distinct()
+        val reservationIds = transactionTemplate.execute { reservationIdsToRestore(sagaId, orderId) }.orEmpty()
         if (reservationIds.isEmpty()) return
         inventoryCommandPort.cancelReservations(reservationIds)
         inventoryCommandPort.cancelConfirmedReservations(reservationIds)
+    }
+
+    private fun reservationIdsToRestore(sagaId: Long, orderId: Long): List<String> {
+        val saga = sagaEventLogRepository.findByIdOrNull(sagaId) ?: return emptyList()
+        if (saga.isTimedOut() || saga.isFullyCompleted()) return emptyList()
+        val order = orderRepository.findByIdOrNull(orderId) ?: return emptyList()
+        if (order.status != OrderStatus.PAID || !order.isCancellable()) return emptyList()
+        return orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }.distinct()
     }
 }
