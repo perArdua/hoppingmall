@@ -6,4 +6,5 @@ import java.math.BigDecimal
 interface MembershipCommandService {
     fun createMembership(userId: Long): MembershipResponse
     fun addPurchaseAmount(userId: Long, amount: BigDecimal): MembershipResponse
+    fun revertPurchaseAmount(userId: Long, amount: BigDecimal): MembershipResponse
 }

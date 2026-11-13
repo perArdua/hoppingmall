@@ -32,4 +32,13 @@ class MembershipCommandServiceImpl(
         val saved = membershipRepository.save(membership)
         return MembershipResponse.from(saved)
     }
+
+    @CacheEvict(cacheNames = ["membership"], key = "#userId")
+    override fun revertPurchaseAmount(userId: Long, amount: BigDecimal): MembershipResponse {
+        val membership = membershipRepository.findByUserIdForUpdate(userId)
+            ?: membershipRepository.save(Membership.create(userId))
+        membership.revertPurchaseAmount(amount)
+        val saved = membershipRepository.save(membership)
+        return MembershipResponse.from(saved)
+    }
 }

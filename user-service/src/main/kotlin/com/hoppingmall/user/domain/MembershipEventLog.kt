@@ -1,8 +1,11 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.user.domain.enums.MembershipEventType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 
@@ -19,5 +22,9 @@ class MembershipEventLog(
     val paymentId: Long,
 
     @Column(nullable = false)
-    val orderId: Long
+    val orderId: Long,
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    val type: MembershipEventType? = MembershipEventType.PURCHASE
 ) : BaseEntity()

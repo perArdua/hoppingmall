@@ -29,6 +29,12 @@ class Membership(
         upgradeGradeIfEligible()
     }
 
+    fun revertPurchaseAmount(amount: BigDecimal) {
+        require(amount > BigDecimal.ZERO) { "되돌릴 금액은 0보다 커야 합니다" }
+        this.totalSpent = this.totalSpent.subtract(amount).max(BigDecimal.ZERO)
+        this.grade = MembershipGrade.fromTotalSpent(totalSpent)
+    }
+
     fun upgradeGradeIfEligible() {
         val newGrade = MembershipGrade.fromTotalSpent(totalSpent)
         if (newGrade.ordinal > this.grade.ordinal) {
