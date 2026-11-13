@@ -172,10 +172,15 @@ class OrderCommandServiceImpl(
                 }
                 restoreInventory(orderItems)
             }
-            OrderStatus.PAID -> {
+            OrderStatus.PAID, OrderStatus.CANCEL_FAILED -> {
+                val expectedStatus = order.status
                 transactionTemplate.execute {
-                    val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
-                    target.updateStatus(OrderStatus.CANCEL_REQUESTED)
+                    orderRepository.lockById(orderId)
+                    val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException()
+                    if (target.status != expectedStatus) {
+                        throw OrderInvalidStatusException()
+                    }
+                    target.requestCancellation()
                     transactionalEventPublisher.publishEvent(
                         aggregateType = "Order",
                         aggregateId = orderId.toString(),
