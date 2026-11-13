@@ -104,6 +104,7 @@ class CouponRefundPointReclaimMySqlIntegrationTest : MySqlJpaTestSupport() {
             mock(),
             refundEventLogRepository,
             refundPointsService,
+            mock(),
             mock()
         )
         TransactionTemplate(transactionManager).executeWithoutResult {

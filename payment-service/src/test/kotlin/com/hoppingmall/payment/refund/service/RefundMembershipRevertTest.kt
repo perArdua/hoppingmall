@@ -10,6 +10,7 @@ import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.service.KafkaPaymentEventPublisher
 import com.hoppingmall.payment.payment.service.PaymentEventService
+import com.hoppingmall.payment.payment.service.PaymentNotificationService
 import com.hoppingmall.payment.payment.service.RefundPointsService
 import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.refund.domain.RefundEventLog
@@ -72,6 +73,9 @@ class RefundMembershipRevertTest {
 
     @Mock
     private lateinit var refundPointsService: RefundPointsService
+
+    @Mock
+    private lateinit var paymentNotificationService: PaymentNotificationService
 
     @Spy
     private var paymentEventService: PaymentEventService = PaymentEventService(KafkaPaymentEventPublisher(recorder))
