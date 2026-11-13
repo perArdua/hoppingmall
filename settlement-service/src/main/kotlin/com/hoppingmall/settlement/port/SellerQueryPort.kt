@@ -6,5 +6,6 @@ interface SellerQueryPort {
 
 data class SellerInfo(
     val id: Long,
-    val userId: Long
+    val userId: Long,
+    val approved: Boolean = false
 )
