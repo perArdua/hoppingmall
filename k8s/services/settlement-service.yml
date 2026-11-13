@@ -31,6 +31,7 @@ spec:
       labels:
         app: settlement-service
     spec:
+      terminationGracePeriodSeconds: 45
       containers:
         - name: settlement-service
           image: settlement-service:latest

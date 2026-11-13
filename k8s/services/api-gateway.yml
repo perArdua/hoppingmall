@@ -31,6 +31,7 @@ spec:
       labels:
         app: api-gateway
     spec:
+      terminationGracePeriodSeconds: 45
       containers:
         - name: api-gateway
           image: api-gateway:latest

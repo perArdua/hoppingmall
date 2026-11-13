@@ -36,6 +36,7 @@ spec:
       annotations:
         sidecar.istio.io/inject: "true"
     spec:
+      terminationGracePeriodSeconds: 45
       containers:
         - name: settlement-service
           image: settlement-service:latest

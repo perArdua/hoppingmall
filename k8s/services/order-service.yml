@@ -34,6 +34,7 @@ spec:
       labels:
         app: order-service
     spec:
+      terminationGracePeriodSeconds: 45
       containers:
         - name: order-service
           image: order-service:latest
