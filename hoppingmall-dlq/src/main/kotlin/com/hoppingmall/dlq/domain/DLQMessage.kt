@@ -2,6 +2,8 @@ package com.hoppingmall.dlq.domain
 
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -37,6 +39,7 @@ class DLQMessage(
     var errorTimestamp: Long,
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 20)
     var status: DLQStatus = DLQStatus.PENDING,
 

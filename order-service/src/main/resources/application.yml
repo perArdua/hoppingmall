@@ -147,13 +147,21 @@ resilience4j:
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
         retryExceptionPredicate: com.hoppingmall.order.grpc.TransientGrpcFailurePredicate
+      http-query:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptionPredicate: com.hoppingmall.order.port.TransientHttpFailurePredicate
     instances:
       product-query:
-        baseConfig: default
+        baseConfig: http-query
       product-query-grpc:
         baseConfig: grpc
       payment-query:
-        baseConfig: default
+        baseConfig: http-query
+      payment-query-grpc:
+        baseConfig: grpc
       inventory-confirm:
         baseConfig: default
 
