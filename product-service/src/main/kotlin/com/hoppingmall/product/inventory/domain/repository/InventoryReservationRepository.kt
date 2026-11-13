@@ -17,6 +17,9 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
 
     fun findByRequestKey(requestKey: String): List<InventoryReservation>
 
+    @Query("SELECT r.id FROM InventoryReservation r WHERE r.reservationId IN :reservationIds")
+    fun findIdsByReservationIdIn(@Param("reservationIds") reservationIds: List<String>): List<Long>
+
     @Modifying(clearAutomatically = true)
     @Query(
         value = """
@@ -63,11 +66,11 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
     @Query("""
         UPDATE InventoryReservation r
         SET r.status = com.hoppingmall.product.inventory.enums.ReservationStatus.CONFIRMED, r.updatedAt = :updatedAt
-        WHERE r.reservationId IN :reservationIds
+        WHERE r.id IN :ids
         AND r.status IN :expectedStatuses
     """)
     fun batchConfirmByCas(
-        @Param("reservationIds") reservationIds: List<String>,
+        @Param("ids") ids: List<Long>,
         @Param("expectedStatuses") expectedStatuses: List<ReservationStatus>,
         @Param("updatedAt") updatedAt: LocalDateTime
     ): Int
@@ -75,24 +78,24 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
     @Query(
         value = """
             SELECT id, product_id, quantity FROM inventory_reservations
-            WHERE reservation_id IN (:reservationIds) AND status IN ('RESERVED', 'CLAIMED')
+            WHERE id IN (:ids) AND status IN ('RESERVED', 'CLAIMED')
             ORDER BY id
             FOR UPDATE
         """,
         nativeQuery = true
     )
-    fun lockCancellable(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
+    fun lockCancellable(@Param("ids") ids: List<Long>): List<Array<Any>>
 
     @Query(
         value = """
             SELECT id, product_id, quantity FROM inventory_reservations
-            WHERE reservation_id IN (:reservationIds) AND status = 'CONFIRMED'
+            WHERE id IN (:ids) AND status = 'CONFIRMED'
             ORDER BY id
             FOR UPDATE
         """,
         nativeQuery = true
     )
-    fun lockConfirmed(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
+    fun lockConfirmed(@Param("ids") ids: List<Long>): List<Array<Any>>
 
     @Modifying(clearAutomatically = true)
     @Query(
