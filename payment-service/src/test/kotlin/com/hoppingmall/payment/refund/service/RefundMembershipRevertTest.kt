@@ -120,6 +120,7 @@ class RefundMembershipRevertTest {
     @Test
     fun 부분_환불이_완료되면_그_환불_금액만큼_되돌리기_요청을_환불_id_기준으로_사용자_키에_낸다() {
         whenever(paymentRepository.findById(200L)).thenReturn(Optional.of(successPayment(BigDecimal("50000"))))
+        whenever(paymentRepository.addRefundedAmountUnlessCancelled(200L, BigDecimal("25000"))).thenReturn(1)
         whenever(refundEventLogRepository.save(any<RefundEventLog>())).thenAnswer { it.arguments[0] }
 
         service.execute(refundEvent(2L, BigDecimal("25000"), isFullRefund = false), eventLog(2L))
@@ -141,6 +142,7 @@ class RefundMembershipRevertTest {
     fun 전체_환불이_완료되면_그_환불_금액만큼_되돌리기_요청을_낸다() {
         whenever(paymentRepository.findById(200L)).thenReturn(Optional.of(successPayment(BigDecimal("50000"))))
         whenever(paymentRepository.save(any<Payment>())).thenAnswer { it.arguments[0] }
+        whenever(paymentRepository.addRefundedAmountUnlessCancelled(200L, BigDecimal("50000"))).thenReturn(1)
         whenever(refundEventLogRepository.save(any<RefundEventLog>())).thenAnswer { it.arguments[0] }
 
         service.execute(refundEvent(3L, BigDecimal("50000"), isFullRefund = true), eventLog(3L))
