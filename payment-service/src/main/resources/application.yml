@@ -119,10 +119,12 @@ resilience4j:
     instances:
       membership-query:
         baseConfig: default
+        waitDurationInOpenState: 10s
       order-command:
         baseConfig: default
       order-query:
         baseConfig: default
+        waitDurationInOpenState: 10s
       inventory-command:
         baseConfig: default
   retry:

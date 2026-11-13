@@ -119,8 +119,10 @@ resilience4j:
     instances:
       product-query:
         baseConfig: default
+        waitDurationInOpenState: 10s
       payment-query:
         baseConfig: default
+        waitDurationInOpenState: 10s
       inventory-command:
         baseConfig: default
         ignoreExceptions:
