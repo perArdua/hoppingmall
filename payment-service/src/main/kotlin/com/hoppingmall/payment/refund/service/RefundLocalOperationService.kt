@@ -3,6 +3,7 @@ package com.hoppingmall.payment.refund.service
 import com.hoppingmall.payment.coupon.service.CouponCommandService
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.enum.PaymentStatus
+import com.hoppingmall.payment.payment.service.RefundPointsService
 import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.refund.domain.RefundEventLog
 import com.hoppingmall.payment.refund.domain.repository.RefundEventLogRepository
@@ -16,7 +17,8 @@ class RefundLocalOperationService(
     private val paymentRepository: PaymentRepository,
     private val pointCommandService: PointCommandService,
     private val couponCommandService: CouponCommandService,
-    private val refundEventLogRepository: RefundEventLogRepository
+    private val refundEventLogRepository: RefundEventLogRepository,
+    private val refundPointsService: RefundPointsService
 ) {
 
     @Transactional

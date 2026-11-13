@@ -5,6 +5,7 @@ import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
+import com.hoppingmall.payment.payment.service.RefundPointsService
 import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.refund.domain.RefundEventLog
 import com.hoppingmall.payment.refund.domain.repository.RefundEventLogRepository
@@ -40,6 +41,9 @@ class RefundLocalOperationServiceTest {
 
     @Mock
     private lateinit var refundEventLogRepository: RefundEventLogRepository
+
+    @Mock
+    private lateinit var refundPointsService: RefundPointsService
 
     @InjectMocks
     private lateinit var service: RefundLocalOperationService

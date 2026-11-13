@@ -42,6 +42,10 @@ class RefundPointsService(
         )
     }
 
+    @Transactional
+    fun reclaimForRefund(userId: Long, paymentId: Long, refundId: Long, refundAmount: BigDecimal, isFullRefund: Boolean) {
+    }
+
     private fun isEarnRequested(paymentId: Long): Boolean {
         val payment = paymentRepository?.findByIdOrNull(paymentId) ?: return false
         return payment.transactionId != null && payment.amount > BigDecimal.ZERO
