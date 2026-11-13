@@ -180,7 +180,7 @@ class OrderCommandServiceImplTest {
     fun 재고_서비스가_재고_부족으로_400을_응답하면_ORD007_재고_부족_예외로_바꾼다() {
         stubReservableCart()
         whenever(inventoryCommandPort.batchReserveStock(any()))
-            .thenThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "INV002", HttpHeaders.EMPTY, ByteArray(0), null))
+            .thenThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "INV002", HttpHeaders.EMPTY, """{"code":"INV002"}""".toByteArray(), null))
 
         assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
             .isInstanceOf(OrderOutOfStockException::class.java)
