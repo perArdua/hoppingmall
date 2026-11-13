@@ -42,7 +42,8 @@ class RefundItem private constructor(
             productId: Long,
             productName: String,
             productPrice: BigDecimal,
-            quantity: Int
+            quantity: Int,
+            refundPrice: BigDecimal = productPrice.multiply(BigDecimal(quantity))
         ): RefundItem {
             return RefundItem(
                 refundId = refundId,
@@ -51,7 +52,7 @@ class RefundItem private constructor(
                 productName = productName,
                 productPrice = productPrice,
                 quantity = quantity,
-                refundPrice = productPrice.multiply(BigDecimal(quantity))
+                refundPrice = refundPrice
             )
         }
     }

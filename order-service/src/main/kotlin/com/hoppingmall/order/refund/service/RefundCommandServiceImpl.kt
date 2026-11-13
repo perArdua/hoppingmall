@@ -8,6 +8,7 @@ import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.port.PaymentInfo
 import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.order.refund.domain.Refund
+import com.hoppingmall.order.refund.domain.RefundAmountCalculator
 import com.hoppingmall.order.refund.domain.RefundItem
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
@@ -68,6 +69,7 @@ class RefundCommandServiceImpl(
 
             val refundedQuantities = refundItemRepository.findRefundedQuantitiesByOrderId(request.orderId)
             val refundedMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedQuantity.toInt() }
+            val refundedAmountMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedAmount }
 
             request.items.forEach { item ->
                 val orderItem = orderItemMap[item.orderItemId]
@@ -79,10 +81,16 @@ class RefundCommandServiceImpl(
                 }
             }
 
-            val refundAmount = request.items.sumOf { item ->
-                val orderItem = orderItemMap[item.orderItemId]!!
-                orderItem.productPrice.multiply(BigDecimal(item.quantity))
+            val refundAmountCalculator = RefundAmountCalculator(orderItems, order.totalAmount.subtract(payment.amount))
+            val refundPrices = request.items.map { item ->
+                refundAmountCalculator.refundPrice(
+                    orderItemId = item.orderItemId,
+                    quantity = item.quantity,
+                    alreadyRefundedQuantity = refundedMap[item.orderItemId] ?: 0,
+                    alreadyRefundedAmount = refundedAmountMap[item.orderItemId] ?: BigDecimal.ZERO
+                )
             }
+            val refundAmount = refundPrices.fold(BigDecimal.ZERO, BigDecimal::add)
 
             val requestItemMap = request.items.associate { it.orderItemId to it.quantity }
             val isFullRefund = orderItems.all { orderItem ->
@@ -106,7 +114,7 @@ class RefundCommandServiceImpl(
             )
             val savedRefund = refundRepository.save(refund)
 
-            val refundItems = request.items.map { item ->
+            val refundItems = request.items.mapIndexed { index, item ->
                 val orderItem = orderItemMap[item.orderItemId]!!
                 RefundItem.create(
                     refundId = savedRefund.id!!,
@@ -114,7 +122,8 @@ class RefundCommandServiceImpl(
                     productId = orderItem.productId,
                     productName = orderItem.productName,
                     productPrice = orderItem.productPrice,
-                    quantity = item.quantity
+                    quantity = item.quantity,
+                    refundPrice = refundPrices[index]
                 )
             }
             val savedRefundItems = refundItemRepository.saveAll(refundItems)
