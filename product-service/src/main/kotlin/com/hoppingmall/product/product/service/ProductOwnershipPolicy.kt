@@ -11,8 +11,10 @@ class ProductOwnershipPolicy(
     private val productRepository: ProductRepository
 ) {
 
-    fun sellerIdForCreate(requester: UserPrincipal, requestedSellerId: Long?): Long =
-        if (requester.isAdmin()) requestedSellerId ?: requester.getUserId() else requester.getUserId()
+    fun sellerIdForCreate(requester: UserPrincipal, requestedSellerId: Long?): Long {
+        if (!requester.isAdmin()) return requester.getUserId()
+        return requestedSellerId ?: throw ProductException(ProductErrorCode.PRODUCT_SELLER_REQUIRED)
+    }
 
     fun checkOwner(productId: Long, requester: UserPrincipal) {
         if (requester.isAdmin()) return

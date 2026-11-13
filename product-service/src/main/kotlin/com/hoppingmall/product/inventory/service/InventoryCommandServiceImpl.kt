@@ -59,21 +59,23 @@ class InventoryCommandServiceImpl(
     }
 
     override fun initStock(request: InventoryInitRequest): InventoryResponse {
-        if (!productRepository.existsById(request.productId)) {
+        val productId = requireNotNull(request.productId)
+        val stockQuantity = requireNotNull(request.stockQuantity)
+        if (!productRepository.existsById(productId)) {
             throw ProductNotFoundException()
         }
 
-        if (inventoryRepository.existsByProductId(request.productId)) {
+        if (inventoryRepository.existsByProductId(productId)) {
             throw InventoryAlreadyExistsException()
         }
 
         val inventory = Inventory.create(
-            productId = request.productId,
-            stockQuantity = request.stockQuantity
+            productId = productId,
+            stockQuantity = stockQuantity
         )
         val savedInventory = inventoryRepository.save(inventory)
         if (bucketStockService.enabled) {
-            bucketStockService.initBuckets(request.productId, request.stockQuantity)
+            bucketStockService.initBuckets(productId, stockQuantity)
         }
         return InventoryResponse.from(savedInventory)
     }
@@ -83,9 +85,10 @@ class InventoryCommandServiceImpl(
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
             ?: throw InventoryNotFoundException()
 
-        inventory.stockQuantity = request.stockQuantity
+        val stockQuantity = requireNotNull(request.stockQuantity)
+        inventory.stockQuantity = stockQuantity
         if (bucketStockService.enabled) {
-            bucketStockService.redistribute(productId, request.stockQuantity)
+            bucketStockService.redistribute(productId, stockQuantity)
         }
         return InventoryResponse.from(inventory)
     }

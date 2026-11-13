@@ -26,13 +26,14 @@ class ProductCommandServiceImpl(
 ) : ProductCommandService {
 
     override fun createProduct(request: ProductCreateRequest): ProductResponse {
-        if (categoryRepository.findNullableById(request.categoryId) == null) {
+        val categoryId = requireNotNull(request.categoryId)
+        if (categoryRepository.findNullableById(categoryId) == null) {
             throw CategoryNotFoundException()
         }
 
         val product = Product.create(
             sellerId = requireNotNull(request.sellerId),
-            categoryId = request.categoryId,
+            categoryId = categoryId,
             name = request.name,
             description = request.description,
             price = request.price,
@@ -55,7 +56,8 @@ class ProductCommandServiceImpl(
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")
     override fun updateProduct(productId: Long, request: ProductUpdateRequest): ProductResponse {
-        if (request.categoryId == null || categoryRepository.findNullableById(request.categoryId) == null) {
+        val categoryId = request.categoryId
+        if (categoryId == null || categoryRepository.findNullableById(categoryId) == null) {
             throw CategoryNotFoundException()
         }
 
@@ -65,7 +67,7 @@ class ProductCommandServiceImpl(
             name = request.name,
             description = request.description,
             price = request.price,
-            categoryId = request.categoryId,
+            categoryId = categoryId,
             status = request.status
         )
 
