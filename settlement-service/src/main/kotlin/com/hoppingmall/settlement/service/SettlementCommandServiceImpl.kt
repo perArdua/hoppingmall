@@ -9,10 +9,12 @@ import com.hoppingmall.settlement.dto.request.CreateSettlementRequest
 import com.hoppingmall.settlement.dto.response.SettlementResponse
 import com.hoppingmall.settlement.exception.SettlementAlreadyExistsException
 import com.hoppingmall.settlement.exception.SettlementInvalidPeriodException
+import com.hoppingmall.settlement.exception.SettlementItemAlreadySettledException
 import com.hoppingmall.settlement.exception.SettlementNoSalesDataException
 import com.hoppingmall.settlement.exception.SettlementNotFoundException
 import com.hoppingmall.settlement.port.OrderItemQueryPort
 import com.hoppingmall.settlement.port.RefundQueryPort
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
@@ -33,6 +35,17 @@ class SettlementCommandServiceImpl(
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
     override fun createSettlement(request: CreateSettlementRequest): SettlementResponse {
+        try {
+            return doCreateSettlement(request)
+        } catch (e: DataIntegrityViolationException) {
+            if (e.mostSpecificCause.message?.contains(SettlementItem.ORDER_ITEM_UNIQUE_CONSTRAINT, ignoreCase = true) == true) {
+                throw SettlementItemAlreadySettledException()
+            }
+            throw e
+        }
+    }
+
+    private fun doCreateSettlement(request: CreateSettlementRequest): SettlementResponse {
         if (request.periodEnd.isBefore(request.periodStart)) {
             throw SettlementInvalidPeriodException()
         }

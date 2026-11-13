@@ -18,4 +18,5 @@ enum class SettlementErrorCode(
     SERVICE_COMMUNICATION_ERROR("STL008", "서비스 간 통신 오류가 발생했습니다.", HttpStatus.SERVICE_UNAVAILABLE),
     SERVICE_REQUEST_REJECTED("STL009", "다른 서비스가 정산 서비스의 요청을 거절했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
     SETTLEMENT_INVALID_SELLER("STL010", "판매자 id는 승인된 판매자의 사용자 id여야 합니다.", HttpStatus.BAD_REQUEST),
+    SETTLEMENT_ITEM_ALREADY_SETTLED("STL011", "이미 다른 정산에 들어간 주문 항목이 있습니다.", HttpStatus.CONFLICT)
 }
