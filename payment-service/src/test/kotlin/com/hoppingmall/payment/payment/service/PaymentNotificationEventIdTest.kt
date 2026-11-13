@@ -22,6 +22,7 @@ import com.hoppingmall.payment.point.domain.PointRepository
 import com.hoppingmall.payment.point.service.PointDomainService
 import com.hoppingmall.payment.point.service.PointEventConsumer
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
+import com.hoppingmall.payment.support.FakeOrderSummaryQueryPort
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -85,12 +86,14 @@ class PaymentNotificationEventIdTest {
     private val published = mutableListOf<PublishedEvent>()
     private val savedHistories = mutableListOf<PointHistory>()
     private var storedPayment: Payment? = null
+    private val orderSummaryQueryPort = FakeOrderSummaryQueryPort()
 
     private lateinit var commandService: PaymentCommandServiceImpl
     private lateinit var pointEventConsumer: PointEventConsumer
 
     @BeforeEach
     fun setUp() {
+        orderSummaryQueryPort.put(ORDER_ID, USER_ID, BigDecimal("30000"))
         doAnswer { invocation ->
             published.add(
                 PublishedEvent(
@@ -144,6 +147,7 @@ class PaymentNotificationEventIdTest {
             couponCommandService,
             PaymentMetrics(SimpleMeterRegistry()),
             pointEarnRateStrategy,
+            orderSummaryQueryPort,
             transactionManager
         )
         pointEventConsumer = PointEventConsumer(

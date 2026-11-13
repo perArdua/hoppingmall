@@ -10,6 +10,7 @@ import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
+import com.hoppingmall.payment.support.FakeOrderSummaryQueryPort
 import com.hoppingmall.common.BaseEntity
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -56,6 +57,8 @@ class PaymentCommandServiceImplTest {
     @Mock
     private lateinit var transactionManager: PlatformTransactionManager
 
+    private val orderSummaryQueryPort = FakeOrderSummaryQueryPort()
+
     private fun createService() = PaymentCommandServiceImpl(
         paymentRepository,
         paymentService,
@@ -64,6 +67,7 @@ class PaymentCommandServiceImplTest {
         couponCommandService,
         paymentMetrics,
         pointEarnRateStrategy,
+        orderSummaryQueryPort,
         transactionManager
     )
 
@@ -94,6 +98,7 @@ class PaymentCommandServiceImplTest {
 
     @Test
     fun cancelPayment_성공_결제를_취소한다() {
+        orderSummaryQueryPort.put(100L, 10L, BigDecimal("50000"), status = "PAYING")
         val service = createService()
         val payment = createPayment(status = PaymentStatus.SUCCESS, userId = 10L)
         whenever(paymentRepository.findByIdForUpdate(1L)).thenReturn(payment)

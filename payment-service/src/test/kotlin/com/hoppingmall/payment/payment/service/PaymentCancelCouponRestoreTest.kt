@@ -16,6 +16,7 @@ import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
+import com.hoppingmall.payment.support.FakeOrderSummaryQueryPort
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -74,6 +75,8 @@ class PaymentCancelCouponRestoreTest {
     @Mock
     private lateinit var compensationMetrics: CouponCompensationMetrics
 
+    private val orderSummaryQueryPort = FakeOrderSummaryQueryPort()
+
     private fun commandService() = PaymentCommandServiceImpl(
         paymentRepository,
         paymentService,
@@ -88,6 +91,7 @@ class PaymentCancelCouponRestoreTest {
         ),
         paymentMetrics,
         pointEarnRateStrategy,
+        orderSummaryQueryPort,
         transactionManager
     )
 
@@ -133,6 +137,7 @@ class PaymentCancelCouponRestoreTest {
 
     @Test
     fun 구매자의_결제_직접_취소는_그_주문에_쓴_쿠폰을_돌려준다() {
+        orderSummaryQueryPort.put(ORDER_ID, USER_ID, BigDecimal("30000"), status = "PAYING")
         val userCoupon = usedCoupon()
         whenever(paymentRepository.findByIdForUpdate(PAYMENT_ID)).thenReturn(couponPayment())
         whenever(paymentRepository.save(any<Payment>())).thenAnswer { it.arguments[0] }

@@ -9,10 +9,21 @@ import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.dto.request.PaymentRequest
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
+import com.hoppingmall.payment.payment.exception.PaymentDirectCancelNotAllowedException
+import com.hoppingmall.payment.payment.exception.PaymentDuplicateException
+import com.hoppingmall.payment.payment.exception.PaymentInvalidAmountException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
+import com.hoppingmall.payment.payment.exception.PaymentOrderNotFoundException
+import com.hoppingmall.payment.payment.exception.PaymentOrderNotPayableException
+import com.hoppingmall.payment.payment.exception.PaymentOrderUnavailableException
+import com.hoppingmall.payment.payment.exception.PaymentPointUseNotAllowedException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
+import com.hoppingmall.payment.port.OrderSummary
+import com.hoppingmall.payment.port.OrderSummaryQueryPort
+import com.hoppingmall.payment.port.exception.OrderSummaryQueryFailedException
 import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
@@ -28,6 +39,7 @@ class PaymentCommandServiceImpl(
     private val couponCommandService: CouponCommandService,
     private val paymentMetrics: PaymentMetrics,
     private val pointEarnRateStrategy: PointEarnRateStrategy,
+    private val orderSummaryQueryPort: OrderSummaryQueryPort,
     transactionManager: PlatformTransactionManager
 ) : PaymentCommandService {
 
@@ -36,32 +48,42 @@ class PaymentCommandServiceImpl(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse = paymentMetrics.recordProcessingTime {
+        if (paymentRequest.pointAmount > BigDecimal.ZERO) {
+            throw PaymentPointUseNotAllowedException()
+        }
+        verifyOrder(paymentRequest, userId)
+
         var couponDiscountAmount = BigDecimal.ZERO
         var couponId: Long? = null
 
-        val savedPayment = transactionTemplate.execute {
-            if (paymentRequest.couponId != null) {
-                couponDiscountAmount = couponCommandService.useCoupon(
+        val savedPayment = try {
+            transactionTemplate.execute {
+                if (paymentRequest.couponId != null) {
+                    couponDiscountAmount = couponCommandService.useCoupon(
+                        userId = userId,
+                        couponId = paymentRequest.couponId,
+                        orderAmount = paymentRequest.amount,
+                        orderId = paymentRequest.orderId
+                    )
+                    couponId = paymentRequest.couponId
+                }
+
+                val payment = Payment.create(
+                    orderId = paymentRequest.orderId,
                     userId = userId,
-                    couponId = paymentRequest.couponId,
-                    orderAmount = paymentRequest.amount,
-                    orderId = paymentRequest.orderId
+                    amount = paymentRequest.amount.subtract(couponDiscountAmount),
+                    method = paymentRequest.method,
+                    pointAmount = paymentRequest.pointAmount,
+                    couponId = couponId,
+                    couponDiscountAmount = couponDiscountAmount
                 )
-                couponId = paymentRequest.couponId
-            }
 
-            val payment = Payment.create(
-                orderId = paymentRequest.orderId,
-                userId = userId,
-                amount = paymentRequest.amount.subtract(couponDiscountAmount),
-                method = paymentRequest.method,
-                pointAmount = paymentRequest.pointAmount,
-                couponId = couponId,
-                couponDiscountAmount = couponDiscountAmount
-            )
-
-            paymentRepository.save(payment)
-        }!!
+                paymentRepository.save(payment)
+            }!!
+        } catch (e: DataIntegrityViolationException) {
+            log.warn("같은 주문의 결제가 이미 있어 결제 요청 거절: orderId={}, userId={}", paymentRequest.orderId, userId)
+            throw PaymentDuplicateException()
+        }
 
         val paymentResult = paymentService.processPayment(savedPayment)
 
@@ -104,6 +126,10 @@ class PaymentCommandServiceImpl(
             throw PaymentAccessDeniedException()
         }
 
+        if (payment.isCancellable() && !findOrder(payment.orderId).isAwaitingPayment()) {
+            throw PaymentDirectCancelNotAllowedException()
+        }
+
         return executeCancelPayment(payment)
     }
 
@@ -133,6 +159,29 @@ class PaymentCommandServiceImpl(
 
         log.info("결제 취소: paymentId={}, orderId={}, userId={}", payment.id, payment.orderId, payment.userId)
         return PaymentResponse.from(cancelledPayment)
+    }
+
+    private fun verifyOrder(paymentRequest: PaymentRequest, userId: Long) {
+        val order = findOrder(paymentRequest.orderId)
+        if (order.buyerId != userId) {
+            throw PaymentAccessDeniedException()
+        }
+        if (!order.isAwaitingPayment()) {
+            throw PaymentOrderNotPayableException()
+        }
+        if (order.totalAmount.compareTo(paymentRequest.amount) != 0) {
+            throw PaymentInvalidAmountException()
+        }
+    }
+
+    private fun findOrder(orderId: Long): OrderSummary {
+        val order = try {
+            orderSummaryQueryPort.findOrder(orderId)
+        } catch (e: OrderSummaryQueryFailedException) {
+            log.warn("주문 조회 실패로 결제 요청 거절: orderId={}", orderId)
+            throw PaymentOrderUnavailableException()
+        }
+        return order ?: throw PaymentOrderNotFoundException()
     }
 
     private fun updatePaymentWithResult(payment: Payment, result: PaymentResult): Payment {

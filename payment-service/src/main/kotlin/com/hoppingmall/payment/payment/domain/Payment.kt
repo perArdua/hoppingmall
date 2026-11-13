@@ -12,9 +12,9 @@ import java.time.LocalDateTime
 @Table(
     name = "payments",
     indexes = [
-        Index(name = "idx_payments_order_id", columnList = "orderId"),
         Index(name = "idx_payments_user_id", columnList = "userId")
-    ]
+    ],
+    uniqueConstraints = [UniqueConstraint(name = "uk_payments_order_id", columnNames = ["order_id"])]
 )
 class Payment private constructor(
     @Column(nullable = false)
@@ -118,6 +118,8 @@ class Payment private constructor(
             throw PaymentInvalidStateException()
         }
     }
+
+    fun isCancellable(): Boolean = PaymentStatus.CANCELLED in (allowedTransitions[status] ?: emptySet())
 
     fun isSuccess(): Boolean = status == PaymentStatus.SUCCESS
 
