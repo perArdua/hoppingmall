@@ -1,5 +1,7 @@
 package com.hoppingmall.gateway.filter
 
+import com.hoppingmall.gateway.config.GatewayRedisProperties
+import com.hoppingmall.gateway.config.GatewayRedisScheduler
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
@@ -22,10 +24,12 @@ import java.util.Optional
 class JwtValidationGatewayFilterFactory(
     @Value("\${jwt.secret}") secret: String,
     private val redisTemplate: ReactiveStringRedisTemplate? = null,
-    private val meterRegistry: MeterRegistry = Metrics.globalRegistry
+    private val meterRegistry: MeterRegistry = Metrics.globalRegistry,
+    redisProperties: GatewayRedisProperties = GatewayRedisProperties()
 ) : AbstractGatewayFilterFactory<JwtValidationGatewayFilterFactory.Config>(Config::class.java) {
 
     private val key = Keys.hmacShaKeyFor(secret.toByteArray())
+    private val redisCommandTimeout = redisProperties.commandTimeout
 
     class Config {
         var requiredRole: String? = null
@@ -80,6 +84,8 @@ class JwtValidationGatewayFilterFactory(
     private fun isLoggedOut(token: String): Mono<Boolean> {
         val template = redisTemplate ?: return Mono.just(false)
         return Mono.defer { template.hasKey(BLACKLIST_KEY_PREFIX + token) }
+            .subscribeOn(GatewayRedisScheduler.instance)
+            .timeout(redisCommandTimeout)
             .defaultIfEmpty(false)
             .onErrorResume { e ->
                 log.warn("로그아웃 토큰 Redis 조회 실패, 요청은 통과시킴: {}", e.message)

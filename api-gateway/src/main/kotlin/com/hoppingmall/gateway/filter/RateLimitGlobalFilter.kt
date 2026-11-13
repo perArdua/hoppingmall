@@ -1,5 +1,7 @@
 package com.hoppingmall.gateway.filter
 
+import com.hoppingmall.gateway.config.GatewayRedisProperties
+import com.hoppingmall.gateway.config.GatewayRedisScheduler
 import com.hoppingmall.gateway.config.RateLimitKeyType
 import com.hoppingmall.gateway.config.RateLimitPolicy
 import io.micrometer.core.instrument.Counter
@@ -27,10 +29,12 @@ class RateLimitGlobalFilter(
     private val redisTemplate: ReactiveStringRedisTemplate,
     @Value("\${gateway.rate-limit.enabled:true}")
     private val enabled: Boolean,
-    private val meterRegistry: MeterRegistry = Metrics.globalRegistry
+    private val meterRegistry: MeterRegistry = Metrics.globalRegistry,
+    redisProperties: GatewayRedisProperties = GatewayRedisProperties()
 ) : GlobalFilter {
 
     private val pathMatcher = AntPathMatcher()
+    private val redisCommandTimeout = redisProperties.commandTimeout
 
     companion object {
         private val log = LoggerFactory.getLogger(RateLimitGlobalFilter::class.java)
@@ -93,6 +97,8 @@ class RateLimitGlobalFilter(
         val redisKey = "rl:${policy.id}:$key:$window"
 
         return Mono.defer { redisTemplate.opsForValue().increment(redisKey) }
+            .subscribeOn(GatewayRedisScheduler.instance)
+            .timeout(redisCommandTimeout)
             .flatMap { count ->
                 if (count == 1L) {
                     setExpiry(redisKey, policy).thenReturn(count)
@@ -116,9 +122,13 @@ class RateLimitGlobalFilter(
 
     private fun setExpiry(redisKey: String, policy: RateLimitPolicy): Mono<Boolean> =
         Mono.defer { redisTemplate.expire(redisKey, policy.window) }
+            .subscribeOn(GatewayRedisScheduler.instance)
+            .timeout(redisCommandTimeout)
             .onErrorResume { e ->
                 recordRedisFailure(policy, "expire", e)
                 Mono.defer { redisTemplate.delete(redisKey) }
+                    .subscribeOn(GatewayRedisScheduler.instance)
+                    .timeout(redisCommandTimeout)
                     .onErrorResume { deleteError ->
                         recordRedisFailure(policy, "delete", deleteError)
                         Mono.empty()
