@@ -13,6 +13,8 @@ import java.util.UUID
         Index(name = "idx_reservation_product_status", columnList = "productId, status"),
         Index(name = "idx_reservation_expires_status", columnList = "expiresAt, status"),
         Index(name = "idx_reservation_product_status_expires", columnList = "productId, status, expiresAt"),
+        Index(name = "idx_reservation_status_expires", columnList = "status, expiresAt"),
+        Index(name = "idx_reservation_status_created", columnList = "status, createdAt"),
         Index(name = "uk_reservation_request_product", columnList = "requestKey, productId", unique = true)
     ]
 )
