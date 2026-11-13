@@ -139,6 +139,12 @@ class OrderCancellationResultConsumer(
             return
         }
 
+        if (existingLog?.isStepCompleted(SagaEventLog.LOCAL_COMPLETED) == true || isPaymentAlreadyCancelled(orderId)) {
+            logger.warn("결제가 이미 취소돼 취소 실패 이벤트를 취소 완료로 마무리: orderId=$orderId, eventId=$eventId, 사유=$reason")
+            completeCancellation(eventId, orderId, existingLog)
+            return
+        }
+
         val transitioned = transactionTemplate.execute {
             val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
@@ -184,5 +190,16 @@ class OrderCancellationResultConsumer(
         if (transitioned == true) {
             logger.warn("결제 취소 실패 처리: orderId=$orderId, CANCEL_FAILED 전환, 사유=$reason")
         }
+    }
+
+    private fun isPaymentAlreadyCancelled(orderId: Long): Boolean {
+        if (orderRepository.findByIdOrNull(orderId)?.status != OrderStatus.CANCEL_REQUESTED) {
+            return false
+        }
+        return paymentQueryPort.findByOrderIdOrThrowIfUnavailable(orderId)?.status == PAYMENT_CANCELLED
+    }
+
+    companion object {
+        private const val PAYMENT_CANCELLED = "CANCELLED"
     }
 }
