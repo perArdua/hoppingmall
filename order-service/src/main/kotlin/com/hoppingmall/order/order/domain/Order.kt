@@ -66,6 +66,13 @@ class Order private constructor(
         cancelRetryCount = 0
     }
 
+    fun recordCancellationRetry() {
+        if (status != OrderStatus.CANCEL_REQUESTED) {
+            throw OrderInvalidStatusException()
+        }
+        cancelRetryCount += 1
+    }
+
     fun isCancellable(): Boolean {
         val allowed = allowedTransitions[this.status] ?: emptySet()
         return OrderStatus.CANCELLED in allowed || OrderStatus.CANCEL_REQUESTED in allowed
