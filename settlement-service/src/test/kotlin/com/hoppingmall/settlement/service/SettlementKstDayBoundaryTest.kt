@@ -33,7 +33,6 @@ import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
 @ExtendWith(MockitoExtension::class)
@@ -83,8 +82,8 @@ class SettlementKstDayBoundaryTest {
 
     @Test
     fun 한국_시각_00시_23분에_배송_완료된_주문은_그날_정산에_잡힌다() {
-        val service = serviceIn(ZoneOffset.UTC)
-        deliveredAt(ZonedDateTime.of(2026, 11, 14, 0, 23, 0, 0, kst), ZoneOffset.UTC)
+        val service = service()
+        deliveredAt(ZonedDateTime.of(2026, 11, 14, 0, 23, 0, 0, kst))
 
         val result = service.createSettlement(requestFor(LocalDate.of(2026, 11, 14)))
 
@@ -93,8 +92,8 @@ class SettlementKstDayBoundaryTest {
 
     @Test
     fun 한국_시각_00시_23분에_배송_완료된_주문은_전날_정산에_잡히지_않는다() {
-        val service = serviceIn(ZoneOffset.UTC)
-        deliveredAt(ZonedDateTime.of(2026, 11, 14, 0, 23, 0, 0, kst), ZoneOffset.UTC)
+        val service = service()
+        deliveredAt(ZonedDateTime.of(2026, 11, 14, 0, 23, 0, 0, kst))
 
         assertThatThrownBy { service.createSettlement(requestFor(LocalDate.of(2026, 11, 13))) }
             .isInstanceOf(SettlementNoSalesDataException::class.java)
@@ -102,30 +101,30 @@ class SettlementKstDayBoundaryTest {
 
     @Test
     fun 한국_시각_23시_59분에_배송_완료된_주문은_다음날_정산에_잡히지_않는다() {
-        val service = serviceIn(ZoneOffset.UTC)
-        deliveredAt(ZonedDateTime.of(2026, 11, 13, 23, 59, 0, 0, kst), ZoneOffset.UTC)
+        val service = service()
+        deliveredAt(ZonedDateTime.of(2026, 11, 13, 23, 59, 0, 0, kst))
 
         assertThatThrownBy { service.createSettlement(requestFor(LocalDate.of(2026, 11, 14))) }
             .isInstanceOf(SettlementNoSalesDataException::class.java)
     }
 
     @Test
-    fun 앱_시간대가_UTC이면_한국_자정을_UTC_시각으로_바꿔_판매와_환불_조회에_넘긴다() {
-        val service = serviceIn(ZoneOffset.UTC)
+    fun 여러_날_기간은_시작일_한국_자정부터_끝날_다음_날_한국_자정까지_판매와_환불_조회에_넘긴다() {
+        val service = service()
         whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
             .thenReturn(listOf(deliveredItem))
 
         service.createSettlement(requestFor(LocalDate.of(2026, 11, 14), LocalDate.of(2026, 11, 15)))
 
-        val expectedStart = LocalDateTime.of(2026, 11, 13, 15, 0)
-        val expectedEnd = LocalDateTime.of(2026, 11, 15, 15, 0)
+        val expectedStart = LocalDateTime.of(2026, 11, 14, 0, 0)
+        val expectedEnd = LocalDateTime.of(2026, 11, 16, 0, 0)
         verify(orderItemQueryPort).findDeliveredItemsBySellerAndPeriod(eq(SELLER_ID), eq(expectedStart), eq(expectedEnd))
         verify(refundQueryPort).findCompletedBySellerAndPeriod(eq(SELLER_ID), eq(expectedStart), eq(expectedEnd))
     }
 
     @Test
-    fun 앱_시간대가_한국이면_날짜의_자정을_그대로_넘긴다() {
-        val service = serviceIn(kst)
+    fun 하루_기간은_그날_한국_자정부터_다음_날_한국_자정까지_넘긴다() {
+        val service = service()
         whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
             .thenReturn(listOf(deliveredItem))
 
@@ -138,17 +137,16 @@ class SettlementKstDayBoundaryTest {
         assertThat(end.firstValue).isEqualTo(LocalDateTime.of(2026, 11, 15, 0, 0))
     }
 
-    private fun serviceIn(applicationZone: ZoneId) = SettlementCommandServiceImpl(
+    private fun service() = SettlementCommandServiceImpl(
         settlementRepository,
         settlementItemRepository,
         orderItemQueryPort,
         refundQueryPort,
-        transactionManager,
-        applicationZone = applicationZone
+        transactionManager
     )
 
-    private fun deliveredAt(deliveredAt: ZonedDateTime, applicationZone: ZoneId) {
-        val stored = deliveredAt.withZoneSameInstant(applicationZone).toLocalDateTime()
+    private fun deliveredAt(deliveredAt: ZonedDateTime) {
+        val stored = deliveredAt.withZoneSameInstant(kst).toLocalDateTime()
         whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
             .thenAnswer { invocation ->
                 val start = invocation.getArgument<LocalDateTime>(1)
