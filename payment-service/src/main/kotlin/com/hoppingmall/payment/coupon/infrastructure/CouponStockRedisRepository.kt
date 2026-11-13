@@ -59,6 +59,7 @@ class CouponStockRedisRepository(
         )
         return when (result.toInt()) {
             2 -> CouponRestoreResult.AlreadyRestored
+            3 -> CouponRestoreResult.NotReserved
             else -> CouponRestoreResult.Restored
         }
     }
@@ -178,11 +179,14 @@ class CouponStockRedisRepository(
                 return 2
             end
 
-            if redis.call('EXISTS', stockKey) == 1 then
+            local removed = redis.call('SREM', userSetKey, userId)
+            if removed == 1 and redis.call('EXISTS', stockKey) == 1 then
                 redis.call('INCR', stockKey)
             end
-            redis.call('SREM', userSetKey, userId)
             redis.call('SET', restoredKey, '1', 'EX', ttl)
+            if removed == 0 then
+                return 3
+            end
             return 1
         """
     }
