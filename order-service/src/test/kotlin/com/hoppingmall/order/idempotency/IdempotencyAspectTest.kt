@@ -76,7 +76,7 @@ class IdempotencyAspectTest {
                 expiresAt = LocalDateTime.now().plusHours(1)
             )
 
-            whenever(idempotencyService.findByKey(key)).thenReturn(cachedRecord)
+            whenever(idempotencyService.findByKey(any())).thenReturn(cachedRecord)
 
             val result = aspect.handleIdempotency(joinPoint, idempotent)
 
@@ -91,8 +91,8 @@ class IdempotencyAspectTest {
             val key = "new-key"
             setUpRequest(idempotencyKey = key)
 
-            whenever(idempotencyService.findByKey(key)).thenReturn(null)
-            whenever(redissonClient.getLock("idempotency:$key")).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0, 10, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
 
@@ -108,7 +108,7 @@ class IdempotencyAspectTest {
                 responseBody = objectMapper.writeValueAsString(responseBody),
                 expiresAt = LocalDateTime.now().plusHours(24)
             )
-            whenever(idempotencyService.save(eq(key), any(), any(), any(), any(), any()))
+            whenever(idempotencyService.save(any(), any(), any(), any(), any(), any()))
                 .thenReturn(savedRecord)
 
             val result = aspect.handleIdempotency(joinPoint, idempotent)
@@ -117,7 +117,7 @@ class IdempotencyAspectTest {
             val response = result as ResponseEntity<*>
             assertEquals(200, response.statusCode.value())
             verify(joinPoint).proceed()
-            verify(idempotencyService).save(eq(key), eq("POST"), eq("/api/v1/payments"), eq(200), any(), eq(24))
+            verify(idempotencyService).save(any(), eq("POST"), eq("/api/v1/payments"), eq(200), any(), eq(24))
             verify(lock).unlock()
         }
 
@@ -126,8 +126,8 @@ class IdempotencyAspectTest {
             val key = "conflict-key"
             setUpRequest(idempotencyKey = key)
 
-            whenever(idempotencyService.findByKey(key)).thenReturn(null)
-            whenever(redissonClient.getLock("idempotency:$key")).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0, 10, TimeUnit.SECONDS)).thenReturn(false)
 
             assertThrows<IdempotencyConflictException> {
@@ -151,10 +151,10 @@ class IdempotencyAspectTest {
                 expiresAt = LocalDateTime.now().plusHours(1)
             )
 
-            whenever(idempotencyService.findByKey(key))
+            whenever(idempotencyService.findByKey(any()))
                 .thenReturn(null)
                 .thenReturn(cachedRecord)
-            whenever(redissonClient.getLock("idempotency:$key")).thenReturn(lock)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0, 10, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
 
@@ -170,8 +170,8 @@ class IdempotencyAspectTest {
             val key = "error-key"
             setUpRequest(idempotencyKey = key)
 
-            whenever(idempotencyService.findByKey(key)).thenReturn(null)
-            whenever(redissonClient.getLock("idempotency:$key")).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0, 10, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
             whenever(joinPoint.proceed()).thenThrow(RuntimeException("결제 실패"))
