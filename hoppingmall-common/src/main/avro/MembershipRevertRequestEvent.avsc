@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "MembershipRevertRequestEvent",
+  "namespace": "com.hoppingmall.common.event",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "userId", "type": "long"},
+    {"name": "orderId", "type": "long"},
+    {"name": "paymentId", "type": "long"},
+    {"name": "amount", "type": "string"},
+    {"name": "reason", "type": "string"},
+    {"name": "refundId", "type": ["null", "long"], "default": null},
+    {"name": "eventType", "type": "string", "default": ""}
+  ]
+}

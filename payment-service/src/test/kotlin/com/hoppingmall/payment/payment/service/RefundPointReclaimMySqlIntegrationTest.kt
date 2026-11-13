@@ -199,7 +199,8 @@ class RefundPointReclaimMySqlIntegrationTest : MySqlJpaTestSupport() {
             mock(),
             mock(),
             refundEventLogRepository,
-            refundPointsService
+            refundPointsService,
+            mock()
         )
         TransactionTemplate(transactionManager).executeWithoutResult {
             val eventLog = refundEventLogRepository.save(

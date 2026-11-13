@@ -1,11 +1,13 @@
 package com.hoppingmall.payment.payment.service
 
 import com.hoppingmall.payment.payment.domain.Payment
+import com.hoppingmall.payment.payment.dto.event.MembershipRevertRequestEvent
 import com.hoppingmall.payment.payment.dto.event.MembershipUpdateRequestEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
+import com.hoppingmall.payment.payment.enum.MembershipRevertReason
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -56,6 +58,50 @@ class PaymentEventService(
         )
         paymentEventPublisher.publishMembershipUpdateEvent(event)
     }
+
+    fun publishMembershipCancelRevertEvent(payment: Payment) {
+        publishMembershipRevertEvent(
+            payment = payment,
+            eventId = "membership-revert-cancel-${payment.id}",
+            amount = payment.amount,
+            reason = MembershipRevertReason.CANCEL,
+            refundId = null
+        )
+    }
+
+    fun publishMembershipRefundRevertEvent(payment: Payment, refundId: Long, refundAmount: BigDecimal) {
+        publishMembershipRevertEvent(
+            payment = payment,
+            eventId = "membership-revert-refund-$refundId",
+            amount = refundAmount,
+            reason = MembershipRevertReason.REFUND,
+            refundId = refundId
+        )
+    }
+
+    private fun publishMembershipRevertEvent(
+        payment: Payment,
+        eventId: String,
+        amount: BigDecimal,
+        reason: MembershipRevertReason,
+        refundId: Long?
+    ) {
+        if (!isMembershipUpdateRequested(payment) || amount <= BigDecimal.ZERO) return
+
+        val event = MembershipRevertRequestEvent(
+            eventId = eventId,
+            userId = payment.userId,
+            orderId = payment.orderId,
+            paymentId = payment.id!!,
+            amount = amount,
+            reason = reason,
+            refundId = refundId
+        )
+        paymentEventPublisher.publishMembershipRevertEvent(event)
+    }
+
+    private fun isMembershipUpdateRequested(payment: Payment): Boolean =
+        payment.transactionId != null && payment.amount > BigDecimal.ZERO
 
     fun publishPaymentFailedEvent(payment: Payment) {
         val eventId = "payment-failed-${payment.id}"
