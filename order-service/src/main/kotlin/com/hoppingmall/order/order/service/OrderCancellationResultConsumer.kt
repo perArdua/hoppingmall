@@ -2,6 +2,7 @@ package com.hoppingmall.order.order.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.order.config.OrderConsumerGroups
 import com.hoppingmall.order.order.domain.SagaEventLog
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
@@ -27,7 +28,7 @@ class OrderCancellationResultConsumer(
 ) {
     private val logger = LoggerFactory.getLogger(OrderCancellationResultConsumer::class.java)
 
-    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "order-cancellation-result-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = OrderConsumerGroups.ORDER_CANCELLATION_RESULT)
     fun handleCancellationResult(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText() ?: return

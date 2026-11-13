@@ -86,6 +86,39 @@ class OperationalRouteConfigurationTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["application.yml", "application-docker.yml", "application-k8s.yml"])
+    fun 관리자_경로가_들어간_라우트는_모두_ADMIN만_통과시킨다(file: String) {
+        val source = load(file)
+        val routes = generateSequence(0) { it + 1 }
+            .takeWhile { source.value("spring.cloud.gateway.routes[$it].id") != null }
+            .toList()
+        val adminRoutes = routes.filter { index ->
+            generateSequence(0) { it + 1 }
+                .map { source.value("spring.cloud.gateway.routes[$index].predicates[$it]") }
+                .takeWhile { it != null }
+                .filterNotNull()
+                .any { it.contains("/api/v1/admin") }
+        }
+
+        assertThat(adminRoutes).isNotEmpty
+        assertThat(adminRoutes.filterNot { source.filters(it).contains("JwtValidation=ADMIN") }
+            .map { source.value("spring.cloud.gateway.routes[$it].id") })
+            .isEmpty()
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["application.yml", "application-docker.yml", "application-k8s.yml"])
+    fun 판매자_승인_관리_라우트는_user로_가고_사용자_라우트보다_먼저_맞춰진다(file: String) {
+        val source = load(file)
+        val index = source.routeIndexByPath("/api/v1/admin/sellers/**")
+
+        assertThat(index).isGreaterThanOrEqualTo(0)
+        assertThat(index).isLessThan(source.routeIndex("user-service"))
+        assertThat(source.value("spring.cloud.gateway.routes[$index].uri"))
+            .isEqualTo(source.value("spring.cloud.gateway.routes[${source.routeIndex("user-service")}].uri"))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["application.yml", "application-docker.yml", "application-k8s.yml"])
     fun 파일_업로드_라우트는_product로_가고_JWT를_검증한다(file: String) {
         val source = load(file)
         val index = source.routeIndexByPath("/api/v1/files/**")
