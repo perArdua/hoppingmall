@@ -51,9 +51,12 @@ class ProductOwnershipPolicyTest {
     }
 
     @Test
-    fun 관리자가_만드는_상품의_판매자는_본문_값이고_없으면_관리자_자신이다() {
+    fun 관리자가_만드는_상품의_판매자는_본문_값이고_없으면_판매자_필수_예외를_던진다() {
         assertThat(policy.sellerIdForCreate(admin, 20L)).isEqualTo(20L)
-        assertThat(policy.sellerIdForCreate(admin, null)).isEqualTo(99L)
+        assertThatThrownBy { policy.sellerIdForCreate(admin, null) }
+            .isInstanceOf(ProductException::class.java)
+            .extracting("errorCode")
+            .isEqualTo(ProductErrorCode.PRODUCT_SELLER_REQUIRED)
     }
 
     @Test
