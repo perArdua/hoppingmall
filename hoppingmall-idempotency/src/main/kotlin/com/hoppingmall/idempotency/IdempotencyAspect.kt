@@ -101,8 +101,11 @@ class IdempotencyAspect(
         return ResponseEntity.status(record.responseStatus).body(body)
     }
 
-    private fun lockTimeoutSeconds(idempotent: Idempotent): Long =
-        if (lockTimeoutOverrideSeconds > 0) lockTimeoutOverrideSeconds else idempotent.lockTimeoutSeconds
+    private fun lockTimeoutSeconds(idempotent: Idempotent): Long = when {
+        lockTimeoutOverrideSeconds > 0 -> lockTimeoutOverrideSeconds
+        idempotent.lockTimeoutSeconds > 0 -> idempotent.lockTimeoutSeconds
+        else -> Idempotent.LOCK_HELD_UNTIL_UNLOCK
+    }
 
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"

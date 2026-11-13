@@ -4,5 +4,9 @@ package com.hoppingmall.idempotency
 @Retention(AnnotationRetention.RUNTIME)
 annotation class Idempotent(
     val ttlHours: Long = 24,
-    val lockTimeoutSeconds: Long = 10
-)
+    val lockTimeoutSeconds: Long = Idempotent.LOCK_HELD_UNTIL_UNLOCK
+) {
+    companion object {
+        const val LOCK_HELD_UNTIL_UNLOCK = -1L
+    }
+}
