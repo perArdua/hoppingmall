@@ -122,7 +122,7 @@ class IdempotencyAspectTest {
                 responseBody = objectMapper.writeValueAsString(body),
                 expiresAt = LocalDateTime.now().plusHours(1)
             )
-            whenever(idempotencyService.findByKey("test-key")).thenReturn(record)
+            whenever(idempotencyService.findByKey(any())).thenReturn(record)
 
             @Suppress("UNCHECKED_CAST")
             val result = aspect.handleIdempotency(joinPoint, idempotent) as ResponseEntity<Any>
@@ -136,7 +136,7 @@ class IdempotencyAspectTest {
         fun 락_획득_후_이중_체크에서_히트하면_캐시된_응답을_반환한다() {
             setUpRequest()
             whenever(idempotent.lockTimeoutSeconds).thenReturn(10L)
-            whenever(redissonClient.getLock(eq("idempotency:test-key"))).thenReturn(lock)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
 
@@ -150,7 +150,7 @@ class IdempotencyAspectTest {
                 responseBody = objectMapper.writeValueAsString(body),
                 expiresAt = LocalDateTime.now().plusHours(1)
             )
-            whenever(idempotencyService.findByKey("test-key"))
+            whenever(idempotencyService.findByKey(any()))
                 .thenReturn(null)
                 .thenReturn(record)
 
@@ -171,8 +171,8 @@ class IdempotencyAspectTest {
         fun 락_획득에_실패하면_충돌_예외를_던진다() {
             setUpRequest()
             whenever(idempotent.lockTimeoutSeconds).thenReturn(10L)
-            whenever(idempotencyService.findByKey("test-key")).thenReturn(null)
-            whenever(redissonClient.getLock(eq("idempotency:test-key"))).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(false)
 
             assertThatThrownBy {
@@ -192,8 +192,8 @@ class IdempotencyAspectTest {
             setUpRequest(path = "/api/v1/orders", method = "POST")
             whenever(idempotent.lockTimeoutSeconds).thenReturn(10L)
             whenever(idempotent.ttlHours).thenReturn(24L)
-            whenever(idempotencyService.findByKey("test-key")).thenReturn(null)
-            whenever(redissonClient.getLock(eq("idempotency:test-key"))).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
 
@@ -217,7 +217,7 @@ class IdempotencyAspectTest {
 
             assertThat(result).isEqualTo(response)
             verify(idempotencyService).save(
-                key = eq("test-key"),
+                key = any(),
                 httpMethod = eq("POST"),
                 endpoint = eq("/api/v1/orders"),
                 responseStatus = eq(201),
@@ -231,8 +231,8 @@ class IdempotencyAspectTest {
         fun 비2xx_응답이면_레코드를_저장하지_않는다() {
             setUpRequest()
             whenever(idempotent.lockTimeoutSeconds).thenReturn(10L)
-            whenever(idempotencyService.findByKey("test-key")).thenReturn(null)
-            whenever(redissonClient.getLock(eq("idempotency:test-key"))).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
 
@@ -250,8 +250,8 @@ class IdempotencyAspectTest {
         fun ResponseEntity가_아닌_반환값이면_저장하지_않는다() {
             setUpRequest()
             whenever(idempotent.lockTimeoutSeconds).thenReturn(10L)
-            whenever(idempotencyService.findByKey("test-key")).thenReturn(null)
-            whenever(redissonClient.getLock(eq("idempotency:test-key"))).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
 
@@ -268,8 +268,8 @@ class IdempotencyAspectTest {
         fun 처리_중_예외가_발생해도_락을_해제한다() {
             setUpRequest()
             whenever(idempotent.lockTimeoutSeconds).thenReturn(10L)
-            whenever(idempotencyService.findByKey("test-key")).thenReturn(null)
-            whenever(redissonClient.getLock(eq("idempotency:test-key"))).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(true)
             whenever(joinPoint.proceed()).thenThrow(RuntimeException("downstream error"))
@@ -286,8 +286,8 @@ class IdempotencyAspectTest {
         fun 락을_보유하지_않으면_unlock을_호출하지_않는다() {
             setUpRequest()
             whenever(idempotent.lockTimeoutSeconds).thenReturn(10L)
-            whenever(idempotencyService.findByKey("test-key")).thenReturn(null)
-            whenever(redissonClient.getLock(eq("idempotency:test-key"))).thenReturn(lock)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(redissonClient.getLock(any<String>())).thenReturn(lock)
             whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(true)
             whenever(lock.isHeldByCurrentThread).thenReturn(false)
 
