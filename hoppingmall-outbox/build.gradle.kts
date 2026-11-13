@@ -42,6 +42,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
     testImplementation("org.assertj:assertj-core:3.24.2")
+    testImplementation("org.testcontainers:mysql:1.21.4")
+    testRuntimeOnly("com.mysql:mysql-connector-j")
 }
 
 tasks.withType<Test> {
