@@ -137,6 +137,7 @@ class PaymentCancelCouponRestoreTest {
 
     @Test
     fun 구매자의_결제_직접_취소는_그_주문에_쓴_쿠폰을_돌려준다() {
+        orderSummaryQueryPort.put(ORDER_ID, USER_ID, BigDecimal("30000"), status = "PAYING")
         val userCoupon = usedCoupon()
         whenever(paymentRepository.findByIdForUpdate(PAYMENT_ID)).thenReturn(couponPayment())
         whenever(paymentRepository.save(any<Payment>())).thenAnswer { it.arguments[0] }

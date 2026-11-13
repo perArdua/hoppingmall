@@ -119,6 +119,8 @@ class Payment private constructor(
         }
     }
 
+    fun isCancellable(): Boolean = PaymentStatus.CANCELLED in (allowedTransitions[status] ?: emptySet())
+
     fun isSuccess(): Boolean = status == PaymentStatus.SUCCESS
 
     fun isFailed(): Boolean = status == PaymentStatus.FAILED

@@ -9,6 +9,7 @@ import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.dto.request.PaymentRequest
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
+import com.hoppingmall.payment.payment.exception.PaymentDirectCancelNotAllowedException
 import com.hoppingmall.payment.payment.exception.PaymentDuplicateException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidAmountException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
@@ -119,6 +120,10 @@ class PaymentCommandServiceImpl(
 
         if (payment.userId != userId) {
             throw PaymentAccessDeniedException()
+        }
+
+        if (payment.isCancellable() && !findOrder(payment.orderId).isAwaitingPayment()) {
+            throw PaymentDirectCancelNotAllowedException()
         }
 
         return executeCancelPayment(payment)
