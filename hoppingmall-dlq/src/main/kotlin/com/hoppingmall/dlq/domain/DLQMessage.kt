@@ -59,7 +59,10 @@ class DLQMessage(
     var archivedAt: Long? = null,
 
     @Column(name = "content_hash", length = 64)
-    var contentHash: String? = null
+    var contentHash: String? = null,
+
+    @Column(name = "consumer_group", length = 255)
+    val consumerGroup: String? = null
 
 ) : BaseEntity() {
 

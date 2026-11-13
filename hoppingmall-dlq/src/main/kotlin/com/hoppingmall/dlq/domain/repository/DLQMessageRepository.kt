@@ -104,6 +104,12 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
         contentHash: String
     ): DLQMessage?
 
+    fun findFirstByOriginalTopicAndConsumerGroupAndContentHashOrderByIdDesc(
+        originalTopic: String,
+        consumerGroup: String,
+        contentHash: String
+    ): DLQMessage?
+
     fun findByStatusAndRetryCountGreaterThanEqual(
         status: DLQStatus,
         retryCount: Int,
@@ -114,6 +120,13 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
         originalTopic: String,
         originalPartition: Int,
         originalOffset: Long
+    ): Boolean
+
+    fun existsByOriginalTopicAndOriginalPartitionAndOriginalOffsetAndConsumerGroup(
+        originalTopic: String,
+        originalPartition: Int,
+        originalOffset: Long,
+        consumerGroup: String
     ): Boolean
 
     @Query("""

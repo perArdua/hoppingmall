@@ -7,5 +7,6 @@ data class DeadLetterMessage(
     val originalKey: String?,
     val originalValue: String?,
     val exception: String?,
-    val timestamp: Long
+    val timestamp: Long,
+    val consumerGroup: String? = null
 )

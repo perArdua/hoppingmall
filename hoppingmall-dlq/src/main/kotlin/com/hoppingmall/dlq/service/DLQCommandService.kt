@@ -11,6 +11,7 @@ import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
 import com.hoppingmall.dlq.metrics.DLQMetrics
 import com.hoppingmall.dlq.publisher.DLQMessagePublisher
 import com.hoppingmall.dlq.publisher.NoOpDLQMessagePublisher
+import com.hoppingmall.dlq.reprocess.DLQReprocessors
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
@@ -25,7 +26,8 @@ class DLQCommandService(
     private val dlqMessagePublisher: DLQMessagePublisher,
     private val dlqMetrics: DLQMetrics,
     private val dlqArchivalService: DLQArchivalService,
-    private val avroEventConverter: AvroEventConverter? = null
+    private val avroEventConverter: AvroEventConverter? = null,
+    private val dlqReprocessors: DLQReprocessors? = null
 ) {
 
     private val logger = LoggerFactory.getLogger(DLQCommandService::class.java)
@@ -42,11 +44,21 @@ class DLQCommandService(
 
     fun saveDLQMessage(deadLetterMessage: DeadLetterMessage) {
         try {
-            val exists = dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
-                deadLetterMessage.originalTopic,
-                deadLetterMessage.originalPartition,
-                deadLetterMessage.originalOffset
-            )
+            val consumerGroup = deadLetterMessage.consumerGroup
+            val exists = if (consumerGroup == null) {
+                dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffset(
+                    deadLetterMessage.originalTopic,
+                    deadLetterMessage.originalPartition,
+                    deadLetterMessage.originalOffset
+                )
+            } else {
+                dlqMessageRepository.existsByOriginalTopicAndOriginalPartitionAndOriginalOffsetAndConsumerGroup(
+                    deadLetterMessage.originalTopic,
+                    deadLetterMessage.originalPartition,
+                    deadLetterMessage.originalOffset,
+                    consumerGroup
+                )
+            }
 
             if (exists) {
                 logger.warn("중복 DLQ 메시지 저장 시도: topic={}, partition={}, offset={}",
@@ -59,9 +71,15 @@ class DLQCommandService(
                 deadLetterMessage.originalKey,
                 deadLetterMessage.originalValue
             )
-            val sameContent = dlqMessageRepository.findFirstByOriginalTopicAndContentHashOrderByIdDesc(
-                deadLetterMessage.originalTopic, contentHash
-            )
+            val sameContent = if (consumerGroup == null) {
+                dlqMessageRepository.findFirstByOriginalTopicAndContentHashOrderByIdDesc(
+                    deadLetterMessage.originalTopic, contentHash
+                )
+            } else {
+                dlqMessageRepository.findFirstByOriginalTopicAndConsumerGroupAndContentHashOrderByIdDesc(
+                    deadLetterMessage.originalTopic, consumerGroup, contentHash
+                )
+            }
             if (sameContent != null) {
                 handleRepeatedFailure(sameContent, deadLetterMessage)
                 return
@@ -75,7 +93,8 @@ class DLQCommandService(
                 originalValue = deadLetterMessage.originalValue,
                 exceptionMessage = deadLetterMessage.exception,
                 errorTimestamp = deadLetterMessage.timestamp,
-                contentHash = contentHash
+                contentHash = contentHash,
+                consumerGroup = consumerGroup
             )
 
             if (dlqMessage.isNonRetryableException()) {
@@ -86,7 +105,7 @@ class DLQCommandService(
                 return
             }
 
-            if (dlqMessagePublisher is NoOpDLQMessagePublisher) {
+            if (dlqMessagePublisher is NoOpDLQMessagePublisher && !canReprocessDirectly(dlqMessage)) {
                 dlqMessage.markAsFailed(NO_PUBLISHER_NOTE)
                 dlqMessageRepository.save(dlqMessage)
                 dlqMetrics.recordDlqSaved(deadLetterMessage.originalTopic)
@@ -125,6 +144,10 @@ class DLQCommandService(
             if (dlqMessage.status != DLQStatus.PENDING) {
                 logger.warn("재처리할 수 없는 상태의 DLQ 메시지: id={}, status={}", dlqMessageId, dlqMessage.status)
                 return false
+            }
+
+            if (canReprocessDirectly(dlqMessage)) {
+                return reprocessDirectly(dlqMessage)
             }
 
             if (dlqMessagePublisher is NoOpDLQMessagePublisher) {
@@ -280,6 +303,60 @@ class DLQCommandService(
             converter.convertJsonToAvro(eventType, value)
         } catch (e: Exception) {
             throw UnrepublishableMessageException("Avro 변환 실패 ($EVENT_TYPE_FIELD=$eventType): ${e.message}")
+        }
+    }
+
+    private fun canReprocessDirectly(dlqMessage: DLQMessage): Boolean =
+        dlqReprocessors?.supports(dlqMessage.originalTopic, dlqMessage.consumerGroup) == true
+
+    private fun reprocessDirectly(dlqMessage: DLQMessage): Boolean {
+        val dlqMessageId = dlqMessage.id!!
+        val consumerGroup = dlqMessage.consumerGroup!!
+
+        if (dlqMessage.retryCount >= MAX_RETRY_COUNT) {
+            dlqMessage.markAsFailed("최대 재시도 횟수 초과")
+            dlqMessageRepository.save(dlqMessage)
+            logger.warn("최대 재시도 횟수 초과: id={}, retryCount={}", dlqMessageId, dlqMessage.retryCount)
+            return false
+        }
+
+        val claimed = dlqMessageRepository.claimForRetry(
+            dlqMessageId, DLQStatus.PENDING, dlqMessage.retryCount, DLQStatus.RETRYING
+        )
+        if (claimed == 0) {
+            logger.info("다른 인스턴스가 먼저 집은 DLQ 메시지: id={}", dlqMessageId)
+            return false
+        }
+
+        logger.info("DLQ 메시지 직접 재처리 시작: id={}, topic={}, group={}",
+            dlqMessageId, dlqMessage.originalTopic, consumerGroup)
+
+        dlqMessage.incrementRetry()
+        dlqMessageRepository.save(dlqMessage)
+
+        return try {
+            dlqReprocessors!!.reprocess(
+                dlqMessage.originalTopic, consumerGroup, dlqMessage.originalKey, dlqMessage.originalValue
+            )
+            dlqMessage.markAsProcessed("직접 재처리 성공")
+            dlqMessageRepository.save(dlqMessage)
+            dlqMetrics.recordDlqRetrySuccess()
+            logger.info("DLQ 메시지 직접 재처리 성공: id={}, topic={}, group={}",
+                dlqMessageId, dlqMessage.originalTopic, consumerGroup)
+            true
+        } catch (e: Exception) {
+            dlqMessage.exceptionMessage = "${e.javaClass.name}: ${e.message}"
+            dlqMessage.errorTimestamp = System.currentTimeMillis()
+            when {
+                dlqMessage.isNonRetryableException() -> dlqMessage.markAsFailed("직접 재처리 중 비재시도 에러")
+                dlqMessage.retryCount >= MAX_RETRY_COUNT -> dlqMessage.markAsFailed("최대 재시도 후 직접 재처리 실패")
+                else -> dlqMessage.scheduleNextRetry()
+            }
+            dlqMessageRepository.save(dlqMessage)
+            dlqMetrics.recordDlqRetryFailed()
+            logger.warn("DLQ 메시지 직접 재처리 실패: id={}, retryCount={}, status={}, error={}",
+                dlqMessageId, dlqMessage.retryCount, dlqMessage.status, e.message)
+            false
         }
     }
 
