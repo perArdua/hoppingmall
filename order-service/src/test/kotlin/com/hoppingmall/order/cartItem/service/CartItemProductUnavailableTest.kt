@@ -50,21 +50,21 @@ class CartItemProductUnavailableTest {
             .isInstanceOfSatisfying(BusinessException::class.java) {
                 val response = handler.handleBusinessException(it)
                 assertThat(response.statusCode).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
-                assertThat(response.body?.code).isNotEqualTo("C003")
+                assertThat(response.body?.code).isNotEqualTo("CART003")
             }
 
         verify(cartItemRepository, never()).save(any<CartItem>())
     }
 
     @Test
-    fun 상품이_정말_없으면_여전히_404_C003으로_응답한다() {
+    fun 상품이_정말_없으면_여전히_404_CART003으로_응답한다() {
         whenever(productQueryPort.findProductById(PRODUCT_ID)).thenReturn(null)
 
         assertThatThrownBy { service.addCartItem(BUYER_ID, CartItemCreateRequest(productId = PRODUCT_ID, quantity = 1)) }
             .isInstanceOfSatisfying(BusinessException::class.java) {
                 val response = handler.handleBusinessException(it)
                 assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
-                assertThat(response.body?.code).isEqualTo("C003")
+                assertThat(response.body?.code).isEqualTo("CART003")
             }
     }
 
