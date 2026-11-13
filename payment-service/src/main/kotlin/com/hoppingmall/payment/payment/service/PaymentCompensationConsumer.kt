@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.payment.service
 
+import com.hoppingmall.payment.config.PaymentConsumerGroups
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
@@ -19,7 +20,7 @@ class PaymentCompensationConsumer(
 
     private val logger = LoggerFactory.getLogger(PaymentCompensationConsumer::class.java)
 
-    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "payment-compensation-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = PaymentConsumerGroups.PAYMENT_COMPENSATION)
     fun handleCompensationEvent(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
@@ -38,7 +39,7 @@ class PaymentCompensationConsumer(
         compensationEventHandlerRegistry.getHandler(eventType)?.onRetriesExhausted(node)
     }
 
-    @KafkaListener(topics = [KafkaTopics.PAYMENT_REVERSAL], groupId = "payment-compensation-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_REVERSAL], groupId = PaymentConsumerGroups.PAYMENT_COMPENSATION)
     fun handlePaymentReversal(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()

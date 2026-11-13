@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.payment.service
 
+import com.hoppingmall.payment.config.PaymentConsumerGroups
 import com.hoppingmall.common.consumer.executeIdempotently
 import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.payment.payment.domain.PaymentEventLog
@@ -19,7 +20,7 @@ class PaymentEventConsumer(
 
     private val logger = LoggerFactory.getLogger(PaymentEventConsumer::class.java)
 
-    @KafkaListener(topics = ["\${kafka.topics.payment:payment}"], groupId = "payment-consumer-group")
+    @KafkaListener(topics = ["\${kafka.topics.payment:payment}"], groupId = PaymentConsumerGroups.PAYMENT_EVENT)
     fun handlePaymentEvent(message: String) {
         val paymentEvent = kafkaEventMapper.readValue(message, PaymentCompletedEvent::class.java)
         executeIdempotently(

@@ -7,6 +7,7 @@ import com.hoppingmall.payment.payment.service.PaymentCompensationConsumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.listener.ConsumerRecordRecoverer
+import org.springframework.kafka.support.KafkaUtils
 
 class PaymentKafkaRecordRecoverer(
     private val dlqCommandService: DLQCommandService,
@@ -25,7 +26,8 @@ class PaymentKafkaRecordRecoverer(
             originalKey = record.key()?.toString(),
             originalValue = record.value()?.toString(),
             exception = exception.message,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            consumerGroup = KafkaUtils.getConsumerGroupId()
         )
         dlqCommandService.saveDLQMessage(deadLetterMessage)
         if (record.topic() == KafkaTopics.PAYMENT_COMPENSATION) {

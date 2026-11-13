@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.refund.service
 
+import com.hoppingmall.payment.config.PaymentConsumerGroups
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.payment.port.InventoryCommandPort
 import com.hoppingmall.payment.port.OrderCommandPort
@@ -27,7 +28,7 @@ class RefundCompletionConsumer(
 
     private val logger = LoggerFactory.getLogger(RefundCompletionConsumer::class.java)
 
-    @KafkaListener(topics = [KafkaTopics.REFUND_COMPLETION], groupId = "refund-completion-service")
+    @KafkaListener(topics = [KafkaTopics.REFUND_COMPLETION], groupId = PaymentConsumerGroups.REFUND_COMPLETION)
     fun handleRefundCompletionEvent(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
