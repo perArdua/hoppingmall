@@ -2,10 +2,10 @@ package com.hoppingmall.user.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.user.auth.service.RefreshTokenService
+import com.hoppingmall.user.common.vo.CurrentPasswordNotMatchedException
 import com.hoppingmall.user.common.vo.DefaultPasswordPolicy
 import com.hoppingmall.user.common.vo.Password
 import com.hoppingmall.user.common.vo.PasswordCreator
-import com.hoppingmall.user.common.vo.PasswordNotMatchedException
 import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
@@ -76,7 +76,7 @@ class PasswordChangeCurrentPasswordTest {
     fun 현재_비밀번호_없이_비밀번호를_바꾸면_거절되고_비밀번호는_그대로다() {
         assertThatThrownBy {
             updateWithBody("""{"name":"새이름","password":"NewPassword1234"}""")
-        }.isInstanceOf(PasswordNotMatchedException::class.java)
+        }.isInstanceOf(CurrentPasswordNotMatchedException::class.java)
 
         assertThat(user.getPassword()).isEqualTo(originalPassword)
         verify(refreshTokenService, never()).delete(any())
@@ -86,7 +86,7 @@ class PasswordChangeCurrentPasswordTest {
     fun 현재_비밀번호가_틀리면_거절되고_비밀번호는_그대로다() {
         assertThatThrownBy {
             updateWithBody("""{"name":"새이름","password":"NewPassword1234","current_password":"WrongPassword1234"}""")
-        }.isInstanceOf(PasswordNotMatchedException::class.java)
+        }.isInstanceOf(CurrentPasswordNotMatchedException::class.java)
 
         assertThat(user.getPassword()).isEqualTo(originalPassword)
         verify(refreshTokenService, never()).delete(any())
