@@ -19,26 +19,13 @@ class RefundPointsService(
 
     @Transactional
     fun refundPoints(userId: Long, paymentId: Long) {
-        val earnHistory = pointHistoryRepository.findByPaymentIdAndType(paymentId, PointType.EARN)
-        if (earnHistory == null) {
-            check(!isEarnRequested(paymentId)) { "적립 이력이 아직 없어 포인트를 회수할 수 없음: paymentId=$paymentId" }
-            return
-        }
-
-        val point = pointRepository.findByUserIdForUpdate(userId) ?: return
-
-        point.usePoints(earnHistory.amount)
-        pointRepository.save(point)
-
-        pointHistoryRepository.save(
-            PointHistory(
-                userId = userId,
-                amount = earnHistory.amount,
-                type = PointType.REFUND,
-                reason = "결제 취소 포인트 반환",
-                paymentId = paymentId,
-                eventId = "refund-$paymentId"
-            )
+        val earnHistory = findEarnHistory(paymentId) ?: return
+        reclaim(
+            userId = userId,
+            paymentId = paymentId,
+            target = remainingEarned(paymentId, earnHistory),
+            eventId = cancelEventId(paymentId),
+            reason = "결제 취소 포인트 반환"
         )
     }
 
@@ -46,8 +33,47 @@ class RefundPointsService(
     fun reclaimForRefund(userId: Long, paymentId: Long, refundId: Long, refundAmount: BigDecimal, isFullRefund: Boolean) {
     }
 
+    private fun findEarnHistory(paymentId: Long): PointHistory? {
+        val earnHistory = pointHistoryRepository.findByPaymentIdAndType(paymentId, PointType.EARN)
+        if (earnHistory == null) {
+            check(!isEarnRequested(paymentId)) { "적립 이력이 아직 없어 포인트를 회수할 수 없음: paymentId=$paymentId" }
+        }
+        return earnHistory
+    }
+
+    private fun remainingEarned(paymentId: Long, earnHistory: PointHistory): BigDecimal {
+        val reclaimed = pointHistoryRepository.findAllByPaymentIdAndType(paymentId, PointType.REFUND)
+            .filter { it.eventId == cancelEventId(paymentId) || it.eventId?.startsWith(refundEventIdPrefix(paymentId)) == true }
+            .sumOf { it.amount }
+        return earnHistory.amount.subtract(reclaimed).max(BigDecimal.ZERO)
+    }
+
+    private fun reclaim(userId: Long, paymentId: Long, target: BigDecimal, eventId: String, reason: String) {
+        val point = pointRepository.findByUserIdForUpdate(userId) ?: return
+
+        val reclaimed = target.min(point.balance).max(BigDecimal.ZERO)
+        val shortfall = target.subtract(reclaimed)
+        point.usePoints(reclaimed)
+        pointRepository.save(point)
+
+        pointHistoryRepository.save(
+            PointHistory(
+                userId = userId,
+                amount = reclaimed,
+                type = PointType.REFUND,
+                reason = if (shortfall > BigDecimal.ZERO) "$reason (잔액 부족으로 ${shortfall.toPlainString()} 미회수)" else reason,
+                paymentId = paymentId,
+                eventId = eventId
+            )
+        )
+    }
+
     private fun isEarnRequested(paymentId: Long): Boolean {
         val payment = paymentRepository?.findByIdOrNull(paymentId) ?: return false
         return payment.transactionId != null && payment.amount > BigDecimal.ZERO
     }
+
+    private fun cancelEventId(paymentId: Long) = "refund-$paymentId"
+
+    private fun refundEventIdPrefix(paymentId: Long) = "refund-$paymentId-"
 }

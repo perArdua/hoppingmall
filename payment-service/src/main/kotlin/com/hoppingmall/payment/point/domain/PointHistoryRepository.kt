@@ -13,4 +13,6 @@ interface PointHistoryRepository : JpaRepository<PointHistory, Long> {
     fun findByUserId(userId: Long, pageable: Pageable): Slice<PointHistory>
 
     fun findByPaymentIdAndType(paymentId: Long, type: PointType): PointHistory?
+
+    fun findAllByPaymentIdAndType(paymentId: Long, type: PointType): List<PointHistory>
 }
