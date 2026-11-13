@@ -99,7 +99,7 @@ class MembershipEventConsumerTest {
     fun DataIntegrityViolationException_발생_시_정상_종료() {
         val event = createEvent()
 
-        whenever(membershipEventLogRepository.existsByEventId(event.eventId)).thenReturn(false)
+        whenever(membershipEventLogRepository.existsByEventId(event.eventId)).thenReturn(false, true)
         whenever(membershipCommandService.addPurchaseAmount(event.userId, event.amount))
             .thenReturn(membershipResponse())
         whenever(membershipEventLogRepository.save(any<MembershipEventLog>()))

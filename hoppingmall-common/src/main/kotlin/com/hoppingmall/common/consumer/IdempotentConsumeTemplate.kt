@@ -17,6 +17,16 @@ inline fun executeIdempotently(
         }
         action()
     } catch (e: DataIntegrityViolationException) {
+        val processed = try {
+            existsCheck()
+        } catch (recheckFailure: Exception) {
+            e.addSuppressed(recheckFailure)
+            false
+        }
+        if (!processed) {
+            logger.error("{} 처리 중 처리 기록이 아닌 무결성 위반: eventId={}, 오류={}", eventDescription, eventId, e.message)
+            throw e
+        }
         logger.info("이미 처리된 {} 이벤트: eventId={}", eventDescription, eventId)
     } catch (e: Exception) {
         logger.error("{} 처리 실패: eventId={}, 오류={}", eventDescription, eventId, e.message)
