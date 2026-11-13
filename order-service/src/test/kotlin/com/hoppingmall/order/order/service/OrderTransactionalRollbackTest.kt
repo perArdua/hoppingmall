@@ -13,13 +13,12 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.order.order.enum.OrderStatus
-import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentCancellationResult
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doThrow
-import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.math.BigDecimal
@@ -148,7 +146,7 @@ class OrderTransactionalRollbackTest {
     }
 
     @Test
-    fun cancelPayment이_false면_주문_취소를_롤백하고_재고_보상도_중단한다() {
+    fun 결제_취소_호출이_실패해도_주문_취소는_유지하고_예약을_취소한다() {
         val order = orderRepository.saveAndFlush(createPayingOrder())
         orderItemRepository.saveAndFlush(
             OrderItem.create(
@@ -162,16 +160,14 @@ class OrderTransactionalRollbackTest {
             )
         )
 
-        whenever(paymentCommandPort.cancelPayment(order.id!!)).thenReturn(false)
+        whenever(paymentCommandPort.cancelPayment(order.id!!)).thenReturn(PaymentCancellationResult.FAILED)
 
-        assertThatThrownBy {
-            orderCommandService.cancelOrder(order.buyerId, order.id!!)
-        }.isInstanceOf(OrderPaymentCancellationFailedException::class.java)
+        orderCommandService.cancelOrder(order.buyerId, order.id!!)
 
         val reloadedOrder = orderRepository.findById(order.id!!).orElseThrow()
 
-        assertThat(reloadedOrder.status).isEqualTo(OrderStatus.PAYING)
-        verify(inventoryCommandPort, never()).cancelReservations(any())
+        assertThat(reloadedOrder.status).isEqualTo(OrderStatus.CANCELLED)
+        verify(inventoryCommandPort).cancelReservations(listOf("rsv-1"))
     }
 
     private fun createPaidOrder(): Order {

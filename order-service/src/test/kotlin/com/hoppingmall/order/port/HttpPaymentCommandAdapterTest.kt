@@ -38,24 +38,24 @@ class HttpPaymentCommandAdapterTest {
     }
 
     @Test
-    fun 결제_취소_성공_시_true를_반환한다() {
+    fun 결제_취소_성공_시_취소됨을_반환한다() {
         whenever(restTemplate.postForEntity(
             any<String>(), eq(null), eq(Void::class.java)
         )).thenReturn(ResponseEntity.ok().build())
 
         val result = adapter.cancelPayment(1L)
 
-        assertThat(result).isTrue()
+        assertThat(result).isEqualTo(PaymentCancellationResult.CANCELLED)
     }
 
     @Test
-    fun 결제_취소_API_호출에_성공하면_true를_반환한다() {
+    fun 결제_취소_API_호출에_성공하면_취소됨을_반환한다() {
         whenever(restTemplate.postForEntity(
             any<String>(), eq(null), eq(Void::class.java)
         )).thenReturn(ResponseEntity.ok().build())
 
         val result = adapter.cancelPayment(100L)
 
-        assertThat(result).isTrue()
+        assertThat(result).isEqualTo(PaymentCancellationResult.CANCELLED)
     }
 }
