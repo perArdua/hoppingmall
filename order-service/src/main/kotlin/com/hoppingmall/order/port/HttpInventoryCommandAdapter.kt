@@ -57,7 +57,7 @@ class HttpInventoryCommandAdapter(
     }
 
     @CircuitBreaker(name = "inventory-command")
-    @Retry(name = "product-query")
+    @Retry(name = "inventory-confirm")
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         val response = restTemplate.postForEntity(
             "$productServiceUrl/internal/api/v1/inventory/reservations/batch-confirm",
