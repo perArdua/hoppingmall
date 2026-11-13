@@ -270,7 +270,7 @@ class RefundPointReclaimMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     private fun reclaimedAmount(eventId: String): BigDecimal? =
         jdbcTemplate.queryForList(
-            "SELECT amount FROM point_histories WHERE event_id = ? AND type = 'REFUND'",
+            "SELECT -amount FROM point_histories WHERE event_id = ? AND type = 'RECLAIM'",
             BigDecimal::class.java,
             eventId
         ).firstOrNull()
@@ -280,7 +280,7 @@ class RefundPointReclaimMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     private fun reclaimHistoryCount(payment: Payment): Long =
         jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM point_histories WHERE payment_id = ? AND type = 'REFUND'",
+            "SELECT COUNT(*) FROM point_histories WHERE payment_id = ? AND type = 'RECLAIM'",
             Long::class.java,
             payment.id
         )!!
