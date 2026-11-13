@@ -46,6 +46,10 @@ class RefundCommandServiceImpl(
     private val refundableOrderStatuses = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
 
     override fun requestRefund(buyerId: Long, request: RefundCreateRequest): RefundResponse {
+        if (request.items.distinctBy { it.orderItemId }.size != request.items.size) {
+            throw RefundException(RefundErrorCode.REFUND_DUPLICATE_ITEM)
+        }
+
         val payment = paymentQueryPort.findByOrderId(request.orderId)
             ?: throw RefundPaymentNotFoundException()
 
