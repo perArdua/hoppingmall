@@ -39,16 +39,21 @@ class ProductStatisticsScheduler(
         do {
             val currentPage = page
             val batchUpdated = transactionTemplate.execute {
-                val statsPage = productStatisticsRepository.findAll(PageRequest.of(currentPage, 500))
-                val productIds = statsPage.content.map { it.productId }
+                val idSlice = productStatisticsRepository.findIdSlice(PageRequest.of(currentPage, 500))
+                val lockedStats = if (idSlice.content.isEmpty()) {
+                    emptyList()
+                } else {
+                    productStatisticsRepository.findAllByIdInForUpdate(idSlice.content)
+                }
+                val productIds = lockedStats.map { it.productId }
                 val stockMap = currentStocks(productIds)
 
-                for (stats in statsPage.content) {
+                for (stats in lockedStats) {
                     val cart = cartMap[stats.productId]
                     stats.updateCartAndInventory(cart?.buyerCount ?: 0L, stockMap[stats.productId] ?: 0)
                 }
 
-                statsPage.hasNext() to statsPage.content.size
+                idSlice.hasNext() to lockedStats.size
             }!!
 
             hasNext = batchUpdated.first
