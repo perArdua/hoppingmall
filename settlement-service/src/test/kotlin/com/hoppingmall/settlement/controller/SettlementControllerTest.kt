@@ -76,6 +76,7 @@ class SettlementControllerTest {
             periodEnd = LocalDate.of(2026, 1, 31),
             commissionRate = BigDecimal("0.1000")
         )
+        whenever(sellerQueryPort.findByUserId(1L)).thenReturn(SellerInfo(id = 5L, userId = 1L, approved = true))
         whenever(settlementCommandService.createSettlement(request)).thenReturn(createSettlementResponse())
 
         val result = controller.createSettlement(request)
@@ -137,7 +138,7 @@ class SettlementControllerTest {
         val userPrincipal = UserPrincipal.of(10L, "SELLER")
         val pageable = PageRequest.of(0, 20)
         whenever(sellerQueryPort.findByUserId(10L)).thenReturn(SellerInfo(id = 5L, userId = 10L))
-        whenever(settlementQueryService.getSettlements(5L, null, pageable))
+        whenever(settlementQueryService.getSettlements(10L, null, pageable))
             .thenReturn(PageImpl(listOf(createSettlementResponse())))
 
         val result = controller.getSettlementsForSeller(userPrincipal, null, pageable)
@@ -158,7 +159,7 @@ class SettlementControllerTest {
             items = emptyList()
         )
         whenever(sellerQueryPort.findByUserId(10L)).thenReturn(SellerInfo(id = 5L, userId = 10L))
-        whenever(settlementQueryService.getSettlementDetail(1L, 5L)).thenReturn(detail)
+        whenever(settlementQueryService.getSettlementDetail(1L, 10L)).thenReturn(detail)
 
         val result = controller.getSettlementDetailForSeller(userPrincipal, 1L)
 
