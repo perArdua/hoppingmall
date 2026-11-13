@@ -7,6 +7,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.order.config.OrderConsumerGroups
 import com.hoppingmall.common.event.KafkaEventMapper
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
@@ -34,7 +35,7 @@ class OrderSagaConsumer(
 
     private enum class RemoteDecision { CONFIRM, TIMEOUT_OWNED, ORDER_CANCELLED, ORDER_CANCELLING }
 
-    @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "order-saga-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = OrderConsumerGroups.ORDER_SAGA)
     fun handlePaymentCompleted(message: String) {
         val event = kafkaEventMapper.readValue(message, PaymentCompletedEvent::class.java)
         val eventId = "payment-completed-${event.transactionId}"
@@ -276,7 +277,7 @@ class OrderSagaConsumer(
         return orderItems.mapNotNull { it.reservationId }.distinct()
     }
 
-    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = "order-saga-service")
+    @KafkaListener(topics = [KafkaTopics.PAYMENT_COMPENSATION], groupId = OrderConsumerGroups.ORDER_SAGA)
     fun handlePaymentCompensation(message: String) {
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
