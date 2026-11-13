@@ -8,9 +8,10 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair
+import java.io.Closeable
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -21,12 +22,12 @@ class TwoLevelCacheManager(
     private val hotKeyDetectorRegistry: HotKeyDetectorRegistry,
     private val refreshGuard: RefreshGuard? = null,
     private val meterRegistry: MeterRegistry? = null
-) : CacheManager {
+) : CacheManager, Closeable {
 
     // XFetch 비동기 갱신 전용 풀(탐지 스케줄러와 격리). 큐 한정 + AbortPolicy:
     // 포화 시 RejectedExecutionException을 던져 호출부(maybeTriggerRefresh)가 refreshInFlight를 정리하게 한다.
     // (DiscardPolicy는 조용히 버려서 doRefresh.finally가 안 돌아 키가 영구 잔류 → 그 키 갱신 정지 버그 유발)
-    private val refreshExecutor: Executor = ThreadPoolExecutor(
+    private val refreshExecutor: ExecutorService = ThreadPoolExecutor(
         2, 4, 60L, TimeUnit.SECONDS,
         LinkedBlockingQueue(64),
         { r -> Thread(r, "cache-xfetch-refresh").apply { isDaemon = true } },
@@ -116,4 +117,8 @@ class TwoLevelCacheManager(
     }
 
     override fun getCacheNames(): Collection<String> = redisCacheManager.cacheNames
+
+    override fun close() {
+        ExecutorShutdown.closeNow(refreshExecutor, "cache-xfetch-refresh")
+    }
 }

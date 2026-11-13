@@ -42,6 +42,6 @@ class HotKeyDetectorRegistry(
 
     override fun close() {
         detectors.values.forEach { it.close() }
-        scheduler.shutdown()
+        ExecutorShutdown.closeNow(scheduler, "hotkey-detector")
     }
 }
