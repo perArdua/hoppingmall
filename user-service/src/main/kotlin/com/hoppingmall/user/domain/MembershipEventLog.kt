@@ -8,6 +8,8 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -25,6 +27,7 @@ class MembershipEventLog(
     val orderId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 32)
     val type: MembershipEventType? = MembershipEventType.PURCHASE
 ) : BaseEntity()

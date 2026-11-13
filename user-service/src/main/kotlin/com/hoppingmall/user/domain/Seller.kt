@@ -4,6 +4,8 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.user.exception.seller.SellerAlreadyAppliedException
 import com.hoppingmall.user.exception.seller.SellerInvalidApprovalStatusException
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -17,7 +19,8 @@ class Seller private constructor(
     businessNumber: String,
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "approval_status", nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "approval_status", nullable = false, length = 32)
     private var approvalStatus: ApprovalStatus = ApprovalStatus.PENDING
 
 ) : BaseEntity() {
