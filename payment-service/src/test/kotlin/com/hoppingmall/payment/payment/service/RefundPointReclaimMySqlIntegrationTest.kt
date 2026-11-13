@@ -93,13 +93,13 @@ class RefundPointReclaimMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
-    fun 쿠폰_결제의_부분_환불_비율은_쿠폰_할인_전_금액을_분모로_한다() {
+    fun 쿠폰_결제의_부분_환불_비율은_실제_결제_금액을_분모로_한다() {
         val payment = savedSucceededPayment(BigDecimal("27000"), "tx-561-3", couponDiscountAmount = BigDecimal("3000"))
         earn(payment, BigDecimal("270"))
 
         refund(payment, refundId = 1L, refundAmount = BigDecimal("15000"), isFullRefund = false)
 
-        assertThat(reclaimedAmount("refund-${payment.id}-1")).isEqualByComparingTo(BigDecimal("135"))
+        assertThat(reclaimedAmount("refund-${payment.id}-1")).isEqualByComparingTo(BigDecimal("150"))
     }
 
     @Test
