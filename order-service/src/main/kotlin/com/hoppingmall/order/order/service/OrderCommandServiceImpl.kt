@@ -17,7 +17,6 @@ import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
-import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
@@ -25,6 +24,7 @@ import com.hoppingmall.order.order.exception.OrderTotalAmountExceededException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentCancellationResult
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
@@ -161,14 +161,9 @@ class OrderCommandServiceImpl(
 
         when (order.status) {
             OrderStatus.PAYING -> {
-                if (!paymentCommandPort.cancelPayment(orderId)) {
-                    throw OrderPaymentCancellationFailedException()
+                if (!cancelPaying(orderId, orderItems)) {
+                    throw OrderInvalidStatusException()
                 }
-                transactionTemplate.execute {
-                    val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
-                    target.updateStatus(OrderStatus.CANCELLED)
-                }
-                restoreInventory(orderItems)
             }
             OrderStatus.CREATED -> {
                 transactionTemplate.execute {
@@ -202,6 +197,34 @@ class OrderCommandServiceImpl(
         orderMetrics.recordOrderCancelled()
         log.info("주문 취소: orderId={}, buyerId={}, status={}", orderId, buyerId, updatedOrder.status)
         return OrderResponse.from(updatedOrder, orderItems)
+    }
+
+    override fun cancelPayingOrder(orderId: Long): Boolean =
+        cancelPaying(orderId, orderItemRepository.findByOrderId(orderId))
+
+    private fun cancelPaying(orderId: Long, orderItems: List<OrderItem>): Boolean {
+        val won = transactionTemplate.execute {
+            orderRepository.lockById(orderId)
+            val target = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException()
+            if (target.status != OrderStatus.PAYING) {
+                return@execute false
+            }
+            target.updateStatus(OrderStatus.CANCELLED)
+            true
+        } ?: false
+        if (!won) {
+            log.info("PAYING이 아니게 된 주문의 결제 전 취소 생략: orderId={}", orderId)
+            return false
+        }
+
+        val result = paymentCommandPort.cancelPayment(orderId)
+        if (result == PaymentCancellationResult.FAILED) {
+            log.warn("결제 전 주문 취소 중 결제 취소 호출 실패, 늦게 온 결제 완료는 취소 요청으로 되돌림: orderId={}", orderId)
+        } else {
+            log.info("결제 전 주문 취소: orderId={}, payment={}", orderId, result)
+        }
+        restoreInventory(orderItems)
+        return true
     }
 
     private fun restoreInventory(orderItems: List<OrderItem>) {
