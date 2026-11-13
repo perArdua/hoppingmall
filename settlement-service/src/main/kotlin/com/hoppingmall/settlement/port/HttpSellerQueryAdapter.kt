@@ -37,7 +37,7 @@ class HttpSellerQueryAdapter(
             return null
         }
         val body = response.body ?: return null
-        return SellerInfo(id = body.id, userId = body.userId)
+        return SellerInfo(id = body.id, userId = body.userId, approved = body.approvalStatus == APPROVED)
     }
 
     private fun findByUserIdFallback(userId: Long, e: Exception): SellerInfo? {
@@ -46,6 +46,10 @@ class HttpSellerQueryAdapter(
             throw ServiceRequestRejectedException("user-service 판매자 조회 거절: ${e.message}")
         }
         throw ServiceCommunicationException("user-service 판매자 조회 실패: ${e.message}")
+    }
+
+    companion object {
+        private const val APPROVED = "APPROVED"
     }
 
     data class SellerResponse(
