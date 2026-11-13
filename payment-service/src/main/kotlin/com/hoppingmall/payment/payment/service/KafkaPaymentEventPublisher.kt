@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.payment.service
 
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.payment.payment.dto.event.MembershipRevertRequestEvent
 import com.hoppingmall.payment.payment.dto.event.MembershipUpdateRequestEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
@@ -64,6 +65,25 @@ class KafkaPaymentEventPublisher(
                 "orderId" to event.orderId,
                 "paymentId" to event.paymentId,
                 "amount" to event.amount
+            ),
+            topic = KafkaTopics.MEMBERSHIP_UPDATE_REQUEST,
+            partitionKey = event.userId.toString()
+        )
+    }
+
+    override fun publishMembershipRevertEvent(event: MembershipRevertRequestEvent) {
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Payment",
+            aggregateId = event.paymentId.toString(),
+            eventType = "MembershipRevertRequested",
+            eventData = mapOf(
+                "eventId" to event.eventId,
+                "userId" to event.userId,
+                "orderId" to event.orderId,
+                "paymentId" to event.paymentId,
+                "amount" to event.amount,
+                "reason" to event.reason.name,
+                "refundId" to event.refundId
             ),
             topic = KafkaTopics.MEMBERSHIP_UPDATE_REQUEST,
             partitionKey = event.userId.toString()

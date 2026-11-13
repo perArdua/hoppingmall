@@ -164,6 +164,7 @@ class PaymentCommandServiceImpl(
 
         paymentMetrics.recordPaymentCancelled()
         paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
+        paymentEventService.publishMembershipCancelRevertEvent(cancelledPayment)
         paymentNotificationService.publishPaymentCancelledNotification(cancelledPayment)
 
         log.info("결제 취소: paymentId={}, orderId={}, userId={}", payment.id, payment.orderId, payment.userId)

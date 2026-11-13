@@ -3,6 +3,7 @@ package com.hoppingmall.payment.refund.service
 import com.hoppingmall.payment.coupon.service.CouponCommandService
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.enum.PaymentStatus
+import com.hoppingmall.payment.payment.service.PaymentEventService
 import com.hoppingmall.payment.payment.service.RefundPointsService
 import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.refund.domain.RefundEventLog
@@ -18,7 +19,8 @@ class RefundLocalOperationService(
     private val pointCommandService: PointCommandService,
     private val couponCommandService: CouponCommandService,
     private val refundEventLogRepository: RefundEventLogRepository,
-    private val refundPointsService: RefundPointsService
+    private val refundPointsService: RefundPointsService,
+    private val paymentEventService: PaymentEventService
 ) {
 
     @Transactional
@@ -30,9 +32,11 @@ class RefundLocalOperationService(
 
     @Transactional
     fun execute(event: RefundCompletedEvent, eventLog: RefundEventLog) {
+        val refundedPayment by lazy { paymentRepository.findByIdOrNull(event.paymentId) }
+
         if (event.isFullRefund) {
             if (!eventLog.isStepCompleted(RefundEventLog.PAYMENT_UPDATED)) {
-                val payment = paymentRepository.findByIdOrNull(event.paymentId)
+                val payment = refundedPayment
                 if (payment != null) {
                     payment.updateStatus(
                         newStatus = PaymentStatus.REFUNDED,
@@ -67,6 +71,9 @@ class RefundLocalOperationService(
                 refundAmount = event.refundAmount,
                 isFullRefund = event.isFullRefund
             )
+            refundedPayment?.let {
+                paymentEventService.publishMembershipRefundRevertEvent(it, event.refundId, event.refundAmount)
+            }
             eventLog.markStepCompleted(RefundEventLog.POINTS_REFUNDED)
         }
 
