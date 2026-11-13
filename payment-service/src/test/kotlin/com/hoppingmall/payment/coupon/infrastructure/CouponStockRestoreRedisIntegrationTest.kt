@@ -59,6 +59,7 @@ class CouponStockRestoreRedisIntegrationTest {
     fun 두_인스턴스의_스윕이_같은_고스트를_함께_보정해도_재고는_한_번만_복원된다() {
         assertThat(repository.tryReserve(couponId, 10L)).isEqualTo(CouponReserveResult.Success)
         assertThat(stock()).isEqualTo(4)
+        backdateReservation(10L)
 
         val schedulerB = scheduler(mock<UserCouponRepository>().also {
             whenever(it.findUserIdsByCouponId(couponId)).thenReturn(emptyList())
@@ -109,6 +110,10 @@ class CouponStockRestoreRedisIntegrationTest {
         val couponRepository = mock<CouponRepository>()
         whenever(couponRepository.findAllActive()).thenReturn(listOf(activeCoupon()))
         return CouponStockReconciliationScheduler(couponRepository, userCouponRepository, repository)
+    }
+
+    private fun backdateReservation(userId: Long) {
+        redisson.getMap<String, String>("coupon:{$couponId}:reserved-at", StringCodec.INSTANCE)[userId.toString()] = "0"
     }
 
     private fun stock(): Int =

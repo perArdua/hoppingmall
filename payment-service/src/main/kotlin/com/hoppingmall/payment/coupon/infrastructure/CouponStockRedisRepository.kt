@@ -19,7 +19,7 @@ class CouponStockRedisRepository(
             RScript.Mode.READ_WRITE,
             RESERVE_SCRIPT,
             RScript.ReturnType.LONG,
-            listOf(stockKey(couponId), issuedKey(couponId)),
+            listOf(stockKey(couponId), issuedKey(couponId), reservedAtKey(couponId)),
             userId.toString()
         )
         return when (result.toInt()) {
@@ -63,6 +63,30 @@ class CouponStockRedisRepository(
         }
     }
 
+    fun reservationClockMillis(couponId: Long): Long {
+        val script = redissonClient.getScript(StringCodec.INSTANCE)
+        return script.eval<Long>(
+            RScript.Mode.READ_WRITE,
+            RESERVATION_CLOCK_SCRIPT,
+            RScript.ReturnType.LONG,
+            listOf(reservedAtKey(couponId))
+        )
+    }
+
+    fun findReservedAfter(couponId: Long, userIds: Collection<Long>, reservedAfterMillis: Long): Set<Long> {
+        if (userIds.isEmpty()) return emptySet()
+        val script = redissonClient.getScript(StringCodec.INSTANCE)
+        val recent = script.eval<List<Any>>(
+            RScript.Mode.READ_WRITE,
+            RESERVED_AFTER_SCRIPT,
+            RScript.ReturnType.LIST,
+            listOf(reservedAtKey(couponId)),
+            reservedAfterMillis.toString(),
+            *userIds.map { it.toString() }.toTypedArray()
+        )
+        return recent.mapNotNullTo(mutableSetOf()) { it.toString().toLongOrNull() }
+    }
+
     fun deleteStock(couponId: Long) {
         redissonClient.keys.delete(stockKey(couponId), issuedKey(couponId))
     }
@@ -75,6 +99,7 @@ class CouponStockRedisRepository(
     private fun stockKey(couponId: Long) = "coupon:{$couponId}:stock"
     private fun issuedKey(couponId: Long) = "coupon:{$couponId}:issued"
     private fun restoredKey(couponId: Long, userId: Long) = "coupon:{$couponId}:restored:$userId"
+    private fun reservedAtKey(couponId: Long) = "coupon:{$couponId}:reserved-at"
 
     companion object {
         const val RESTORED_TTL_SECONDS = 86_400L
@@ -99,7 +124,33 @@ class CouponStockRedisRepository(
 
             redis.call('DECR', stockKey)
             redis.call('SADD', userSetKey, userId)
+            local now = redis.call('TIME')
+            redis.call('HSET', KEYS[3], userId, tostring(now[1] * 1000 + math.floor(now[2] / 1000)))
             return 1
+        """
+
+        const val RESERVATION_CLOCK_SCRIPT = """
+            local now = redis.call('TIME')
+            return now[1] * 1000 + math.floor(now[2] / 1000)
+        """
+
+        const val RESERVED_AFTER_SCRIPT = """
+            local reservedAtKey = KEYS[1]
+            local reservedAfter = tonumber(ARGV[1])
+            local now = redis.call('TIME')
+            local nowMillis = tostring(now[1] * 1000 + math.floor(now[2] / 1000))
+            local recent = {}
+
+            for i = 2, #ARGV do
+                local reservedAt = redis.call('HGET', reservedAtKey, ARGV[i])
+                if not reservedAt then
+                    redis.call('HSET', reservedAtKey, ARGV[i], nowMillis)
+                    table.insert(recent, ARGV[i])
+                elseif tonumber(reservedAt) > reservedAfter then
+                    table.insert(recent, ARGV[i])
+                end
+            end
+            return recent
         """
 
         const val RESTORE_SCRIPT = """
