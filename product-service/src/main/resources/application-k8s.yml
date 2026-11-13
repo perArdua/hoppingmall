@@ -51,7 +51,7 @@ internal:
 grpc:
   client:
     order-service:
-      address: static://order-service.hoppingmall.svc.cluster.local:9094
+      address: dns:///order-service.hoppingmall.svc.cluster.local:9094
       negotiation-type: plaintext
 
 cache:

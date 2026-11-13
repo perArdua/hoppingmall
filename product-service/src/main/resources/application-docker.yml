@@ -56,6 +56,6 @@ internal:
 grpc:
   client:
     order-service:
-      address: static://order-service:9094
+      address: dns:///order-service:9094
       negotiation-type: plaintext
 

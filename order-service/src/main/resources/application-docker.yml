@@ -56,8 +56,8 @@ internal:
 grpc:
   client:
     product-service:
-      address: static://product-service:9093
+      address: dns:///product-service:9093
       negotiation-type: plaintext
     payment-service:
-      address: static://payment-service:9095
+      address: dns:///payment-service:9095
       negotiation-type: plaintext

@@ -58,8 +58,8 @@ internal:
 grpc:
   client:
     order-service:
-      address: static://order-service:9094
+      address: dns:///order-service:9094
       negotiation-type: plaintext
     user-service:
-      address: static://user-service:9082
+      address: dns:///user-service:9082
       negotiation-type: plaintext

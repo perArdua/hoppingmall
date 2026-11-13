@@ -52,8 +52,8 @@ internal:
 grpc:
   client:
     product-service:
-      address: static://product-service.hoppingmall.svc.cluster.local:9093
+      address: dns:///product-service.hoppingmall.svc.cluster.local:9093
       negotiation-type: plaintext
     payment-service:
-      address: static://payment-service.hoppingmall.svc.cluster.local:9095
+      address: dns:///payment-service.hoppingmall.svc.cluster.local:9095
       negotiation-type: plaintext
