@@ -46,14 +46,15 @@ class IdempotentConsumeTemplateTest {
     }
 
     @Test
-    fun DataIntegrityViolationException_발생_시_이미_처리된_것으로_간주한다() {
+    fun DataIntegrityViolationException_발생_뒤_처리_기록이_있으면_이미_처리된_것으로_간주한다() {
         var actionCalled = false
+        var checks = 0
 
         executeIdempotently(
             eventId = "event-1",
             eventDescription = "테스트",
             logger = logger,
-            existsCheck = { false },
+            existsCheck = { checks++ > 0 },
             action = {
                 actionCalled = true
                 throw DataIntegrityViolationException("Duplicate entry")
