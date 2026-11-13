@@ -61,10 +61,10 @@ class SettlementListCurrentStateTest {
     fun setUp() {
         clear()
         whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
-            .thenReturn(
+            .thenAnswer { invocation ->
                 listOf(
                     OrderItemInfo(
-                        id = 10L,
+                        id = invocation.getArgument<Long>(0) * 1000 + invocation.getArgument<LocalDateTime>(1).dayOfYear,
                         orderId = 100L,
                         sellerId = SELLER_ID,
                         productId = 1L,
@@ -74,7 +74,7 @@ class SettlementListCurrentStateTest {
                         totalPrice = BigDecimal("100000")
                     )
                 )
-            )
+            }
         whenever(refundQueryPort.findCompletedBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
             .thenReturn(emptyList())
     }
