@@ -207,7 +207,8 @@ class InventoryCommandServiceBucketModeTest {
     fun 예약_취소는_버킷에_복구한다() {
         val reservation = InventoryReservation.create(1L, 2, 600)
         val row = arrayOf<Any>(1L, 1L, 2)
-        whenever(inventoryReservationRepository.lockCancellable(listOf(reservation.reservationId))).thenReturn(listOf(row))
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf(reservation.reservationId))).thenReturn(listOf(1L))
+        whenever(inventoryReservationRepository.lockCancellable(listOf(1L))).thenReturn(listOf(row))
 
         service.cancelReservation(reservation.reservationId)
 
@@ -222,7 +223,8 @@ class InventoryCommandServiceBucketModeTest {
             arrayOf<Any>(2L, 1L, 2),
             arrayOf<Any>(3L, 2L, 3)
         )
-        whenever(inventoryReservationRepository.lockCancellable(any())).thenReturn(rows)
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("rsv-1", "rsv-2", "rsv-3"))).thenReturn(listOf(1L, 2L, 3L))
+        whenever(inventoryReservationRepository.lockCancellable(listOf(1L, 2L, 3L))).thenReturn(rows)
 
         service.cancelReservations(listOf("rsv-1", "rsv-2", "rsv-3"))
 
@@ -239,9 +241,10 @@ class InventoryCommandServiceBucketModeTest {
         val second = InventoryReservation.create(2L, 1, 600)
         val ids = listOf(first.reservationId, second.reservationId)
 
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(ids)).thenReturn(listOf(1L, 2L))
         whenever(
             inventoryReservationRepository.batchConfirmByCas(
-                eq(ids),
+                eq(listOf(1L, 2L)),
                 eq(listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)),
                 any()
             )
