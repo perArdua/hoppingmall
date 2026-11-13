@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.point.service
 
+import com.hoppingmall.payment.config.PaymentConsumerGroups
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.common.consumer.executeIdempotently
@@ -36,7 +37,7 @@ class PointEventConsumer(
     @Value("\${chaos.point.failure-rate:0.0}")
     private var chaosFailureRate: Float = 0.0f
 
-    @KafkaListener(topics = [KafkaTopics.POINT_EARN_REQUEST], groupId = "point-service")
+    @KafkaListener(topics = [KafkaTopics.POINT_EARN_REQUEST], groupId = PaymentConsumerGroups.POINT_EARN)
     fun handlePointEarnRequest(message: String) {
         if (chaosFailureRate > 0 && Random.nextFloat() < chaosFailureRate) {
             throw RuntimeException("Chaos injection: point operation failed")
