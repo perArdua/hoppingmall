@@ -31,6 +31,25 @@ class StatisticsEventConsumer(
 
         if (statisticsEventLogRepository.existsByEventId(event.transactionId)) return
 
+        if (statisticsEventLogRepository.existsByEventId(cancelledEventId(event.paymentId))) {
+            executeIdempotently(
+                eventId = event.transactionId,
+                eventDescription = "통계",
+                logger = logger,
+                existsCheck = { statisticsEventLogRepository.existsByEventId(event.transactionId) }
+            ) {
+                statisticsEventLogRepository.save(
+                    StatisticsEventLog(
+                        eventId = event.transactionId,
+                        eventType = "PaymentCompleted",
+                        orderId = event.orderId
+                    )
+                )
+                logger.info("이미 취소된 결제의 완료 이벤트, 통계에 더하지 않음: orderId=${event.orderId}")
+            }
+            return
+        }
+
         val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
 
         executeIdempotently(
@@ -72,6 +91,10 @@ class StatisticsEventConsumer(
 
     private fun handlePaymentCancelled(event: PaymentCancelledEvent) {
         if (statisticsEventLogRepository.existsByEventId(event.eventId)) return
+
+        if (event.transactionId.isNotBlank() && !statisticsEventLogRepository.existsByEventId(event.transactionId)) {
+            throw IllegalStateException("결제 완료 통계가 아직 반영되지 않아 취소를 다시 시도: orderId=${event.orderId}")
+        }
 
         val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
 
@@ -140,4 +163,6 @@ class StatisticsEventConsumer(
             logger.info("결제 역보상 통계 반영: orderId=$orderId")
         }
     }
+
+    private fun cancelledEventId(paymentId: Long) = "payment-cancelled-$paymentId"
 }
