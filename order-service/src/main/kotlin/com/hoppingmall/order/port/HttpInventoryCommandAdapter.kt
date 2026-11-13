@@ -6,8 +6,10 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.stereotype.Component
+import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestTemplate
 import java.time.Duration
+import java.util.UUID
 
 @Component
 class HttpInventoryCommandAdapter(
@@ -95,18 +97,28 @@ class HttpInventoryCommandAdapter(
     @CircuitBreaker(name = "inventory-command")
     override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
         val requestBody = items.map { BatchReserveRequest(it.first, it.second) }
-        val responseType = object : org.springframework.core.ParameterizedTypeReference<Map<Long, String>>() {}
-        val response = restTemplate.exchange(
-            "$productServiceUrl/internal/api/v1/inventory/batch-reserve",
-            org.springframework.http.HttpMethod.POST,
-            org.springframework.http.HttpEntity(requestBody, reserveHeaders()),
-            responseType
-        )
+        val requestKey = UUID.randomUUID().toString()
+        val request = org.springframework.http.HttpEntity(requestBody, reserveHeaders(requestKey))
+        val response = try {
+            exchangeBatchReserve(request)
+        } catch (e: ResourceAccessException) {
+            logger.warn("배치 재고 예약 I/O 오류, 같은 요청 키로 한 번 다시 보냄: requestKey={}, cause={}", requestKey, e.message)
+            exchangeBatchReserve(request)
+        }
         return response.body ?: throw RuntimeException("배치 재고 예약 응답 없음")
     }
 
-    private fun reserveHeaders(): org.springframework.http.HttpHeaders {
+    private fun exchangeBatchReserve(request: org.springframework.http.HttpEntity<*>) =
+        restTemplate.exchange(
+            "$productServiceUrl/internal/api/v1/inventory/batch-reserve",
+            org.springframework.http.HttpMethod.POST,
+            request,
+            object : org.springframework.core.ParameterizedTypeReference<Map<Long, String>>() {}
+        )
+
+    private fun reserveHeaders(requestKey: String): org.springframework.http.HttpHeaders {
         val headers = org.springframework.http.HttpHeaders()
+        headers.set(REQUEST_KEY_HEADER, requestKey)
         if (budgetHeaderEnabled) headers.set(RESERVE_BUDGET_HEADER, RESERVE_BUDGET_MS.toString())
         return headers
     }
@@ -114,6 +126,7 @@ class HttpInventoryCommandAdapter(
     companion object {
         const val RESERVE_BUDGET_HEADER = "X-Reserve-Budget-Ms"
         const val RESERVE_BUDGET_MS = 5000L
+        const val REQUEST_KEY_HEADER = "X-Reservation-Request-Key"
     }
 
     data class ReservationResponse(val reservationId: String = "")
