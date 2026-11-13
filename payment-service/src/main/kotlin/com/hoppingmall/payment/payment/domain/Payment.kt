@@ -55,7 +55,7 @@ class Payment private constructor(
 
     companion object {
         private val allowedTransitions: Map<PaymentStatus, Set<PaymentStatus>> = mapOf(
-            PaymentStatus.PENDING to setOf(PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.CANCELLED),
+            PaymentStatus.PENDING to setOf(PaymentStatus.SUCCESS, PaymentStatus.FAILED),
             PaymentStatus.SUCCESS to setOf(PaymentStatus.CANCELLED, PaymentStatus.REFUNDED),
             PaymentStatus.FAILED to emptySet(),
             PaymentStatus.CANCELLED to emptySet(),
@@ -120,6 +120,10 @@ class Payment private constructor(
     }
 
     fun isCancellable(): Boolean = PaymentStatus.CANCELLED in (allowedTransitions[status] ?: emptySet())
+
+    fun isPending(): Boolean = status == PaymentStatus.PENDING
+
+    fun isCancelled(): Boolean = status == PaymentStatus.CANCELLED
 
     fun isSuccess(): Boolean = status == PaymentStatus.SUCCESS
 

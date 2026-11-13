@@ -3,9 +3,8 @@ package com.hoppingmall.payment.payment.service.strategy
 import com.fasterxml.jackson.databind.JsonNode
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
-import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
-import com.hoppingmall.payment.payment.enum.PaymentStatus
+import com.hoppingmall.payment.payment.exception.PaymentCancelInProgressException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import com.hoppingmall.payment.payment.service.CompensationEventLogService
@@ -34,7 +33,7 @@ class PaymentCancellationRequestedHandler(
             val log = compensationEventLogService.saveIfAbsent(
                 eventId = eventId,
                 compensationType = "PAYMENT_CANCELLATION_REQUESTED",
-                paymentId = cancellationTargetId(payment),
+                paymentId = payment?.id ?: 0L,
                 orderId = orderId
             )
             if (log.isCompleted()) {
@@ -48,18 +47,15 @@ class PaymentCancellationRequestedHandler(
                 return
             }
 
-            if (payment.status == PaymentStatus.CANCELLED && log.paymentId == payment.id) {
-                publishCompletedEvent(eventId, orderId, payment.id!!)
-                compensationEventLogService.markCompleted(eventId)
-                logger.info("이미 커밋된 결제 취소의 완료 처리: orderId=$orderId, paymentId=${payment.id}")
-                return
-            }
-
             try {
                 paymentCommandService.cancelPaymentInternal(payment.id!!)
                 publishCompletedEvent(eventId, orderId, payment.id!!)
                 compensationEventLogService.markCompleted(eventId)
                 logger.info("결제 취소 처리 완료: orderId=$orderId, paymentId=${payment.id}")
+            } catch (e: PaymentCancelInProgressException) {
+                publishFailedEvent(eventId, orderId, "결제 진행 중: ${payment.status}")
+                compensationEventLogService.markCompleted(eventId)
+                logger.warn("진행 중인 결제라 취소하지 않음: orderId=$orderId, paymentId=${payment.id}")
             } catch (e: PaymentInvalidStateException) {
                 publishFailedEvent(eventId, orderId, "결제 상태 부적합: ${payment.status}")
                 compensationEventLogService.markCompleted(eventId)
@@ -90,9 +86,6 @@ class PaymentCancellationRequestedHandler(
         compensationEventLogService.markCompleted(eventId)
         logger.warn("결제 취소 재시도 소진으로 취소 실패 처리: orderId=$orderId, eventId=$eventId")
     }
-
-    private fun cancellationTargetId(payment: Payment?): Long =
-        payment?.takeIf { it.status != PaymentStatus.CANCELLED }?.id ?: 0L
 
     private fun publishCompletedEvent(eventId: String, orderId: Long, paymentId: Long) {
         transactionalEventPublisher.publishEvent(
