@@ -36,7 +36,7 @@ class InventoryControllerSecurityTest {
     @MockitoBean
     private lateinit var inventoryQueryService: InventoryQueryService
 
-    private val inventoryJson = """{"productId":1,"quantity":100}"""
+    private val inventoryJson = """{"product_id":1,"stock_quantity":100}"""
 
     @Nested
     @DisplayName("POST /api/v1/inventories")
@@ -85,7 +85,7 @@ class InventoryControllerSecurityTest {
     @DisplayName("PATCH /api/v1/inventories/{productId}")
     inner class UpdateStock {
 
-        private val updateJson = """{"quantity":50}"""
+        private val updateJson = """{"stock_quantity":50}"""
 
         @Test
         fun SELLER_역할로_재고_수정_성공() {

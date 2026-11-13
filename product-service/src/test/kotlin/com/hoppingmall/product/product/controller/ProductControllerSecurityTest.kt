@@ -51,7 +51,7 @@ class ProductControllerSecurityTest {
     @MockitoBean
     private lateinit var bulkImportService: BulkImportService
 
-    private val productJson = """{"name":"test","price":1000,"description":"desc","categoryId":1}"""
+    private val productJson = """{"seller_id":1,"name":"test","price":1000,"description":"desc","category_id":1}"""
 
     @Nested
     @DisplayName("POST /api/v1/products")
