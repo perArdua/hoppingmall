@@ -1,0 +1,6 @@
+package com.hoppingmall.product.inventory.exception
+
+import com.hoppingmall.common.BusinessException
+import com.hoppingmall.product.inventory.exception.code.InventoryErrorCode
+
+class ReservationRequestKeyConflictException : BusinessException(InventoryErrorCode.RESERVATION_REQUEST_KEY_CONFLICT)

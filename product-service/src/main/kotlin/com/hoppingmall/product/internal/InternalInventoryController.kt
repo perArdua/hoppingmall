@@ -31,9 +31,14 @@ class InternalInventoryController(
     @PostMapping("/{productId}/reserve")
     fun reserveStock(
         @PathVariable productId: Long,
-        @RequestParam quantity: Int
+        @RequestParam quantity: Int,
+        @RequestHeader(name = REQUEST_KEY_HEADER, required = false) requestKey: String? = null
     ): ResponseEntity<ReservationResponse> {
-        val reservationId = inventoryCommandService.reserveStock(productId, quantity)
+        val reservationId = if (requestKey != null) {
+            inventoryCommandService.batchReserveStock(listOf(productId to quantity), requestKey).getValue(productId)
+        } else {
+            inventoryCommandService.reserveStock(productId, quantity)
+        }
         return ResponseEntity.ok(ReservationResponse(reservationId))
     }
 
@@ -70,17 +75,26 @@ class InternalInventoryController(
     @PostMapping("/batch-reserve")
     fun batchReserveStock(
         @RequestBody items: List<ReserveRequest>,
-        @RequestHeader(name = ReserveDeadline.HEADER, required = false) budgetMs: Long? = null
+        @RequestHeader(name = ReserveDeadline.HEADER, required = false) budgetMs: Long? = null,
+        @RequestHeader(name = REQUEST_KEY_HEADER, required = false) requestKey: String? = null
     ): ResponseEntity<Map<Long, String>> {
         val receivedAt = System.currentTimeMillis()
         if (budgetEnabled && budgetMs != null && budgetMs > 0) ReserveDeadline.set(receivedAt + budgetMs)
         try {
             val pairs = items.map { it.productId to it.quantity }
-            val result = inventoryCommandService.batchReserveStock(pairs)
+            val result = if (requestKey != null) {
+                inventoryCommandService.batchReserveStock(pairs, requestKey)
+            } else {
+                inventoryCommandService.batchReserveStock(pairs)
+            }
             return ResponseEntity.ok(result)
         } finally {
             ReserveDeadline.clear()
         }
+    }
+
+    companion object {
+        const val REQUEST_KEY_HEADER = "X-Reservation-Request-Key"
     }
 
     data class ReserveRequest(val productId: Long, val quantity: Int)

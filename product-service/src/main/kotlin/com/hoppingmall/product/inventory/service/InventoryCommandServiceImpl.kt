@@ -8,17 +8,20 @@ import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
 import com.hoppingmall.product.inventory.enums.ReservationStatus
+import com.hoppingmall.product.inventory.exception.InvalidReservationRequestKeyException
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidStockChangeQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryNotFoundException
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
+import com.hoppingmall.product.inventory.exception.ReservationRequestKeyConflictException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
@@ -188,20 +191,62 @@ class InventoryCommandServiceImpl(
         }
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    override fun batchReserveStock(items: List<Pair<Long, Int>>, requestKey: String): Map<Long, String> {
+        if (requestKey.isBlank() || requestKey.length > InventoryReservation.REQUEST_KEY_MAX_LENGTH) {
+            throw InvalidReservationRequestKeyException()
+        }
+        items.forEach { (_, quantity) -> requirePositiveQuantity(quantity) }
+        return withReserveGate(items.map { it.first }) {
+            try {
+                inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) }
+            } catch (e: DataIntegrityViolationException) {
+                reserveTransaction.execute { findReplayable(requestKey, items) } ?: throw e
+            }
+        }
+    }
+
+    private fun replayOrReserve(requestKey: String, items: List<Pair<Long, Int>>, lockAll: Boolean): Map<Long, String> {
+        val existing = inventoryReservationRepository.findByRequestKey(requestKey)
+        if (existing.isEmpty()) return batchReserveInTransaction(items, lockAll, requestKey)
+        if (existing.all { it.status in CLOSED }) {
+            inventoryReservationRepository.releaseRequestKey(existing.mapNotNull { it.id }, requestKey, LocalDateTime.now())
+            return batchReserveInTransaction(items, lockAll, requestKey)
+        }
+        return replay(existing, items)
+    }
+
+    private fun findReplayable(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
+        val existing = inventoryReservationRepository.findByRequestKey(requestKey)
+        if (existing.isEmpty()) return null
+        return replay(existing, items)
+    }
+
+    private fun replay(existing: List<InventoryReservation>, items: List<Pair<Long, Int>>): Map<Long, String> {
+        val requested = items.toMap()
+        val sameRequest = existing.size == items.size && existing.all { requested[it.productId] == it.quantity }
+        if (!sameRequest || existing.any { it.status !in REPLAYABLE }) throw ReservationRequestKeyConflictException()
+        return existing.associate { it.productId to it.reservationId }
+    }
+
     private fun requirePositiveQuantity(quantity: Int) {
         if (quantity <= 0) throw InventoryInvalidQuantityException()
     }
 
-    private fun batchReserveInTransaction(items: List<Pair<Long, Int>>, lockAll: Boolean): Map<Long, String> {
+    private fun batchReserveInTransaction(
+        items: List<Pair<Long, Int>>,
+        lockAll: Boolean,
+        requestKey: String? = null
+    ): Map<Long, String> {
         val sorted = items.sortedBy { it.first }
         val reservationMap = mutableMapOf<Long, String>()
         try {
             sorted.forEach { (productId, quantity) ->
-                val reservationId = reserveOne(productId, quantity, lockAll)
+                val reservationId = reserveOne(productId, quantity, lockAll, requestKey)
                 reservationMap[productId] = reservationId
             }
         } catch (e: Exception) {
-            if (!bucketStockService.enabled) {
+            if (!bucketStockService.enabled && e !is DataIntegrityViolationException) {
                 reservationMap.values.forEach { cancelReservation(it) }
             }
             throw e
@@ -223,16 +268,17 @@ class InventoryCommandServiceImpl(
         }
     }
 
-    private fun reserveOne(productId: Long, quantity: Int, lockAll: Boolean): String {
+    private fun reserveOne(productId: Long, quantity: Int, lockAll: Boolean, requestKey: String? = null): String {
         maybeInjectChaos("reserveStock")
         val deadline = ReserveDeadline.current()
         val reservation = if (deadline != null) {
             InventoryReservation.create(
                 productId, quantity,
-                LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(deadline + ReserveDeadline.EXPIRY_GRACE_MS), java.time.ZoneId.systemDefault())
+                LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(deadline + ReserveDeadline.EXPIRY_GRACE_MS), java.time.ZoneId.systemDefault()),
+                requestKey = requestKey
             )
         } else {
-            InventoryReservation.create(productId, quantity, ttlSeconds)
+            InventoryReservation.create(productId, quantity, ttlSeconds, requestKey)
         }
         if (bucketStockService.enabled && lockAll) {
             bucketStockService.reserveLockingAll(productId, quantity)
@@ -277,5 +323,7 @@ class InventoryCommandServiceImpl(
     companion object {
         private const val INVENTORY_CACHE = "inventory"
         private val CONFIRMABLE = listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)
+        private val REPLAYABLE = setOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED, ReservationStatus.CONFIRMED)
+        private val CLOSED = setOf(ReservationStatus.CANCELLED, ReservationStatus.EXPIRED)
     }
 }

@@ -15,6 +15,22 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
 
     fun findByReservationIdIn(reservationIds: List<String>): List<InventoryReservation>
 
+    fun findByRequestKey(requestKey: String): List<InventoryReservation>
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE inventory_reservations SET request_key = NULL, updated_at = :updatedAt
+            WHERE id IN (:ids) AND request_key = :requestKey
+        """,
+        nativeQuery = true
+    )
+    fun releaseRequestKey(
+        @Param("ids") ids: List<Long>,
+        @Param("requestKey") requestKey: String,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
         UPDATE InventoryReservation r

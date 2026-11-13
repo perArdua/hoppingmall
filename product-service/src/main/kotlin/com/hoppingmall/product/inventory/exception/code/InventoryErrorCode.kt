@@ -16,4 +16,6 @@ enum class InventoryErrorCode(
     INVENTORY_BUDGET_EXCEEDED("INV006", "재고 예약 처리 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
     INVALID_RESERVE_QUANTITY("INV007", "예약 수량은 1개 이상이어야 합니다.", HttpStatus.BAD_REQUEST),
     INVALID_STOCK_CHANGE_QUANTITY("INV008", "재고 증감 수량은 1개 이상이어야 합니다.", HttpStatus.BAD_REQUEST),
+    RESERVATION_REQUEST_KEY_CONFLICT("INV009", "같은 요청 키로 내용이 다른 예약 요청이 왔습니다.", HttpStatus.CONFLICT),
+    INVALID_RESERVATION_REQUEST_KEY("INV010", "예약 요청 키는 비어 있지 않은 64자 이하 문자열이어야 합니다.", HttpStatus.BAD_REQUEST),
 }
