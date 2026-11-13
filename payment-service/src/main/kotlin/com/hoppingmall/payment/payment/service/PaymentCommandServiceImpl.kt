@@ -12,6 +12,7 @@ import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
+import com.hoppingmall.payment.port.OrderSummaryQueryPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -28,6 +29,7 @@ class PaymentCommandServiceImpl(
     private val couponCommandService: CouponCommandService,
     private val paymentMetrics: PaymentMetrics,
     private val pointEarnRateStrategy: PointEarnRateStrategy,
+    private val orderSummaryQueryPort: OrderSummaryQueryPort,
     transactionManager: PlatformTransactionManager
 ) : PaymentCommandService {
 

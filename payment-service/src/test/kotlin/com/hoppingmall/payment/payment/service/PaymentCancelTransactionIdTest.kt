@@ -13,6 +13,7 @@ import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.service.strategy.PaymentCancellationRequestedHandler
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
+import com.hoppingmall.payment.support.FakeOrderSummaryQueryPort
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -64,6 +65,8 @@ class PaymentCancelTransactionIdTest {
     @Mock
     private lateinit var compensationEventLogService: CompensationEventLogService
 
+    private val orderSummaryQueryPort = FakeOrderSummaryQueryPort()
+
     private val transactionId = "txn-cancel-1"
     private val completedAt = LocalDateTime.of(2026, 11, 13, 10, 0, 0)
 
@@ -75,6 +78,7 @@ class PaymentCancelTransactionIdTest {
         couponCommandService,
         paymentMetrics,
         pointEarnRateStrategy,
+        orderSummaryQueryPort,
         transactionManager
     )
 

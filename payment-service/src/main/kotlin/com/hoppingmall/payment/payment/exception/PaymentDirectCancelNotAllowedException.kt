@@ -1,0 +1,5 @@
+package com.hoppingmall.payment.payment.exception
+
+import com.hoppingmall.payment.payment.exception.code.PaymentErrorCode
+
+class PaymentDirectCancelNotAllowedException : PaymentException(PaymentErrorCode.PAYMENT_DIRECT_CANCEL_NOT_ALLOWED)
