@@ -3,6 +3,8 @@ spring:
     allow-bean-definition-overriding: true
   kafka:
     bootstrap-servers: kafka.hoppingmall.svc.cluster.local:29092
+    properties:
+      schema.registry.url: http://schema-registry.hoppingmall.svc.cluster.local:8081
     consumer:
       group-id: membership-service
       auto-offset-reset: earliest

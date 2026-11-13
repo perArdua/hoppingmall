@@ -24,6 +24,8 @@ spring:
       bootstrap-servers: kafka.hoppingmall.svc.cluster.local:29092
     producer:
       bootstrap-servers: kafka.hoppingmall.svc.cluster.local:29092
+    properties:
+      schema.registry.url: http://schema-registry.hoppingmall.svc.cluster.local:8081
 
 management:
   endpoint:
