@@ -318,7 +318,7 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
     ports:
       - "127.0.0.1:8091:8081"
     healthcheck:
@@ -341,7 +341,7 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker,grpc
-      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
     ports:
@@ -367,7 +367,7 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker,grpc
-      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
     ports:
@@ -395,7 +395,7 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker,grpc
-      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
     ports:
@@ -423,7 +423,7 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker,grpc
-      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
     ports:
@@ -447,7 +447,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
     ports:
@@ -504,7 +504,7 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-default-docker-secret-key-for-development-only-32chars!}
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports:
       - "127.0.0.1:8000:8000"

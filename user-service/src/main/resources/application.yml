@@ -70,7 +70,7 @@ management:
       endpoint: http://localhost:9411/api/v2/spans
 
 jwt:
-  secret: ${JWT_SECRET:default-docker-secret-key-for-development-only-32chars!}
+  secret: ${JWT_SECRET}
   access-expiration-ms: 3600000
   refresh-expiration-ms: 86400000
 
