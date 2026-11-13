@@ -31,7 +31,7 @@ class ProductCommandServiceImpl(
         }
 
         val product = Product.create(
-            sellerId = request.sellerId,
+            sellerId = requireNotNull(request.sellerId),
             categoryId = request.categoryId,
             name = request.name,
             description = request.description,

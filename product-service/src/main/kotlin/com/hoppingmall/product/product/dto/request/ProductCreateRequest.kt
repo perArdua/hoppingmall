@@ -7,8 +7,7 @@ import jakarta.validation.constraints.Positive
 import java.math.BigDecimal
 
 data class ProductCreateRequest(
-    @field:NotNull(message = "판매자 ID는 필수입니다.")
-    val sellerId: Long,
+    val sellerId: Long? = null,
 
     @field:NotNull(message = "카테고리 ID는 필수입니다.")
     val categoryId: Long,
