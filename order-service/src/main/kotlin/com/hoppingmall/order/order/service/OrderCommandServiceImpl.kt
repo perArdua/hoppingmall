@@ -33,6 +33,7 @@ import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
@@ -146,10 +147,14 @@ class OrderCommandServiceImpl(
         try {
             inventoryCommandPort.batchReserveStock(items)
         } catch (e: HttpClientErrorException.BadRequest) {
-            throw OrderOutOfStockException()
+            if (productErrorCode(e) == PRODUCT_INSUFFICIENT_STOCK) throw OrderOutOfStockException()
+            throw e
         } catch (e: HttpClientErrorException.TooManyRequests) {
             throw OrderBusyException()
         }
+
+    private fun productErrorCode(e: HttpClientErrorException): String? =
+        runCatching { errorBodyReader.readTree(e.responseBodyAsString).path("code").textValue() }.getOrNull()
 
     override fun cancelOrder(buyerId: Long, orderId: Long): OrderResponse {
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
@@ -264,5 +269,10 @@ class OrderCommandServiceImpl(
 
         val orderItems = orderItemRepository.findByOrderId(orderId)
         return OrderResponse.from(order, orderItems)
+    }
+
+    companion object {
+        private const val PRODUCT_INSUFFICIENT_STOCK = "INV002"
+        private val errorBodyReader = ObjectMapper()
     }
 }
