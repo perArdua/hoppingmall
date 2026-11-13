@@ -60,13 +60,16 @@ class ProductStatisticsCommandServiceImpl(
             )
             if (slice.isEmpty) break
 
-            val chunk = slice.content
+            val chunkIds = slice.content.mapNotNull { it.id }
             transactionTemplate.executeWithoutResult {
+                val lockedChunk = productStatisticsRepository.findAllByIdInForUpdate(chunkIds)
+                val closedProductIds = productDailyStatisticsRepository
+                    .findByStatisticsDateAndProductIdIn(statisticsDate, lockedChunk.map { it.productId })
+                    .map { it.productId }
+                    .toSet()
+                val chunk = lockedChunk.filterNot { it.productId in closedProductIds }
+                if (chunk.isEmpty()) return@executeWithoutResult
                 val productIds = chunk.map { it.productId }
-
-                val existingDailyMap = productDailyStatisticsRepository
-                    .findByStatisticsDateAndProductIdIn(statisticsDate, productIds)
-                    .associateBy { it.productId }
 
                 val last7DaysMap = toSalesAmountMap(
                     productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, statisticsDate.minusDays(6), statisticsDate)
@@ -80,7 +83,7 @@ class ProductStatisticsCommandServiceImpl(
 
                 val dailyToSave = mutableListOf<ProductDailyStatistics>()
                 for (stats in chunk) {
-                    val daily = existingDailyMap[stats.productId] ?: ProductDailyStatistics.create(
+                    val daily = ProductDailyStatistics.create(
                         productId = stats.productId,
                         statisticsDate = statisticsDate
                     )
@@ -99,7 +102,7 @@ class ProductStatisticsCommandServiceImpl(
                 productStatisticsRepository.saveAll(chunk)
             }
 
-            totalProcessed += chunk.size
+            totalProcessed += chunkIds.size
             if (!slice.hasNext()) break
             page++
         }

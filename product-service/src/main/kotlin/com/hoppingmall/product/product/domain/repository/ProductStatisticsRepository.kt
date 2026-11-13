@@ -22,6 +22,10 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.productId = :productId")
     fun findByProductIdForUpdate(@Param("productId") productId: Long): ProductStatistics?
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ps FROM ProductStatistics ps WHERE ps.id IN :ids ORDER BY ps.id")
+    fun findAllByIdInForUpdate(@Param("ids") ids: Collection<Long>): List<ProductStatistics>
+
     @Query("SELECT COUNT(ps) FROM ProductStatistics ps")
     fun countAllProducts(): Long
 
