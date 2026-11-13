@@ -206,11 +206,12 @@ class OrderCommandServiceImpl(
     override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
-        if (order.buyerId != userId && !isAdmin) {
+        if (!isAdmin) {
             throw OrderAccessDeniedException()
         }
 
         order.updateStatus(request.status)
+        log.info("주문 상태 변경: orderId={}, userId={}, status={}", orderId, userId, request.status)
 
         val orderItems = orderItemRepository.findByOrderId(orderId)
         return OrderResponse.from(order, orderItems)
