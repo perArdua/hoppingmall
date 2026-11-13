@@ -290,7 +290,7 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?.env에 GRAFANA_ADMIN_PASSWORD를 설정하세요}
     volumes:
       - ./docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
       - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
