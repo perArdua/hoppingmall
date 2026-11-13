@@ -4,6 +4,8 @@ import com.hoppingmall.payment.coupon.enum.UserCouponStatus
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -22,7 +24,8 @@ class UserCoupon private constructor(
     val couponId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: UserCouponStatus = UserCouponStatus.ISSUED,
 
     @Column
