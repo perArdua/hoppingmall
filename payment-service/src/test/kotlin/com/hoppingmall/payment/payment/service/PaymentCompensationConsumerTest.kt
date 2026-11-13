@@ -39,6 +39,9 @@ class PaymentCompensationConsumerTest {
     private lateinit var refundPointsService: RefundPointsService
 
     @Mock
+    private lateinit var paymentCommandService: PaymentCommandService
+
+    @Mock
     private lateinit var compensationEventHandlerRegistry: CompensationEventHandlerRegistry
 
     @Mock
@@ -48,7 +51,7 @@ class PaymentCompensationConsumerTest {
     private lateinit var consumer: PaymentCompensationConsumer
 
     @Test
-    fun 결제_역보상_요청_시_포인트_환불을_수행한다() {
+    fun 결제_역보상_요청_시_결제를_취소한다() {
         val node = mock<com.fasterxml.jackson.databind.JsonNode>()
         whenever(objectMapper.readTree(any<String>())).thenReturn(node)
         whenever(node.get("eventType")).thenReturn(TextNode("PaymentReversalRequested"))
@@ -69,7 +72,7 @@ class PaymentCompensationConsumerTest {
 
         consumer.handlePaymentReversal("{}")
 
-        verify(refundPointsService).refundPoints(1L, 100L)
+        verify(paymentCommandService).cancelPaymentInternal(100L)
         verify(compensationEventLogService).markCompleted("reversal-evt-1")
     }
 
@@ -95,7 +98,7 @@ class PaymentCompensationConsumerTest {
 
         consumer.handlePaymentReversal("{}")
 
-        verify(refundPointsService, never()).refundPoints(any(), any())
+        verify(paymentCommandService, never()).cancelPaymentInternal(any())
     }
 
     @Nested
