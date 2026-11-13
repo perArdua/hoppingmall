@@ -3,9 +3,13 @@ package com.hoppingmall.gateway.filter
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Metrics
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cloud.gateway.filter.GatewayFilter
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate
 import org.springframework.http.HttpStatus
 import org.springframework.http.server.reactive.ServerHttpRequest
 import org.springframework.stereotype.Component
@@ -16,7 +20,9 @@ import java.util.Optional
 
 @Component
 class JwtValidationGatewayFilterFactory(
-    @Value("\${jwt.secret}") secret: String
+    @Value("\${jwt.secret}") secret: String,
+    private val redisTemplate: ReactiveStringRedisTemplate? = null,
+    private val meterRegistry: MeterRegistry = Metrics.globalRegistry
 ) : AbstractGatewayFilterFactory<JwtValidationGatewayFilterFactory.Config>(Config::class.java) {
 
     private val key = Keys.hmacShaKeyFor(secret.toByteArray())
@@ -57,13 +63,29 @@ class JwtValidationGatewayFilterFactory(
             .subscribeOn(Schedulers.boundedElastic())
             .onErrorReturn(Optional.empty())
             .flatMap { authenticatedRequest ->
-                when {
-                    authenticatedRequest.isEmpty -> onUnauthorized(exchange)
-                    !hasRequiredRole(authenticatedRequest.get(), config) -> onForbidden(exchange)
-                    else -> chain.filter(exchange.mutate().request(authenticatedRequest.get()).build())
+                if (authenticatedRequest.isEmpty) {
+                    return@flatMap onUnauthorized(exchange)
+                }
+                isLoggedOut(token).flatMap { loggedOut ->
+                    when {
+                        loggedOut -> onUnauthorized(exchange)
+                        !hasRequiredRole(authenticatedRequest.get(), config) -> onForbidden(exchange)
+                        else -> chain.filter(exchange.mutate().request(authenticatedRequest.get()).build())
+                    }
                 }
             }
         }
+    }
+
+    private fun isLoggedOut(token: String): Mono<Boolean> {
+        val template = redisTemplate ?: return Mono.just(false)
+        return Mono.defer { template.hasKey(BLACKLIST_KEY_PREFIX + token) }
+            .defaultIfEmpty(false)
+            .onErrorResume { e ->
+                log.warn("로그아웃 토큰 Redis 조회 실패, 요청은 통과시킴: {}", e.message)
+                meterRegistry.counter(BLACKLIST_REDIS_FAILURE_METRIC).increment()
+                Mono.just(false)
+            }
     }
 
     private fun accessTokenRole(claims: Claims): String? {
@@ -93,6 +115,9 @@ class JwtValidationGatewayFilterFactory(
     }
 
     companion object {
+        private val log = LoggerFactory.getLogger(JwtValidationGatewayFilterFactory::class.java)
+        private const val BLACKLIST_KEY_PREFIX = "blacklist:"
+        private const val BLACKLIST_REDIS_FAILURE_METRIC = "gateway.jwt.blacklist.redis.failures"
         private const val TOKEN_TYPE_CLAIM = "typ"
         private const val ACCESS_TOKEN_TYPE = "access"
         private const val ROLE_CLAIM = "role"
