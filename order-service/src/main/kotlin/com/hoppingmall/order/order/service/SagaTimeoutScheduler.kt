@@ -7,6 +7,7 @@ import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
@@ -23,6 +24,7 @@ class SagaTimeoutScheduler(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val inventoryCommandPort: InventoryCommandPort,
+    private val paymentQueryPort: PaymentQueryPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val transactionTemplate: TransactionTemplate,
     private val sagaCompensationMetrics: SagaCompensationMetrics

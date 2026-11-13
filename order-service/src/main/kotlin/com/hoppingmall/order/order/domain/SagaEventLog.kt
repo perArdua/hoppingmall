@@ -1,6 +1,7 @@
 package com.hoppingmall.order.order.domain
 
 import jakarta.persistence.*
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
@@ -23,6 +24,9 @@ class SagaEventLog(
 
     @Column(nullable = true)
     val paymentId: Long? = null,
+
+    @Column(nullable = true, precision = 10, scale = 2)
+    val paymentAmount: BigDecimal? = null,
 
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),

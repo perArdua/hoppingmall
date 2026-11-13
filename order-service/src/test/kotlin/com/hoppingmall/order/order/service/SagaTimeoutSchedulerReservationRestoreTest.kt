@@ -9,6 +9,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -51,6 +52,9 @@ class SagaTimeoutSchedulerReservationRestoreTest {
     private lateinit var inventoryCommandPort: InventoryCommandPort
 
     @Mock
+    private lateinit var paymentQueryPort: PaymentQueryPort
+
+    @Mock
     private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @Mock
@@ -77,6 +81,7 @@ class SagaTimeoutSchedulerReservationRestoreTest {
             orderRepository,
             orderItemRepository,
             inventoryCommandPort,
+            paymentQueryPort,
             transactionalEventPublisher,
             transactionTemplate,
             sagaCompensationMetrics
