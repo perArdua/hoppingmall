@@ -123,10 +123,13 @@ resilience4j:
     instances:
       order-query:
         baseConfig: default
+        waitDurationInOpenState: 10s
       cart-query:
         baseConfig: default
+        waitDurationInOpenState: 10s
       order-item-query:
         baseConfig: default
+        waitDurationInOpenState: 10s
   retry:
     retryAspectOrder: 1
     configs:
