@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
 import java.time.Duration
 
@@ -45,12 +46,13 @@ class HttpProductQueryAdapter(
     }
 
     private fun findProductByIdFallback(productId: Long, e: Exception): ProductInfo? {
+        if (e is HttpClientErrorException.NotFound) return null
         logger.warn("CB fallback: 상품 조회 실패 productId=$productId", e)
-        return null
+        throw ProductQueryUnavailableException("상품 조회 실패 productId=$productId", e)
     }
 
     private fun findProductsByIdsFallback(productIds: List<Long>, e: Exception): List<ProductInfo> {
         logger.warn("CB fallback: 상품 목록 조회 실패 productIds=$productIds", e)
-        return emptyList()
+        throw ProductQueryUnavailableException("상품 목록 조회 실패 productIds=$productIds", e)
     }
 }
