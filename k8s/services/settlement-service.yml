@@ -43,11 +43,6 @@ spec:
               value: "k8s"
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC"
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hoppingmall-secret
-                  key: JWT_SECRET
             - name: INTERNAL_SERVICE_TOKEN
               valueFrom:
                 secretKeyRef:
