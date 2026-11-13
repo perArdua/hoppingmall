@@ -123,17 +123,36 @@ class AvroEventConverterMissingFieldTest {
     }
 
     @Test
-    fun 역보상_요청은_발행_쪽이_아직_넣지_않는_결제_ID와_금액만_예전처럼_채운다() {
+    fun 역보상_요청에_결제_ID가_빠지면_0으로_채우지_않고_변환에_실패한다() {
+        assertThatThrownBy {
+            convert(
+                "PaymentReversalRequested",
+                mapOf("eventId" to "timeout-1", "orderId" to 10L, "userId" to 100L, "amount" to "10000", "reason" to "SAGA_TIMEOUT")
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessage("Missing required field: PaymentReversalRequested.paymentId")
+    }
+
+    @Test
+    fun 역보상_요청에_금액이_빠지면_빈_문자열로_채우지_않고_변환에_실패한다() {
+        assertThatThrownBy {
+            convert(
+                "PaymentReversalRequested",
+                mapOf("eventId" to "reversal-tx-1", "orderId" to 10L, "paymentId" to 1L, "userId" to 100L, "reason" to "INVENTORY_CONFIRM_FAILED")
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessage("Missing required field: PaymentReversalRequested.amount")
+    }
+
+    @Test
+    fun 결제를_찾지_못한_역보상의_결제_ID_0과_금액_0은_값이_있으므로_그대로_변환한다() {
         val record = convert(
             "PaymentReversalRequested",
-            mapOf("eventId" to "timeout-1", "orderId" to 10L, "userId" to 100L, "reason" to "SAGA_TIMEOUT")
+            mapOf("eventId" to "timeout-2", "orderId" to 10L, "paymentId" to 0L, "userId" to 100L, "amount" to "0", "reason" to "SAGA_TIMEOUT")
         )
 
         assertThat(record.get("paymentId")).isEqualTo(0L)
-        assertThat(record.get("amount").toString()).isEqualTo("")
-        assertThatThrownBy {
-            convert("PaymentReversalRequested", mapOf("eventId" to "timeout-2", "userId" to 100L, "paymentId" to 1L))
-        }.isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("orderId")
+        assertThat(record.get("amount").toString()).isEqualTo("0")
+        assertThat(record.get("orderId")).isEqualTo(10L)
     }
 }
