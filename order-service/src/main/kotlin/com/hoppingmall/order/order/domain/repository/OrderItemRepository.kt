@@ -19,8 +19,19 @@ interface OrderItemRepository : JpaRepository<OrderItem, Long> {
             SELECT oi.* FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             WHERE oi.seller_id = :sellerId
-              AND o.status = 'DELIVERED'
-              AND o.updated_at BETWEEN :startDate AND :endDate
+              AND (
+                (o.status = 'DELIVERED' AND o.updated_at BETWEEN :startDate AND :endDate)
+                OR (
+                  o.status = 'REFUNDED'
+                  AND EXISTS (
+                    SELECT 1 FROM shippings s
+                    WHERE s.order_id = o.id
+                      AND s.status = 'DELIVERED'
+                      AND s.updated_at BETWEEN :startDate AND :endDate
+                      AND s.deleted_at IS NULL
+                  )
+                )
+              )
               AND oi.deleted_at IS NULL
               AND o.deleted_at IS NULL
         """,

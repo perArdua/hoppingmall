@@ -14,6 +14,7 @@ import com.hoppingmall.order.port.PaymentInfo
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.support.MySqlJpaTestSupport
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -228,7 +229,7 @@ class OrderTimeoutSchedulerMySqlIntegrationTest : MySqlJpaTestSupport() {
             orderRepository, orderItemRepository, mock<CartItemRepository>(),
             mock<ProductQueryPort>(), inventoryCommandPort,
             HttpPaymentCommandAdapter(PAYMENT_URL, restTemplateBuilder),
-            transactionalEventPublisher, mock<OrderMetrics>(), transactionTemplate
+            transactionalEventPublisher, mock<OrderMetrics>(), transactionTemplate, mock<RefundRepository>()
         )
         return OrderTimeoutScheduler(
             orderRepository,

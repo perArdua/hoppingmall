@@ -77,10 +77,14 @@ class InternalOrderController(
     fun cancelOrder(@PathVariable orderId: Long): ResponseEntity<Void> {
         val order = orderRepository.findByIdOrNull(orderId)
             ?: return ResponseEntity.notFound().build()
-        if (order.isCancelled()) {
+        if (order.isCancelled() || order.isRefunded()) {
             return ResponseEntity.ok().build()
         }
-        order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.CANCELLED)
+        if (order.isRefundable()) {
+            order.completeRefund()
+        } else {
+            order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.CANCELLED)
+        }
         orderRepository.save(order)
         return ResponseEntity.ok().build()
     }

@@ -13,6 +13,7 @@ import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import io.micrometer.tracing.Tracer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -53,6 +54,9 @@ class OrderStatusUpdateAuthorizationTest {
 
     @MockitoBean
     private lateinit var cartItemRepository: CartItemRepository
+
+    @MockitoBean
+    private lateinit var refundRepository: RefundRepository
 
     @MockitoBean
     private lateinit var productQueryPort: ProductQueryPort

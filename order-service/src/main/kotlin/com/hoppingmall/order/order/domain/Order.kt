@@ -40,8 +40,11 @@ class Order private constructor(
             OrderStatus.SHIPPED to setOf(OrderStatus.DELIVERED),
             OrderStatus.DELIVERED to emptySet(),
             OrderStatus.CANCELLED to emptySet(),
-            OrderStatus.CANCEL_FAILED to setOf(OrderStatus.CANCEL_REQUESTED)
+            OrderStatus.CANCEL_FAILED to setOf(OrderStatus.CANCEL_REQUESTED),
+            OrderStatus.REFUNDED to emptySet()
         )
+
+        private val refundableStatuses: Set<OrderStatus> = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
 
         fun create(
             buyerId: Long,
@@ -78,5 +81,16 @@ class Order private constructor(
         return OrderStatus.CANCELLED in allowed || OrderStatus.CANCEL_REQUESTED in allowed
     }
 
+    fun completeRefund() {
+        if (status !in refundableStatuses) {
+            throw OrderInvalidStatusException()
+        }
+        this.status = OrderStatus.REFUNDED
+    }
+
+    fun isRefundable(): Boolean = status in refundableStatuses
+
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
+
+    fun isRefunded(): Boolean = status == OrderStatus.REFUNDED
 }
