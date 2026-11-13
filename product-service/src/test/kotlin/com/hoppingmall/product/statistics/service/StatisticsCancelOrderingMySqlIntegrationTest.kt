@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 
 @DisplayName("결제 완료·취소 이벤트 순서에 따른 상품 통계 MySQL 테스트")
@@ -52,6 +53,9 @@ class StatisticsCancelOrderingMySqlIntegrationTest : MySqlIntegrationTestSupport
     @Autowired
     private lateinit var kafkaEventMapper: KafkaEventMapper
 
+    @Autowired
+    private lateinit var transactionTemplate: TransactionTemplate
+
     private val orderItemQueryPort: OrderItemQueryPort = mock()
 
     private lateinit var consumer: StatisticsEventConsumer
@@ -66,7 +70,8 @@ class StatisticsCancelOrderingMySqlIntegrationTest : MySqlIntegrationTestSupport
             orderItemQueryPort,
             productStatisticsCommandService,
             objectMapper,
-            kafkaEventMapper
+            kafkaEventMapper,
+            transactionTemplate
         )
         productId = createProduct()
         whenever(orderItemQueryPort.findByOrderId(ORDER_ID)).thenReturn(
