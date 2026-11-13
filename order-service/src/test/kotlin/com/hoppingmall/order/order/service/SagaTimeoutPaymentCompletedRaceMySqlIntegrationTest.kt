@@ -12,6 +12,7 @@ import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.event.PaymentCompletedEvent
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.order.support.MySqlJpaTestSupport
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
@@ -54,6 +55,8 @@ class SagaTimeoutPaymentCompletedRaceMySqlIntegrationTest : MySqlJpaTestSupport(
 
     private val sagaCompensationMetrics: SagaCompensationMetrics = mock()
 
+    private val paymentQueryPort: PaymentQueryPort = mock()
+
     private lateinit var inventory: FakeInventory
 
     private lateinit var consumer: OrderSagaConsumer
@@ -82,6 +85,7 @@ class SagaTimeoutPaymentCompletedRaceMySqlIntegrationTest : MySqlJpaTestSupport(
             orderRepository,
             orderItemRepository,
             inventory,
+            paymentQueryPort,
             transactionalEventPublisher,
             transactionTemplate,
             sagaCompensationMetrics

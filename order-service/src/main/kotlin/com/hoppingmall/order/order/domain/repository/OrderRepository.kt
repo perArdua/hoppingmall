@@ -17,5 +17,16 @@ interface OrderRepository : JpaRepository<Order, Long> {
     @Query(value = "SELECT id FROM orders WHERE id = :id FOR UPDATE", nativeQuery = true)
     fun lockById(@Param("id") id: Long): Long?
 
+    @Query(
+        """
+        SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END
+        FROM SagaEventLog s JOIN s.completedSteps step
+        WHERE s.orderId = :orderId
+        AND s.timedOut = false
+        AND step = 'TIMEOUT_CLAIMED'
+    """
+    )
+    fun isHeldBySagaTimeout(@Param("orderId") orderId: Long): Boolean
+
     fun findByStatusAndUpdatedAtBefore(status: OrderStatus, updatedBefore: LocalDateTime, pageable: Pageable): List<Order>
 }

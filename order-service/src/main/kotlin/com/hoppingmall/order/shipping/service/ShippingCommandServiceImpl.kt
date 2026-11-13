@@ -66,6 +66,7 @@ class ShippingCommandServiceImpl(
         shippingId: Long,
         request: ShippingStatusUpdateRequest
     ): ShippingResponse {
+        shippingRepository.lockOrderIdById(shippingId)?.let { orderRepository.lockById(it) }
         val shipping = shippingRepository.findByIdOrNull(shippingId) ?: throw ShippingNotFoundException() 
 
         shipping.updateStatus(request.status)
@@ -74,6 +75,9 @@ class ShippingCommandServiceImpl(
 
         when (request.status) {
             ShippingStatus.IN_TRANSIT -> {
+                if (orderRepository.isHeldBySagaTimeout(shipping.orderId)) {
+                    throw OrderInvalidStatusException()
+                }
                 order.updateStatus(OrderStatus.SHIPPED)
                 publishShippingNotification(
                     shipping = shipping,

@@ -8,6 +8,8 @@ import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentInfo
+import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -50,6 +52,9 @@ class SagaTimeoutSchedulerTest {
     private lateinit var inventoryCommandPort: InventoryCommandPort
 
     @Mock
+    private lateinit var paymentQueryPort: PaymentQueryPort
+
+    @Mock
     private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @Mock
@@ -72,6 +77,7 @@ class SagaTimeoutSchedulerTest {
             orderRepository,
             orderItemRepository,
             inventoryCommandPort,
+            paymentQueryPort,
             transactionalEventPublisher,
             transactionTemplate,
             sagaCompensationMetrics
@@ -120,7 +126,7 @@ class SagaTimeoutSchedulerTest {
     }
 
     @Test
-    fun paymentId가_없는_타임아웃_saga는_userId만_포함하여_역보상을_발행한다() {
+    fun paymentId가_없는_타임아웃_saga는_결제를_조회해_결제_ID와_결제액을_채워_역보상을_발행한다() {
         val saga = SagaEventLog(
             eventId = "payment-completed-txn-4",
             eventType = "PAYMENT_COMPLETED",
@@ -138,6 +144,9 @@ class SagaTimeoutSchedulerTest {
         whenever(sagaEventLogRepository.findById(400L)).thenReturn(Optional.of(saga))
         whenever(orderRepository.findById(4L)).thenReturn(Optional.of(order))
         whenever(sagaEventLogRepository.save(any<SagaEventLog>())).thenAnswer { it.arguments[0] }
+        whenever(paymentQueryPort.findByOrderIdOrThrowIfUnavailable(4L)).thenReturn(
+            PaymentInfo(id = 400L, orderId = 4L, amount = BigDecimal("10000.00"), pointAmount = BigDecimal.ZERO, couponId = null, status = "SUCCESS")
+        )
 
         scheduler.checkTimedOutSagas()
 
@@ -148,7 +157,8 @@ class SagaTimeoutSchedulerTest {
             eventData = check<Any> {
                 @Suppress("UNCHECKED_CAST")
                 val data = it as Map<String, Any?>
-                assertThat(data).doesNotContainKey("paymentId")
+                assertThat(data["paymentId"]).isEqualTo(400L)
+                assertThat(data["amount"]).isEqualTo("10000.00")
                 assertThat(data["userId"]).isEqualTo(40L)
                 assertThat(data["reason"]).isEqualTo("SAGA_TIMEOUT")
             },
