@@ -4,6 +4,7 @@ import io.github.bucket4j.distributed.proxy.ProxyManager
 import io.github.bucket4j.redis.redisson.cas.RedissonBasedProxyManager
 import org.redisson.Redisson
 import org.redisson.api.RedissonClient
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
@@ -13,7 +14,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 @Profile("!test & !loadtest")
 class RateLimitConfig(
-    private val redissonClient: RedissonClient
+    private val redissonClient: RedissonClient,
+    @Value("\${user.rate-limit.trusted-proxy-count:0}")
+    private val trustedProxyCount: Int
 ) : WebMvcConfigurer {
 
     @Bean
@@ -25,7 +28,7 @@ class RateLimitConfig(
 
     @Bean
     fun rateLimitInterceptor(): RateLimitInterceptor {
-        return RateLimitInterceptor(rateLimitProxyManager())
+        return RateLimitInterceptor(rateLimitProxyManager(), trustedProxyCount)
     }
 
     override fun addInterceptors(registry: InterceptorRegistry) {

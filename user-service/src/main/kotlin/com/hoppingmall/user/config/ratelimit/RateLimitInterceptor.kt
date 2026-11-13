@@ -13,8 +13,13 @@ import org.springframework.util.AntPathMatcher
 import org.springframework.web.servlet.HandlerInterceptor
 
 class RateLimitInterceptor(
-    private val proxyManager: ProxyManager<String>
+    private val proxyManager: ProxyManager<String>,
+    private val trustedProxyCount: Int = 0
 ) : HandlerInterceptor {
+
+    init {
+        require(trustedProxyCount >= 0) { "user.rate-limit.trusted-proxy-count는 0 이상이어야 합니다: $trustedProxyCount" }
+    }
 
     private val pathMatcher = AntPathMatcher()
 
@@ -52,14 +57,27 @@ class RateLimitInterceptor(
 
     private fun resolveKey(policy: RateLimitPolicy, request: HttpServletRequest): String? {
         return when (policy.keyType) {
-            RateLimitKeyType.IP -> request.getHeader("X-Forwarded-For")?.split(",")?.first()?.trim()
-                ?: request.remoteAddr
+            RateLimitKeyType.IP -> resolveClientIp(request)
             RateLimitKeyType.USER_ID -> {
                 val auth = SecurityContextHolder.getContext().authentication ?: return null
                 val principal = auth.principal as? UserPrincipal ?: return null
                 principal.getUserId().toString()
             }
         }
+    }
+
+    private fun resolveClientIp(request: HttpServletRequest): String {
+        if (trustedProxyCount == 0) {
+            return request.remoteAddr
+        }
+        val forwarded = request.getHeaders(FORWARDED_FOR_HEADER).toList()
+            .flatMap { it.split(",") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        if (forwarded.size < trustedProxyCount) {
+            return request.remoteAddr
+        }
+        return forwarded[forwarded.size - trustedProxyCount]
     }
 
     private fun buildConfiguration(policy: RateLimitPolicy): BucketConfiguration {
@@ -71,5 +89,9 @@ class RateLimitInterceptor(
                     .build()
             )
             .build()
+    }
+
+    companion object {
+        private const val FORWARDED_FOR_HEADER = "X-Forwarded-For"
     }
 }
