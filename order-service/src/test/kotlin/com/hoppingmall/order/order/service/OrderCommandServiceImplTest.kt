@@ -523,7 +523,7 @@ class OrderCommandServiceImplTest {
             1L,
             com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.SHIPPED),
             10L,
-            false
+            true
         )
 
         assertThat(result.status).isEqualTo(OrderStatus.SHIPPED)

@@ -19,13 +19,16 @@ import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
+import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
+import com.hoppingmall.order.order.exception.OrderTotalAmountExceededException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
+import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -66,15 +69,18 @@ class OrderCommandServiceImpl(
         }
 
         val productIds = cartItems.map { it.productId }.distinct()
-        val productMap = productQueryPort.findProductsByIds(productIds).associateBy { it.id }
+        val productMap = findProducts(productIds).associateBy { it.id }
         productIds.forEach { productId ->
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
 
+        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
+        if (totalAmount > Order.MAX_TOTAL_AMOUNT) {
+            throw OrderTotalAmountExceededException()
+        }
+
         val items = cartItems.groupBy { it.productId }.map { (productId, rows) -> productId to rows.sumOf { it.quantity } }
         val reservationMap = reserveStock(items)
-
-        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
 
         val fence = reservationFence?.takeIf { it.enabled }
         return try {
@@ -123,6 +129,13 @@ class OrderCommandServiceImpl(
         orderMetrics.recordOrderCreated(totalAmount)
         return response
     }
+
+    private fun findProducts(productIds: List<Long>): List<ProductInfo> =
+        try {
+            productQueryPort.findProductsByIds(productIds)
+        } catch (e: ProductQueryUnavailableException) {
+            throw OrderProductUnavailableException()
+        }
 
     private fun reserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
         try {
@@ -206,11 +219,12 @@ class OrderCommandServiceImpl(
     override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
-        if (order.buyerId != userId && !isAdmin) {
+        if (!isAdmin) {
             throw OrderAccessDeniedException()
         }
 
         order.updateStatus(request.status)
+        log.info("주문 상태 변경: orderId={}, userId={}, status={}", orderId, userId, request.status)
 
         val orderItems = orderItemRepository.findByOrderId(orderId)
         return OrderResponse.from(order, orderItems)

@@ -11,8 +11,10 @@ import com.hoppingmall.order.cartItem.exception.CartItemConcurrentAddException
 import com.hoppingmall.order.cartItem.exception.CartItemInvalidQuantityException
 import com.hoppingmall.order.cartItem.exception.CartItemNotFoundException
 import com.hoppingmall.order.cartItem.exception.CartItemProductNotFoundException
+import com.hoppingmall.order.cartItem.exception.CartItemProductUnavailableException
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
+import com.hoppingmall.order.port.ProductQueryUnavailableException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.stereotype.Service
@@ -26,8 +28,7 @@ class CartItemCommandServiceImpl(
 ) : CartItemCommandService {
 
     override fun addCartItem(buyerId: Long, request: CartItemCreateRequest): CartItemResponse {
-        val product = productQueryPort.findProductById(request.productId)
-            ?: throw CartItemProductNotFoundException()
+        val product = findProduct(request.productId) ?: throw CartItemProductNotFoundException()
 
         val existingCartItem = cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)
 
@@ -39,6 +40,13 @@ class CartItemCommandServiceImpl(
 
         return CartItemResponse.from(cartItem)
     }
+
+    private fun findProduct(productId: Long): ProductInfo? =
+        try {
+            productQueryPort.findProductById(productId)
+        } catch (e: ProductQueryUnavailableException) {
+            throw CartItemProductUnavailableException()
+        }
 
     private fun updateExistingCartItem(existingCartItem: CartItem, additionalQuantity: Int): CartItem {
         existingCartItem.updateQuantity(validQuantity(existingCartItem.quantity.toLong() + additionalQuantity))
