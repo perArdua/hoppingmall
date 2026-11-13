@@ -132,16 +132,16 @@ class OrderCancellationResultConsumer(
             return
         }
 
-        transactionTemplate.execute {
+        val transitioned = transactionTemplate.execute {
             val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=$orderId")
-                return@execute
+                return@execute false
             }
 
             if (order.status != OrderStatus.CANCEL_REQUESTED) {
                 logger.warn("CANCEL_REQUESTED가 아닌 주문: orderId=$orderId, status=${order.status}")
-                return@execute
+                return@execute false
             }
 
             order.updateStatus(OrderStatus.CANCEL_FAILED)
@@ -171,8 +171,11 @@ class OrderCancellationResultConsumer(
                 topic = KafkaTopics.NOTIFICATION,
                 partitionKey = orderId.toString()
             )
+            true
         }
 
-        logger.warn("결제 취소 실패 처리: orderId=$orderId, CANCEL_FAILED 전환, 사유=$reason")
+        if (transitioned == true) {
+            logger.warn("결제 취소 실패 처리: orderId=$orderId, CANCEL_FAILED 전환, 사유=$reason")
+        }
     }
 }

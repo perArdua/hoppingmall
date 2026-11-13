@@ -24,6 +24,14 @@ class CartItemQueryServiceImpl(
     var productQueryPort: ProductQueryPort? = null
 
     override fun getCartItems(buyerId: Long, pageable: Pageable): Slice<CartItemResponse> {
+        var page = sellingCartItems(buyerId, pageable)
+        while (page.content.isEmpty() && page.hasNext()) {
+            page = sellingCartItems(buyerId, page.nextPageable())
+        }
+        return page
+    }
+
+    private fun sellingCartItems(buyerId: Long, pageable: Pageable): Slice<CartItemResponse> {
         val cartItems = cartItemRepository.findByBuyerId(buyerId, pageable)
         val sellingProductIds = sellingProductIds(cartItems.content.map { it.productId }.distinct())
         val responses = cartItems.content
