@@ -1,11 +1,7 @@
 package com.hoppingmall.dlq.publisher
 
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
-import org.springframework.stereotype.Component
 
-@Component
-@ConditionalOnMissingBean(KafkaDLQMessagePublisher::class)
 class NoOpDLQMessagePublisher : DLQMessagePublisher {
 
     private val log = LoggerFactory.getLogger(javaClass)
