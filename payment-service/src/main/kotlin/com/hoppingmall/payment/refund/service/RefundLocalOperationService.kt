@@ -60,6 +60,13 @@ class RefundLocalOperationService(
                 paymentId = event.paymentId,
                 orderId = event.orderId
             )
+            refundPointsService.reclaimForRefund(
+                userId = event.buyerId,
+                paymentId = event.paymentId,
+                refundId = event.refundId,
+                refundAmount = event.refundAmount,
+                isFullRefund = event.isFullRefund
+            )
             eventLog.markStepCompleted(RefundEventLog.POINTS_REFUNDED)
         }
 

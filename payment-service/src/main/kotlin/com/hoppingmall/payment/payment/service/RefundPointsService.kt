@@ -9,6 +9,7 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 @Service
 class RefundPointsService(
@@ -31,6 +32,31 @@ class RefundPointsService(
 
     @Transactional
     fun reclaimForRefund(userId: Long, paymentId: Long, refundId: Long, refundAmount: BigDecimal, isFullRefund: Boolean) {
+        val eventId = refundEventIdPrefix(paymentId) + refundId
+        if (pointHistoryRepository.existsByEventId(eventId)) return
+
+        val earnHistory = findEarnHistory(paymentId) ?: return
+        val remaining = remainingEarned(paymentId, earnHistory)
+        val target = if (isFullRefund) {
+            remaining
+        } else {
+            proportionalEarned(paymentId, earnHistory.amount, refundAmount).min(remaining)
+        }
+
+        reclaim(
+            userId = userId,
+            paymentId = paymentId,
+            target = target,
+            eventId = eventId,
+            reason = "환불 포인트 회수"
+        )
+    }
+
+    private fun proportionalEarned(paymentId: Long, earnedAmount: BigDecimal, refundAmount: BigDecimal): BigDecimal {
+        val payment = paymentRepository?.findByIdOrNull(paymentId) ?: return BigDecimal.ZERO
+        val orderAmount = payment.amount.add(payment.couponDiscountAmount)
+        if (orderAmount <= BigDecimal.ZERO) return BigDecimal.ZERO
+        return earnedAmount.multiply(refundAmount).divide(orderAmount, 2, RoundingMode.DOWN)
     }
 
     private fun findEarnHistory(paymentId: Long): PointHistory? {
