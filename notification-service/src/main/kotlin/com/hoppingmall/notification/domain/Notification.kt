@@ -3,6 +3,8 @@ package com.hoppingmall.notification.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.notification.enums.NotificationType
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -20,7 +22,8 @@ class Notification(
     val userId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     val type: NotificationType,
 
     @Column(nullable = false)
