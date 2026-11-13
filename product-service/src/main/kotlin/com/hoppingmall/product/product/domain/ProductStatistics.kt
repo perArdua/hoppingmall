@@ -160,6 +160,14 @@ class ProductStatistics private constructor(
         this.lastAggregatedAt = LocalDateTime.now()
     }
 
+    fun refreshDerivedMetrics() {
+        this.refundRate = calculateRefundRate(this.totalRefundQuantity, this.totalSalesQuantity)
+        this.stockTurnoverRate = calculateStockTurnoverRate(this.totalSalesQuantity, this.currentStock)
+        this.netRevenue = this.totalSalesAmount.subtract(this.totalRefundAmount)
+        this.averageOrderAmount = calculateAverageOrderAmount(this.totalSalesAmount, this.orderCount)
+        this.lastAggregatedAt = LocalDateTime.now()
+    }
+
     fun resetToday() {
         this.todaySalesQuantity = 0
         this.todaySalesAmount = BigDecimal.ZERO

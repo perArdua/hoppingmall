@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -21,6 +22,61 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.productId = :productId")
     fun findByProductIdForUpdate(@Param("productId") productId: Long): ProductStatistics?
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE ProductStatistics ps
+        SET ps.totalSalesQuantity = ps.totalSalesQuantity + :quantity,
+            ps.totalSalesAmount = ps.totalSalesAmount + :amount,
+            ps.todaySalesQuantity = ps.todaySalesQuantity + :quantity,
+            ps.todaySalesAmount = ps.todaySalesAmount + :amount,
+            ps.todayOrderCount = ps.todayOrderCount + 1,
+            ps.orderCount = ps.orderCount + 1
+        WHERE ps.productId = :productId
+        """
+    )
+    fun addSales(
+        @Param("productId") productId: Long,
+        @Param("quantity") quantity: Long,
+        @Param("amount") amount: BigDecimal
+    ): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE ProductStatistics ps
+        SET ps.totalSalesQuantity = CASE WHEN ps.totalSalesQuantity > :quantity THEN ps.totalSalesQuantity - :quantity ELSE 0 END,
+            ps.totalSalesAmount = CASE WHEN ps.totalSalesAmount > :amount THEN ps.totalSalesAmount - :amount ELSE 0 END,
+            ps.todaySalesQuantity = CASE WHEN ps.todaySalesQuantity > :quantity THEN ps.todaySalesQuantity - :quantity ELSE 0 END,
+            ps.todaySalesAmount = CASE WHEN ps.todaySalesAmount > :amount THEN ps.todaySalesAmount - :amount ELSE 0 END,
+            ps.todayOrderCount = CASE WHEN ps.todayOrderCount > 0 THEN ps.todayOrderCount - 1 ELSE 0 END,
+            ps.orderCount = CASE WHEN ps.orderCount > 0 THEN ps.orderCount - 1 ELSE 0 END
+        WHERE ps.productId = :productId
+        """
+    )
+    fun subtractSales(
+        @Param("productId") productId: Long,
+        @Param("quantity") quantity: Long,
+        @Param("amount") amount: BigDecimal
+    ): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE ProductStatistics ps
+        SET ps.totalRefundQuantity = ps.totalRefundQuantity + :quantity,
+            ps.totalRefundAmount = ps.totalRefundAmount + :amount,
+            ps.todayRefundQuantity = ps.todayRefundQuantity + :quantity,
+            ps.todayRefundAmount = ps.todayRefundAmount + :amount
+        WHERE ps.productId = :productId
+        """
+    )
+    fun addRefund(
+        @Param("productId") productId: Long,
+        @Param("quantity") quantity: Long,
+        @Param("amount") amount: BigDecimal
+    ): Int
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.id IN :ids ORDER BY ps.id")

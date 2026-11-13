@@ -30,23 +30,26 @@ class ProductStatisticsCommandServiceImpl(
 
     @Transactional
     override fun incrementSalesStats(productId: Long, quantity: Long, amount: BigDecimal) {
-        val stats = getOrCreateStatistics(productId)
-        stats.incrementSales(quantity, amount)
-        productStatisticsRepository.save(stats)
+        if (productStatisticsRepository.addSales(productId, quantity, amount) == 0) {
+            createStatistics(productId)
+            productStatisticsRepository.addSales(productId, quantity, amount)
+        }
+        refreshDerivedMetrics(productId)
     }
 
     @Transactional
     override fun decrementSalesStats(productId: Long, quantity: Long, amount: BigDecimal) {
-        val stats = productStatisticsRepository.findByProductId(productId) ?: return
-        stats.decrementSales(quantity, amount)
-        productStatisticsRepository.save(stats)
+        if (productStatisticsRepository.subtractSales(productId, quantity, amount) == 0) return
+        refreshDerivedMetrics(productId)
     }
 
     @Transactional
     override fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal) {
-        val stats = getOrCreateStatistics(productId)
-        stats.incrementRefund(quantity, amount)
-        productStatisticsRepository.save(stats)
+        if (productStatisticsRepository.addRefund(productId, quantity, amount) == 0) {
+            createStatistics(productId)
+            productStatisticsRepository.addRefund(productId, quantity, amount)
+        }
+        refreshDerivedMetrics(productId)
     }
 
     override fun flushDailySnapshot() {
@@ -162,10 +165,11 @@ class ProductStatisticsCommandServiceImpl(
         private const val CLOSED_DAY_OFFSET = 1L
     }
 
-    private fun getOrCreateStatistics(productId: Long): ProductStatistics {
-        val existing = productStatisticsRepository.findByProductId(productId)
-        if (existing != null) return existing
+    private fun refreshDerivedMetrics(productId: Long) {
+        productStatisticsRepository.findByProductIdForUpdate(productId)?.refreshDerivedMetrics()
+    }
 
+    private fun createStatistics(productId: Long): ProductStatistics {
         val product = productRepository.findByIdOrNull(productId)
             ?: productRepository.findIncludingDeletedById(productId)
             ?: throw IllegalArgumentException("상품을 찾을 수 없습니다: $productId")
