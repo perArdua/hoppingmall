@@ -1,5 +1,7 @@
 package com.hoppingmall.product.internal
 
+import com.hoppingmall.product.internal.enums.AppliedRequestOperation
+import com.hoppingmall.product.internal.service.AppliedRequestKeyGuard
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.inventory.service.InventoryCommandService
 import com.hoppingmall.product.inventory.service.ReserveDeadline
@@ -10,7 +12,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/internal/api/v1/inventory")
 class InternalInventoryController(
-    private val inventoryCommandService: InventoryCommandService
+    private val inventoryCommandService: InventoryCommandService,
+    private val appliedRequestKeyGuard: AppliedRequestKeyGuard
 ) {
 
     @Value("\${inventory.link-check.enabled:false}")
@@ -23,8 +26,18 @@ class InternalInventoryController(
     }
 
     @PostMapping("/{productId}/increase")
-    fun increaseStock(@PathVariable productId: Long, @RequestParam quantity: Int): ResponseEntity<Void> {
-        inventoryCommandService.increaseStock(productId, quantity)
+    fun increaseStock(
+        @PathVariable productId: Long,
+        @RequestParam quantity: Int,
+        @RequestHeader(name = AppliedRequestKeyGuard.REQUEST_KEY_HEADER, required = false) requestKey: String? = null
+    ): ResponseEntity<Void> {
+        if (requestKey == null) {
+            inventoryCommandService.increaseStock(productId, quantity)
+        } else {
+            appliedRequestKeyGuard.applyOnce(AppliedRequestOperation.INVENTORY_INCREASE, requestKey) {
+                inventoryCommandService.increaseStock(productId, quantity)
+            }
+        }
         return ResponseEntity.ok().build()
     }
 

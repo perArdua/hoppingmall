@@ -1,5 +1,6 @@
 package com.hoppingmall.product.internal
 
+import com.hoppingmall.product.internal.service.AppliedRequestKeyGuard
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -21,6 +22,9 @@ class InternalProductStatisticsControllerTest {
 
     @Mock
     private lateinit var productStatisticsCommandService: ProductStatisticsCommandService
+
+    @Mock
+    private lateinit var appliedRequestKeyGuard: AppliedRequestKeyGuard
 
     @InjectMocks
     private lateinit var controller: InternalProductStatisticsController

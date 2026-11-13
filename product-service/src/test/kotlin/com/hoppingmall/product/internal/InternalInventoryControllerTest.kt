@@ -1,5 +1,6 @@
 package com.hoppingmall.product.internal
 
+import com.hoppingmall.product.internal.service.AppliedRequestKeyGuard
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.inventory.service.InventoryCommandService
 import org.assertj.core.api.Assertions.assertThat
@@ -22,6 +23,9 @@ class InternalInventoryControllerTest {
 
     @Mock
     private lateinit var inventoryCommandService: InventoryCommandService
+
+    @Mock
+    private lateinit var appliedRequestKeyGuard: AppliedRequestKeyGuard
 
     @InjectMocks
     private lateinit var controller: InternalInventoryController
