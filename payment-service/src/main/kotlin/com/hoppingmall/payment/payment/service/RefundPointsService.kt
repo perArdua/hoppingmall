@@ -68,9 +68,10 @@ class RefundPointsService(
     }
 
     private fun remainingEarned(paymentId: Long, earnHistory: PointHistory): BigDecimal {
-        val reclaimed = pointHistoryRepository.findAllByPaymentIdAndType(paymentId, PointType.REFUND)
+        val legacyReclaims = pointHistoryRepository.findAllByPaymentIdAndType(paymentId, PointType.REFUND)
             .filter { it.eventId == cancelEventId(paymentId) || it.eventId?.startsWith(refundEventIdPrefix(paymentId)) == true }
-            .sumOf { it.amount }
+        val reclaimed = (pointHistoryRepository.findAllByPaymentIdAndType(paymentId, PointType.RECLAIM) + legacyReclaims)
+            .sumOf { it.amount.abs() }
         return earnHistory.amount.subtract(reclaimed).max(BigDecimal.ZERO)
     }
 
@@ -85,8 +86,8 @@ class RefundPointsService(
         pointHistoryRepository.save(
             PointHistory(
                 userId = userId,
-                amount = reclaimed,
-                type = PointType.REFUND,
+                amount = reclaimed.negate(),
+                type = PointType.RECLAIM,
                 reason = if (shortfall > BigDecimal.ZERO) "$reason (잔액 부족으로 ${shortfall.toPlainString()} 미회수)" else reason,
                 paymentId = paymentId,
                 eventId = eventId

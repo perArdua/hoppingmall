@@ -53,7 +53,7 @@ WHERE uc.deleted_at IS NULL
   AND uc.status = 'USED'
   AND p.id IS NULL;
 
--- @INV INV-5 | 결제가 SUCCESS가 아닌데 적립(EARN) 포인트가 회수(REFUND)되지 않음
+-- @INV INV-5 | 결제가 SUCCESS가 아닌데 적립(EARN) 포인트가 회수(RECLAIM, 이전 형식 REFUND)되지 않음
 SELECT h.id AS point_history_id, h.user_id, h.payment_id, h.amount, p.status AS payment_status
 FROM payment_db.point_histories h
 JOIN payment_db.payments p ON p.id = h.payment_id AND p.deleted_at IS NULL
@@ -62,7 +62,7 @@ WHERE h.deleted_at IS NULL
   AND p.status <> 'SUCCESS'
   AND NOT EXISTS (
     SELECT 1 FROM payment_db.point_histories r
-    WHERE r.payment_id = h.payment_id AND r.type = 'REFUND' AND r.deleted_at IS NULL
+    WHERE r.payment_id = h.payment_id AND r.type IN ('RECLAIM', 'REFUND') AND r.deleted_at IS NULL
   );
 
 -- @INV INV-6 | 한 주문에 SUCCESS 결제가 2건 이상
