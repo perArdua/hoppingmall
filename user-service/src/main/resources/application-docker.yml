@@ -17,7 +17,7 @@ spring:
     url: jdbc:mysql://mysql:3306/user_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
-    password: root
+    password: ${MYSQL_ROOT_PASSWORD}
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
@@ -50,7 +50,7 @@ management:
 
 internal:
   service:
-    token: ${INTERNAL_SERVICE_TOKEN:dev-internal-token-2026}
+    token: ${INTERNAL_SERVICE_TOKEN}
 
 grpc:
   server:
