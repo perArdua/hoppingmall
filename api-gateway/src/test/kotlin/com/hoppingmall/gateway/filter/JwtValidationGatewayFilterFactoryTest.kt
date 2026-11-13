@@ -100,7 +100,7 @@ class JwtValidationGatewayFilterFactoryTest {
     }
 
     @Test
-    fun role_클레임이_없으면_기본값_BUYER가_x_user_role_헤더에_설정된다() {
+    fun role_클레임이_없으면_기본값_BUYER로_채우지_않고_401을_반환한다() {
         val tokenWithoutRole = Jwts.builder()
             .setSubject("99")
             .setExpiration(Date(System.currentTimeMillis() + 60_000))
@@ -114,7 +114,8 @@ class JwtValidationGatewayFilterFactoryTest {
 
         factory.apply(config).filter(exchange, chainCapturing(captured)).block()
 
-        assertThat(captured[0].request.headers.getFirst("x-user-role")).isEqualTo("BUYER")
+        assertThat(exchange.response.statusCode).isEqualTo(HttpStatus.UNAUTHORIZED)
+        assertThat(captured).isEmpty()
     }
 
     @Test
