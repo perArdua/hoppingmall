@@ -9,10 +9,14 @@ import com.hoppingmall.user.dto.request.UpdateUserRequest
 import com.hoppingmall.user.dto.response.SignInResponse
 import com.hoppingmall.user.dto.response.SignUpResponse
 import com.hoppingmall.user.dto.response.UserProfileResponse
+import com.hoppingmall.user.exception.user.LoginAttemptsExceededException
 import com.hoppingmall.user.service.UserCommandService
 import com.hoppingmall.user.service.UserQueryService
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
@@ -24,6 +28,8 @@ class UserController(
     private val userQueryService: UserQueryService,
     private val authService: AuthService
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @PostMapping("/signup")
     fun signUp(
@@ -58,5 +64,14 @@ class UserController(
         val userId = principal.getUserId()
         userCommandService.updateUserProfile(userId, request)
         return ApiResponse.success(Unit)
+    }
+
+    @ExceptionHandler(LoginAttemptsExceededException::class)
+    fun handleLoginAttemptsExceeded(ex: LoginAttemptsExceededException): ResponseEntity<ApiResponse<Unit>> {
+        val retryAfterSeconds = (ex.retryAfter.toMillis() + 999) / 1000
+        log.warn("BusinessException: code={}, message={}, retryAfterSeconds={}", ex.errorCode.code, ex.errorCode.message, retryAfterSeconds)
+        return ResponseEntity.status(ex.errorCode.status)
+            .header(HttpHeaders.RETRY_AFTER, retryAfterSeconds.toString())
+            .body(ApiResponse.failure(ex.errorCode))
     }
 }

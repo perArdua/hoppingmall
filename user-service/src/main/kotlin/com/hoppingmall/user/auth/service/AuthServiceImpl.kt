@@ -32,8 +32,9 @@ class AuthServiceImpl(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun login(request: SignInRequest): SignInResponse {
-        if (loginAttemptLimiter.isBlocked(request.email)) {
-            throw LoginAttemptsExceededException()
+        val remainingBlock = loginAttemptLimiter.remainingBlock(request.email)
+        if (!remainingBlock.isZero) {
+            throw LoginAttemptsExceededException(remainingBlock)
         }
         val user = try {
             userQueryService.authenticate(request)

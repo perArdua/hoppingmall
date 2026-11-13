@@ -15,10 +15,11 @@ class RedisLoginAttemptLimiter(
     private val clock: Clock
 ) : LoginAttemptLimiter {
 
-    override fun isBlocked(email: String): Boolean {
+    override fun remainingBlock(email: String): Duration {
         val blockedUntil = redissonClient.getBucket<String>(blockedKey(email), StringCodec.INSTANCE).get()
-            ?: return false
-        return clock.millis() < blockedUntil.toLong()
+            ?: return Duration.ZERO
+        val remainingMillis = blockedUntil.toLong() - clock.millis()
+        return if (remainingMillis > 0) Duration.ofMillis(remainingMillis) else Duration.ZERO
     }
 
     override fun recordFailure(email: String) {

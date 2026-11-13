@@ -1,3 +1,7 @@
 package com.hoppingmall.user.exception.user
 
-class LoginAttemptsExceededException : UserException(UserErrorCode.LOGIN_ATTEMPTS_EXCEEDED)
+import java.time.Duration
+
+class LoginAttemptsExceededException(
+    val retryAfter: Duration
+) : UserException(UserErrorCode.LOGIN_ATTEMPTS_EXCEEDED)
