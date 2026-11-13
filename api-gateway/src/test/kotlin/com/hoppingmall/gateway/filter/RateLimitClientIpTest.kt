@@ -84,8 +84,8 @@ class RateLimitClientIpTest {
     }
 
     @Test
-    fun 주소가_믿는_프록시_단수보다_적으면_가장_왼쪽_주소를_쓴다() {
-        assertThat(limitKeyOf(3, login("203.0.113.7, 10.0.0.9"))).isEqualTo("rl:login:203.0.113.7")
+    fun 주소가_믿는_프록시_단수보다_적으면_연결_주소를_쓴다() {
+        assertThat(limitKeyOf(3, login("203.0.113.7, 10.0.0.9"))).isEqualTo("rl:login:10.0.0.5")
     }
 
     @Test
