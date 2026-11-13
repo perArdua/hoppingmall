@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -135,6 +136,44 @@ class OperationalRouteAccessTest {
     fun ADMIN이_아니면_payment_DLQ_관리_경로도_403이고_뒷단에_닿지_않는다(role: String) {
         webTestClient.get()
             .uri("/api/v1/admin/dlq/payment/stats")
+            .header("Authorization", "Bearer ${token(role)}")
+            .exchange()
+            .expectStatus().isForbidden
+
+        assertThat(received).isEmpty()
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "/api/v1/admin/product-statistics/products/1, product",
+        "/api/v1/admin/coupons, payment",
+        "/api/v1/admin/settlements, settlement",
+        "/api/v1/admin/sellers/1/approve, user"
+    )
+    fun ADMIN은_관리자_경로로_그_서비스에_닿는다(path: String, service: String) {
+        webTestClient.get()
+            .uri(path)
+            .header("Authorization", "Bearer ${token("ADMIN")}")
+            .exchange()
+            .expectStatus().isOk
+
+        assertThat(received).containsExactly("$service GET $path")
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "/api/v1/admin/product-statistics/products/1, BUYER",
+        "/api/v1/admin/product-statistics/products/1, SELLER",
+        "/api/v1/admin/coupons, BUYER",
+        "/api/v1/admin/coupons, SELLER",
+        "/api/v1/admin/settlements, BUYER",
+        "/api/v1/admin/settlements, SELLER",
+        "/api/v1/admin/sellers/1/approve, BUYER",
+        "/api/v1/admin/sellers/1/approve, SELLER"
+    )
+    fun ADMIN이_아니면_관리자_경로는_403이고_뒷단에_닿지_않는다(path: String, role: String) {
+        webTestClient.get()
+            .uri(path)
             .header("Authorization", "Bearer ${token(role)}")
             .exchange()
             .expectStatus().isForbidden
