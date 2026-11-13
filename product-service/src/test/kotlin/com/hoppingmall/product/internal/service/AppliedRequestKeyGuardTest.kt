@@ -17,6 +17,7 @@ import org.mockito.Mock
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.check
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -52,7 +53,10 @@ class AppliedRequestKeyGuardTest {
         guard.applyOnce(OPERATION, KEY) { applied++ }
 
         assertThat(applied).isEqualTo(1)
-        verify(appliedRequestKeyRepository).saveAndFlush(any<AppliedRequestKey>())
+        verify(appliedRequestKeyRepository).saveAndFlush(check<AppliedRequestKey> {
+            assertThat(it.operation).isEqualTo(OPERATION.name)
+            assertThat(it.requestKey).isEqualTo(KEY)
+        })
     }
 
     @Test
