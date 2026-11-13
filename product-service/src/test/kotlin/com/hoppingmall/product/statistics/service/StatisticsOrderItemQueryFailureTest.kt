@@ -113,6 +113,7 @@ class StatisticsOrderItemQueryFailureTest {
 
     @Test
     fun 주문_항목_조회가_실패하면_역보상_이벤트를_처리_완료로_남기지_않고_예외로_끝낸다() {
+        whenever(statisticsEventLogRepository.existsByOrderIdAndEventType(ORDER_ID, "PaymentCompleted")).thenReturn(true)
         orderService.failure = Status.UNAVAILABLE.withDescription("order 연결 불가")
 
         val result = runCatching { consumer.handlePaymentReversal(REVERSAL_MESSAGE) }

@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository
 @Repository
 interface StatisticsEventLogRepository : JpaRepository<StatisticsEventLog, Long> {
     fun existsByEventId(eventId: String): Boolean
+
+    fun existsByOrderIdAndEventType(orderId: Long, eventType: String): Boolean
 }

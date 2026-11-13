@@ -110,6 +110,7 @@ class StatisticsEventConsumerTest {
         )
 
         whenever(statisticsEventLogRepository.existsByEventId("rev-1")).thenReturn(false)
+        whenever(statisticsEventLogRepository.existsByOrderIdAndEventType(10L, "PaymentCompleted")).thenReturn(true)
         whenever(orderItemQueryPort.findByOrderId(10L)).thenReturn(items)
         whenever(statisticsEventLogRepository.save(any<StatisticsEventLog>())).thenAnswer { it.arguments[0] }
 
