@@ -4,6 +4,7 @@ import com.hoppingmall.payment.coupon.service.CouponCommandService
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.service.PaymentEventService
+import com.hoppingmall.payment.payment.service.PaymentNotificationService
 import com.hoppingmall.payment.payment.service.RefundPointsService
 import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.refund.domain.RefundEventLog
@@ -20,7 +21,8 @@ class RefundLocalOperationService(
     private val couponCommandService: CouponCommandService,
     private val refundEventLogRepository: RefundEventLogRepository,
     private val refundPointsService: RefundPointsService,
-    private val paymentEventService: PaymentEventService
+    private val paymentEventService: PaymentEventService,
+    private val paymentNotificationService: PaymentNotificationService
 ) {
 
     @Transactional
@@ -74,6 +76,14 @@ class RefundLocalOperationService(
             refundedPayment?.let {
                 paymentEventService.publishMembershipRefundRevertEvent(it, event.refundId, event.refundAmount)
             }
+            paymentNotificationService.publishRefundCompletedNotification(
+                refundId = event.refundId,
+                orderId = event.orderId,
+                paymentId = event.paymentId,
+                userId = event.buyerId,
+                refundAmount = event.refundAmount,
+                transactionId = refundedPayment?.transactionId
+            )
             eventLog.markStepCompleted(RefundEventLog.POINTS_REFUNDED)
         }
 

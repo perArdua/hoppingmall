@@ -6,6 +6,7 @@ import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.common.NotificationType
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
+import java.math.BigDecimal
 
 @Service
 class PaymentNotificationService(
@@ -102,6 +103,44 @@ class PaymentNotificationService(
             eventData = eventData,
             topic = KafkaTopics.NOTIFICATION,
             partitionKey = payment.userId.toString()
+        )
+    }
+
+    fun publishRefundCompletedNotification(
+        refundId: Long,
+        orderId: Long,
+        paymentId: Long,
+        userId: Long,
+        refundAmount: BigDecimal,
+        transactionId: String?
+    ) {
+        val eventId = "refund-completed-notification-$refundId"
+        val amount = refundAmount.toPlainString()
+        val metadata = objectMapper.writeValueAsString(
+            mapOf(
+                "orderId" to orderId,
+                "paymentId" to paymentId,
+                "amount" to amount,
+                "transactionId" to transactionId
+            )
+        )
+
+        val eventData = notificationEventFactory.createNotificationEventData(
+            eventId = eventId,
+            userId = userId,
+            type = NotificationType.REFUND_COMPLETED,
+            title = "환불이 완료되었습니다",
+            content = "주문번호 ${orderId}의 환불이 완료되었습니다. 환불 금액: ${amount}원",
+            metadata = metadata
+        )
+
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Payment",
+            aggregateId = paymentId.toString(),
+            eventType = "RefundCompletedNotificationRequested",
+            eventData = eventData,
+            topic = KafkaTopics.NOTIFICATION,
+            partitionKey = userId.toString()
         )
     }
 }
