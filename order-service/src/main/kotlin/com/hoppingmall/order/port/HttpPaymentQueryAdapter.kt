@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
 import java.time.Duration
 
@@ -33,6 +34,18 @@ class HttpPaymentQueryAdapter(
         )
     }
 
+    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByOrderIdOrThrowIfUnavailableFallback")
+    @Retry(name = "payment-query")
+    override fun findByOrderIdOrThrowIfUnavailable(orderId: Long): PaymentInfo? =
+        try {
+            restTemplate.getForObject(
+                "$paymentServiceUrl/internal/api/v1/payments/by-order/$orderId",
+                PaymentInfo::class.java
+            )
+        } catch (e: HttpClientErrorException.NotFound) {
+            null
+        }
+
     @CircuitBreaker(name = "payment-query", fallbackMethod = "findByIdFallback")
     @Retry(name = "payment-query")
     override fun findById(paymentId: Long): PaymentInfo? {
@@ -45,6 +58,11 @@ class HttpPaymentQueryAdapter(
     private fun findByOrderIdFallback(orderId: Long, e: Exception): PaymentInfo? {
         logger.warn("CB fallback: 주문별 결제 조회 실패 orderId=$orderId", e)
         return null
+    }
+
+    private fun findByOrderIdOrThrowIfUnavailableFallback(orderId: Long, e: Exception): PaymentInfo? {
+        logger.warn("CB fallback: 주문별 결제 조회 불가 orderId=$orderId", e)
+        throw PaymentQueryUnavailableException("주문별 결제 조회 실패 orderId=$orderId", e)
     }
 
     private fun findByIdFallback(paymentId: Long, e: Exception): PaymentInfo? {

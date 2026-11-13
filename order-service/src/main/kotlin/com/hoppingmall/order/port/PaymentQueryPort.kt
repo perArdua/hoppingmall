@@ -4,6 +4,7 @@ import java.math.BigDecimal
 
 interface PaymentQueryPort {
     fun findByOrderId(orderId: Long): PaymentInfo?
+    fun findByOrderIdOrThrowIfUnavailable(orderId: Long): PaymentInfo?
     fun findById(paymentId: Long): PaymentInfo?
 }
 
