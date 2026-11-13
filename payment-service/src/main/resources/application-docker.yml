@@ -63,3 +63,7 @@ grpc:
     user-service:
       address: dns:///user-service:9082
       negotiation-type: plaintext
+
+coupon:
+  reconciliation:
+    enabled: true
