@@ -155,10 +155,10 @@ class PaymentCancelTransactionIdTest {
 
         val eventTypes = argumentCaptor<String>()
         val eventData = argumentCaptor<Any>()
-        verify(transactionalEventPublisher, times(2)).publishEvent(
+        verify(transactionalEventPublisher, times(3)).publishEvent(
             any(), any(), eventTypes.capture(), eventData.capture(), any(), anyOrNull()
         )
-        assertThat(eventTypes.allValues).containsExactly("PaymentCancelled", "PaymentCancellationCompleted")
+        assertThat(eventTypes.allValues).containsExactly("PaymentCancelled", "MembershipRevertRequested", "PaymentCancellationCompleted")
         assertThat((eventData.firstValue as Map<*, *>)["transactionId"]).isEqualTo(transactionId)
         verify(compensationEventLogService).markCompleted("cancel-100-1")
     }

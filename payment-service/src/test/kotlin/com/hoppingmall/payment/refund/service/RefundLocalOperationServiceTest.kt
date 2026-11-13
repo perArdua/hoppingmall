@@ -5,6 +5,7 @@ import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
+import com.hoppingmall.payment.payment.service.PaymentEventService
 import com.hoppingmall.payment.payment.service.RefundPointsService
 import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.refund.domain.RefundEventLog
@@ -44,6 +45,9 @@ class RefundLocalOperationServiceTest {
 
     @Mock
     private lateinit var refundPointsService: RefundPointsService
+
+    @Mock
+    private lateinit var paymentEventService: PaymentEventService
 
     @InjectMocks
     private lateinit var service: RefundLocalOperationService
@@ -147,7 +151,7 @@ class RefundLocalOperationServiceTest {
 
         service.execute(event, eventLog)
 
-        verify(paymentRepository, never()).findById(any())
+        verify(paymentRepository, never()).save(any<Payment>())
         verify(couponCommandService, never()).restoreCouponByOrder(any())
         verify(pointCommandService).refundPoints(
             userId = event.buyerId,
