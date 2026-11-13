@@ -5,6 +5,8 @@ import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.refund.exception.RefundInvalidStatusException
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -33,11 +35,13 @@ class Refund private constructor(
     val sellerId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: RefundStatus = RefundStatus.REQUESTED,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     val reason: RefundReason,
 
     @Column

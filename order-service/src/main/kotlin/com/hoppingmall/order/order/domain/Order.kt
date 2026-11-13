@@ -4,6 +4,8 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 
 @Entity
@@ -19,7 +21,8 @@ class Order private constructor(
     val buyerId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: OrderStatus = OrderStatus.CREATED,
 
     @Column(nullable = false, precision = 10, scale = 2)

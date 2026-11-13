@@ -4,6 +4,8 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import com.hoppingmall.order.shipping.exception.ShippingInvalidStatusException
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -22,7 +24,8 @@ class Shipping private constructor(
     val buyerId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: ShippingStatus = ShippingStatus.PREPARING,
 
     @Column(nullable = false)
