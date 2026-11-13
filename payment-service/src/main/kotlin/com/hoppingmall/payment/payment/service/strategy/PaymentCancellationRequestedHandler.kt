@@ -72,13 +72,21 @@ class PaymentCancellationRequestedHandler(
         val eventId = node.get("eventId")?.asText() ?: return
         val orderId = node.get("orderId")?.asLong() ?: return
 
+        val payment = paymentRepository.findByOrderId(orderId)
         val log = compensationEventLogService.saveIfAbsent(
             eventId = eventId,
             compensationType = "PAYMENT_CANCELLATION_REQUESTED",
-            paymentId = 0L,
+            paymentId = payment?.id ?: 0L,
             orderId = orderId
         )
         if (log.isCompleted()) {
+            return
+        }
+
+        if (payment != null && payment.isCancelled()) {
+            publishCompletedEvent(eventId, orderId, payment.id!!)
+            compensationEventLogService.markCompleted(eventId)
+            logger.warn("결제 취소 재시도 소진, 결제는 이미 취소돼 완료 처리: orderId=$orderId, paymentId=${payment.id}, eventId=$eventId")
             return
         }
 
