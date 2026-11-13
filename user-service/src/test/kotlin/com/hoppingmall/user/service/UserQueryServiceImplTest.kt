@@ -3,7 +3,6 @@ package com.hoppingmall.user.service
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
-import com.hoppingmall.user.common.vo.PasswordNotMatchedException
 import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
@@ -21,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -66,9 +66,11 @@ class UserQueryServiceImplTest {
     @Test
     fun 사용자가_없으면_로그인_예외가_발생한다() {
         whenever(userRepository.findByEmail(Email("missing@example.com"))).thenReturn(null)
+        whenever(passwordEncoder.encode(any())).thenReturn("dummy-encoded-password")
 
         assertThatThrownBy { userQueryService.authenticate(SignInRequest("missing@example.com", "Password1234")) }
             .isInstanceOf(UserLoginFailedException::class.java)
+        verify(passwordEncoder).matches("Password1234", "dummy-encoded-password")
     }
 
     @Test
@@ -81,7 +83,7 @@ class UserQueryServiceImplTest {
         whenever(passwordEncoder.matches("WrongPassword1234", "encoded-password")).thenReturn(false)
 
         assertThatThrownBy { userQueryService.authenticate(SignInRequest(user.email.value, "WrongPassword1234")) }
-            .isInstanceOf(PasswordNotMatchedException::class.java)
+            .isInstanceOf(UserLoginFailedException::class.java)
     }
 
     @Test

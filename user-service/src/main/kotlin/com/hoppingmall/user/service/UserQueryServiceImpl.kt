@@ -21,9 +21,10 @@ class UserQueryServiceImpl(
     override fun authenticate(request: SignInRequest): User {
         val email = Email(request.email)
         val user = userRepository.findByEmail(email)
-            ?: throw UserLoginFailedException()
 
-        passwordVerifier.assertMatches(request.password, user.getPassword())
+        if (!passwordVerifier.matchesStored(request.password, user?.getPassword()) || user == null) {
+            throw UserLoginFailedException()
+        }
 
         return user
     }
