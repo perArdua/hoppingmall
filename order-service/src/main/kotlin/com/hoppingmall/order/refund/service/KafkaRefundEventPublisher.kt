@@ -24,7 +24,15 @@ class KafkaRefundEventPublisher(
                 "buyerId" to event.buyerId,
                 "refundAmount" to event.refundAmount,
                 "pointRefundAmount" to event.pointRefundAmount,
-                "isFullRefund" to event.isFullRefund
+                "isFullRefund" to event.isFullRefund,
+                "couponId" to event.couponId,
+                "items" to event.items.map { item ->
+                    mapOf(
+                        "productId" to item.productId,
+                        "quantity" to item.quantity,
+                        "refundPrice" to item.refundPrice.toPlainString()
+                    )
+                }
             ),
             topic = KafkaTopics.REFUND_COMPLETION,
             partitionKey = event.refundId.toString()
