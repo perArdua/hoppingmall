@@ -32,6 +32,8 @@ class OrderSagaConsumer(
 ) {
     private val logger = LoggerFactory.getLogger(OrderSagaConsumer::class.java)
 
+    private enum class RemoteDecision { CONFIRM, TIMEOUT_OWNED, ORDER_CANCELLED, ORDER_CANCELLING }
+
     @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = "order-saga-service")
     fun handlePaymentCompleted(message: String) {
         val event = kafkaEventMapper.readValue(message, PaymentCompletedEvent::class.java)
@@ -117,6 +119,13 @@ class OrderSagaConsumer(
     }
 
     private fun executeRemotePhase(eventId: String, event: PaymentCompletedEvent, reservationIds: List<String>) {
+        val decision = transactionTemplate.execute { decideUnderOrderLock(eventId, event.orderId, markConfirmed = false) }
+            ?: RemoteDecision.CONFIRM
+        if (decision != RemoteDecision.CONFIRM) {
+            skipConfirmation(eventId, event, reservationIds, decision)
+            return
+        }
+
         val confirmed = try {
             reservationIds.isEmpty() || inventoryCommandPort.confirmReservations(reservationIds)
         } catch (e: Exception) {
@@ -129,12 +138,62 @@ class OrderSagaConsumer(
             return
         }
 
+        val completion = transactionTemplate.execute { decideUnderOrderLock(eventId, event.orderId, markConfirmed = true) }
+            ?: RemoteDecision.CONFIRM
+        if (completion != RemoteDecision.CONFIRM) {
+            logger.warn("재고 확정 중 주문 처리가 넘어가 확정 결과를 따르지 않음: orderId=${event.orderId}, decision=$completion")
+            skipConfirmation(eventId, event, reservationIds, completion)
+            return
+        }
+        logger.info("주문 결제 확정: orderId=${event.orderId}")
+    }
+
+    private fun decideUnderOrderLock(eventId: String, orderId: Long, markConfirmed: Boolean): RemoteDecision {
+        orderRepository.lockById(orderId)
+        val log = sagaEventLogRepository.findByEventId(eventId)
+        if (log != null && log.isTimeoutClaimed()) return RemoteDecision.TIMEOUT_OWNED
+
+        val decision = when (orderRepository.findByIdOrNull(orderId)?.status) {
+            OrderStatus.CANCELLED -> RemoteDecision.ORDER_CANCELLED
+            OrderStatus.CANCEL_REQUESTED, OrderStatus.CANCEL_FAILED -> RemoteDecision.ORDER_CANCELLING
+            else -> RemoteDecision.CONFIRM
+        }
+        if (markConfirmed && decision == RemoteDecision.CONFIRM) {
+            log!!.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+            sagaEventLogRepository.save(log)
+        }
+        return decision
+    }
+
+    private fun skipConfirmation(eventId: String, event: PaymentCompletedEvent, reservationIds: List<String>, decision: RemoteDecision) {
+        when (decision) {
+            RemoteDecision.TIMEOUT_OWNED -> {
+                logger.warn("타임아웃 보상이 맡은 주문의 결제 완료, 재고 확정 생략: orderId=${event.orderId}")
+                return
+            }
+            RemoteDecision.ORDER_CANCELLED -> {
+                if (reservationIds.isNotEmpty()) {
+                    inventoryCommandPort.cancelReservations(reservationIds)
+                    inventoryCommandPort.cancelConfirmedReservations(reservationIds)
+                }
+            }
+            RemoteDecision.ORDER_CANCELLING -> {
+                if (reservationIds.isNotEmpty()) {
+                    inventoryCommandPort.cancelReservations(reservationIds)
+                }
+            }
+            RemoteDecision.CONFIRM -> return
+        }
+
         transactionTemplate.execute {
             val log = sagaEventLogRepository.findByEventId(eventId)!!
             log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
             sagaEventLogRepository.save(log)
+            if (decision == RemoteDecision.ORDER_CANCELLED) {
+                requestLatePaymentCancellation(event)
+            }
         }
-        logger.info("주문 결제 확정: orderId=${event.orderId}")
+        logger.warn("취소됐거나 취소 중인 주문의 결제 완료, 재고 확정 생략: orderId=${event.orderId}, decision=$decision")
     }
 
     fun compensateFailedConfirmation(eventId: String, event: PaymentCompletedEvent) {
@@ -142,12 +201,23 @@ class OrderSagaConsumer(
         val startTime = System.currentTimeMillis()
         restoreReservationsBeforeCancel(event.orderId)
         val compensated = transactionTemplate.execute {
-            val order = orderRepository.findByIdOrNull(event.orderId) ?: return@execute false
-            if (order.status == OrderStatus.PAID && order.isCancellable()) {
-                order.updateStatus(OrderStatus.CANCEL_REQUESTED)
-                order.updateStatus(OrderStatus.CANCELLED)
-                orderRepository.save(order)
+            orderRepository.lockById(event.orderId)
+            val log = sagaEventLogRepository.findByEventId(eventId)
+            if (log != null && log.isTimeoutClaimed()) {
+                logger.warn("타임아웃 보상이 맡은 주문, 확정 실패 보상 생략: orderId=${event.orderId}")
+                return@execute false
             }
+
+            val order = orderRepository.findByIdOrNull(event.orderId) ?: return@execute false
+            if (order.status != OrderStatus.PAID || !order.isCancellable()) {
+                log?.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+                log?.let { sagaEventLogRepository.save(it) }
+                logger.warn("결제 완료 상태가 아닌 주문, 확정 실패 역보상 생략: orderId=${event.orderId}, status=${order.status}")
+                return@execute false
+            }
+            order.updateStatus(OrderStatus.CANCEL_REQUESTED)
+            order.updateStatus(OrderStatus.CANCELLED)
+            orderRepository.save(order)
 
             transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",
@@ -165,7 +235,6 @@ class OrderSagaConsumer(
                 partitionKey = event.orderId.toString()
             )
 
-            val log = sagaEventLogRepository.findByEventId(eventId)
             log?.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
             log?.let { sagaEventLogRepository.save(it) }
             true

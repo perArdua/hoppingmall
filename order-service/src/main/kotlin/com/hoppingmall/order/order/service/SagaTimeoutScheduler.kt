@@ -52,20 +52,26 @@ class SagaTimeoutScheduler(
     }
 
     private fun compensateTimedOutSaga(sagaId: Long, orderId: Long, eventId: String) {
-        restoreReservationsBeforeCancel(sagaId, orderId)
+        val claimed = transactionTemplate.execute { claimTimedOutSaga(sagaId, orderId) } ?: false
+        if (!claimed) return
+
+        restoreReservations(orderId)
         val compensated = transactionTemplate.execute {
+            orderRepository.lockById(orderId)
             val saga = sagaEventLogRepository.findByIdOrNull(sagaId) ?: return@execute false
-            if (saga.isTimedOut() || saga.isFullyCompleted()) return@execute false
+            if (saga.isTimedOut()) return@execute false
 
             saga.markAsTimedOut()
             sagaEventLogRepository.save(saga)
 
             val order = orderRepository.findByIdOrNull(orderId) ?: return@execute false
-            if (order.status == OrderStatus.PAID && order.isCancellable()) {
-                order.updateStatus(OrderStatus.CANCEL_REQUESTED)
-                order.updateStatus(OrderStatus.CANCELLED)
-                orderRepository.save(order)
+            if (order.status != OrderStatus.PAID || !order.isCancellable()) {
+                logger.warn("타임아웃 보상 중 주문 상태가 바뀌어 역보상 생략: sagaId={}, orderId={}, status={}", sagaId, orderId, order.status)
+                return@execute false
             }
+            order.updateStatus(OrderStatus.CANCEL_REQUESTED)
+            order.updateStatus(OrderStatus.CANCELLED)
+            orderRepository.save(order)
 
             if (saga.paymentId == null) {
                 logger.warn("타임아웃 saga에 paymentId 없음, 포인트 환불 생략: sagaId={}, orderId={}", sagaId, orderId)
@@ -95,18 +101,29 @@ class SagaTimeoutScheduler(
         }
     }
 
-    private fun restoreReservationsBeforeCancel(sagaId: Long, orderId: Long) {
-        val reservationIds = transactionTemplate.execute { reservationIdsToRestore(sagaId, orderId) }.orEmpty()
+    private fun claimTimedOutSaga(sagaId: Long, orderId: Long): Boolean {
+        orderRepository.lockById(orderId)
+        val saga = sagaEventLogRepository.findByIdOrNull(sagaId) ?: return false
+        if (saga.isTimedOut() || saga.isFullyCompleted()) return false
+        if (saga.isTimeoutClaimed()) return true
+
+        val order = orderRepository.findByIdOrNull(orderId)
+        if (order == null || order.status != OrderStatus.PAID || !order.isCancellable()) {
+            saga.markAsTimedOut()
+            sagaEventLogRepository.save(saga)
+            logger.warn("결제 완료 상태가 아닌 주문의 타임아웃 saga, 보상 생략: sagaId={}, orderId={}, status={}", sagaId, orderId, order?.status)
+            return false
+        }
+
+        saga.claimTimeout()
+        sagaEventLogRepository.save(saga)
+        return true
+    }
+
+    private fun restoreReservations(orderId: Long) {
+        val reservationIds = orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }.distinct()
         if (reservationIds.isEmpty()) return
         inventoryCommandPort.cancelReservations(reservationIds)
         inventoryCommandPort.cancelConfirmedReservations(reservationIds)
-    }
-
-    private fun reservationIdsToRestore(sagaId: Long, orderId: Long): List<String> {
-        val saga = sagaEventLogRepository.findByIdOrNull(sagaId) ?: return emptyList()
-        if (saga.isTimedOut() || saga.isFullyCompleted()) return emptyList()
-        val order = orderRepository.findByIdOrNull(orderId) ?: return emptyList()
-        if (order.status != OrderStatus.PAID || !order.isCancellable()) return emptyList()
-        return orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }.distinct()
     }
 }

@@ -57,10 +57,17 @@ class SagaEventLog(
 
     fun isTimedOut(): Boolean = timedOut
 
+    fun claimTimeout() {
+        markStepCompleted(TIMEOUT_CLAIMED)
+    }
+
+    fun isTimeoutClaimed(): Boolean = TIMEOUT_CLAIMED in completedSteps
+
     companion object {
         const val LOCAL_COMPLETED = "LOCAL_COMPLETED"
         const val REMOTE_COMPLETED = "REMOTE_COMPLETED"
         const val TIMED_OUT = "TIMED_OUT"
+        const val TIMEOUT_CLAIMED = "TIMEOUT_CLAIMED"
         const val DEFAULT_TIMEOUT_MINUTES = 5L
     }
 }
