@@ -2,6 +2,8 @@ package com.hoppingmall.product.inventory.domain
 
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -29,6 +31,7 @@ class InventoryReservation(
     val quantity: Int,
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     var status: ReservationStatus = ReservationStatus.RESERVED,
 
