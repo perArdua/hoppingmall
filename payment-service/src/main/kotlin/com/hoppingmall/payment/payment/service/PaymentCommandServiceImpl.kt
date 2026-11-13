@@ -142,6 +142,8 @@ class PaymentCommandServiceImpl(
         return executeCancelPayment(payment)
     }
 
+    override fun findPaymentIdByOrderId(orderId: Long): Long? = paymentRepository.findByOrderId(orderId)?.id
+
     private fun executeCancelPayment(payment: Payment): PaymentResponse {
         if (payment.isCancelled()) {
             log.info("이미 취소된 결제의 취소 요청: paymentId={}, orderId={}", payment.id, payment.orderId)

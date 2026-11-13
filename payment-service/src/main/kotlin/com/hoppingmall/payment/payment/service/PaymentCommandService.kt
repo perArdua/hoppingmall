@@ -7,4 +7,5 @@ interface PaymentCommandService {
     fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse
     fun cancelPayment(paymentId: Long, userId: Long): PaymentResponse
     fun cancelPaymentInternal(paymentId: Long): PaymentResponse
+    fun findPaymentIdByOrderId(orderId: Long): Long?
 }
