@@ -38,6 +38,7 @@ dependencies {
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.redisson:redisson-spring-boot-starter:4.3.0")
+	testImplementation("com.github.codemonstur:embedded-redis:1.4.3")
 }
 
 tasks.withType<Test> {
