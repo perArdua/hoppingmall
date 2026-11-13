@@ -281,17 +281,26 @@ jobs:
       - name: 공유 모듈 테스트
         run: |
           chmod +x ./gradlew
+          failed_modules=()
           for module in hoppingmall-common hoppingmall-cache hoppingmall-dlq hoppingmall-idempotency hoppingmall-outbox; do
             if [ -d "$module" ] && [ -f "$module/build.gradle.kts" ]; then
               echo "Testing $module..."
               if [ -f "$module/gradlew" ]; then
                 chmod +x "$module/gradlew"
-                cd "$module" && ./gradlew test --no-daemon --build-cache && cd ..
+                if ! (cd "$module" && ./gradlew test --no-daemon --build-cache); then
+                  failed_modules+=("$module")
+                fi
               else
-                ./gradlew -p "$module" test --no-daemon --build-cache
+                if ! ./gradlew -p "$module" test --no-daemon --build-cache; then
+                  failed_modules+=("$module")
+                fi
               fi
             fi
           done
+          if ((${#failed_modules[@]} > 0)); then
+            echo "::error::공유 모듈 테스트 실패: ${failed_modules[*]}"
+            exit 1
+          fi
 
   final-check:
     name: CI 최종 검증
