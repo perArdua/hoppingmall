@@ -1,7 +1,11 @@
 package com.hoppingmall.order.internal
 
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.annotation.JsonNaming
+import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
+import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
@@ -12,6 +16,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDateTime
 
 @RestController
@@ -22,6 +27,17 @@ class InternalOrderController(
     private val shippingRepository: ShippingRepository,
     private val refundRepository: RefundRepository
 ) {
+
+    @GetMapping("/orders/{orderId}")
+    fun getOrder(@PathVariable orderId: Long): ResponseEntity<ApiResponse<OrderSummaryResponse>> {
+        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException()
+        return ResponseEntity.ok(ApiResponse.success(OrderSummaryResponse(
+            orderId = order.id!!,
+            buyerId = order.buyerId,
+            totalAmount = order.totalAmount.setScale(2, RoundingMode.HALF_UP),
+            status = order.status.name
+        )))
+    }
 
     @GetMapping("/orders/{orderId}/items")
     fun getOrderItems(@PathVariable orderId: Long): ResponseEntity<List<OrderItemResponse>> {
@@ -125,6 +141,14 @@ class InternalOrderController(
         val productPrice: BigDecimal,
         val quantity: Int,
         val totalPrice: BigDecimal
+    )
+
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy::class)
+    data class OrderSummaryResponse(
+        val orderId: Long,
+        val buyerId: Long,
+        val totalAmount: BigDecimal,
+        val status: String
     )
 
     data class RefundResponse(
