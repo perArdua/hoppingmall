@@ -4,6 +4,8 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.user.domain.enums.MembershipGrade
 import jakarta.persistence.*
 import java.math.BigDecimal
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "memberships")
@@ -12,7 +14,8 @@ class Membership(
     val userId: Long,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var grade: MembershipGrade = MembershipGrade.BRONZE,
 
     @Column(nullable = false, precision = 15, scale = 2)

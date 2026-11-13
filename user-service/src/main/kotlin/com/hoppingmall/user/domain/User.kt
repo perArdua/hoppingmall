@@ -5,6 +5,8 @@ import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "users")
@@ -19,7 +21,8 @@ class User private constructor(
     private var name: String,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     private var role: Role = Role.BUYER,
 
 ) : BaseEntity() {
