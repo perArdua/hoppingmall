@@ -22,7 +22,12 @@ interface WishlistRepository : JpaRepository<Wishlist, Long> {
     """)
     fun findByBuyerIdWithProduct(buyerId: Long, pageable: Pageable): Slice<WishlistResponse>
 
-    fun existsByBuyerIdAndProductId(buyerId: Long, productId: Long): Boolean
+    @Query("""
+        SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END
+        FROM Wishlist w JOIN Product p ON w.productId = p.id
+        WHERE w.buyerId = :buyerId AND w.productId = :productId
+    """)
+    fun existsByBuyerIdAndProductId(@Param("buyerId") buyerId: Long, @Param("productId") productId: Long): Boolean
 
     @Modifying
     @Query(

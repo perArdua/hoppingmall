@@ -73,6 +73,11 @@ class CategoryCommandServiceImpl(
 
         categoryRepository.deleteSoftDeletedByName(request.name)
         category.update(request.name)
+        try {
+            categoryRepository.flush()
+        } catch (e: DataIntegrityViolationException) {
+            throw CategoryAlreadyExistsException()
+        }
         return CategoryResponse.from(category)
     }
 
