@@ -1,5 +1,6 @@
 package com.hoppingmall.product.product.controller
 
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.product.common.enums.ProductStatus
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.dto.request.ProductSearchCondition
@@ -9,6 +10,7 @@ import com.hoppingmall.product.product.dto.response.ProductResponse
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.product.service.ProductImageService
+import com.hoppingmall.product.product.service.ProductOwnershipPolicy
 import com.hoppingmall.product.product.service.ProductQueryService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -43,6 +45,11 @@ class ProductControllerTest {
 
     @Mock
     private lateinit var productImageService: ProductImageService
+
+    @Mock
+    private lateinit var productOwnershipPolicy: ProductOwnershipPolicy
+
+    private val seller = UserPrincipal.of(1L, "SELLER")
 
     @InjectMocks
     private lateinit var controller: ProductController
@@ -128,7 +135,7 @@ class ProductControllerTest {
 
         whenever(productCommandService.createProduct(any())).thenReturn(productResponse())
 
-        val result = controller.createProduct(request)
+        val result = controller.createProduct(request, seller)
 
         assertThat(result.data!!.name).isEqualTo("테스트")
     }
@@ -141,14 +148,14 @@ class ProductControllerTest {
 
         whenever(productCommandService.updateProduct(eq(1L), any())).thenReturn(productResponse())
 
-        val result = controller.updateProduct(1L, request)
+        val result = controller.updateProduct(1L, request, seller)
 
         assertThat(result.data).isNotNull
     }
 
     @Test
     fun 상품을_삭제한다() {
-        val result = controller.deleteProduct(1L)
+        val result = controller.deleteProduct(1L, seller)
 
         verify(productCommandService).deleteProduct(1L)
         assertThat(result.data).isNotNull

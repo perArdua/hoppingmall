@@ -1,6 +1,7 @@
 package com.hoppingmall.product.product.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import com.hoppingmall.product.product.dto.request.ProductSearchCondition
@@ -9,11 +10,13 @@ import com.hoppingmall.product.product.dto.response.ProductImageResponse
 import com.hoppingmall.product.product.dto.response.ProductResponse
 import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.product.service.ProductImageService
+import com.hoppingmall.product.product.service.ProductOwnershipPolicy
 import com.hoppingmall.product.product.service.ProductQueryService
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.web.SortDefault
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
@@ -24,7 +27,8 @@ import org.springframework.web.multipart.MultipartFile
 class ProductController(
     private val productQueryService: ProductQueryService,
     private val productCommandService: ProductCommandService,
-    private val productImageService: ProductImageService
+    private val productImageService: ProductImageService,
+    private val productOwnershipPolicy: ProductOwnershipPolicy
 ) {
 
     @GetMapping
@@ -68,22 +72,32 @@ class ProductController(
     }
 
     @PostMapping
-    fun createProduct(@Valid @RequestBody request: ProductCreateRequest): ApiResponse<ProductResponse> {
-        val productResponse = productCommandService.createProduct(request)
+    fun createProduct(
+        @Valid @RequestBody request: ProductCreateRequest,
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
+    ): ApiResponse<ProductResponse> {
+        val sellerId = productOwnershipPolicy.sellerIdForCreate(userPrincipal, request.sellerId)
+        val productResponse = productCommandService.createProduct(request.copy(sellerId = sellerId))
         return ApiResponse.success(productResponse)
     }
 
     @PutMapping("/{productId}")
     fun updateProduct(
         @PathVariable productId: Long,
-        @Valid @RequestBody request: ProductUpdateRequest
+        @Valid @RequestBody request: ProductUpdateRequest,
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
     ): ApiResponse<ProductResponse> {
+        productOwnershipPolicy.checkOwner(productId, userPrincipal)
         val productResponse = productCommandService.updateProduct(productId, request)
         return ApiResponse.success(productResponse)
     }
 
     @DeleteMapping("/{productId}")
-    fun deleteProduct(@PathVariable productId: Long): ApiResponse<Unit> {
+    fun deleteProduct(
+        @PathVariable productId: Long,
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
+    ): ApiResponse<Unit> {
+        productOwnershipPolicy.checkOwner(productId, userPrincipal)
         productCommandService.deleteProduct(productId)
         return ApiResponse.success(Unit)
     }
