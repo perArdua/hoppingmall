@@ -38,6 +38,7 @@ import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 
 @DisplayName("주문 항목 조회 실패 때의 통계 이벤트 처리")
@@ -73,7 +74,8 @@ class StatisticsOrderItemQueryFailureTest {
             orderItemQueryPort,
             productStatisticsCommandService,
             objectMapper,
-            KafkaEventMapper(objectMapper)
+            KafkaEventMapper(objectMapper),
+            TransactionTemplate(mock())
         )
         whenever(statisticsEventLogRepository.existsByEventId(any())).thenReturn(false)
     }

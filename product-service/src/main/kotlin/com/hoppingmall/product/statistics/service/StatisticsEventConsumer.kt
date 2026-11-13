@@ -13,6 +13,7 @@ import com.hoppingmall.product.statistics.port.OrderItemQueryPort
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
 
 @Service
 class StatisticsEventConsumer(
@@ -20,7 +21,8 @@ class StatisticsEventConsumer(
     private val orderItemQueryPort: OrderItemQueryPort,
     private val productStatisticsCommandService: ProductStatisticsCommandService,
     private val objectMapper: ObjectMapper,
-    private val kafkaEventMapper: KafkaEventMapper
+    private val kafkaEventMapper: KafkaEventMapper,
+    private val transactionTemplate: TransactionTemplate
 ) {
 
     private val logger = LoggerFactory.getLogger(StatisticsEventConsumer::class.java)
@@ -60,21 +62,23 @@ class StatisticsEventConsumer(
             logger = logger,
             existsCheck = { statisticsEventLogRepository.existsByEventId(event.transactionId) }
         ) {
-            orderItems.forEach { item ->
-                productStatisticsCommandService.incrementSalesStats(
-                    item.productId,
-                    item.quantity.toLong(),
-                    item.totalPrice
+            transactionTemplate.executeWithoutResult {
+                orderItems.forEach { item ->
+                    productStatisticsCommandService.incrementSalesStats(
+                        item.productId,
+                        item.quantity.toLong(),
+                        item.totalPrice
+                    )
+                }
+
+                statisticsEventLogRepository.save(
+                    StatisticsEventLog(
+                        eventId = event.transactionId,
+                        eventType = COMPLETED_EVENT_TYPE,
+                        orderId = event.orderId
+                    )
                 )
             }
-
-            statisticsEventLogRepository.save(
-                StatisticsEventLog(
-                    eventId = event.transactionId,
-                    eventType = COMPLETED_EVENT_TYPE,
-                    orderId = event.orderId
-                )
-            )
 
             logger.info("결제 완료 통계 반영: orderId=${event.orderId}")
         }
@@ -106,21 +110,23 @@ class StatisticsEventConsumer(
             logger = logger,
             existsCheck = { statisticsEventLogRepository.existsByEventId(event.eventId) }
         ) {
-            orderItems.forEach { item ->
-                productStatisticsCommandService.decrementSalesStats(
-                    item.productId,
-                    item.quantity.toLong(),
-                    item.totalPrice
+            transactionTemplate.executeWithoutResult {
+                orderItems.forEach { item ->
+                    productStatisticsCommandService.decrementSalesStats(
+                        item.productId,
+                        item.quantity.toLong(),
+                        item.totalPrice
+                    )
+                }
+
+                statisticsEventLogRepository.save(
+                    StatisticsEventLog(
+                        eventId = event.eventId,
+                        eventType = "PaymentCancelled",
+                        orderId = event.orderId
+                    )
                 )
             }
-
-            statisticsEventLogRepository.save(
-                StatisticsEventLog(
-                    eventId = event.eventId,
-                    eventType = "PaymentCancelled",
-                    orderId = event.orderId
-                )
-            )
 
             logger.info("결제 취소 통계 반영: orderId=${event.orderId}")
         }
@@ -150,21 +156,23 @@ class StatisticsEventConsumer(
             logger = logger,
             existsCheck = { statisticsEventLogRepository.existsByEventId(eventId) }
         ) {
-            orderItems.forEach { item ->
-                productStatisticsCommandService.decrementSalesStats(
-                    item.productId,
-                    item.quantity.toLong(),
-                    item.totalPrice
+            transactionTemplate.executeWithoutResult {
+                orderItems.forEach { item ->
+                    productStatisticsCommandService.decrementSalesStats(
+                        item.productId,
+                        item.quantity.toLong(),
+                        item.totalPrice
+                    )
+                }
+
+                statisticsEventLogRepository.save(
+                    StatisticsEventLog(
+                        eventId = eventId,
+                        eventType = REVERSAL_EVENT_TYPE,
+                        orderId = orderId
+                    )
                 )
             }
-
-            statisticsEventLogRepository.save(
-                StatisticsEventLog(
-                    eventId = eventId,
-                    eventType = REVERSAL_EVENT_TYPE,
-                    orderId = orderId
-                )
-            )
 
             logger.info("결제 역보상 통계 반영: orderId=$orderId")
         }

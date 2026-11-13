@@ -9,6 +9,7 @@ import com.hoppingmall.product.product.domain.repository.StatisticsEventLogRepos
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
 import com.hoppingmall.product.statistics.port.OrderItemInfo
 import com.hoppingmall.product.statistics.port.OrderItemQueryPort
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
 import org.mockito.Spy
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
@@ -23,7 +25,10 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.transaction.TransactionStatus
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
+import java.util.function.Consumer
 
 @DisplayName("StatisticsEventConsumer")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -46,8 +51,19 @@ class StatisticsEventConsumerTest {
     @Spy
     private var kafkaEventMapper: KafkaEventMapper = KafkaEventMapper(objectMapper)
 
+    @Mock
+    private lateinit var transactionTemplate: TransactionTemplate
+
     @InjectMocks
     private lateinit var consumer: StatisticsEventConsumer
+
+    @BeforeEach
+    fun setUp() {
+        lenient().doAnswer { invocation ->
+            invocation.getArgument<Consumer<TransactionStatus>>(0).accept(org.mockito.kotlin.mock())
+            null
+        }.`when`(transactionTemplate).executeWithoutResult(any())
+    }
 
     @Test
     fun 결제_완료_이벤트를_처리한다() {
