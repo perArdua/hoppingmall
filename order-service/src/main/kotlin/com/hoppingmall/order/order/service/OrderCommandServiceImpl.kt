@@ -57,6 +57,8 @@ class OrderCommandServiceImpl(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
+    private val cancellationBlockingRefundStatuses = setOf(RefundStatus.REQUESTED, RefundStatus.APPROVED, RefundStatus.COMPLETED)
+
     @Autowired(required = false)
     var reservationFence: ReservationFence? = null
 
@@ -183,7 +185,7 @@ class OrderCommandServiceImpl(
                     if (target.status != expectedStatus) {
                         throw OrderInvalidStatusException()
                     }
-                    if (refundRepository.existsByOrderIdAndStatusAndDeletedAtIsNull(orderId, RefundStatus.COMPLETED)) {
+                    if (refundRepository.existsByOrderIdAndStatusInAndDeletedAtIsNull(orderId, cancellationBlockingRefundStatuses)) {
                         throw OrderPartiallyRefundedException()
                     }
                     target.requestCancellation()
