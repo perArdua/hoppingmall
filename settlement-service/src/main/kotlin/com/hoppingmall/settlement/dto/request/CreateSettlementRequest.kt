@@ -12,9 +12,11 @@ data class CreateSettlementRequest(
     @field:Positive
     val sellerId: Long,
 
+    @field:Schema(description = "정산 시작일. 한국 날짜(Asia/Seoul)로 그날 00:00부터 센다.")
     @field:NotNull
     val periodStart: LocalDate,
 
+    @field:Schema(description = "정산 종료일(포함). 한국 날짜(Asia/Seoul)로 다음 날 00:00 전까지 센다.")
     @field:NotNull
     val periodEnd: LocalDate,
 
