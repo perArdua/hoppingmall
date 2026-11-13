@@ -58,13 +58,13 @@ class JwtValidationRequiredRoleTest {
     }
 
     @Test
-    fun 필수_역할이_ADMIN인데_role_클레임이_없으면_BUYER로_보고_403이다() {
+    fun 필수_역할이_ADMIN인데_role_클레임이_없으면_BUYER로_보지_않고_401이다() {
         val exchange = exchangeWith(tokenWithRole(null))
         val captured = mutableListOf<ServerWebExchange>()
 
         factory.apply(adminOnly).filter(exchange, chainCapturing(captured)).block()
 
-        assertThat(exchange.response.statusCode).isEqualTo(HttpStatus.FORBIDDEN)
+        assertThat(exchange.response.statusCode).isEqualTo(HttpStatus.UNAUTHORIZED)
         assertThat(captured).isEmpty()
     }
 
