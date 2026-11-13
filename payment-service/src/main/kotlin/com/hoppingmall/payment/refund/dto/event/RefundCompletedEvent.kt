@@ -21,5 +21,6 @@ data class RefundCompletedEvent(
 data class RefundItemEvent(
     val productId: Long = 0,
     val quantity: Int = 0,
-    val refundPrice: BigDecimal = BigDecimal.ZERO
+    val refundPrice: BigDecimal = BigDecimal.ZERO,
+    val orderItemId: Long? = null
 )

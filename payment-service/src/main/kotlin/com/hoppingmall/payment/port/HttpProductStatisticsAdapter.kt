@@ -24,9 +24,18 @@ class HttpProductStatisticsAdapter(
 
     @CircuitBreaker(name = "product-statistics-command")
     override fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal) {
+        post(productId, quantity, amount, null)
+    }
+
+    @CircuitBreaker(name = "product-statistics-command")
+    override fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal, requestKey: String) {
+        post(productId, quantity, amount, requestKey)
+    }
+
+    private fun post(productId: Long, quantity: Long, amount: BigDecimal, requestKey: String?) {
         restTemplate.postForEntity(
             "$productServiceUrl/internal/api/v1/product-statistics/$productId/refund?quantity=$quantity&amount=$amount",
-            null,
+            requestKeyEntity(requestKey),
             Void::class.java
         )
     }
