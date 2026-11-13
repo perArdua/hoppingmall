@@ -14,16 +14,23 @@ interface SagaEventLogRepository : JpaRepository<SagaEventLog, Long> {
     fun findByEventId(eventId: String): SagaEventLog?
 
     @Query(
-        """
-        SELECT s FROM SagaEventLog s
-        WHERE s.timedOut = false
-        AND s.eventType = 'PAYMENT_COMPLETED'
-        AND s.createdAt < :createdBefore
+        value = """
+        SELECT s.* FROM saga_event_logs s
+        WHERE s.timed_out = false
+        AND s.event_type = 'PAYMENT_COMPLETED'
+        AND s.created_at < :createdBefore
         AND NOT EXISTS (
-            SELECT 1 FROM s.completedSteps step WHERE step = 'REMOTE_COMPLETED'
+            SELECT 1 FROM saga_event_log_steps step
+            WHERE step.saga_event_log_id = s.id AND step.step = 'REMOTE_COMPLETED'
         )
-        ORDER BY s.createdAt ASC
-    """
+        ORDER BY s.created_at ASC
+        LIMIT $TIMEOUT_SCAN_LIMIT
+    """,
+        nativeQuery = true
     )
     fun findTimedOutSagas(@Param("createdBefore") createdBefore: LocalDateTime): List<SagaEventLog>
+
+    companion object {
+        const val TIMEOUT_SCAN_LIMIT = 100
+    }
 }
