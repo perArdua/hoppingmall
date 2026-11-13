@@ -93,6 +93,7 @@ class PaymentNotificationEventIdTest {
 
     @BeforeEach
     fun setUp() {
+        orderSummaryQueryPort.put(ORDER_ID, USER_ID, BigDecimal("30000"))
         doAnswer { invocation ->
             published.add(
                 PublishedEvent(

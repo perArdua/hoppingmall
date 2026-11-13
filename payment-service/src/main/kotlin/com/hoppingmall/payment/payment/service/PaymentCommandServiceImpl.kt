@@ -9,10 +9,16 @@ import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.dto.request.PaymentRequest
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
+import com.hoppingmall.payment.payment.exception.PaymentInvalidAmountException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
+import com.hoppingmall.payment.payment.exception.PaymentOrderNotFoundException
+import com.hoppingmall.payment.payment.exception.PaymentOrderNotPayableException
+import com.hoppingmall.payment.payment.exception.PaymentOrderUnavailableException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
+import com.hoppingmall.payment.port.OrderSummary
 import com.hoppingmall.payment.port.OrderSummaryQueryPort
+import com.hoppingmall.payment.port.exception.OrderSummaryQueryFailedException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -38,6 +44,8 @@ class PaymentCommandServiceImpl(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse = paymentMetrics.recordProcessingTime {
+        verifyOrder(paymentRequest, userId)
+
         var couponDiscountAmount = BigDecimal.ZERO
         var couponId: Long? = null
 
@@ -135,6 +143,29 @@ class PaymentCommandServiceImpl(
 
         log.info("결제 취소: paymentId={}, orderId={}, userId={}", payment.id, payment.orderId, payment.userId)
         return PaymentResponse.from(cancelledPayment)
+    }
+
+    private fun verifyOrder(paymentRequest: PaymentRequest, userId: Long) {
+        val order = findOrder(paymentRequest.orderId)
+        if (order.buyerId != userId) {
+            throw PaymentAccessDeniedException()
+        }
+        if (!order.isAwaitingPayment()) {
+            throw PaymentOrderNotPayableException()
+        }
+        if (order.totalAmount.compareTo(paymentRequest.amount) != 0) {
+            throw PaymentInvalidAmountException()
+        }
+    }
+
+    private fun findOrder(orderId: Long): OrderSummary {
+        val order = try {
+            orderSummaryQueryPort.findOrder(orderId)
+        } catch (e: OrderSummaryQueryFailedException) {
+            log.warn("주문 조회 실패로 결제 요청 거절: orderId={}", orderId)
+            throw PaymentOrderUnavailableException()
+        }
+        return order ?: throw PaymentOrderNotFoundException()
     }
 
     private fun updatePaymentWithResult(payment: Payment, result: PaymentResult): Payment {
