@@ -9,6 +9,7 @@ import com.hoppingmall.user.auth.service.AuthServiceImpl
 import com.hoppingmall.user.auth.service.RefreshTokenServiceImpl
 import com.hoppingmall.user.common.vo.PasswordCreator
 import com.hoppingmall.user.common.vo.PasswordPolicy
+import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
@@ -94,6 +95,7 @@ class PasswordChangeRefreshTokenRevocationTest {
         userCommandService = UserCommandServiceImpl(
             userRepository = userRepository,
             passwordCreator = PasswordCreator(passwordEncoder, passwordPolicy),
+            passwordVerifier = PasswordVerifier(passwordEncoder),
             userDomainService = userDomainService,
             membershipCommandService = membershipCommandService,
             refreshTokenService = refreshTokenService
@@ -112,9 +114,10 @@ class PasswordChangeRefreshTokenRevocationTest {
     @Test
     fun 비밀번호를_바꾸면_변경_전에_발급된_refresh_token으로_재발급할_수_없다() {
         val issuedBeforeChange = login().refreshToken
+        whenever(passwordEncoder.matches("Password1234", "encoded-password")).thenReturn(true)
         whenever(passwordEncoder.encode("NewPassword1234")).thenReturn("encoded-new-password")
 
-        userCommandService.updateUserProfile(1L, UpdateUserRequest(name = "새이름", password = "NewPassword1234"))
+        userCommandService.updateUserProfile(1L, passwordChangeRequest())
 
         assertThatThrownBy { authService.refreshAccessToken(issuedBeforeChange) }
             .isInstanceOf(RefreshTokenNotFoundException::class.java)
@@ -134,14 +137,18 @@ class PasswordChangeRefreshTokenRevocationTest {
     @Test
     fun 비밀번호를_바꾼_뒤_다시_로그인하면_새_refresh_token으로_재발급할_수_있다() {
         login()
+        whenever(passwordEncoder.matches("Password1234", "encoded-password")).thenReturn(true)
         whenever(passwordEncoder.encode("NewPassword1234")).thenReturn("encoded-new-password")
 
-        userCommandService.updateUserProfile(1L, UpdateUserRequest(name = "새이름", password = "NewPassword1234"))
+        userCommandService.updateUserProfile(1L, passwordChangeRequest())
         val issuedAfterChange = login().refreshToken
         val response = authService.refreshAccessToken(issuedAfterChange)
 
         assertThat(response.accessToken).isNotBlank()
     }
+
+    private fun passwordChangeRequest() =
+        UpdateUserRequest(name = "새이름", password = "NewPassword1234", currentPassword = "Password1234")
 
     private fun login() = SignInRequest(email = "user@example.com", password = "Password1234").let { request ->
         whenever(userQueryService.authenticate(request)).thenReturn(user)

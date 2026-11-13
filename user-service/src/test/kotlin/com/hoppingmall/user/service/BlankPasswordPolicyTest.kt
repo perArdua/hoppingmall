@@ -3,6 +3,7 @@ package com.hoppingmall.user.service
 import com.hoppingmall.user.common.vo.DefaultPasswordPolicy
 import com.hoppingmall.user.common.vo.Password
 import com.hoppingmall.user.common.vo.PasswordCreator
+import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.common.vo.WeakPasswordException
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
@@ -40,13 +41,16 @@ class BlankPasswordPolicyTest {
 
     private val passwordPolicy = DefaultPasswordPolicy()
 
+    private val passwordEncoder = BCryptPasswordEncoder()
+
     private lateinit var userCommandService: UserCommandServiceImpl
 
     @BeforeEach
     fun setUp() {
         userCommandService = UserCommandServiceImpl(
             userRepository = userRepository,
-            passwordCreator = PasswordCreator(BCryptPasswordEncoder(), passwordPolicy),
+            passwordCreator = PasswordCreator(passwordEncoder, passwordPolicy),
+            passwordVerifier = PasswordVerifier(passwordEncoder),
             userDomainService = UserDomainServiceImpl(userRepository, passwordPolicy),
             membershipCommandService = membershipCommandService
         )
@@ -81,13 +85,17 @@ class BlankPasswordPolicyTest {
 
     @Test
     fun 공백만으로_된_비밀번호로는_변경할_수_없다() {
-        val user = User.fixture(password = Password("encoded-password")).withId(1L)
+        val currentPassword = Password(passwordEncoder.encode("Password1234"))
+        val user = User.fixture(password = currentPassword).withId(1L)
         whenever(userRepository.findNullableById(1L)).thenReturn(user)
 
         assertThatThrownBy {
-            userCommandService.updateUserProfile(1L, UpdateUserRequest(name = "새이름", password = "        "))
+            userCommandService.updateUserProfile(
+                1L,
+                UpdateUserRequest(name = "새이름", password = "        ", currentPassword = "Password1234")
+            )
         }.isInstanceOf(WeakPasswordException::class.java)
 
-        assertThat(user.getPassword()).isEqualTo(Password("encoded-password"))
+        assertThat(user.getPassword()).isEqualTo(currentPassword)
     }
 }
