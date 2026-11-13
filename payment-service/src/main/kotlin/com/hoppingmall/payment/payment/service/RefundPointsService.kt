@@ -54,9 +54,8 @@ class RefundPointsService(
 
     private fun proportionalEarned(paymentId: Long, earnedAmount: BigDecimal, refundAmount: BigDecimal): BigDecimal {
         val payment = paymentRepository?.findByIdOrNull(paymentId) ?: return BigDecimal.ZERO
-        val orderAmount = payment.amount.add(payment.couponDiscountAmount)
-        if (orderAmount <= BigDecimal.ZERO) return BigDecimal.ZERO
-        return earnedAmount.multiply(refundAmount).divide(orderAmount, 2, RoundingMode.DOWN)
+        if (payment.amount <= BigDecimal.ZERO) return BigDecimal.ZERO
+        return earnedAmount.multiply(refundAmount).divide(payment.amount, 2, RoundingMode.DOWN)
     }
 
     private fun findEarnHistory(paymentId: Long): PointHistory? {
