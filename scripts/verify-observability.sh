@@ -8,6 +8,7 @@ TEMPO_URL="${TEMPO_URL:-http://localhost:3200}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"
 LOKI_URL="${LOKI_URL:-http://localhost:3100}"
 GRAFANA_URL="${GRAFANA_URL:-http://localhost:3000}"
+GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD 환경 변수를 설정하세요}"
 
 check() {
   local name="$1" url="$2"
@@ -58,7 +59,7 @@ echo ""
 
 echo "--- 5. Grafana Datasources ---"
 for ds in Prometheus Loki Tempo; do
-  result=$(curl -sf -u admin:admin "$GRAFANA_URL/api/datasources/name/$ds" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
+  result=$(curl -sf -u "admin:$GRAFANA_ADMIN_PASSWORD" "$GRAFANA_URL/api/datasources/name/$ds" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
   if [ "$result" = "$ds" ]; then
     echo "[PASS] Grafana datasource '$ds' configured"
   else
@@ -68,7 +69,7 @@ done
 echo ""
 
 echo "--- 6. Grafana Dashboards ---"
-dashboard_count=$(curl -sf -u admin:admin "$GRAFANA_URL/api/search?type=dash-db" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d))" 2>/dev/null || echo "0")
+dashboard_count=$(curl -sf -u "admin:$GRAFANA_ADMIN_PASSWORD" "$GRAFANA_URL/api/search?type=dash-db" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d))" 2>/dev/null || echo "0")
 echo "[INFO] Grafana has $dashboard_count dashboards loaded"
 echo ""
 

@@ -53,7 +53,7 @@ management:
     enabled: false
 
 jwt:
-  secret: ${JWT_SECRET:default-docker-secret-key-for-development-only-32chars!}
+  secret: ${JWT_SECRET}
 
 logging:
   level:
