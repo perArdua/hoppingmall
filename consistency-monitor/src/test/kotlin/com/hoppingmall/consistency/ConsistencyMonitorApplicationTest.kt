@@ -1,5 +1,6 @@
 package com.hoppingmall.consistency
 
+import com.hoppingmall.consistency.auth.TestTokens
 import com.hoppingmall.consistency.config.ConsistencyProperties
 import com.hoppingmall.consistency.enums.RepairPolicy
 import com.hoppingmall.consistency.enums.Severity
@@ -16,7 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest
     properties = [
         "spring.datasource.url=jdbc:h2:mem:monitor;MODE=MySQL;DB_CLOSE_DELAY=-1",
         "spring.datasource.hikari.connection-init-sql=SELECT 1",
-        "consistency.initial-delay-ms=3600000"
+        "consistency.initial-delay-ms=3600000",
+        "jwt.secret=${TestTokens.SECRET}"
     ]
 )
 @DisplayName("consistency-monitor 컨텍스트")
