@@ -2,7 +2,7 @@ spring:
   main:
     allow-bean-definition-overriding: true
   datasource:
-    url: jdbc:mysql://mysql.hoppingmall.svc.cluster.local:3306/product_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://mysql.hoppingmall.svc.cluster.local:3306/product_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&connectTimeout=3000&socketTimeout=120000
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: ${MYSQL_ROOT_PASSWORD}
@@ -51,7 +51,7 @@ internal:
 grpc:
   client:
     order-service:
-      address: static://order-service.hoppingmall.svc.cluster.local:9094
+      address: dns:///order-service.hoppingmall.svc.cluster.local:9094
       negotiation-type: plaintext
 
 cache:

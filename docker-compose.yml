@@ -304,6 +304,7 @@ services:
       - mimir
 
   notification-service:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: notification-service/Dockerfile
@@ -329,6 +330,7 @@ services:
       start_period: 60s
 
   user-service:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: user-service/Dockerfile
@@ -355,6 +357,7 @@ services:
       start_period: 60s
 
   product-service:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: product-service/Dockerfile
@@ -381,6 +384,7 @@ services:
       start_period: 60s
 
   order-service:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: order-service/Dockerfile
@@ -409,6 +413,7 @@ services:
       start_period: 60s
 
   payment-service:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: payment-service/Dockerfile
@@ -437,6 +442,7 @@ services:
       start_period: 60s
 
   settlement-service:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: settlement-service/Dockerfile
@@ -460,6 +466,7 @@ services:
       start_period: 60s
 
   consistency-monitor:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: consistency-monitor/Dockerfile
@@ -482,6 +489,7 @@ services:
       start_period: 40s
 
   api-gateway:
+    stop_grace_period: 45s
     build:
       context: .
       dockerfile: api-gateway/Dockerfile

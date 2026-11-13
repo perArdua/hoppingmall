@@ -92,10 +92,10 @@ grpc:
     port: 9095
   client:
     order-service:
-      address: static://localhost:9094
+      address: dns:///localhost:9094
       negotiation-type: plaintext
     user-service:
-      address: static://localhost:9082
+      address: dns:///localhost:9082
       negotiation-type: plaintext
 
 resilience4j:

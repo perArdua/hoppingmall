@@ -99,7 +99,7 @@ grpc:
     port: 9093
   client:
     order-service:
-      address: static://localhost:9094
+      address: dns:///localhost:9094
       negotiation-type: plaintext
 
 resilience4j:
