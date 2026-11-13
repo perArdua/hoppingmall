@@ -23,5 +23,11 @@ object MySqlContainerSupport {
         registry.add("spring.datasource.password") { container.password }
         registry.add("spring.datasource.driver-class-name") { "com.mysql.cj.jdbc.Driver" }
         registry.add("spring.jpa.database-platform") { "org.hibernate.dialect.MySQLDialect" }
+        registry.add("spring.datasource.hikari.maximum-pool-size") { MAXIMUM_POOL_SIZE }
+        registry.add("spring.datasource.hikari.minimum-idle") { 0 }
+        registry.add("spring.datasource.hikari.idle-timeout") { IDLE_TIMEOUT_MS }
     }
+
+    private const val MAXIMUM_POOL_SIZE = 5
+    private const val IDLE_TIMEOUT_MS = 10_000L
 }
