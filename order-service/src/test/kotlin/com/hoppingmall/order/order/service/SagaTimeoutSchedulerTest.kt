@@ -2,10 +2,12 @@ package com.hoppingmall.order.order.service
 
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.SagaEventLog
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
+import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -42,6 +44,12 @@ class SagaTimeoutSchedulerTest {
     private lateinit var orderRepository: OrderRepository
 
     @Mock
+    private lateinit var orderItemRepository: OrderItemRepository
+
+    @Mock
+    private lateinit var inventoryCommandPort: InventoryCommandPort
+
+    @Mock
     private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @Mock
@@ -62,6 +70,8 @@ class SagaTimeoutSchedulerTest {
         scheduler = SagaTimeoutScheduler(
             sagaEventLogRepository,
             orderRepository,
+            orderItemRepository,
+            inventoryCommandPort,
             transactionalEventPublisher,
             transactionTemplate,
             sagaCompensationMetrics

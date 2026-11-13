@@ -3,9 +3,11 @@ package com.hoppingmall.order.order.service
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.SagaEventLog
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
+import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.support.MySqlJpaTestSupport
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
@@ -37,7 +39,12 @@ class SagaTimeoutSchedulerMySqlIntegrationTest : MySqlJpaTestSupport() {
     private lateinit var sagaEventLogRepository: SagaEventLogRepository
 
     @Autowired
+    private lateinit var orderItemRepository: OrderItemRepository
+
+    @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
+
+    private val inventoryCommandPort: InventoryCommandPort = mock()
 
     private val transactionalEventPublisher: TransactionalEventPublisher = mock()
 
@@ -52,6 +59,8 @@ class SagaTimeoutSchedulerMySqlIntegrationTest : MySqlJpaTestSupport() {
         scheduler = SagaTimeoutScheduler(
             sagaEventLogRepository,
             orderRepository,
+            orderItemRepository,
+            inventoryCommandPort,
             transactionalEventPublisher,
             TransactionTemplate(transactionManager),
             sagaCompensationMetrics

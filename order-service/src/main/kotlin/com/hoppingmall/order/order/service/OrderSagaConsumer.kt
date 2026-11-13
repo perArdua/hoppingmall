@@ -117,32 +117,30 @@ class OrderSagaConsumer(
     }
 
     private fun executeRemotePhase(eventId: String, event: PaymentCompletedEvent, reservationIds: List<String>) {
-        try {
-            val confirmed = if (reservationIds.isNotEmpty()) {
-                inventoryCommandPort.confirmReservations(reservationIds)
-            } else {
-                true
-            }
-
-            if (confirmed) {
-                transactionTemplate.execute {
-                    val log = sagaEventLogRepository.findByEventId(eventId)!!
-                    log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
-                    sagaEventLogRepository.save(log)
-                }
-                logger.info("주문 결제 확정: orderId=${event.orderId}")
-            } else {
-                compensateFailedConfirmation(eventId, event)
-            }
+        val confirmed = try {
+            reservationIds.isEmpty() || inventoryCommandPort.confirmReservations(reservationIds)
         } catch (e: Exception) {
             logger.error("재고 확정 실패, 보상 처리: orderId=${event.orderId}", e)
-            compensateFailedConfirmation(eventId, event)
+            false
         }
+
+        if (!confirmed) {
+            compensateFailedConfirmation(eventId, event)
+            return
+        }
+
+        transactionTemplate.execute {
+            val log = sagaEventLogRepository.findByEventId(eventId)!!
+            log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+            sagaEventLogRepository.save(log)
+        }
+        logger.info("주문 결제 확정: orderId=${event.orderId}")
     }
 
     fun compensateFailedConfirmation(eventId: String, event: PaymentCompletedEvent) {
         sagaCompensationMetrics.recordTriggered()
         val startTime = System.currentTimeMillis()
+        restoreReservationsBeforeCancel(event.orderId)
         val compensated = transactionTemplate.execute {
             val order = orderRepository.findByIdOrNull(event.orderId) ?: return@execute false
             if (order.status == OrderStatus.PAID && order.isCancellable()) {
@@ -178,6 +176,15 @@ class OrderSagaConsumer(
             sagaCompensationMetrics.recordRecoveryTime(System.currentTimeMillis() - startTime)
             logger.warn("예약 만료로 주문 취소 + 결제 역보상 요청: orderId=${event.orderId}")
         }
+    }
+
+    private fun restoreReservationsBeforeCancel(orderId: Long) {
+        val order = orderRepository.findByIdOrNull(orderId) ?: return
+        if (order.status != OrderStatus.PAID || !order.isCancellable()) return
+        val reservationIds = orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }.distinct()
+        if (reservationIds.isEmpty()) return
+        inventoryCommandPort.cancelReservations(reservationIds)
+        inventoryCommandPort.cancelConfirmedReservations(reservationIds)
     }
 
     private fun reconstructReservationIds(orderId: Long): List<String>? {

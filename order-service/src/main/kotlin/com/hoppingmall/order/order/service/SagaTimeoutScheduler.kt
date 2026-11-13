@@ -1,10 +1,12 @@
 package com.hoppingmall.order.order.service
 
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.metrics.SagaCompensationMetrics
+import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
@@ -19,6 +21,8 @@ import java.time.LocalDateTime
 class SagaTimeoutScheduler(
     private val sagaEventLogRepository: SagaEventLogRepository,
     private val orderRepository: OrderRepository,
+    private val orderItemRepository: OrderItemRepository,
+    private val inventoryCommandPort: InventoryCommandPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val transactionTemplate: TransactionTemplate,
     private val sagaCompensationMetrics: SagaCompensationMetrics
@@ -48,6 +52,7 @@ class SagaTimeoutScheduler(
     }
 
     private fun compensateTimedOutSaga(sagaId: Long, orderId: Long, eventId: String) {
+        restoreReservationsBeforeCancel(sagaId, orderId)
         val compensated = transactionTemplate.execute {
             val saga = sagaEventLogRepository.findByIdOrNull(sagaId) ?: return@execute false
             if (saga.isTimedOut() || saga.isFullyCompleted()) return@execute false
@@ -88,5 +93,16 @@ class SagaTimeoutScheduler(
             sagaCompensationMetrics.recordTimeoutTriggered()
             logger.warn("saga 타임아웃 보상 완료: orderId={}, eventId={}", orderId, eventId)
         }
+    }
+
+    private fun restoreReservationsBeforeCancel(sagaId: Long, orderId: Long) {
+        val saga = sagaEventLogRepository.findByIdOrNull(sagaId) ?: return
+        if (saga.isTimedOut() || saga.isFullyCompleted()) return
+        val order = orderRepository.findByIdOrNull(orderId) ?: return
+        if (order.status != OrderStatus.PAID || !order.isCancellable()) return
+        val reservationIds = orderItemRepository.findByOrderId(orderId).mapNotNull { it.reservationId }.distinct()
+        if (reservationIds.isEmpty()) return
+        inventoryCommandPort.cancelReservations(reservationIds)
+        inventoryCommandPort.cancelConfirmedReservations(reservationIds)
     }
 }
