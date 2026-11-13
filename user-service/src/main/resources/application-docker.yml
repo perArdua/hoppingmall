@@ -37,6 +37,10 @@ spring:
               - "redis://redis-node-2:7002"
               - "redis://redis-node-3:7003"
             scanInterval: 1000
+
+server:
+  forward-headers-strategy: none
+
 management:
   metrics:
     tags:

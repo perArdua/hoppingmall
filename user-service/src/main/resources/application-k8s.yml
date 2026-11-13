@@ -31,6 +31,9 @@ spring:
           singleServerConfig:
             address: "redis://redis.hoppingmall.svc.cluster.local:6379"
 
+server:
+  forward-headers-strategy: none
+
 management:
   endpoint:
     health:
