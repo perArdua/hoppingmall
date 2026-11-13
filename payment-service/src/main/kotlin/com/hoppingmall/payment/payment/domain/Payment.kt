@@ -53,6 +53,12 @@ class Payment private constructor(
     val couponDiscountAmount: BigDecimal = BigDecimal.ZERO
 ) : BaseEntity() {
 
+    @Column(name = "refunded_amount", precision = 10, scale = 2, insertable = false, updatable = false)
+    val refundedAmount: BigDecimal? = null
+
+    fun membershipCancelRevertAmount(): BigDecimal =
+        amount.subtract(refundedAmount ?: BigDecimal.ZERO).max(BigDecimal.ZERO)
+
     companion object {
         private val allowedTransitions: Map<PaymentStatus, Set<PaymentStatus>> = mapOf(
             PaymentStatus.PENDING to setOf(PaymentStatus.SUCCESS, PaymentStatus.FAILED),

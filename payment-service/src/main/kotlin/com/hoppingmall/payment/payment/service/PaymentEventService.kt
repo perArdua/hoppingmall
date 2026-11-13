@@ -63,7 +63,7 @@ class PaymentEventService(
         publishMembershipRevertEvent(
             payment = payment,
             eventId = "membership-revert-cancel-${payment.id}",
-            amount = payment.amount,
+            amount = payment.membershipCancelRevertAmount(),
             reason = MembershipRevertReason.CANCEL,
             refundId = null
         )
