@@ -1,5 +1,6 @@
 package com.hoppingmall.gateway.filter
 
+import com.hoppingmall.gateway.config.GatewayRateLimitProperties
 import com.hoppingmall.gateway.config.GatewayRedisProperties
 import com.hoppingmall.gateway.config.GatewayRedisScheduler
 import com.hoppingmall.gateway.config.RateLimitKeyType
@@ -30,15 +31,18 @@ class RateLimitGlobalFilter(
     @Value("\${gateway.rate-limit.enabled:true}")
     private val enabled: Boolean,
     private val meterRegistry: MeterRegistry = Metrics.globalRegistry,
-    redisProperties: GatewayRedisProperties = GatewayRedisProperties()
+    redisProperties: GatewayRedisProperties = GatewayRedisProperties(),
+    rateLimitProperties: GatewayRateLimitProperties = GatewayRateLimitProperties()
 ) : GlobalFilter {
 
     private val pathMatcher = AntPathMatcher()
     private val redisCommandTimeout = redisProperties.commandTimeout
+    private val trustedProxyCount = rateLimitProperties.trustedProxyCount
 
     companion object {
         private val log = LoggerFactory.getLogger(RateLimitGlobalFilter::class.java)
         private const val REDIS_FAILURE_METRIC = "gateway.ratelimit.redis.failures"
+        private const val X_FORWARDED_FOR = "X-Forwarded-For"
 
         private val GLOBAL_FALLBACK = RateLimitPolicy(
             id = "global",
@@ -77,13 +81,28 @@ class RateLimitGlobalFilter(
         return when (keyType) {
             RateLimitKeyType.USER_ID -> {
                 exchange.request.headers.getFirst("x-user-id")
-                    ?: exchange.request.remoteAddress?.address?.hostAddress
+                    ?: resolveClientIp(exchange)
                     ?: "anonymous"
             }
             RateLimitKeyType.IP -> {
-                exchange.request.remoteAddress?.address?.hostAddress ?: "anonymous"
+                resolveClientIp(exchange) ?: "anonymous"
             }
         }
+    }
+
+    private fun resolveClientIp(exchange: ServerWebExchange): String? {
+        val remoteAddress = exchange.request.remoteAddress?.address?.hostAddress
+        if (trustedProxyCount == 0) {
+            return remoteAddress
+        }
+        val forwarded = exchange.request.headers[X_FORWARDED_FOR].orEmpty()
+            .flatMap { it.split(',') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        if (forwarded.isEmpty()) {
+            return remoteAddress
+        }
+        return forwarded[(forwarded.size - trustedProxyCount).coerceAtLeast(0)]
     }
 
     private fun checkLimit(
