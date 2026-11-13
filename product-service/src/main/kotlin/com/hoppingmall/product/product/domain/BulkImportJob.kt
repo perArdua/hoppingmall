@@ -3,6 +3,8 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.product.product.enum.BulkImportStatus
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 
 @Entity
@@ -18,7 +20,8 @@ class BulkImportJob private constructor(
     val fileName: String,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: BulkImportStatus = BulkImportStatus.VALIDATING,
 
     @Column(nullable = false)

@@ -3,7 +3,9 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.product.common.enums.ProductStatus
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.SQLRestriction
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 
 @Entity
@@ -33,7 +35,8 @@ class Product private constructor(
     var price: BigDecimal,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32)
     var status: ProductStatus = ProductStatus.AVAILABLE
 
 ): BaseEntity() {
