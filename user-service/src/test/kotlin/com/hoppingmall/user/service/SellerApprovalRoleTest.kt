@@ -9,6 +9,7 @@ import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.PasswordCreator
+import com.hoppingmall.user.config.ratelimit.NoOpLoginAttemptLimiter
 import com.hoppingmall.user.domain.Seller
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.SellerRepository
@@ -72,7 +73,8 @@ class SellerApprovalRoleTest {
             refreshTokenService = mock<RefreshTokenService>(),
             jwtProperties = jwtProperties,
             userRepository = userRepository,
-            accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>()
+            accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
+            loginAttemptLimiter = NoOpLoginAttemptLimiter()
         )
     }
 

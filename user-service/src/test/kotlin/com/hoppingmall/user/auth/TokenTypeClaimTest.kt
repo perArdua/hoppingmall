@@ -6,6 +6,7 @@ import com.hoppingmall.user.auth.exception.InvalidTokenException
 import com.hoppingmall.user.auth.service.AuthServiceImpl
 import com.hoppingmall.user.auth.service.RefreshTokenServiceImpl
 import com.hoppingmall.user.common.enums.Role
+import com.hoppingmall.user.config.ratelimit.NoOpLoginAttemptLimiter
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
@@ -81,7 +82,8 @@ class TokenTypeClaimTest {
             refreshTokenService = RefreshTokenServiceImpl(RefreshTokenRepository(stringRedisTemplate)),
             jwtProperties = jwtProperties,
             userRepository = userRepository,
-            accessTokenBlacklistRepository = accessTokenBlacklistRepository
+            accessTokenBlacklistRepository = accessTokenBlacklistRepository,
+            loginAttemptLimiter = NoOpLoginAttemptLimiter()
         )
         user = User.fixture().withId(1L)
 

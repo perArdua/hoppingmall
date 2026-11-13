@@ -5,9 +5,12 @@ import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
+import com.hoppingmall.user.config.ratelimit.LoginAttemptLimiter
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
 import com.hoppingmall.user.dto.response.SignInResponse
+import com.hoppingmall.user.exception.user.LoginAttemptsExceededException
+import com.hoppingmall.user.exception.user.UserLoginFailedException
 import com.hoppingmall.user.exception.user.UserNotFoundException
 import com.hoppingmall.user.service.UserQueryService
 import org.slf4j.LoggerFactory
@@ -22,13 +25,23 @@ class AuthServiceImpl(
     private val refreshTokenService: RefreshTokenService,
     private val jwtProperties: JwtProperties,
     private val userRepository: UserRepository,
-    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository
+    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository,
+    private val loginAttemptLimiter: LoginAttemptLimiter
 ) : AuthService {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun login(request: SignInRequest): SignInResponse {
-        val user = userQueryService.authenticate(request)
+        if (loginAttemptLimiter.isBlocked(request.email)) {
+            throw LoginAttemptsExceededException()
+        }
+        val user = try {
+            userQueryService.authenticate(request)
+        } catch (e: UserLoginFailedException) {
+            loginAttemptLimiter.recordFailure(request.email)
+            throw e
+        }
+        loginAttemptLimiter.reset(request.email)
         val userId = user.id!!
         log.info("로그인 성공: userId={}, role={}", userId, user.getRole())
 
