@@ -77,12 +77,13 @@ class ProductStatisticsCommandServiceImplTest {
     fun 기존_통계에_판매를_증가시킨다() {
         val stats = createStats()
 
-        whenever(productStatisticsRepository.findByProductId(1L)).thenReturn(stats)
-        whenever(productStatisticsRepository.save(any<ProductStatistics>())).thenReturn(stats)
+        whenever(productStatisticsRepository.addSales(1L, 5, BigDecimal("50000"))).thenReturn(1)
+        whenever(productStatisticsRepository.findByProductIdForUpdate(1L)).thenReturn(stats)
 
         service.incrementSalesStats(1L, 5, BigDecimal("50000"))
 
-        assertThat(stats.totalSalesQuantity).isEqualTo(5)
+        verify(productStatisticsRepository).addSales(1L, 5, BigDecimal("50000"))
+        verify(productStatisticsRepository).findByProductIdForUpdate(1L)
     }
 
     @Test
@@ -93,18 +94,19 @@ class ProductStatisticsCommandServiceImplTest {
         ).withId(1L)
         val stats = createStats()
 
-        whenever(productStatisticsRepository.findByProductId(1L)).thenReturn(null)
+        whenever(productStatisticsRepository.addSales(1L, 5, BigDecimal("50000"))).thenReturn(0).thenReturn(1)
         whenever(productRepository.findById(1L)).thenReturn(Optional.of(product))
         whenever(productStatisticsRepository.save(any<ProductStatistics>())).thenReturn(stats)
 
         service.incrementSalesStats(1L, 5, BigDecimal("50000"))
 
-        verify(productStatisticsRepository, org.mockito.kotlin.times(2)).save(any<ProductStatistics>())
+        verify(productStatisticsRepository).save(any<ProductStatistics>())
+        verify(productStatisticsRepository, org.mockito.kotlin.times(2)).addSales(1L, 5, BigDecimal("50000"))
     }
 
     @Test
     fun 존재하지_않는_상품의_통계_생성_시_예외를_발생시킨다() {
-        whenever(productStatisticsRepository.findByProductId(999L)).thenReturn(null)
+        whenever(productStatisticsRepository.addSales(999L, 5, BigDecimal("50000"))).thenReturn(0)
         whenever(productRepository.findById(999L)).thenReturn(Optional.empty())
 
         assertThatThrownBy { service.incrementSalesStats(999L, 5, BigDecimal("50000")) }
@@ -114,35 +116,36 @@ class ProductStatisticsCommandServiceImplTest {
     @Test
     fun 판매_통계를_감소시킨다() {
         val stats = createStats()
-        stats.incrementSales(10, BigDecimal("100000"))
 
-        whenever(productStatisticsRepository.findByProductId(1L)).thenReturn(stats)
-        whenever(productStatisticsRepository.save(any<ProductStatistics>())).thenReturn(stats)
+        whenever(productStatisticsRepository.subtractSales(1L, 5, BigDecimal("50000"))).thenReturn(1)
+        whenever(productStatisticsRepository.findByProductIdForUpdate(1L)).thenReturn(stats)
 
         service.decrementSalesStats(1L, 5, BigDecimal("50000"))
 
-        assertThat(stats.totalSalesQuantity).isEqualTo(5)
+        verify(productStatisticsRepository).subtractSales(1L, 5, BigDecimal("50000"))
+        verify(productStatisticsRepository).findByProductIdForUpdate(1L)
     }
 
     @Test
     fun 통계가_없는_상품의_판매_감소는_무시한다() {
-        whenever(productStatisticsRepository.findByProductId(999L)).thenReturn(null)
+        whenever(productStatisticsRepository.subtractSales(999L, 5, BigDecimal("50000"))).thenReturn(0)
 
         service.decrementSalesStats(999L, 5, BigDecimal("50000"))
 
-        verify(productStatisticsRepository).findByProductId(999L)
+        verify(productStatisticsRepository, org.mockito.kotlin.never()).findByProductIdForUpdate(999L)
     }
 
     @Test
     fun 환불_통계를_증가시킨다() {
         val stats = createStats()
 
-        whenever(productStatisticsRepository.findByProductId(1L)).thenReturn(stats)
-        whenever(productStatisticsRepository.save(any<ProductStatistics>())).thenReturn(stats)
+        whenever(productStatisticsRepository.addRefund(1L, 3, BigDecimal("30000"))).thenReturn(1)
+        whenever(productStatisticsRepository.findByProductIdForUpdate(1L)).thenReturn(stats)
 
         service.incrementRefundStats(1L, 3, BigDecimal("30000"))
 
-        assertThat(stats.totalRefundQuantity).isEqualTo(3)
+        verify(productStatisticsRepository).addRefund(1L, 3, BigDecimal("30000"))
+        verify(productStatisticsRepository).findByProductIdForUpdate(1L)
     }
 
     @Test
