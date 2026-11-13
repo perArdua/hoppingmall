@@ -7,6 +7,7 @@ import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
+import com.hoppingmall.payment.payment.exception.PaymentCancelInProgressException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
@@ -134,11 +135,24 @@ class PaymentCommandServiceImplTest {
     @Test
     fun cancelPayment_취소_불가_상태면_예외() {
         val service = createService()
-        val payment = createPayment(status = PaymentStatus.CANCELLED)
+        val payment = createPayment(status = PaymentStatus.FAILED)
         whenever(paymentRepository.findByIdForUpdate(1L)).thenReturn(payment)
 
         assertThatThrownBy { service.cancelPayment(1L, 10L) }
             .isInstanceOf(PaymentInvalidStateException::class.java)
+    }
+
+    @Test
+    fun cancelPayment_이미_취소된_결제면_다시_되돌리지_않고_그대로_돌려준다() {
+        val service = createService()
+        val payment = createPayment(status = PaymentStatus.CANCELLED)
+        whenever(paymentRepository.findByIdForUpdate(1L)).thenReturn(payment)
+
+        val result = service.cancelPayment(1L, 10L)
+
+        assertThat(result.status).isEqualTo(PaymentStatus.CANCELLED)
+        verify(paymentRepository, never()).save(any<Payment>())
+        verify(paymentEventService, never()).publishPaymentCancelledEvent(any())
     }
 
     @Test
@@ -168,15 +182,16 @@ class PaymentCommandServiceImplTest {
     }
 
     @Test
-    fun cancelPaymentInternal_PENDING_결제도_취소_가능() {
+    fun cancelPaymentInternal_PENDING_결제는_진행_중이라_취소하지_않는다() {
         val service = createService()
         val payment = createPayment(status = PaymentStatus.PENDING)
         whenever(paymentRepository.findByIdForUpdate(1L)).thenReturn(payment)
-        whenever(paymentRepository.save(any<Payment>())).thenAnswer { it.arguments[0] }
 
-        val result = service.cancelPaymentInternal(1L)
+        assertThatThrownBy { service.cancelPaymentInternal(1L) }
+            .isInstanceOf(PaymentCancelInProgressException::class.java)
 
-        assertThat(result.status).isEqualTo(PaymentStatus.CANCELLED)
+        assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+        verify(paymentRepository, never()).save(any<Payment>())
     }
 
     @Test
