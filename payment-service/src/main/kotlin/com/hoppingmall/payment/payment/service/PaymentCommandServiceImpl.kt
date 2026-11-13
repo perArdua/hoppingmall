@@ -17,6 +17,7 @@ import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import com.hoppingmall.payment.payment.exception.PaymentOrderNotFoundException
 import com.hoppingmall.payment.payment.exception.PaymentOrderNotPayableException
 import com.hoppingmall.payment.payment.exception.PaymentOrderUnavailableException
+import com.hoppingmall.payment.payment.exception.PaymentPointUseNotAllowedException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
 import com.hoppingmall.payment.port.OrderSummary
 import com.hoppingmall.payment.port.OrderSummaryQueryPort
@@ -47,6 +48,9 @@ class PaymentCommandServiceImpl(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse = paymentMetrics.recordProcessingTime {
+        if (paymentRequest.pointAmount > BigDecimal.ZERO) {
+            throw PaymentPointUseNotAllowedException()
+        }
         verifyOrder(paymentRequest, userId)
 
         var couponDiscountAmount = BigDecimal.ZERO
