@@ -68,7 +68,7 @@ class RefundCompletionConsumer(
     fun processRefundCompletion(event: RefundCompletedEvent) {
         try {
             val existingLog = refundEventLogRepository.findByEventIdWithSteps(event.eventId)
-            if (existingLog != null && existingLog.completedSteps.size >= 6) {
+            if (existingLog != null && existingLog.isAllStepsCompleted()) {
                 logger.info("이미 완료된 환불 이벤트: ${event.eventId}")
                 return
             }
@@ -103,25 +103,32 @@ class RefundCompletionConsumer(
     }
 
     fun executeInventoryOperations(event: RefundCompletedEvent, eventLog: RefundEventLog) {
-        if (!eventLog.isStepCompleted(RefundEventLog.INVENTORY_RESTORED)) {
-            event.items.forEach { item ->
-                inventoryCommandPort.increaseStock(item.productId, item.quantity)
+        runStepOnce(event.eventId, eventLog, RefundEventLog.INVENTORY_RESTORED) {
+            event.items.forEachIndexed { index, item ->
+                runStepOnce(event.eventId, eventLog, RefundEventLog.inventoryItemStep(index)) {
+                    inventoryCommandPort.increaseStock(item.productId, item.quantity)
+                }
             }
-            refundLocalOperationService.markStepAndSave(event.eventId, RefundEventLog.INVENTORY_RESTORED)
-            eventLog.markStepCompleted(RefundEventLog.INVENTORY_RESTORED)
         }
 
-        if (!eventLog.isStepCompleted(RefundEventLog.STATS_UPDATED)) {
-            event.items.forEach { item ->
-                productStatisticsPort.incrementRefundStats(
-                    item.productId,
-                    item.quantity.toLong(),
-                    item.refundPrice
-                )
+        runStepOnce(event.eventId, eventLog, RefundEventLog.STATS_UPDATED) {
+            event.items.forEachIndexed { index, item ->
+                runStepOnce(event.eventId, eventLog, RefundEventLog.statsItemStep(index)) {
+                    productStatisticsPort.incrementRefundStats(
+                        item.productId,
+                        item.quantity.toLong(),
+                        item.refundPrice
+                    )
+                }
             }
-            refundLocalOperationService.markStepAndSave(event.eventId, RefundEventLog.STATS_UPDATED)
-            eventLog.markStepCompleted(RefundEventLog.STATS_UPDATED)
         }
+    }
+
+    private fun runStepOnce(eventId: String, eventLog: RefundEventLog, step: String, action: () -> Unit) {
+        if (eventLog.isStepCompleted(step)) return
+        action()
+        refundLocalOperationService.markStepAndSave(eventId, step)
+        eventLog.markStepCompleted(step)
     }
 
     fun executeOrderOperations(event: RefundCompletedEvent, eventLog: RefundEventLog) {
