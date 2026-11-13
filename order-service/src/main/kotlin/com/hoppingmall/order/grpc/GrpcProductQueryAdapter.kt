@@ -2,6 +2,7 @@ package com.hoppingmall.order.grpc
 
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
+import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.product.grpc.ProductIdRequest
 import com.hoppingmall.product.grpc.ProductIdsRequest
 import com.hoppingmall.product.grpc.ProductQueryServiceGrpc
@@ -57,11 +58,11 @@ class GrpcProductQueryAdapter(
     private fun findProductByIdFallback(productId: Long, e: Exception): ProductInfo? {
         if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
         log.warn("CB fallback: 상품 조회 실패 productId=$productId", e)
-        return null
+        throw ProductQueryUnavailableException("상품 조회 실패 productId=$productId", e)
     }
 
     private fun findProductsByIdsFallback(productIds: List<Long>, e: Exception): List<ProductInfo> {
         log.warn("CB fallback: 상품 목록 조회 실패 productIds=$productIds", e)
-        return emptyList()
+        throw ProductQueryUnavailableException("상품 목록 조회 실패 productIds=$productIds", e)
     }
 }

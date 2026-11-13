@@ -19,6 +19,7 @@ import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
+import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.common.KafkaTopics
@@ -26,6 +27,7 @@ import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
+import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -66,7 +68,7 @@ class OrderCommandServiceImpl(
         }
 
         val productIds = cartItems.map { it.productId }.distinct()
-        val productMap = productQueryPort.findProductsByIds(productIds).associateBy { it.id }
+        val productMap = findProducts(productIds).associateBy { it.id }
         productIds.forEach { productId ->
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
@@ -123,6 +125,13 @@ class OrderCommandServiceImpl(
         orderMetrics.recordOrderCreated(totalAmount)
         return response
     }
+
+    private fun findProducts(productIds: List<Long>): List<ProductInfo> =
+        try {
+            productQueryPort.findProductsByIds(productIds)
+        } catch (e: ProductQueryUnavailableException) {
+            throw OrderProductUnavailableException()
+        }
 
     private fun reserveStock(items: List<Pair<Long, Int>>): Map<Long, String> =
         try {
