@@ -5,6 +5,7 @@ import com.hoppingmall.dlq.service.DLQCommandService
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.listener.ConsumerRecordRecoverer
+import org.springframework.kafka.support.KafkaUtils
 
 class OrderKafkaRecordRecoverer(
     private val dlqCommandService: DLQCommandService
@@ -22,7 +23,8 @@ class OrderKafkaRecordRecoverer(
             originalKey = record.key()?.toString(),
             originalValue = record.value()?.toString(),
             exception = exception.message,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            consumerGroup = KafkaUtils.getConsumerGroupId()
         )
         dlqCommandService.saveDLQMessage(deadLetterMessage)
     }
