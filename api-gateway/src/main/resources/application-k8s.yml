@@ -52,6 +52,53 @@ spring:
           filters:
             - JwtValidation
 
+        - id: order-service-admin-dlq-by-service
+          uri: http://order-service.hoppingmall.svc.cluster.local:8084
+          predicates:
+            - Path=/api/v1/admin/dlq/order/**
+          filters:
+            - JwtValidation=ADMIN
+            - RewritePath=/api/v1/admin/dlq/order/(?<segment>.*), /api/v1/admin/dlq/$\{segment}
+
+        - id: product-service-admin-dlq-by-service
+          uri: http://product-service.hoppingmall.svc.cluster.local:8083
+          predicates:
+            - Path=/api/v1/admin/dlq/product/**
+          filters:
+            - JwtValidation=ADMIN
+            - RewritePath=/api/v1/admin/dlq/product/(?<segment>.*), /api/v1/admin/dlq/$\{segment}
+
+        - id: user-service-admin-dlq-by-service
+          uri: http://user-service.hoppingmall.svc.cluster.local:8082
+          predicates:
+            - Path=/api/v1/admin/dlq/user/**
+          filters:
+            - JwtValidation=ADMIN
+            - RewritePath=/api/v1/admin/dlq/user/(?<segment>.*), /api/v1/admin/dlq/$\{segment}
+
+        - id: notification-service-admin-dlq-by-service
+          uri: http://notification-service.hoppingmall.svc.cluster.local:8081
+          predicates:
+            - Path=/api/v1/admin/dlq/notification/**
+          filters:
+            - JwtValidation=ADMIN
+            - RewritePath=/api/v1/admin/dlq/notification/(?<segment>.*), /api/v1/admin/dlq/$\{segment}
+
+        - id: payment-service-admin-dlq-by-service
+          uri: http://payment-service.hoppingmall.svc.cluster.local:8085
+          predicates:
+            - Path=/api/v1/admin/dlq/payment/**
+          filters:
+            - JwtValidation=ADMIN
+            - RewritePath=/api/v1/admin/dlq/payment/(?<segment>.*), /api/v1/admin/dlq/$\{segment}
+
+        - id: product-service-files
+          uri: http://product-service.hoppingmall.svc.cluster.local:8083
+          predicates:
+            - Path=/api/v1/files/**
+          filters:
+            - JwtValidation
+
         - id: payment-service-admin-dlq
           uri: http://payment-service.hoppingmall.svc.cluster.local:8085
           predicates:
