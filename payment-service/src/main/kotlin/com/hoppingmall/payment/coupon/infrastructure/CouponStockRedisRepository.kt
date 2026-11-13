@@ -107,10 +107,12 @@ class CouponStockRedisRepository(
             local userSetKey = KEYS[2]
             local userId = ARGV[1]
 
+            if redis.call('SREM', userSetKey, userId) == 0 then
+                return 0
+            end
             if redis.call('EXISTS', stockKey) == 1 then
                 redis.call('INCR', stockKey)
             end
-            redis.call('SREM', userSetKey, userId)
             return 1
         """
 
