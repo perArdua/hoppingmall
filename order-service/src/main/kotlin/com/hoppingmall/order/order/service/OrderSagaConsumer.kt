@@ -228,6 +228,13 @@ class OrderSagaConsumer(
             val log = SagaEventLog(eventId = eventId, eventType = "PAYMENT_COMPENSATION", orderId = orderId)
             log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
 
+            if (order.status == OrderStatus.CANCEL_REQUESTED) {
+                log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+                sagaEventLogRepository.save(log)
+                logger.info("취소 요청 중인 주문의 결제 보상은 취소 결과 처리에 맡김: orderId=$orderId")
+                return@execute null
+            }
+
             if (!order.isCancellable()) {
                 log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
                 sagaEventLogRepository.save(log)
