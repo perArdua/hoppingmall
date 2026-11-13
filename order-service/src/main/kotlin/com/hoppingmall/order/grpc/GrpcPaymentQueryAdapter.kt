@@ -2,6 +2,7 @@ package com.hoppingmall.order.grpc
 
 import com.hoppingmall.order.port.PaymentInfo
 import com.hoppingmall.order.port.PaymentQueryPort
+import com.hoppingmall.order.port.PaymentQueryUnavailableException
 import com.hoppingmall.payment.grpc.PaymentIdRequest
 import com.hoppingmall.payment.grpc.PaymentOrderIdRequest
 import com.hoppingmall.payment.grpc.PaymentQueryServiceGrpc
@@ -33,6 +34,18 @@ class GrpcPaymentQueryAdapter(
         return response.toPaymentInfo()
     }
 
+    @CircuitBreaker(name = "payment-query", fallbackMethod = "findByOrderIdOrThrowIfUnavailableFallback")
+    @Retry(name = "payment-query")
+    override fun findByOrderIdOrThrowIfUnavailable(orderId: Long): PaymentInfo? =
+        try {
+            stub.findPaymentByOrderId(
+                PaymentOrderIdRequest.newBuilder().setOrderId(orderId).build()
+            ).toPaymentInfo()
+        } catch (e: StatusRuntimeException) {
+            if (e.status.code != Status.Code.NOT_FOUND) throw e
+            null
+        }
+
     @CircuitBreaker(name = "payment-query", fallbackMethod = "findByIdFallback")
     @Retry(name = "payment-query")
     override fun findById(paymentId: Long): PaymentInfo? {
@@ -46,6 +59,11 @@ class GrpcPaymentQueryAdapter(
         if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
         log.warn("CB fallback: 결제 조회 실패 orderId=$orderId", e)
         return null
+    }
+
+    private fun findByOrderIdOrThrowIfUnavailableFallback(orderId: Long, e: Exception): PaymentInfo? {
+        log.warn("CB fallback: 결제 조회 불가 orderId=$orderId", e)
+        throw PaymentQueryUnavailableException("결제 조회 실패 orderId=$orderId", e)
     }
 
     private fun findByIdFallback(paymentId: Long, e: Exception): PaymentInfo? {

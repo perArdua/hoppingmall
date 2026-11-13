@@ -56,6 +56,7 @@ class OrderSagaConsumer(
 
     private fun executeLocalPhase(event: PaymentCompletedEvent, eventId: String): List<String>? {
         return transactionTemplate.execute {
+            orderRepository.lockById(event.orderId)
             val order = orderRepository.findByIdOrNull(event.orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=${event.orderId}")
@@ -64,6 +65,9 @@ class OrderSagaConsumer(
 
             if (order.status !in setOf(OrderStatus.CREATED, OrderStatus.PAYING)) {
                 logger.warn("주문 상태가 CREATED/PAYING이 아님: orderId=${event.orderId}, status=${order.status}")
+                if (order.status == OrderStatus.CANCELLED) {
+                    requestLatePaymentCancellation(event)
+                }
                 val log = sagaEventLogRepository.findByEventId(eventId)
                     ?: SagaEventLog(
                         eventId = eventId,
@@ -94,6 +98,22 @@ class OrderSagaConsumer(
 
             orderItemRepository.findByOrderId(event.orderId).mapNotNull { it.reservationId }.distinct()
         }
+    }
+
+    private fun requestLatePaymentCancellation(event: PaymentCompletedEvent) {
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Order",
+            aggregateId = event.orderId.toString(),
+            eventType = "PaymentCancellationRequested",
+            eventData = mapOf(
+                "eventType" to "PaymentCancellationRequested",
+                "eventId" to "cancel-late-${event.transactionId}",
+                "orderId" to event.orderId
+            ),
+            topic = KafkaTopics.PAYMENT_COMPENSATION,
+            partitionKey = event.orderId.toString()
+        )
+        logger.warn("취소된 주문에 늦게 온 결제 완료, 결제 취소 요청: orderId=${event.orderId}, paymentId=${event.paymentId}")
     }
 
     private fun executeRemotePhase(eventId: String, event: PaymentCompletedEvent, reservationIds: List<String>) {

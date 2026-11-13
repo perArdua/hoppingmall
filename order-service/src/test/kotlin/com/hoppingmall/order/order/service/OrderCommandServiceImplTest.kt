@@ -16,6 +16,7 @@ import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentCancellationResult
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
@@ -392,7 +393,7 @@ class OrderCommandServiceImplTest {
 
         whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
         whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
-        whenever(paymentCommandPort.cancelPayment(1L)).thenReturn(true)
+        whenever(paymentCommandPort.cancelPayment(1L)).thenReturn(PaymentCancellationResult.CANCELLED)
 
         service.cancelOrder(10L, 1L)
 
@@ -615,7 +616,6 @@ class OrderCommandServiceImplTest {
             .thenReturn(Optional.of(order))
             .thenReturn(Optional.empty())
         whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
-        whenever(paymentCommandPort.cancelPayment(1L)).thenReturn(true)
 
         assertThatThrownBy { service.cancelOrder(10L, 1L) }
             .isInstanceOf(OrderNotFoundException::class.java)

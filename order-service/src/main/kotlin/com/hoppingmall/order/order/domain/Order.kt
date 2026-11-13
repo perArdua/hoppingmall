@@ -26,6 +26,9 @@ class Order private constructor(
     val totalAmount: BigDecimal
 ) : BaseEntity() {
 
+    @Column(nullable = false)
+    var cancelRetryCount: Int = 0
+
     companion object {
         val MAX_TOTAL_AMOUNT: BigDecimal = BigDecimal("99999999.99")
 
@@ -56,6 +59,18 @@ class Order private constructor(
             throw OrderInvalidStatusException()
         }
         this.status = newStatus
+    }
+
+    fun requestCancellation() {
+        updateStatus(OrderStatus.CANCEL_REQUESTED)
+        cancelRetryCount = 0
+    }
+
+    fun recordCancellationRetry() {
+        if (status != OrderStatus.CANCEL_REQUESTED) {
+            throw OrderInvalidStatusException()
+        }
+        cancelRetryCount += 1
     }
 
     fun isCancellable(): Boolean {
