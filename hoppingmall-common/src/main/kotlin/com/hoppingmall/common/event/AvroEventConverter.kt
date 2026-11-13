@@ -11,9 +11,6 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
 
     companion object {
         private const val EVENT_TYPE_FIELD = "eventType"
-        private val LEGACY_FILLED_FIELDS: Map<String, Set<String>> = mapOf(
-            "PaymentReversalRequested" to setOf("paymentId", "amount")
-        )
     }
 
     private val schemaMap: Map<String, Schema> = mapOf(
@@ -46,21 +43,15 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
                 throw IllegalArgumentException("Unknown event type: $eventType")
             }
         val jsonMap = objectMapper.readValue(jsonData, Map::class.java)
-        val legacyFilled = LEGACY_FILLED_FIELDS[eventType].orEmpty()
-        return buildGenericRecord(schema, jsonMap, eventType, legacyFilled).apply { put(EVENT_TYPE_FIELD, eventType) }
+        return buildGenericRecord(schema, jsonMap, eventType).apply { put(EVENT_TYPE_FIELD, eventType) }
     }
 
-    private fun buildGenericRecord(
-        schema: Schema,
-        map: Map<*, *>,
-        eventType: String,
-        legacyFilled: Set<String> = emptySet()
-    ): GenericRecord {
+    private fun buildGenericRecord(schema: Schema, map: Map<*, *>, eventType: String): GenericRecord {
         val record = GenericData.Record(schema)
         for (field in schema.fields) {
             val value = map[field.name()]
             val converted = if (value == null) {
-                missingValue(field, eventType, legacyFilled)
+                missingValue(field, eventType)
             } else {
                 convertValue(field.schema(), value, eventType)
             }
@@ -69,10 +60,9 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
         return record
     }
 
-    private fun missingValue(field: Schema.Field, eventType: String, legacyFilled: Set<String>): Any? = when {
+    private fun missingValue(field: Schema.Field, eventType: String): Any? = when {
         field.hasDefaultValue() -> GenericData.get().getDefaultValue(field)
         field.schema().isNullable -> null
-        field.name() in legacyFilled -> convertValue(field.schema(), null, eventType)
         else -> throw IllegalArgumentException("Missing required field: $eventType.${field.name()}")
     }
 
