@@ -24,7 +24,7 @@ class HttpInventoryCommandAdapter(
 
     private val restTemplate: RestTemplate = restTemplateBuilder
         .connectTimeout(Duration.ofSeconds(2))
-        .readTimeout(READ_TIMEOUT)
+        .readTimeout(Duration.ofMillis(RESERVE_BUDGET_MS + RESPONSE_MARGIN_MS))
         .build()
 
     @CircuitBreaker(name = "inventory-command")
@@ -127,7 +127,6 @@ class HttpInventoryCommandAdapter(
         const val RESERVE_BUDGET_HEADER = "X-Reserve-Budget-Ms"
         const val RESERVE_BUDGET_MS = 5000L
         const val RESPONSE_MARGIN_MS = 1000L
-        val READ_TIMEOUT: Duration = Duration.ofMillis(RESERVE_BUDGET_MS + RESPONSE_MARGIN_MS)
         const val REQUEST_KEY_HEADER = "X-Reservation-Request-Key"
     }
 
