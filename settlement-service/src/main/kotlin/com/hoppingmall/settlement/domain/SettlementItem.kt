@@ -5,6 +5,7 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import java.math.BigDecimal
 
 @Entity
@@ -13,6 +14,9 @@ import java.math.BigDecimal
     indexes = [
         Index(name = "idx_settlement_items_settlement_id", columnList = "settlementId"),
         Index(name = "idx_settlement_items_order_id", columnList = "orderId")
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(name = SettlementItem.ORDER_ITEM_UNIQUE_CONSTRAINT, columnNames = ["orderItemId"])
     ]
 )
 class SettlementItem private constructor(
@@ -36,6 +40,8 @@ class SettlementItem private constructor(
 ) : BaseEntity() {
 
     companion object {
+        const val ORDER_ITEM_UNIQUE_CONSTRAINT = "uk_settlement_items_order_item_id"
+
         fun create(
             settlementId: Long,
             orderId: Long,

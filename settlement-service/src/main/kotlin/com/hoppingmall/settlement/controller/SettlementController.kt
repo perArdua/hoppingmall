@@ -6,10 +6,13 @@ import com.hoppingmall.settlement.dto.request.CreateSettlementRequest
 import com.hoppingmall.settlement.dto.response.SettlementDetailResponse
 import com.hoppingmall.settlement.dto.response.SettlementResponse
 import com.hoppingmall.settlement.enums.SettlementStatus
+import com.hoppingmall.settlement.exception.SettlementInvalidSellerException
 import com.hoppingmall.settlement.exception.SettlementSellerNotFoundException
 import com.hoppingmall.settlement.port.SellerQueryPort
 import com.hoppingmall.settlement.service.SettlementCommandService
 import com.hoppingmall.settlement.service.SettlementQueryService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -27,10 +30,15 @@ class SettlementController(
     private val sellerQueryPort: SellerQueryPort
 ) {
 
+    @Operation(description = "정산을 만든다. 요청의 seller_id는 승인된 판매자의 사용자 id(users.id)다. 판매자 행 id(sellers.id)가 아니다. 승인된 판매자의 사용자 id가 아니면 400(STL010).")
     @PostMapping("/api/v1/admin/settlements")
     fun createSettlement(
         @Valid @RequestBody request: CreateSettlementRequest
     ): ResponseEntity<ApiResponse<SettlementResponse>> {
+        val seller = sellerQueryPort.findByUserId(request.sellerId)
+        if (seller == null || !seller.approved) {
+            throw SettlementInvalidSellerException()
+        }
         val result = settlementCommandService.createSettlement(request)
         return ResponseEntity.ok(ApiResponse.success(result))
     }
@@ -53,6 +61,7 @@ class SettlementController(
 
     @GetMapping("/api/v1/admin/settlements")
     fun getSettlementsForAdmin(
+        @Parameter(description = "판매자의 사용자 id(users.id). 판매자 행 id(sellers.id)가 아니다.")
         @RequestParam(required = false) sellerId: Long?,
         @RequestParam(required = false) status: SettlementStatus?,
         @PageableDefault(size = 20, sort = ["createdAt"]) pageable: Pageable
@@ -75,9 +84,9 @@ class SettlementController(
         @RequestParam(required = false) status: SettlementStatus?,
         @PageableDefault(size = 20, sort = ["createdAt"]) pageable: Pageable
     ): ResponseEntity<ApiResponse<Page<SettlementResponse>>> {
-        val seller = sellerQueryPort.findByUserId(userPrincipal.getUserId())
-            ?: throw SettlementSellerNotFoundException()
-        val result = settlementQueryService.getSettlements(seller.id, status, pageable)
+        val userId = userPrincipal.getUserId()
+        sellerQueryPort.findByUserId(userId) ?: throw SettlementSellerNotFoundException()
+        val result = settlementQueryService.getSettlements(userId, status, pageable)
         return ResponseEntity.ok(ApiResponse.success(result))
     }
 
@@ -86,9 +95,9 @@ class SettlementController(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable settlementId: Long
     ): ResponseEntity<ApiResponse<SettlementDetailResponse>> {
-        val seller = sellerQueryPort.findByUserId(userPrincipal.getUserId())
-            ?: throw SettlementSellerNotFoundException()
-        val result = settlementQueryService.getSettlementDetail(settlementId, seller.id)
+        val userId = userPrincipal.getUserId()
+        sellerQueryPort.findByUserId(userId) ?: throw SettlementSellerNotFoundException()
+        val result = settlementQueryService.getSettlementDetail(settlementId, userId)
         return ResponseEntity.ok(ApiResponse.success(result))
     }
 }
