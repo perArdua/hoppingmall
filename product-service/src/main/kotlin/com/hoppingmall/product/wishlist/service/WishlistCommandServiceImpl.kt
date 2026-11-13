@@ -21,14 +21,15 @@ class WishlistCommandServiceImpl(
 ) : WishlistCommandService {
 
     override fun addWishlist(buyerId: Long, request: WishlistCreateRequest): WishlistResponse {
-        val product = productRepository.findByIdOrNull(request.productId) ?: throw ProductNotFoundException()
+        val productId = requireNotNull(request.productId)
+        val product = productRepository.findByIdOrNull(productId) ?: throw ProductNotFoundException()
 
-        if (wishlistRepository.existsByBuyerIdAndProductId(buyerId, request.productId)) {
+        if (wishlistRepository.existsByBuyerIdAndProductId(buyerId, productId)) {
             throw WishlistAlreadyExistsException()
         }
 
-        val wishlist = Wishlist.create(buyerId, request.productId)
-        wishlistRepository.deleteSoftDeleted(buyerId, request.productId)
+        val wishlist = Wishlist.create(buyerId, productId)
+        wishlistRepository.deleteSoftDeleted(buyerId, productId)
         val savedWishlist = try {
             wishlistRepository.save(wishlist)
         } catch (e: DataIntegrityViolationException) {

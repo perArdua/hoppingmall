@@ -31,7 +31,7 @@ class InventoryController(
         @Valid @RequestBody request: InventoryInitRequest,
         @AuthenticationPrincipal userPrincipal: UserPrincipal
     ): ResponseEntity<ApiResponse<InventoryResponse>> {
-        productOwnershipPolicy.checkOwner(request.productId, userPrincipal)
+        productOwnershipPolicy.checkOwner(requireNotNull(request.productId), userPrincipal)
         val response = inventoryCommandService.initStock(request)
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(response))
