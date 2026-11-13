@@ -45,6 +45,11 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "k8s,grpc"
+            - name: GATEWAY_IDENTITY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hoppingmall-secret
+                  key: GATEWAY_IDENTITY_SECRET
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
             - name: JWT_SECRET

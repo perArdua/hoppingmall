@@ -7,6 +7,7 @@ REGISTRY_PORT="5001"
 
 : "${JWT_SECRET:?JWT_SECRET 환경 변수를 설정하세요}"
 : "${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN 환경 변수를 설정하세요}"
+: "${GATEWAY_IDENTITY_SECRET:?GATEWAY_IDENTITY_SECRET 환경 변수를 설정하세요}"
 : "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 환경 변수를 설정하세요}"
 : "${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD 환경 변수를 설정하세요}"
 
@@ -84,6 +85,7 @@ kubectl apply -f k8s/configmap.yml
 kubectl create secret generic hoppingmall-secret -n hoppingmall \
   --from-literal=JWT_SECRET="${JWT_SECRET}" \
   --from-literal=INTERNAL_SERVICE_TOKEN="${INTERNAL_SERVICE_TOKEN}" \
+  --from-literal=GATEWAY_IDENTITY_SECRET="${GATEWAY_IDENTITY_SECRET}" \
   --from-literal=MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}" \
   --from-literal=GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f -
