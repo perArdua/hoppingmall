@@ -5,6 +5,7 @@ import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
 import com.hoppingmall.user.common.vo.PasswordCreator
 import com.hoppingmall.user.common.vo.PasswordPolicy
+import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignUpRequest
@@ -58,6 +59,7 @@ class UserCommandServiceImplTest {
         userCommandService = UserCommandServiceImpl(
             userRepository = userRepository,
             passwordCreator = passwordCreator,
+            passwordVerifier = PasswordVerifier(passwordEncoder),
             userDomainService = userDomainService,
             membershipCommandService = membershipCommandService
         )
@@ -107,9 +109,13 @@ class UserCommandServiceImplTest {
     fun 프로필_수정_시_이름과_비밀번호를_함께_변경한다() {
         val user = User.fixture().withId(1L)
         whenever(userRepository.findNullableById(1L)).thenReturn(user)
+        whenever(passwordEncoder.matches("Password1234", "encoded-password")).thenReturn(true)
         whenever(passwordEncoder.encode("NewPassword1234")).thenReturn("encoded-new-password")
 
-        userCommandService.updateUserProfile(1L, UpdateUserRequest(name = "새이름", password = "NewPassword1234"))
+        userCommandService.updateUserProfile(
+            1L,
+            UpdateUserRequest(name = "새이름", password = "NewPassword1234", currentPassword = "Password1234")
+        )
 
         assertThat(user.getName()).isEqualTo("새이름")
         assertThat(user.getPassword()).isEqualTo(Password("encoded-new-password"))

@@ -8,5 +8,7 @@ data class UpdateUserRequest(
     @field:Size(min = 1, max = 50, message = "이름은 1-50자 사이여야 합니다")
     val name: String,
 
-    val password: String? = null
+    val password: String? = null,
+
+    val currentPassword: String? = null
 )

@@ -4,6 +4,8 @@ import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.PasswordCreator
+import com.hoppingmall.user.common.vo.PasswordNotMatchedException
+import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignUpRequest
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional
 class UserCommandServiceImpl(
     private val userRepository: UserRepository,
     private val passwordCreator: PasswordCreator,
+    private val passwordVerifier: PasswordVerifier,
     private val userDomainService: UserDomainService,
     private val membershipCommandService: MembershipCommandService,
     private val refreshTokenService: RefreshTokenService? = null
@@ -50,6 +53,11 @@ class UserCommandServiceImpl(
     override fun updateUserProfile(userId: Long, request: UpdateUserRequest) {
         val user = userRepository.findNullableById(userId)
             ?: throw UserNotFoundException()
+
+        if (request.password != null) {
+            val currentPassword = request.currentPassword ?: throw PasswordNotMatchedException()
+            passwordVerifier.assertMatches(currentPassword, user.getPassword())
+        }
 
         user.updateName(request.name)
 

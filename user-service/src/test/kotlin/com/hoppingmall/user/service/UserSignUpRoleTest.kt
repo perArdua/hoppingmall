@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.PasswordCreator
 import com.hoppingmall.user.common.vo.PasswordPolicy
+import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignUpRequest
@@ -57,6 +58,7 @@ class UserSignUpRoleTest {
         userCommandService = UserCommandServiceImpl(
             userRepository = userRepository,
             passwordCreator = PasswordCreator(passwordEncoder, passwordPolicy),
+            passwordVerifier = PasswordVerifier(passwordEncoder),
             userDomainService = userDomainService,
             membershipCommandService = membershipCommandService
         )
