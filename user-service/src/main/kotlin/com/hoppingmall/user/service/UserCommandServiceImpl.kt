@@ -2,9 +2,9 @@ package com.hoppingmall.user.service
 
 import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.enums.Role
+import com.hoppingmall.user.common.vo.CurrentPasswordNotMatchedException
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.PasswordCreator
-import com.hoppingmall.user.common.vo.PasswordNotMatchedException
 import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
@@ -55,8 +55,10 @@ class UserCommandServiceImpl(
             ?: throw UserNotFoundException()
 
         if (request.password != null) {
-            val currentPassword = request.currentPassword ?: throw PasswordNotMatchedException()
-            passwordVerifier.assertMatches(currentPassword, user.getPassword())
+            val currentPassword = request.currentPassword ?: throw CurrentPasswordNotMatchedException()
+            if (!passwordVerifier.matches(currentPassword, user.getPassword())) {
+                throw CurrentPasswordNotMatchedException()
+            }
         }
 
         user.updateName(request.name)
