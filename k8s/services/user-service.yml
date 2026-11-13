@@ -34,6 +34,7 @@ spec:
       labels:
         app: user-service
     spec:
+      terminationGracePeriodSeconds: 45
       containers:
         - name: user-service
           image: user-service:latest

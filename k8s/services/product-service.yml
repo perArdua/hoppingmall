@@ -34,6 +34,7 @@ spec:
       labels:
         app: product-service
     spec:
+      terminationGracePeriodSeconds: 45
       containers:
         - name: product-service
           image: product-service:latest

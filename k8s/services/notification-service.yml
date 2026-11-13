@@ -31,6 +31,7 @@ spec:
       labels:
         app: notification-service
     spec:
+      terminationGracePeriodSeconds: 45
       containers:
         - name: notification-service
           image: notification-service:latest
