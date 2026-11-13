@@ -21,6 +21,8 @@ repositories {
     maven { url = uri("https://packages.confluent.io/maven/") }
 }
 
+extra["testcontainers.version"] = "1.21.4"
+
 dependencyManagement {
     imports {
         mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.0")
