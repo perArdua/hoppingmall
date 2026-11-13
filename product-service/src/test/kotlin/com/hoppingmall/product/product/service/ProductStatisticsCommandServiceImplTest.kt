@@ -168,6 +168,9 @@ class ProductStatisticsCommandServiceImplTest {
         whenever(productStatisticsRepository.findAll(any<Pageable>()))
             .thenReturn(PageImpl(listOf(stats1), PageRequest.of(0, 1), 2))
             .thenReturn(PageImpl(listOf(stats2), PageRequest.of(1, 1), 2))
+        whenever(productStatisticsRepository.findAllByIdInForUpdate(any()))
+            .thenReturn(listOf(stats1))
+            .thenReturn(listOf(stats2))
         whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
             .thenReturn(emptyList())
         whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
@@ -184,25 +187,23 @@ class ProductStatisticsCommandServiceImplTest {
     }
 
     @Test
-    fun 일별_스냅샷을_저장한다() {
+    fun 이미_마감된_상품의_일별_스냅샷은_덮지_않고_오늘_값도_그대로_둔다() {
         val stats = createStats()
         stats.incrementSales(10, BigDecimal("100000"))
         val daily = ProductDailyStatistics.create(productId = 1L, statisticsDate = LocalDate.now())
 
         whenever(productStatisticsRepository.findAll(any<Pageable>()))
             .thenReturn(PageImpl(listOf(stats)))
+        whenever(productStatisticsRepository.findAllByIdInForUpdate(any()))
+            .thenReturn(listOf(stats))
         whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
             .thenReturn(listOf(daily))
-        whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
-            .thenReturn(listOf(arrayOf<Any>(1L, BigDecimal("100000"))))
-        whenever(productDailyStatisticsRepository.saveAll(any<List<ProductDailyStatistics>>()))
-            .thenAnswer { it.arguments[0] }
-        whenever(productStatisticsRepository.saveAll(any<List<ProductStatistics>>()))
-            .thenAnswer { it.arguments[0] }
 
         service.flushDailySnapshot()
 
-        assertThat(stats.todaySalesQuantity).isEqualTo(0)
+        assertThat(stats.todaySalesQuantity).isEqualTo(10)
+        verify(productDailyStatisticsRepository, org.mockito.kotlin.never())
+            .saveAll(any<List<ProductDailyStatistics>>())
     }
 
     @Test
@@ -212,6 +213,8 @@ class ProductStatisticsCommandServiceImplTest {
 
         whenever(productStatisticsRepository.findAll(any<Pageable>()))
             .thenReturn(PageImpl(listOf(stats)))
+        whenever(productStatisticsRepository.findAllByIdInForUpdate(any()))
+            .thenReturn(listOf(stats))
         whenever(productDailyStatisticsRepository.findByStatisticsDateAndProductIdIn(any(), any()))
             .thenReturn(emptyList())
         whenever(productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(any(), any(), any()))
