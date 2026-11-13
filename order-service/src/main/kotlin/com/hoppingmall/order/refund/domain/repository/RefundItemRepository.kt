@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @Repository
 interface RefundItemRepository : JpaRepository<RefundItem, Long> {
@@ -45,6 +46,38 @@ interface RefundItemRepository : JpaRepository<RefundItem, Long> {
         nativeQuery = true
     )
     fun aggregateRefundsByProduct(@Param("status") status: String): List<RefundAggregation>
+
+    @Query(
+        value = """
+            SELECT r.id AS refundId,
+                   SUM(ri.product_price * ri.quantity) AS saleAmount
+            FROM refunds r
+            JOIN refund_items ri ON ri.refund_id = r.id AND ri.deleted_at IS NULL
+            JOIN orders o ON o.id = r.order_id AND o.deleted_at IS NULL
+            LEFT JOIN shippings s ON s.order_id = o.id AND s.status = 'DELIVERED' AND s.deleted_at IS NULL
+            WHERE r.seller_id = :sellerId
+              AND r.status = 'COMPLETED'
+              AND r.deleted_at IS NULL
+              AND (o.status = 'DELIVERED' OR (o.status = 'REFUNDED' AND s.id IS NOT NULL))
+              AND GREATEST(
+                    r.completed_at,
+                    CASE WHEN o.status = 'DELIVERED' THEN o.updated_at ELSE s.updated_at END
+                  ) BETWEEN :startDate AND :endDate
+            GROUP BY r.id
+            ORDER BY r.id
+        """,
+        nativeQuery = true
+    )
+    fun findSettlementRefundsBySellerAndPeriod(
+        @Param("sellerId") sellerId: Long,
+        @Param("startDate") startDate: LocalDateTime,
+        @Param("endDate") endDate: LocalDateTime
+    ): List<SettlementRefundProjection>
+}
+
+interface SettlementRefundProjection {
+    val refundId: Long
+    val saleAmount: BigDecimal
 }
 
 interface RefundedQuantityProjection {
