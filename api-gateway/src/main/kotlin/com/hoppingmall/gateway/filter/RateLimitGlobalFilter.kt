@@ -99,10 +99,10 @@ class RateLimitGlobalFilter(
             .flatMap { it.split(',') }
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-        if (forwarded.isEmpty()) {
+        if (forwarded.size < trustedProxyCount) {
             return remoteAddress
         }
-        return forwarded[(forwarded.size - trustedProxyCount).coerceAtLeast(0)]
+        return forwarded[forwarded.size - trustedProxyCount]
     }
 
     private fun checkLimit(

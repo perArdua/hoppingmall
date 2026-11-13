@@ -271,6 +271,7 @@ spring:
 
 server:
   port: 8000
+  forward-headers-strategy: none
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain

@@ -265,6 +265,9 @@ spring:
           filters:
             - name: JwtValidation
 
+server:
+  forward-headers-strategy: none
+
 management:
   metrics:
     tags:
