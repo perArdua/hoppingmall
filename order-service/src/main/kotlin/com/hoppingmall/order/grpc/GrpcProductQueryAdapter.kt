@@ -25,7 +25,7 @@ class GrpcProductQueryAdapter(
     private val log = LoggerFactory.getLogger(GrpcProductQueryAdapter::class.java)
 
     @CircuitBreaker(name = "product-query", fallbackMethod = "findProductByIdFallback")
-    @Retry(name = "product-query")
+    @Retry(name = "product-query-grpc")
     override fun findProductById(productId: Long): ProductInfo? {
         val response = stub.findProductById(
             ProductIdRequest.newBuilder().setProductId(productId).build()
@@ -40,7 +40,7 @@ class GrpcProductQueryAdapter(
     }
 
     @CircuitBreaker(name = "product-query", fallbackMethod = "findProductsByIdsFallback")
-    @Retry(name = "product-query")
+    @Retry(name = "product-query-grpc")
     override fun findProductsByIds(productIds: List<Long>): List<ProductInfo> {
         val response = stub.findProductsByIds(
             ProductIdsRequest.newBuilder().addAllProductIds(productIds).build()

@@ -146,13 +146,15 @@ resilience4j:
         waitDuration: 500ms
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
-        retryExceptions:
-          - io.grpc.StatusRuntimeException
-          - java.io.IOException
+        retryExceptionPredicate: com.hoppingmall.order.grpc.TransientGrpcFailurePredicate
     instances:
       product-query:
         baseConfig: default
+      product-query-grpc:
+        baseConfig: grpc
       payment-query:
+        baseConfig: default
+      inventory-confirm:
         baseConfig: default
 
 springdoc:

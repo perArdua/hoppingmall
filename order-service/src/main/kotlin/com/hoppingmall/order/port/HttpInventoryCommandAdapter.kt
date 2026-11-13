@@ -24,7 +24,7 @@ class HttpInventoryCommandAdapter(
 
     private val restTemplate: RestTemplate = restTemplateBuilder
         .connectTimeout(Duration.ofSeconds(2))
-        .readTimeout(Duration.ofSeconds(5))
+        .readTimeout(Duration.ofMillis(RESERVE_BUDGET_MS + RESPONSE_MARGIN_MS))
         .build()
 
     @CircuitBreaker(name = "inventory-command")
@@ -57,7 +57,7 @@ class HttpInventoryCommandAdapter(
     }
 
     @CircuitBreaker(name = "inventory-command")
-    @Retry(name = "product-query")
+    @Retry(name = "inventory-confirm")
     override fun confirmReservations(reservationIds: List<String>): Boolean {
         val response = restTemplate.postForEntity(
             "$productServiceUrl/internal/api/v1/inventory/reservations/batch-confirm",
@@ -126,6 +126,7 @@ class HttpInventoryCommandAdapter(
     companion object {
         const val RESERVE_BUDGET_HEADER = "X-Reserve-Budget-Ms"
         const val RESERVE_BUDGET_MS = 5000L
+        const val RESPONSE_MARGIN_MS = 1000L
         const val REQUEST_KEY_HEADER = "X-Reservation-Request-Key"
     }
 
