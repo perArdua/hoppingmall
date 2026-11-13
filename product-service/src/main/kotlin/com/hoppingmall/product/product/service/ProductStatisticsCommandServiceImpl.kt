@@ -50,7 +50,7 @@ class ProductStatisticsCommandServiceImpl(
     }
 
     override fun flushDailySnapshot() {
-        val today = LocalDate.now()
+        val statisticsDate = LocalDate.now().minusDays(CLOSED_DAY_OFFSET)
         var page = 0
         var totalProcessed = 0
 
@@ -65,24 +65,24 @@ class ProductStatisticsCommandServiceImpl(
                 val productIds = chunk.map { it.productId }
 
                 val existingDailyMap = productDailyStatisticsRepository
-                    .findByStatisticsDateAndProductIdIn(today, productIds)
+                    .findByStatisticsDateAndProductIdIn(statisticsDate, productIds)
                     .associateBy { it.productId }
 
                 val last7DaysMap = toSalesAmountMap(
-                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(6), today)
+                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, statisticsDate.minusDays(6), statisticsDate)
                 )
                 val last30DaysMap = toSalesAmountMap(
-                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(29), today)
+                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, statisticsDate.minusDays(29), statisticsDate)
                 )
                 val previousWeekMap = toSalesAmountMap(
-                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, today.minusDays(13), today.minusDays(7))
+                    productDailyStatisticsRepository.sumSalesAmountByProductIdsAndDateRange(productIds, statisticsDate.minusDays(13), statisticsDate.minusDays(7))
                 )
 
                 val dailyToSave = mutableListOf<ProductDailyStatistics>()
                 for (stats in chunk) {
                     val daily = existingDailyMap[stats.productId] ?: ProductDailyStatistics.create(
                         productId = stats.productId,
-                        statisticsDate = today
+                        statisticsDate = statisticsDate
                     )
                     daily.updateFromStatistics(stats)
                     dailyToSave.add(daily)
@@ -156,6 +156,7 @@ class ProductStatisticsCommandServiceImpl(
 
     companion object {
         private const val BATCH_SIZE = 100
+        private const val CLOSED_DAY_OFFSET = 1L
     }
 
     private fun getOrCreateStatistics(productId: Long): ProductStatistics {
