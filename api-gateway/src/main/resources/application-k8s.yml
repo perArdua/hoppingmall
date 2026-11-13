@@ -99,13 +99,6 @@ spring:
           filters:
             - JwtValidation
 
-        - id: payment-service-admin-dlq
-          uri: http://payment-service.hoppingmall.svc.cluster.local:8085
-          predicates:
-            - Path=/api/v1/admin/dlq/**
-          filters:
-            - JwtValidation
-
         - id: user-service
           uri: http://user-service.hoppingmall.svc.cluster.local:8082
           predicates:
