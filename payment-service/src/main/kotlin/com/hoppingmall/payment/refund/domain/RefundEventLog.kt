@@ -30,6 +30,8 @@ class RefundEventLog(
 
     fun isStepCompleted(step: String): Boolean = step in completedSteps
 
+    fun isAllStepsCompleted(): Boolean = REQUIRED_STEPS.all { it in completedSteps }
+
     companion object {
         const val PAYMENT_UPDATED = "PAYMENT_UPDATED"
         const val POINTS_REFUNDED = "POINTS_REFUNDED"
@@ -37,5 +39,17 @@ class RefundEventLog(
         const val INVENTORY_RESTORED = "INVENTORY_RESTORED"
         const val STATS_UPDATED = "STATS_UPDATED"
         const val ORDER_CANCELLED = "ORDER_CANCELLED"
+
+        private val REQUIRED_STEPS = listOf(
+            PAYMENT_UPDATED,
+            POINTS_REFUNDED,
+            INVENTORY_RESTORED,
+            STATS_UPDATED,
+            ORDER_CANCELLED
+        )
+
+        fun inventoryItemStep(index: Int): String = "$INVENTORY_RESTORED:$index"
+
+        fun statsItemStep(index: Int): String = "$STATS_UPDATED:$index"
     }
 }

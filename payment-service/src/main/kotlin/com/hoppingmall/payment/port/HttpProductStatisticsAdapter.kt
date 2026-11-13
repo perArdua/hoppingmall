@@ -1,7 +1,6 @@
 package com.hoppingmall.payment.port
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
-import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -23,8 +22,7 @@ class HttpProductStatisticsAdapter(
         .readTimeout(Duration.ofSeconds(5))
         .build()
 
-    @CircuitBreaker(name = "inventory-command")
-    @Retry(name = "default")
+    @CircuitBreaker(name = "product-statistics-command")
     override fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal) {
         restTemplate.postForEntity(
             "$productServiceUrl/internal/api/v1/product-statistics/$productId/refund?quantity=$quantity&amount=$amount",
