@@ -73,7 +73,7 @@ class OrderCancellationFailedLogTest {
         consumer = OrderCancellationResultConsumer(
             orderRepository, orderItemRepository, sagaEventLogRepository,
             inventoryCommandPort, transactionalEventPublisher,
-            ObjectMapper(), transactionTemplate
+            ObjectMapper(), transactionTemplate, mock()
         )
     }
 

@@ -9,6 +9,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
@@ -24,7 +25,8 @@ class OrderCancellationResultConsumer(
     private val inventoryCommandPort: InventoryCommandPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper,
-    private val transactionTemplate: TransactionTemplate
+    private val transactionTemplate: TransactionTemplate,
+    private val paymentQueryPort: PaymentQueryPort
 ) {
     private val logger = LoggerFactory.getLogger(OrderCancellationResultConsumer::class.java)
 

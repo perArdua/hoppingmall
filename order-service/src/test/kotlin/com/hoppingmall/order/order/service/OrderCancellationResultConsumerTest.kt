@@ -53,7 +53,7 @@ class OrderCancellationResultConsumerTest {
     private fun createConsumer() = OrderCancellationResultConsumer(
         orderRepository, orderItemRepository, sagaEventLogRepository,
         inventoryCommandPort, transactionalEventPublisher,
-        objectMapper, transactionTemplate
+        objectMapper, transactionTemplate, mock()
     )
 
     private fun createOrder(status: OrderStatus): Order {
