@@ -87,13 +87,15 @@ class OrderCommandServiceImpl(
         val reservationMap = reserveStock(items)
 
         val fence = reservationFence?.takeIf { it.enabled }
-        return try {
+        val response = try {
             createOrderInTransaction(buyerId, request, cartItems, productMap, reservationMap, totalAmount, fence)
-        } catch (e: OrderReservationFencedException) {
+        } catch (e: Exception) {
             runCatching { inventoryCommandPort.cancelReservations(reservationMap.values.distinct()) }
-                .onFailure { log.warn("fence 충돌 후 예약 취소 실패: rids={}", reservationMap.values, it) }
+                .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName, it) }
             throw e
         }
+        orderMetrics.recordOrderCreated(totalAmount)
+        return response
     }
 
     private fun createOrderInTransaction(
@@ -104,8 +106,8 @@ class OrderCommandServiceImpl(
         reservationMap: Map<Long, String>,
         totalAmount: BigDecimal,
         fence: ReservationFence?
-    ): OrderResponse {
-        val response = transactionTemplate.execute {
+    ): OrderResponse =
+        transactionTemplate.execute {
             if (fence != null && fence.link(reservationMap.values).isNotEmpty()) {
                 throw OrderReservationFencedException()
             }
@@ -130,9 +132,6 @@ class OrderCommandServiceImpl(
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
             OrderResponse.from(order, savedOrderItems)
         }!!
-        orderMetrics.recordOrderCreated(totalAmount)
-        return response
-    }
 
     private fun findProducts(productIds: List<Long>): List<ProductInfo> =
         try {
