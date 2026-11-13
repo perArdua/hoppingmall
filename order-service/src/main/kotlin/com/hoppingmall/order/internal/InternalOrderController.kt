@@ -6,8 +6,7 @@ import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.exception.OrderNotFoundException
-import com.hoppingmall.order.refund.domain.repository.RefundRepository
-import com.hoppingmall.order.refund.enum.RefundStatus
+import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import org.springframework.data.repository.findByIdOrNull
@@ -25,7 +24,7 @@ class InternalOrderController(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val shippingRepository: ShippingRepository,
-    private val refundRepository: RefundRepository
+    private val refundItemRepository: RefundItemRepository
 ) {
 
     @GetMapping("/orders/{orderId}")
@@ -125,13 +124,11 @@ class InternalOrderController(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) startDate: LocalDateTime,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) endDate: LocalDateTime
     ): ResponseEntity<List<RefundResponse>> {
-        val refunds = refundRepository.findBySellerIdAndStatusAndCompletedAtBetween(
-            sellerId, RefundStatus.COMPLETED, startDate, endDate
-        )
+        val refunds = refundItemRepository.findSettlementRefundsBySellerAndPeriod(sellerId, startDate, endDate)
         return ResponseEntity.ok(refunds.map { refund ->
             RefundResponse(
-                id = refund.id!!,
-                refundAmount = refund.refundAmount
+                id = refund.refundId,
+                refundAmount = refund.saleAmount
             )
         })
     }

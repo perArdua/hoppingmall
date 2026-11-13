@@ -5,7 +5,7 @@ import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
-import com.hoppingmall.order.refund.domain.repository.RefundRepository
+import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import io.micrometer.tracing.Tracer
 import org.assertj.core.api.Assertions.assertThat
@@ -45,7 +45,7 @@ class InternalOrderSummaryApiTest {
     private lateinit var shippingRepository: ShippingRepository
 
     @MockitoBean
-    private lateinit var refundRepository: RefundRepository
+    private lateinit var refundItemRepository: RefundItemRepository
 
     @MockitoBean
     private lateinit var tracer: Tracer
