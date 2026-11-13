@@ -14,11 +14,9 @@ import com.hoppingmall.payment.payment.domain.Payment
 import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
-import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
 import com.hoppingmall.payment.support.FakeOrderSummaryQueryPort
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -160,8 +158,9 @@ class PaymentCancelCouponRestoreTest {
         val service = commandService()
 
         service.cancelPaymentInternal(PAYMENT_ID)
-        assertThatThrownBy { service.cancelPaymentInternal(PAYMENT_ID) }
-            .isInstanceOf(PaymentInvalidStateException::class.java)
+        val second = service.cancelPaymentInternal(PAYMENT_ID)
+
+        assertThat(second.status).isEqualTo(PaymentStatus.CANCELLED)
 
         assertThat(payment.status).isEqualTo(PaymentStatus.CANCELLED)
         assertThat(userCoupon.status).isEqualTo(UserCouponStatus.ISSUED)

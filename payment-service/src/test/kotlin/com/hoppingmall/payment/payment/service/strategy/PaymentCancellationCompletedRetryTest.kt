@@ -11,7 +11,6 @@ import com.hoppingmall.payment.payment.domain.repository.PaymentRepository
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
-import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import com.hoppingmall.payment.payment.service.CompensationEventLogService
 import com.hoppingmall.payment.payment.service.PaymentCommandService
 import org.assertj.core.api.Assertions.assertThat
@@ -82,10 +81,9 @@ class PaymentCancellationCompletedRetryTest {
         val payment = payment(orderId = 100L, id = 1L)
         whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(1L)).thenAnswer {
-            if (payment.status == PaymentStatus.CANCELLED) {
-                throw PaymentInvalidStateException()
+            if (payment.status != PaymentStatus.CANCELLED) {
+                payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
             }
-            payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
             mock<PaymentResponse>()
         }
         Mockito.lenient()
@@ -108,43 +106,42 @@ class PaymentCancellationCompletedRetryTest {
     }
 
     @Test
-    fun 처리_전부터_취소돼_있던_결제에_취소_요청이_오면_상태_부적합_실패_이벤트를_낸다() {
+    fun 처리_전부터_취소돼_있던_결제에_취소_요청이_오면_완료_이벤트를_낸다() {
         val payment = payment(orderId = 200L, id = 2L)
         payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
         whenever(paymentRepository.findByOrderId(200L)).thenReturn(payment)
-        whenever(paymentCommandService.cancelPaymentInternal(2L)).thenThrow(PaymentInvalidStateException())
+        whenever(paymentCommandService.cancelPaymentInternal(2L)).thenReturn(mock<PaymentResponse>())
 
         handler.handle(request("cancel-200-1", 200L))
 
         verify(transactionalEventPublisher, times(1)).publishEvent(
-            eq("Payment"), eq("200"), eq("PaymentCancellationFailed"), any(), any(), eq("200")
+            eq("Payment"), eq("2"), eq("PaymentCancellationCompleted"), any(), any(), eq("200")
         )
         verify(transactionalEventPublisher, never()).publishEvent(
-            any(), any(), eq("PaymentCancellationCompleted"), any(), any(), anyOrNull()
+            any(), any(), eq("PaymentCancellationFailed"), any(), any(), anyOrNull()
         )
         assertThat(logs["cancel-200-1"]!!.status).isEqualTo(CompensationEventLogStatus.COMPLETED)
     }
 
     @Test
-    fun 다른_요청이_결제를_취소한_뒤_새_취소_요청이_오면_완료_이벤트를_내지_않는다() {
+    fun 다른_요청이_결제를_취소한_뒤_새_취소_요청이_와도_완료_이벤트를_낸다() {
         val payment = payment(orderId = 300L, id = 3L)
         whenever(paymentRepository.findByOrderId(300L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(3L)).thenAnswer {
-            if (payment.status == PaymentStatus.CANCELLED) {
-                throw PaymentInvalidStateException()
+            if (payment.status != PaymentStatus.CANCELLED) {
+                payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
             }
-            payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
             mock<PaymentResponse>()
         }
 
         handler.handle(request("cancel-300-1", 300L))
         handler.handle(request("cancel-300-2", 300L))
 
-        verify(transactionalEventPublisher, times(1)).publishEvent(
-            any(), any(), eq("PaymentCancellationCompleted"), any(), any(), anyOrNull()
+        verify(transactionalEventPublisher, times(2)).publishEvent(
+            eq("Payment"), eq("3"), eq("PaymentCancellationCompleted"), any(), any(), eq("300")
         )
-        verify(transactionalEventPublisher, times(1)).publishEvent(
-            eq("Payment"), eq("300"), eq("PaymentCancellationFailed"), any(), any(), eq("300")
+        verify(transactionalEventPublisher, never()).publishEvent(
+            any(), any(), eq("PaymentCancellationFailed"), any(), any(), anyOrNull()
         )
         assertThat(logs["cancel-300-2"]!!.status).isEqualTo(CompensationEventLogStatus.COMPLETED)
     }

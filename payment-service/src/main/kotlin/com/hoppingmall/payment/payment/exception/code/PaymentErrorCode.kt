@@ -19,5 +19,6 @@ enum class PaymentErrorCode(
     PAYMENT_ORDER_NOT_PAYABLE("PAY009", "결제를 받을 수 없는 주문 상태입니다.", HttpStatus.BAD_REQUEST),
     PAYMENT_DUPLICATE("PAY010", "이미 결제가 있는 주문입니다.", HttpStatus.CONFLICT),
     PAYMENT_POINT_USE_NOT_ALLOWED("PAY011", "결제에 포인트를 사용할 수 없습니다.", HttpStatus.BAD_REQUEST),
-    PAYMENT_DIRECT_CANCEL_NOT_ALLOWED("PAY012", "결제 대기 중인 주문만 결제를 직접 취소할 수 있습니다. 주문 취소를 이용해 주세요.", HttpStatus.BAD_REQUEST)
+    PAYMENT_DIRECT_CANCEL_NOT_ALLOWED("PAY012", "결제 대기 중인 주문만 결제를 직접 취소할 수 있습니다. 주문 취소를 이용해 주세요.", HttpStatus.BAD_REQUEST),
+    PAYMENT_CANCEL_IN_PROGRESS("PAY013", "결제가 진행 중이라 지금은 취소할 수 없습니다.", HttpStatus.CONFLICT)
 }

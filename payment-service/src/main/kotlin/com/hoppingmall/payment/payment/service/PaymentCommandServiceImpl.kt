@@ -9,6 +9,7 @@ import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.dto.request.PaymentRequest
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.exception.PaymentAccessDeniedException
+import com.hoppingmall.payment.payment.exception.PaymentCancelInProgressException
 import com.hoppingmall.payment.payment.exception.PaymentDirectCancelNotAllowedException
 import com.hoppingmall.payment.payment.exception.PaymentDuplicateException
 import com.hoppingmall.payment.payment.exception.PaymentInvalidAmountException
@@ -142,6 +143,14 @@ class PaymentCommandServiceImpl(
     }
 
     private fun executeCancelPayment(payment: Payment): PaymentResponse {
+        if (payment.isCancelled()) {
+            log.info("이미 취소된 결제의 취소 요청: paymentId={}, orderId={}", payment.id, payment.orderId)
+            return PaymentResponse.from(payment)
+        }
+        if (payment.isPending()) {
+            log.warn("진행 중인 결제의 취소 요청 거절: paymentId={}, orderId={}", payment.id, payment.orderId)
+            throw PaymentCancelInProgressException()
+        }
         payment.updateStatus(
             newStatus = PaymentStatus.CANCELLED,
             transactionId = payment.transactionId,

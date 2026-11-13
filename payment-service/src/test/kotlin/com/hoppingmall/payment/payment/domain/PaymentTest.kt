@@ -159,6 +159,7 @@ class PaymentTest {
     @Test
     fun CANCELLED_상태에서_상태_변경_시_예외가_발생한다() {
         val payment = createPayment()
+        payment.updateStatus(PaymentStatus.SUCCESS)
         payment.updateStatus(PaymentStatus.CANCELLED)
 
         assertThatThrownBy { payment.updateStatus(PaymentStatus.SUCCESS) }
@@ -173,6 +174,15 @@ class PaymentTest {
 
         assertThatThrownBy { payment.updateStatus(PaymentStatus.SUCCESS) }
             .isInstanceOf(PaymentInvalidStateException::class.java)
+    }
+
+    @Test
+    fun PENDING에서_CANCELLED로_전환_시_예외가_발생한다() {
+        val payment = createPayment()
+
+        assertThatThrownBy { payment.updateStatus(PaymentStatus.CANCELLED) }
+            .isInstanceOf(PaymentInvalidStateException::class.java)
+        assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
     }
 
     @Test
