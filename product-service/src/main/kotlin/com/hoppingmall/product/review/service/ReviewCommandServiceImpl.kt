@@ -14,12 +14,13 @@ import com.hoppingmall.product.review.exception.ReviewNotFoundException
 import com.hoppingmall.product.review.exception.code.ReviewErrorCode
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
 
 @Service
-@Transactional
+@Transactional(isolation = Isolation.READ_COMMITTED)
 class ReviewCommandServiceImpl(
     private val reviewRepository: ReviewRepository,
     private val orderQueryPort: OrderQueryPort,

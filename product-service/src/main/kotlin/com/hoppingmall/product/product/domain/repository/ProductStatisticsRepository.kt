@@ -82,6 +82,9 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.id IN :ids ORDER BY ps.id")
     fun findAllByIdInForUpdate(@Param("ids") ids: Collection<Long>): List<ProductStatistics>
 
+    @Query("SELECT ps.id FROM ProductStatistics ps ORDER BY ps.id")
+    fun findIdSlice(pageable: Pageable): Slice<Long>
+
     @Query("SELECT COUNT(ps) FROM ProductStatistics ps")
     fun countAllProducts(): Long
 
