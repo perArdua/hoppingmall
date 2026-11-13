@@ -11,6 +11,9 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
 
     companion object {
         private const val EVENT_TYPE_FIELD = "eventType"
+        private val LEGACY_FILLED_FIELDS: Map<String, Set<String>> = mapOf(
+            "PaymentReversalRequested" to setOf("paymentId", "amount")
+        )
     }
 
     private val schemaMap: Map<String, Schema> = mapOf(
@@ -43,24 +46,42 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
                 throw IllegalArgumentException("Unknown event type: $eventType")
             }
         val jsonMap = objectMapper.readValue(jsonData, Map::class.java)
-        return buildGenericRecord(schema, jsonMap).apply { put(EVENT_TYPE_FIELD, eventType) }
+        val legacyFilled = LEGACY_FILLED_FIELDS[eventType].orEmpty()
+        return buildGenericRecord(schema, jsonMap, eventType, legacyFilled).apply { put(EVENT_TYPE_FIELD, eventType) }
     }
 
-    private fun buildGenericRecord(schema: Schema, map: Map<*, *>): GenericRecord {
+    private fun buildGenericRecord(
+        schema: Schema,
+        map: Map<*, *>,
+        eventType: String,
+        legacyFilled: Set<String> = emptySet()
+    ): GenericRecord {
         val record = GenericData.Record(schema)
         for (field in schema.fields) {
             val value = map[field.name()]
-            record.put(field.name(), convertValue(field.schema(), value))
+            val converted = if (value == null) {
+                missingValue(field, eventType, legacyFilled)
+            } else {
+                convertValue(field.schema(), value, eventType)
+            }
+            record.put(field.name(), converted)
         }
         return record
     }
 
-    private fun convertValue(schema: Schema, value: Any?): Any? {
+    private fun missingValue(field: Schema.Field, eventType: String, legacyFilled: Set<String>): Any? = when {
+        field.hasDefaultValue() -> GenericData.get().getDefaultValue(field)
+        field.schema().isNullable -> null
+        field.name() in legacyFilled -> convertValue(field.schema(), null, eventType)
+        else -> throw IllegalArgumentException("Missing required field: $eventType.${field.name()}")
+    }
+
+    private fun convertValue(schema: Schema, value: Any?, eventType: String): Any? {
         return when (schema.type) {
             Schema.Type.UNION -> {
                 if (value == null) return null
                 val nonNullSchema = schema.types.first { it.type != Schema.Type.NULL }
-                convertValue(nonNullSchema, value)
+                convertValue(nonNullSchema, value, eventType)
             }
             Schema.Type.ENUM -> GenericData.EnumSymbol(schema, value.toString())
             Schema.Type.LONG -> (value as? Number)?.toLong() ?: 0L
@@ -72,14 +93,14 @@ class AvroEventConverter(private val objectMapper: ObjectMapper) {
                 val list = value as? List<*> ?: emptyList<Any>()
                 list.map { item ->
                     if (elementSchema.type == Schema.Type.RECORD && item is Map<*, *>) {
-                        buildGenericRecord(elementSchema, item)
+                        buildGenericRecord(elementSchema, item, eventType)
                     } else {
-                        convertValue(elementSchema, item)
+                        convertValue(elementSchema, item, eventType)
                     }
                 }
             }
             Schema.Type.RECORD -> {
-                if (value is Map<*, *>) buildGenericRecord(schema, value)
+                if (value is Map<*, *>) buildGenericRecord(schema, value, eventType)
                 else GenericData.Record(schema)
             }
             else -> value
