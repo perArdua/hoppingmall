@@ -27,6 +27,8 @@ class Order private constructor(
 ) : BaseEntity() {
 
     companion object {
+        val MAX_TOTAL_AMOUNT: BigDecimal = BigDecimal("99999999.99")
+
         private val allowedTransitions: Map<OrderStatus, Set<OrderStatus>> = mapOf(
             OrderStatus.CREATED to setOf(OrderStatus.PAYING, OrderStatus.CANCELLED),
             OrderStatus.PAYING to setOf(OrderStatus.PAID, OrderStatus.CANCELLED),

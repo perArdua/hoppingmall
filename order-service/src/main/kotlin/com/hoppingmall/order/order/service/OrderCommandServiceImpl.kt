@@ -21,6 +21,7 @@ import com.hoppingmall.order.order.exception.OrderPaymentCancellationFailedExcep
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
+import com.hoppingmall.order.order.exception.OrderTotalAmountExceededException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.common.KafkaTopics
 import com.hoppingmall.order.port.InventoryCommandPort
@@ -73,10 +74,13 @@ class OrderCommandServiceImpl(
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
 
+        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
+        if (totalAmount > Order.MAX_TOTAL_AMOUNT) {
+            throw OrderTotalAmountExceededException()
+        }
+
         val items = cartItems.groupBy { it.productId }.map { (productId, rows) -> productId to rows.sumOf { it.quantity } }
         val reservationMap = reserveStock(items)
-
-        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
 
         val fence = reservationFence?.takeIf { it.enabled }
         return try {

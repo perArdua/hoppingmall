@@ -18,4 +18,5 @@ enum class OrderErrorCode(
     ORDER_BUSY("ORD008", "주문이 몰려 처리할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
     ORDER_RESERVATION_FENCED("ORD009", "재고 예약이 만료 처리되었습니다. 다시 주문해주세요.", HttpStatus.CONFLICT),
     ORDER_PRODUCT_UNAVAILABLE("ORD010", "상품 정보를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE),
+    ORDER_TOTAL_AMOUNT_EXCEEDED("ORD011", "주문 합계는 99,999,999.99원을 넘을 수 없습니다.", HttpStatus.BAD_REQUEST),
 }
