@@ -1,0 +1,2 @@
+com.hoppingmall.dlq.publisher.KafkaDLQPublisherAutoConfiguration
+com.hoppingmall.dlq.publisher.DLQPublisherAutoConfiguration

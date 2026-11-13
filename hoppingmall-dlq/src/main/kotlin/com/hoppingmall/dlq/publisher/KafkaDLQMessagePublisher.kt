@@ -1,13 +1,9 @@
 package com.hoppingmall.dlq.publisher
 
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
 
-@Component
-@ConditionalOnBean(KafkaTemplate::class)
 class KafkaDLQMessagePublisher(
     private val kafkaTemplate: KafkaTemplate<String, Any>
 ) : DLQMessagePublisher {
