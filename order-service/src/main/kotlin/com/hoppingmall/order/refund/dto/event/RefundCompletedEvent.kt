@@ -20,5 +20,6 @@ data class RefundItemEvent(
     val productId: Long,
     val quantity: Int,
     val refundPrice: BigDecimal,
-    val orderItemId: Long? = null
+    val orderItemId: Long? = null,
+    val productPrice: BigDecimal? = null
 )
