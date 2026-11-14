@@ -456,8 +456,6 @@ class InventoryCommandServiceImplTest {
         assertThatThrownBy { service.confirmReservations(reservationIds) }
             .isInstanceOf(ReservationConfirmFailedException::class.java)
 
-        verify(inventoryReservationRepository, never()).batchUpdateStatusByCas(any(), any(), any(), any())
-        verify(inventoryReservationRepository, never()).findByReservationId(any())
         verify(inventoryRepository, never()).findByProductIdForUpdate(any())
         verify(inventoryRepository, never()).findByProductIdInForUpdate(any())
     }

@@ -113,7 +113,11 @@ class ReservationLinkCheckJob(
     private fun claim(linked: List<String>, now: LocalDateTime): Int {
         if (linked.isEmpty()) return 0
         val n = transactionTemplate.execute {
-            inventoryReservationRepository.claimByReservationIds(linked, LocalDateTime.now().plusHours(claimHours), LocalDateTime.now())
+            val reserved = lockWithStatus(linked, RESERVED)
+            if (reserved.isEmpty()) return@execute 0
+            inventoryReservationRepository.claimLockedByIds(
+                reserved.map { it.id }, LocalDateTime.now().plusHours(claimHours), LocalDateTime.now()
+            )
         } ?: 0
         linkedCounter.increment(n.toDouble())
         return n
@@ -168,24 +172,35 @@ class ReservationLinkCheckJob(
     }
 
     private fun expireLocked(productId: Long, reservationIds: List<String>): Int =
-        transactionTemplate.execute {
-            val locked = inventoryReservationRepository.lockReservedByReservationIds(reservationIds)
-            if (locked.isEmpty()) return@execute 0
-            inventoryReservationRepository.expireByIds(locked.map { (it[0] as Number).toLong() }, LocalDateTime.now())
-            bucketStockService.restore(productId, locked.sumOf { (it[1] as Number).toInt() })
-            inventoryCacheEvictor?.evictAfterCommit(productId)
-            locked.size
-        } ?: 0
+        expireWithStatus(productId, reservationIds, RESERVED)
 
     private fun expireClaimedLocked(productId: Long, reservationIds: List<String>): Int =
+        expireWithStatus(productId, reservationIds, CLAIMED)
+
+    private fun expireWithStatus(productId: Long, reservationIds: List<String>, status: String): Int =
         transactionTemplate.execute {
-            val locked = inventoryReservationRepository.lockClaimedByReservationIds(reservationIds)
+            val locked = lockWithStatus(reservationIds, status)
             if (locked.isEmpty()) return@execute 0
-            inventoryReservationRepository.expireClaimedByIds(locked.map { (it[0] as Number).toLong() }, LocalDateTime.now())
-            bucketStockService.restore(productId, locked.sumOf { (it[1] as Number).toInt() })
+            inventoryReservationRepository.expireLockedByIds(locked.map { it.id }, LocalDateTime.now())
+            bucketStockService.restore(productId, locked.sumOf { it.quantity })
             inventoryCacheEvictor?.evictAfterCommit(productId)
             locked.size
         } ?: 0
 
+    private fun lockWithStatus(reservationIds: List<String>, status: String): List<LockedReservation> {
+        val ids = inventoryReservationRepository.findIdsByReservationIdIn(reservationIds)
+        if (ids.isEmpty()) return emptyList()
+        return inventoryReservationRepository.lockByIds(ids)
+            .filter { it[2].toString() == status }
+            .map { LockedReservation((it[0] as Number).toLong(), (it[1] as Number).toInt()) }
+    }
+
+    private data class LockedReservation(val id: Long, val quantity: Int)
+
     data class CycleResult(val batches: Int, val linked: Int, val aborted: Int, val floor: Int, val failed: Boolean)
+
+    companion object {
+        private const val RESERVED = "RESERVED"
+        private const val CLAIMED = "CLAIMED"
+    }
 }
