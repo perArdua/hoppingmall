@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.testcontainers.containers.MySQLContainer
 import java.util.concurrent.TimeUnit
 
-@DisplayName("보관이 꺼져 있을 때 처리 끝난 DLQ 메시지 퍼지 (MySQL)")
+@DisplayName("보관이 꺼져 있을 때 처리 완료된 DLQ 메시지 퍼지 (MySQL)")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 @DataJpaTest(properties = ["spring.jpa.hibernate.ddl-auto=create-drop"])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -54,7 +54,7 @@ class DLQRetentionPurgeMySqlBatchTest {
     }
 
     @Test
-    fun 처리_끝난_지_30일이_지난_메시지를_보관_없이_한_트랜잭션에_1000건이_넘지_않게_나눠_지운다() {
+    fun 처리_완료된_지_30일이_지난_PROCESSED_메시지만_보관_없이_한_트랜잭션에_1000건이_넘지_않게_나눠_지운다() {
         val now = System.currentTimeMillis()
         val old = now - TimeUnit.DAYS.toMillis(31)
         val recent = now - TimeUnit.DAYS.toMillis(29)
@@ -71,40 +71,40 @@ class DLQRetentionPurgeMySqlBatchTest {
         dlqRetentionPurgeScheduler.purgeFinishedMessages()
 
         val deletedPerTransaction = deletedRowsPerTransaction()
-        assertThat(deletedPerTransaction.sum()).isEqualTo(2505L)
+        assertThat(deletedPerTransaction.sum()).isEqualTo(2500L)
         assertThat(deletedPerTransaction).allMatch { it <= 1000L }
         assertThat(deletedPerTransaction.count { it > 0L }).isGreaterThanOrEqualTo(3)
         assertThat(countByStatus(DLQStatus.PROCESSED)).isEqualTo(5L)
-        assertThat(countByStatus(DLQStatus.FAILED)).isEqualTo(5L)
+        assertThat(countByStatus(DLQStatus.FAILED)).isEqualTo(10L)
         assertThat(countByStatus(DLQStatus.PENDING)).isEqualTo(5L)
         assertThat(countByStatus(DLQStatus.RETRYING)).isEqualTo(5L)
     }
 
     @Test
-    fun FAILED로_바뀐_메시지에도_끝난_시각이_남아_보존_기간이_지나면_지워진다() {
+    fun FAILED_메시지는_보존_기간이_지나도_보관_없이_지우지_않는다() {
+        val old = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(31)
         val failed = message(60_001L, DLQStatus.PENDING, null).also { it.markAsFailed("최대 재시도 횟수 초과") }
-        dlqMessageRepository.save(failed)
+        dlqMessageRepository.saveAll(listOf(failed, message(60_002L, DLQStatus.FAILED, old)))
         jdbcTemplate.update(
-            "UPDATE dlq_messages SET processed_at = processed_at - ? WHERE processed_at IS NOT NULL",
+            "UPDATE dlq_messages SET processed_at = processed_at - ? WHERE original_offset = 60001 AND processed_at IS NOT NULL",
             TimeUnit.DAYS.toMillis(31)
         )
 
         dlqRetentionPurgeScheduler.purgeFinishedMessages()
 
-        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM dlq_messages", Long::class.java)).isEqualTo(0L)
+        assertThat(countByStatus(DLQStatus.FAILED)).isEqualTo(2L)
     }
 
     @Test
-    fun 처리_끝난_메시지_삭제는_상태와_끝난_시각_인덱스로_범위만_읽는다() {
+    fun 처리_완료된_메시지_삭제는_상태와_끝난_시각_인덱스로_범위만_읽는다() {
         val now = System.currentTimeMillis()
         dlqMessageRepository.saveAll((1..2000).map { message(100_000L + it, DLQStatus.PENDING, null) })
         dlqMessageRepository.saveAll((1..20).map { message(200_000L + it, DLQStatus.PROCESSED, now) })
         jdbcTemplate.execute("ANALYZE TABLE dlq_messages")
 
         val plan = jdbcTemplate.queryForMap(
-            "EXPLAIN DELETE FROM dlq_messages WHERE status IN (?, ?) AND processed_at < ? LIMIT 1000",
+            "EXPLAIN DELETE FROM dlq_messages WHERE status = ? AND processed_at < ? LIMIT 1000",
             DLQStatus.PROCESSED.name,
-            DLQStatus.FAILED.name,
             now - TimeUnit.DAYS.toMillis(30)
         )
 
