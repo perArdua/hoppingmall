@@ -17,7 +17,7 @@ import java.math.BigDecimal
 @Component
 @Profile("grpc")
 class GrpcOrderQueryAdapter(
-    @GrpcClient("order-service") private val stub: OrderQueryServiceGrpc.OrderQueryServiceBlockingStub
+    @GrpcClient("order-service", interceptors = [ConnectBackoffResetClientInterceptor::class]) private val stub: OrderQueryServiceGrpc.OrderQueryServiceBlockingStub
 ) : OrderQueryPort {
 
     private val log = LoggerFactory.getLogger(GrpcOrderQueryAdapter::class.java)

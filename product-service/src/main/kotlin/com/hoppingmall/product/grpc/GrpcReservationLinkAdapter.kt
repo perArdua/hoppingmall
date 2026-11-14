@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 @Component
 @ConditionalOnProperty(name = ["inventory.link-check.enabled"], havingValue = "true")
 class GrpcReservationLinkAdapter(
-    @GrpcClient("order-service") private val stub: ReservationLinkServiceGrpc.ReservationLinkServiceBlockingStub,
+    @GrpcClient("order-service", interceptors = [ConnectBackoffResetClientInterceptor::class]) private val stub: ReservationLinkServiceGrpc.ReservationLinkServiceBlockingStub,
     @Value("\${inventory.link-check.deadline-ms:2000}") private val deadlineMs: Long
 ) : ReservationLinkPort {
 
