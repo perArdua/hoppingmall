@@ -27,8 +27,9 @@ import kotlin.math.ln
  * 핫키 읽기는 절대 블로킹하지 않는다 — CacheEntry가 물리적으로 있으면 즉시(약간 stale 가능) 값을 반환하고,
  * 논리 만료(XFetch 확률식)에 도달하면 백그라운드에서 클러스터 전체 1개 인스턴스만 갱신한다.
  *
- * 정합성: 갱신은 자기 L1만 갱신하고 타 인스턴스 L1은 TTL로 수렴한다(pub-sub 미도입).
- *   ⇒ 최대 staleness = L1 TTL(product 600s). 물리 L2 TTL(1800s)은 페일세이프(갱신 실패/크래시 시 그때까지 stale 서빙).
+ * 정합성: evict·clear는 invalidationPublisher로 타 인스턴스 L1에도 알린다. XFetch 갱신은 자기 L1만 갱신하고
+ *   타 인스턴스 L1은 TTL로 수렴한다 ⇒ 갱신 값의 최대 staleness = L1 TTL(product 600s).
+ *   물리 L2 TTL(1800s)은 페일세이프(갱신 실패/크래시 시 그때까지 stale 서빙).
  *
  * 비핫 캐시는 CacheEntry로 래핑하지 않으며(wrapEntries=false) XFetch도 트리거되지 않는다 — 기존 동작 유지.
  */
@@ -43,7 +44,8 @@ class TwoLevelCache(
     meterRegistry: MeterRegistry? = null,
     private val clock: () -> Long = System::currentTimeMillis,
     // (0,1] 균등난수. ThreadLocalRandom.nextDouble()는 [0,1)이므로 1.0 - x로 0을 제외한다(ln(0)=-inf 방지).
-    private val random: () -> Double = { 1.0 - ThreadLocalRandom.current().nextDouble() }
+    private val random: () -> Double = { 1.0 - ThreadLocalRandom.current().nextDouble() },
+    private val invalidationPublisher: L1InvalidationPublisher? = null
 ) : AbstractValueAdaptingCache(true) {
 
     private val log = LoggerFactory.getLogger(TwoLevelCache::class.java)
@@ -284,6 +286,7 @@ class TwoLevelCache(
         }
         caffeineCache.invalidate(key)
         refreshInFlight.remove(key)
+        invalidationPublisher?.publishEvict(name, key)
     }
 
     override fun clear() {
@@ -294,6 +297,18 @@ class TwoLevelCache(
             log.warn("L2 clear 실패 [cache={}]: {}", name, e.message)
             l2FailureCounter?.increment()
         }
+        caffeineCache.invalidateAll()
+        invalidationPublisher?.publishClear(name)
+    }
+
+    fun evictLocal(key: Any) {
+        evictEpoch.incrementAndGet()
+        caffeineCache.invalidate(key)
+        refreshInFlight.remove(key)
+    }
+
+    fun clearLocal() {
+        evictEpoch.incrementAndGet()
         caffeineCache.invalidateAll()
     }
 
