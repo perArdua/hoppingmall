@@ -31,7 +31,8 @@ class KafkaRefundEventPublisher(
                         "productId" to item.productId,
                         "quantity" to item.quantity,
                         "refundPrice" to item.refundPrice.toPlainString(),
-                        "orderItemId" to item.orderItemId
+                        "orderItemId" to item.orderItemId,
+                        "productPrice" to item.productPrice?.toPlainString()
                     )
                 }
             ),
