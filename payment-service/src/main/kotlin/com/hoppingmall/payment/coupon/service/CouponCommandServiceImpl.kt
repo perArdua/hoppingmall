@@ -131,6 +131,10 @@ class CouponCommandServiceImpl(
         TransactionSynchronizationManager.registerSynchronization(
             object : TransactionSynchronization {
                 override fun afterCompletion(status: Int) {
+                    if (status == TransactionSynchronization.STATUS_COMMITTED) {
+                        clearReservedAt(couponId, userId)
+                        return
+                    }
                     if (status != TransactionSynchronization.STATUS_ROLLED_BACK) return
                     try {
                         couponStockRedisRepository.restoreStock(couponId, userId)
@@ -147,6 +151,14 @@ class CouponCommandServiceImpl(
                 }
             }
         )
+    }
+
+    private fun clearReservedAt(couponId: Long, userId: Long) {
+        try {
+            couponStockRedisRepository.clearReservedAt(couponId, userId)
+        } catch (e: Exception) {
+            log.warn("발급 확정 뒤 예약 시각 삭제 실패: couponId={}, userId={}", couponId, userId, e)
+        }
     }
 
     private fun publishCompensationEvent(couponId: Long, userId: Long, reason: CouponRestoreReason) {

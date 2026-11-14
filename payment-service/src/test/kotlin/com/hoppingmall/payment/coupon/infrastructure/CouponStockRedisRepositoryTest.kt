@@ -114,7 +114,7 @@ class CouponStockRedisRepositoryTest {
             eq(RScript.Mode.READ_WRITE),
             eq(CouponStockRedisRepository.RESTORE_SCRIPT),
             eq(RScript.ReturnType.LONG),
-            eq(listOf("coupon:{1}:stock", "coupon:{1}:issued")),
+            eq(listOf("coupon:{1}:stock", "coupon:{1}:issued", "coupon:{1}:reserved-at")),
             eq("10")
         )
     }
@@ -140,7 +140,7 @@ class CouponStockRedisRepositoryTest {
     }
 
     @Test
-    fun restoreStockIdempotent_3개_키와_TTL_인자를_Lua에_전달한다() {
+    fun restoreStockIdempotent_4개_키와_TTL_인자를_Lua에_전달한다() {
         whenever(redissonClient.getScript(any<Codec>())).thenReturn(rScript)
         whenever(rScript.eval<Long>(any(), any<String>(), any(), any<List<Any>>(), any(), any())).thenReturn(1L)
 
@@ -150,19 +150,19 @@ class CouponStockRedisRepositoryTest {
             eq(org.redisson.api.RScript.Mode.READ_WRITE),
             eq(CouponStockRedisRepository.RESTORE_IDEMPOTENT_SCRIPT),
             eq(org.redisson.api.RScript.ReturnType.LONG),
-            eq(listOf("coupon:{7}:stock", "coupon:{7}:issued", "coupon:{7}:restored:42")),
+            eq(listOf("coupon:{7}:stock", "coupon:{7}:issued", "coupon:{7}:restored:42", "coupon:{7}:reserved-at")),
             eq("42"),
             eq(CouponStockRedisRepository.RESTORED_TTL_SECONDS.toString())
         )
     }
 
     @Test
-    fun deleteStock_두_키를_모두_삭제한다() {
+    fun deleteStock_재고_발급_집합_예약_시각_키를_모두_삭제한다() {
         whenever(redissonClient.keys).thenReturn(rKeys)
 
         repository.deleteStock(1L)
 
-        verify(rKeys).delete("coupon:{1}:stock", "coupon:{1}:issued")
+        verify(rKeys).delete("coupon:{1}:stock", "coupon:{1}:issued", "coupon:{1}:reserved-at")
     }
 
     @Test

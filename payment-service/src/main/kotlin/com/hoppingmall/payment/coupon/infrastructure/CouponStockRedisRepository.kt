@@ -42,7 +42,7 @@ class CouponStockRedisRepository(
             RScript.Mode.READ_WRITE,
             RESTORE_SCRIPT,
             RScript.ReturnType.LONG,
-            listOf(stockKey(couponId), issuedKey(couponId)),
+            listOf(stockKey(couponId), issuedKey(couponId), reservedAtKey(couponId)),
             userId.toString()
         )
     }
@@ -53,7 +53,7 @@ class CouponStockRedisRepository(
             RScript.Mode.READ_WRITE,
             RESTORE_IDEMPOTENT_SCRIPT,
             RScript.ReturnType.LONG,
-            listOf(stockKey(couponId), issuedKey(couponId), restoredKey(couponId, userId)),
+            listOf(stockKey(couponId), issuedKey(couponId), restoredKey(couponId, userId), reservedAtKey(couponId)),
             userId.toString(),
             RESTORED_TTL_SECONDS.toString()
         )
@@ -88,8 +88,12 @@ class CouponStockRedisRepository(
         return recent.mapNotNullTo(mutableSetOf()) { it.toString().toLongOrNull() }
     }
 
+    fun clearReservedAt(couponId: Long, userId: Long) {
+        redissonClient.getMap<String, String>(reservedAtKey(couponId), StringCodec.INSTANCE).fastRemove(userId.toString())
+    }
+
     fun deleteStock(couponId: Long) {
-        redissonClient.keys.delete(stockKey(couponId), issuedKey(couponId))
+        redissonClient.keys.delete(stockKey(couponId), issuedKey(couponId), reservedAtKey(couponId))
     }
 
     fun getIssuedUserIds(couponId: Long): Set<Long> {
@@ -159,6 +163,7 @@ class CouponStockRedisRepository(
             local userSetKey = KEYS[2]
             local userId = ARGV[1]
 
+            redis.call('HDEL', KEYS[3], userId)
             if redis.call('SREM', userSetKey, userId) == 0 then
                 return 0
             end
@@ -180,6 +185,7 @@ class CouponStockRedisRepository(
             end
 
             local removed = redis.call('SREM', userSetKey, userId)
+            redis.call('HDEL', KEYS[4], userId)
             if removed == 1 and redis.call('EXISTS', stockKey) == 1 then
                 redis.call('INCR', stockKey)
             end
