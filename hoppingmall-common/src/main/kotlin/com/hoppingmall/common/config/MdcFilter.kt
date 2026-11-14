@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.MDC
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
@@ -14,10 +15,15 @@ import java.util.UUID
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
-class MdcFilter(
+class MdcFilter @Autowired constructor(
     @Value("\${spring.application.name:unknown}") private val serviceName: String,
-    private val tracer: Tracer
+    private val tracer: Tracer,
+    @Value("\${gateway.identity.secret:}") identitySecret: String
 ) : OncePerRequestFilter() {
+
+    constructor(serviceName: String, tracer: Tracer) : this(serviceName, tracer, "")
+
+    private val identityProof = GatewayIdentityProof(identitySecret)
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -33,7 +39,9 @@ class MdcFilter(
 
             MDC.put(TRACE_ID_KEY, traceId)
             MDC.put(SERVICE_KEY, serviceName)
-            request.getHeader(USER_ID_HEADER)?.let { MDC.put(USER_ID_KEY, it) }
+            request.getHeader(USER_ID_HEADER)
+                ?.takeIf { identityProof.isFromGateway(request) }
+                ?.let { MDC.put(USER_ID_KEY, it) }
             request.getHeader(GLOBAL_TRACE_ID_HEADER)?.let { MDC.put(GLOBAL_TRACE_ID_KEY, it) }
             response.setHeader(TRACE_ID_HEADER, traceId)
             filterChain.doFilter(request, response)
