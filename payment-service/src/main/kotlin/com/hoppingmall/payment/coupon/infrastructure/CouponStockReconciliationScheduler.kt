@@ -79,8 +79,9 @@ class CouponStockReconciliationScheduler(
         var restored = 0
         ghostUserIds.forEach { userId ->
             try {
-                couponStockRedisRepository.restoreStock(couponId, userId)
-                restored++
+                if (couponStockRedisRepository.restoreStockIfReservedBefore(couponId, userId, reservedBeforeMillis)) {
+                    restored++
+                }
             } catch (e: Exception) {
                 log.error("Redis 고스트 복원 실패: couponId={}, userId={}", couponId, userId, e)
             }
@@ -89,6 +90,8 @@ class CouponStockReconciliationScheduler(
     }
 
     companion object {
+        // 예약은 발급 트랜잭션 안에서 하고 그 트랜잭션은 ISSUE_TRANSACTION_TIMEOUT_SECONDS(30초) 안에 커밋되거나 롤백된다.
+        // 이보다 오래된 예약이 DB에 없으면 버려진 발급이다. 5분은 30초 위에 커밋 뒤 처리 지연 여유를 둔 값이다.
         const val DEFAULT_MIN_RESERVATION_AGE_MS = 300_000L
     }
 }

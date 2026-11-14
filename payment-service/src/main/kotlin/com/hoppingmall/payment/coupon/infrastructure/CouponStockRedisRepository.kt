@@ -42,9 +42,22 @@ class CouponStockRedisRepository(
             RScript.Mode.READ_WRITE,
             RESTORE_SCRIPT,
             RScript.ReturnType.LONG,
-            listOf(stockKey(couponId), issuedKey(couponId)),
+            listOf(stockKey(couponId), issuedKey(couponId), reservedAtKey(couponId)),
             userId.toString()
         )
+    }
+
+    fun restoreStockIfReservedBefore(couponId: Long, userId: Long, reservedBeforeMillis: Long): Boolean {
+        val script = redissonClient.getScript(StringCodec.INSTANCE)
+        val result = script.eval<Long>(
+            RScript.Mode.READ_WRITE,
+            RESTORE_IF_RESERVED_BEFORE_SCRIPT,
+            RScript.ReturnType.LONG,
+            listOf(stockKey(couponId), issuedKey(couponId), reservedAtKey(couponId)),
+            userId.toString(),
+            reservedBeforeMillis.toString()
+        )
+        return result == 1L
     }
 
     fun restoreStockIdempotent(couponId: Long, userId: Long): CouponRestoreResult {
@@ -53,7 +66,7 @@ class CouponStockRedisRepository(
             RScript.Mode.READ_WRITE,
             RESTORE_IDEMPOTENT_SCRIPT,
             RScript.ReturnType.LONG,
-            listOf(stockKey(couponId), issuedKey(couponId), restoredKey(couponId, userId)),
+            listOf(stockKey(couponId), issuedKey(couponId), restoredKey(couponId, userId), reservedAtKey(couponId)),
             userId.toString(),
             RESTORED_TTL_SECONDS.toString()
         )
@@ -88,8 +101,12 @@ class CouponStockRedisRepository(
         return recent.mapNotNullTo(mutableSetOf()) { it.toString().toLongOrNull() }
     }
 
+    fun clearReservedAt(couponId: Long, userId: Long) {
+        redissonClient.getMap<String, String>(reservedAtKey(couponId), StringCodec.INSTANCE).fastRemove(userId.toString())
+    }
+
     fun deleteStock(couponId: Long) {
-        redissonClient.keys.delete(stockKey(couponId), issuedKey(couponId))
+        redissonClient.keys.delete(stockKey(couponId), issuedKey(couponId), reservedAtKey(couponId))
     }
 
     fun getIssuedUserIds(couponId: Long): Set<Long> {
@@ -159,9 +176,33 @@ class CouponStockRedisRepository(
             local userSetKey = KEYS[2]
             local userId = ARGV[1]
 
+            redis.call('HDEL', KEYS[3], userId)
             if redis.call('SREM', userSetKey, userId) == 0 then
                 return 0
             end
+            if redis.call('EXISTS', stockKey) == 1 then
+                redis.call('INCR', stockKey)
+            end
+            return 1
+        """
+
+        const val RESTORE_IF_RESERVED_BEFORE_SCRIPT = """
+            local stockKey = KEYS[1]
+            local userSetKey = KEYS[2]
+            local reservedAtKey = KEYS[3]
+            local userId = ARGV[1]
+            local reservedBefore = tonumber(ARGV[2])
+
+            if redis.call('SISMEMBER', userSetKey, userId) == 0 then
+                return 0
+            end
+            local reservedAt = redis.call('HGET', reservedAtKey, userId)
+            if not reservedAt or tonumber(reservedAt) > reservedBefore then
+                return 0
+            end
+
+            redis.call('SREM', userSetKey, userId)
+            redis.call('HDEL', reservedAtKey, userId)
             if redis.call('EXISTS', stockKey) == 1 then
                 redis.call('INCR', stockKey)
             end
@@ -180,6 +221,7 @@ class CouponStockRedisRepository(
             end
 
             local removed = redis.call('SREM', userSetKey, userId)
+            redis.call('HDEL', KEYS[4], userId)
             if removed == 1 and redis.call('EXISTS', stockKey) == 1 then
                 redis.call('INCR', stockKey)
             end
