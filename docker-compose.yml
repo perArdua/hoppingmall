@@ -512,16 +512,22 @@ services:
         condition: service_started
       user-service:
         condition: service_healthy
+        required: false
       notification-service:
         condition: service_healthy
+        required: false
       product-service:
         condition: service_healthy
+        required: false
       order-service:
         condition: service_healthy
+        required: false
       payment-service:
         condition: service_healthy
+        required: false
       settlement-service:
         condition: service_healthy
+        required: false
     environment:
       SPRING_PROFILES_ACTIVE: docker
       GATEWAY_IDENTITY_SECRET: ${GATEWAY_IDENTITY_SECRET:?.env에 GATEWAY_IDENTITY_SECRET을 설정하세요}
