@@ -29,4 +29,11 @@ interface OrderRepository : JpaRepository<Order, Long> {
     fun isHeldBySagaTimeout(@Param("orderId") orderId: Long): Boolean
 
     fun findByStatusAndUpdatedAtBefore(status: OrderStatus, updatedBefore: LocalDateTime, pageable: Pageable): List<Order>
+
+    @Query("SELECT o.id FROM Order o WHERE o.id IN :ids AND o.status IN :statuses AND o.updatedAt < :updatedBefore")
+    fun findTerminalOrderIds(
+        @Param("ids") ids: Collection<Long>,
+        @Param("statuses") statuses: Collection<OrderStatus>,
+        @Param("updatedBefore") updatedBefore: LocalDateTime
+    ): List<Long>
 }
