@@ -14,6 +14,8 @@ interface OrderItemRepository : JpaRepository<OrderItem, Long> {
 
     fun findByOrderIdIn(orderIds: List<Long>): List<OrderItem>
 
+    fun findByReservationIdIn(reservationIds: Collection<String>): List<OrderItem>
+
     @Query(
         value = """
             SELECT oi.* FROM order_items oi

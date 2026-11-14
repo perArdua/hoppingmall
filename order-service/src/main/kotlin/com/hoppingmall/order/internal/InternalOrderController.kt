@@ -9,6 +9,10 @@ import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
@@ -26,6 +30,9 @@ class InternalOrderController(
     private val shippingRepository: ShippingRepository,
     private val refundItemRepository: RefundItemRepository
 ) {
+
+    @Value("\${order.terminal.retention-days:30}")
+    private var terminalRetentionDays: Long = 30
 
     @GetMapping("/orders/{orderId}")
     fun getOrder(@PathVariable orderId: Long): ResponseEntity<ApiResponse<OrderSummaryResponse>> {
@@ -149,6 +156,33 @@ class InternalOrderController(
         })
     }
 
+    @PostMapping("/orders/terminal-check")
+    fun terminalCheck(@Valid @RequestBody request: TerminalCheckRequest): ResponseEntity<ApiResponse<TerminalCheckResponse>> {
+        val reservationIds = request.reservationIds.orEmpty().distinct()
+        if (reservationIds.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(emptyList())))
+        }
+        val items = orderItemRepository.findByReservationIdIn(reservationIds)
+        val orders = orderRepository.findAllById(items.map { it.orderId }.distinct()).associateBy { it.id!! }
+        val updatedBefore = LocalDateTime.now().minusDays(terminalRetentionDays)
+        val terminalReservationIds = items
+            .groupBy { it.reservationId!! }
+            .filterValues { held -> held.all { orders[it.orderId]?.isTerminalBefore(updatedBefore) == true } }
+            .keys
+            .sorted()
+        return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(terminalReservationIds)))
+    }
+
+    data class TerminalCheckRequest(
+        @field:NotNull(message = "reservation_ids는 필수입니다")
+        @field:Size(max = MAX_TERMINAL_CHECK_RESERVATION_IDS, message = "reservation_ids는 최대 500개입니다")
+        val reservationIds: List<String>?
+    )
+
+    data class TerminalCheckResponse(
+        val terminalReservationIds: List<String>
+    )
+
     data class OrderItemResponse(
         val id: Long,
         val orderId: Long,
@@ -172,4 +206,8 @@ class InternalOrderController(
         val id: Long,
         val refundAmount: BigDecimal
     )
+
+    companion object {
+        const val MAX_TERMINAL_CHECK_RESERVATION_IDS = 500
+    }
 }
