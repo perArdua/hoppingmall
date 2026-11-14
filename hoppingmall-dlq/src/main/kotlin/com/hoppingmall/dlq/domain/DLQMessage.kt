@@ -13,7 +13,8 @@ import jakarta.persistence.*
         Index(name = "idx_dlq_created_at", columnList = "created_at"),
         Index(name = "idx_dlq_next_retry_at", columnList = "status, next_retry_at"),
         Index(name = "idx_dlq_topic_content_hash", columnList = "original_topic, content_hash"),
-        Index(name = "idx_dlq_status_archived_at", columnList = "status, archived_at")
+        Index(name = "idx_dlq_status_archived_at", columnList = "status, archived_at"),
+        Index(name = "idx_dlq_status_processed_at", columnList = "status, processed_at")
     ]
 )
 class DLQMessage(
@@ -83,6 +84,7 @@ class DLQMessage(
 
     fun markAsFailed(notes: String? = null) {
         this.status = DLQStatus.FAILED
+        this.processedAt = System.currentTimeMillis()
         this.notes = notes
     }
 
