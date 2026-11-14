@@ -3,12 +3,17 @@ package com.hoppingmall.order.internal
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
@@ -26,6 +31,9 @@ class InternalOrderController(
     private val shippingRepository: ShippingRepository,
     private val refundItemRepository: RefundItemRepository
 ) {
+
+    @Value("\${order.terminal.retention-days:30}")
+    private var terminalRetentionDays: Long = 30
 
     @GetMapping("/orders/{orderId}")
     fun getOrder(@PathVariable orderId: Long): ResponseEntity<ApiResponse<OrderSummaryResponse>> {
@@ -149,6 +157,31 @@ class InternalOrderController(
         })
     }
 
+    @PostMapping("/orders/terminal-check")
+    fun terminalCheck(@Valid @RequestBody request: TerminalCheckRequest): ResponseEntity<ApiResponse<TerminalCheckResponse>> {
+        val orderIds = request.orderIds.orEmpty().distinct()
+        val terminalOrderIds = if (orderIds.isEmpty()) {
+            emptyList()
+        } else {
+            orderRepository.findTerminalOrderIds(
+                orderIds,
+                Order.TERMINAL_STATUSES,
+                LocalDateTime.now().minusDays(terminalRetentionDays)
+            ).sorted()
+        }
+        return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(terminalOrderIds)))
+    }
+
+    data class TerminalCheckRequest(
+        @field:NotNull(message = "order_ids는 필수입니다")
+        @field:Size(max = MAX_TERMINAL_CHECK_ORDER_IDS, message = "order_ids는 최대 500개입니다")
+        val orderIds: List<Long>?
+    )
+
+    data class TerminalCheckResponse(
+        val terminalOrderIds: List<Long>
+    )
+
     data class OrderItemResponse(
         val id: Long,
         val orderId: Long,
@@ -172,4 +205,8 @@ class InternalOrderController(
         val id: Long,
         val refundAmount: BigDecimal
     )
+
+    companion object {
+        const val MAX_TERMINAL_CHECK_ORDER_IDS = 500
+    }
 }

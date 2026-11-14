@@ -1,8 +1,11 @@
 package com.hoppingmall.order.internal
 
 import com.hoppingmall.order.config.SecurityConfig
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
+import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
+import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import io.micrometer.tracing.Tracer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -25,7 +28,7 @@ import java.time.LocalDateTime
 
 @DisplayName("주문 끝남 확인 내부 API")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@WebMvcTest(controllers = [InternalOrderTerminalCheckController::class], properties = ["internal.service.token=$TERMINAL_TOKEN"])
+@WebMvcTest(controllers = [InternalOrderController::class], properties = ["internal.service.token=$TERMINAL_TOKEN"])
 @Import(SecurityConfig::class)
 class InternalOrderTerminalCheckApiTest {
 
@@ -34,6 +37,15 @@ class InternalOrderTerminalCheckApiTest {
 
     @MockitoBean
     private lateinit var orderRepository: OrderRepository
+
+    @MockitoBean
+    private lateinit var orderItemRepository: OrderItemRepository
+
+    @MockitoBean
+    private lateinit var shippingRepository: ShippingRepository
+
+    @MockitoBean
+    private lateinit var refundItemRepository: RefundItemRepository
 
     @MockitoBean
     private lateinit var tracer: Tracer

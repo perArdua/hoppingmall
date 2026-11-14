@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.mock
 import org.springframework.beans.factory.annotation.Autowired
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -60,8 +61,8 @@ class OrderTerminalCheckMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     private fun terminalCheck(orderIds: List<Long>): List<Long> =
-        InternalOrderTerminalCheckController(orderRepository, 30)
-            .terminalCheck(InternalOrderTerminalCheckController.TerminalCheckRequest(orderIds))
+        InternalOrderController(orderRepository, mock(), mock(), mock())
+            .terminalCheck(InternalOrderController.TerminalCheckRequest(orderIds))
             .body!!.data!!.terminalOrderIds
 
     private fun saveOrder(status: OrderStatus, daysAgo: Long): Long {
