@@ -47,6 +47,9 @@ class Order private constructor(
 
         private val refundableStatuses: Set<OrderStatus> = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
 
+        val TERMINAL_STATUSES: Set<OrderStatus> =
+            allowedTransitions.filterValues { it.isEmpty() }.keys - refundableStatuses
+
         fun create(
             buyerId: Long,
             totalAmount: BigDecimal
