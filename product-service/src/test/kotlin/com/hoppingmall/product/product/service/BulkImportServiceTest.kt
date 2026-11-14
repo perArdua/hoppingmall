@@ -26,14 +26,19 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Spy
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.cache.CacheManager
 import org.springframework.cache.support.NoOpCache
+import org.springframework.core.task.SyncTaskExecutor
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.transaction.PlatformTransactionManager
 import java.math.BigDecimal
 import java.util.Optional
+import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
 
 @DisplayName("BulkImportService")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -69,6 +74,12 @@ class BulkImportServiceTest {
 
     @Mock
     private lateinit var fileUploadConfig: FileUploadConfig
+
+    @Spy
+    private var bulkImportExecutor: Executor = SyncTaskExecutor()
+
+    @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
 
     @InjectMocks
     private lateinit var service: BulkImportService
@@ -351,5 +362,43 @@ class BulkImportServiceTest {
 
         assertThatThrownBy { service.getJobErrors(999L, 1L) }
             .isInstanceOf(ProductException::class.java)
+    }
+
+    @Test
+    fun 처리_중_예외가_나면_작업을_FAILED로_바꾼다() {
+        val file = MockMultipartFile("file", "test.csv", "text/csv", "data".toByteArray())
+        val rows = listOf(BulkProductRow(1, "상품A", "설명", 1L, BigDecimal("1000"), 10, emptyList()))
+        val job = BulkImportJob.create(sellerId = 1L, fileName = "test.csv", totalRows = 1).withId(1L)
+
+        whenever(csvParsingService.parse(any())).thenReturn(CsvParsingService.ParseResult(rows, emptyList()))
+        whenever(bulkImportJobRepository.save(any<BulkImportJob>())).thenReturn(job)
+        whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(job))
+        whenever(categoryRepository.findAllById(any<List<Long>>())).thenThrow(RuntimeException("DB 에러"))
+
+        service.startImport(1L, file)
+
+        assertThat(job.status).isEqualTo(BulkImportStatus.FAILED)
+        assertThat(job.completedAt).isNotNull()
+    }
+
+    @Test
+    fun 작업_시작이_거절되면_작업을_FAILED로_바꾼다() {
+        val rejectingService = BulkImportService(
+            bulkImportValidator, csvParsingService, bulkImportJobRepository, productRepository, productImageRepository,
+            categoryRepository, inventoryCommandService, objectMapper, cacheManager, fileUploadConfig,
+            Executor { throw RejectedExecutionException("대기열 가득 참") }, transactionManager
+        )
+        val file = MockMultipartFile("file", "test.csv", "text/csv", "data".toByteArray())
+        val rows = listOf(BulkProductRow(1, "상품A", "설명", 1L, BigDecimal("1000"), 10, emptyList()))
+        val job = BulkImportJob.create(sellerId = 1L, fileName = "test.csv", totalRows = 1).withId(1L)
+
+        whenever(csvParsingService.parse(any())).thenReturn(CsvParsingService.ParseResult(rows, emptyList()))
+        whenever(bulkImportJobRepository.save(any<BulkImportJob>())).thenReturn(job)
+        whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(job))
+
+        rejectingService.startImport(1L, file)
+
+        assertThat(job.status).isEqualTo(BulkImportStatus.FAILED)
+        assertThat(job.completedAt).isNotNull()
     }
 }
