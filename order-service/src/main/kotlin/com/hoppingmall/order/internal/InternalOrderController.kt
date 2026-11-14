@@ -34,6 +34,9 @@ class InternalOrderController(
     @Value("\${order.terminal.retention-days:30}")
     private var terminalRetentionDays: Long = 30
 
+    @Value("\${order.refund.window-days:30}")
+    private var refundWindowDays: Long = 30
+
     @GetMapping("/orders/{orderId}")
     fun getOrder(@PathVariable orderId: Long): ResponseEntity<ApiResponse<OrderSummaryResponse>> {
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException()
@@ -164,10 +167,14 @@ class InternalOrderController(
         }
         val items = orderItemRepository.findByReservationIdIn(reservationIds)
         val orders = orderRepository.findAllById(items.map { it.orderId }.distinct()).associateBy { it.id!! }
-        val updatedBefore = LocalDateTime.now().minusDays(terminalRetentionDays)
+        val now = LocalDateTime.now()
+        val updatedBefore = now.minusDays(terminalRetentionDays)
+        val deliveredBefore = now.minusDays(refundWindowDays + terminalRetentionDays)
         val terminalReservationIds = items
             .groupBy { it.reservationId!! }
-            .filterValues { held -> held.all { orders[it.orderId]?.isTerminalBefore(updatedBefore) == true } }
+            .filterValues { held ->
+                held.all { orders[it.orderId]?.isTerminalBefore(updatedBefore, deliveredBefore) == true }
+            }
             .keys
             .sorted()
         return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(terminalReservationIds)))

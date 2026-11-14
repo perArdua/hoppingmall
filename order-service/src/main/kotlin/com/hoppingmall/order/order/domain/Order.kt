@@ -31,6 +31,10 @@ class Order private constructor(
     @Column(nullable = false)
     var cancelRetryCount: Int = 0
 
+    @Column
+    var deliveredAt: LocalDateTime? = null
+        private set
+
     companion object {
         val MAX_TOTAL_AMOUNT: BigDecimal = BigDecimal("99999999.99")
 
@@ -67,7 +71,13 @@ class Order private constructor(
             throw OrderInvalidStatusException()
         }
         this.status = newStatus
+        if (newStatus == OrderStatus.DELIVERED) {
+            deliveredAt = LocalDateTime.now()
+        }
     }
+
+    fun isRefundWindowClosed(deliveredBefore: LocalDateTime): Boolean =
+        deliveredAt?.isBefore(deliveredBefore) == true
 
     fun requestCancellation() {
         updateStatus(OrderStatus.CANCEL_REQUESTED)
@@ -95,8 +105,9 @@ class Order private constructor(
 
     fun isRefundable(): Boolean = status in refundableStatuses
 
-    fun isTerminalBefore(updatedBefore: LocalDateTime): Boolean =
-        status in TERMINAL_STATUSES && updatedAt?.isBefore(updatedBefore) == true
+    fun isTerminalBefore(updatedBefore: LocalDateTime, deliveredBefore: LocalDateTime): Boolean =
+        (status in TERMINAL_STATUSES && updatedAt?.isBefore(updatedBefore) == true) ||
+            (status == OrderStatus.DELIVERED && isRefundWindowClosed(deliveredBefore))
 
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
 

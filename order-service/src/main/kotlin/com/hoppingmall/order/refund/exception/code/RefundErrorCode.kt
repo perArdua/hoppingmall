@@ -18,4 +18,5 @@ enum class RefundErrorCode(
     REFUND_QUANTITY_EXCEEDED("RFD008", "환불 가능한 수량을 초과했습니다.", HttpStatus.BAD_REQUEST),
     REFUND_PAYMENT_NOT_FOUND("RFD009", "결제 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     REFUND_DUPLICATE_ITEM("RFD010", "같은 주문 아이템이 환불 요청에 두 번 이상 들어 있습니다.", HttpStatus.BAD_REQUEST),
+    REFUND_WINDOW_EXPIRED("RFD011", "배송 완료 뒤 환불 요청 기한이 지났습니다.", HttpStatus.BAD_REQUEST),
 }
