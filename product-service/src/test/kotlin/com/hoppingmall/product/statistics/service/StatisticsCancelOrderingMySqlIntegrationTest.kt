@@ -108,7 +108,7 @@ class StatisticsCancelOrderingMySqlIntegrationTest : MySqlIntegrationTestSupport
 
         deliverCancelBeforeCompleted(ORDER_ID, PAYMENT_ID, TRANSACTION_ID)
 
-        val stats = stats()
+        val stats = stats()!!
         assertThat(stats.orderCount).isEqualTo(1L)
         assertThat(stats.totalSalesQuantity).isEqualTo(2L)
         assertThat(stats.totalSalesAmount).isEqualByComparingTo("2000")
@@ -116,11 +116,12 @@ class StatisticsCancelOrderingMySqlIntegrationTest : MySqlIntegrationTestSupport
     }
 
     @Test
-    fun 판매가_반영되기_전에_온_취소는_처리_완료로_남지_않는다() {
+    fun 판매가_반영되기_전에_온_취소는_판매를_빼지_않고_처리_기록만_남긴다() {
         val result = runCatching { consumer.handleCompensationEvent(cancelledMessage(ORDER_ID, PAYMENT_ID, TRANSACTION_ID)) }
 
-        assertThat(result.isFailure).isTrue()
-        assertThat(statisticsEventLogRepository.existsByEventId(cancelEventId(PAYMENT_ID))).isFalse()
+        assertThat(result.isSuccess).isTrue()
+        assertThat(statisticsEventLogRepository.existsByEventId(cancelEventId(PAYMENT_ID))).isTrue()
+        assertNoSales(stats())
     }
 
     @Test
@@ -146,9 +147,10 @@ class StatisticsCancelOrderingMySqlIntegrationTest : MySqlIntegrationTestSupport
         }
     }
 
-    private fun stats(): ProductStatistics = productStatisticsRepository.findByProductId(productId)!!
+    private fun stats(): ProductStatistics? = productStatisticsRepository.findByProductId(productId)
 
-    private fun assertNoSales(stats: ProductStatistics) {
+    private fun assertNoSales(stats: ProductStatistics?) {
+        if (stats == null) return
         assertThat(stats.orderCount).isEqualTo(0L)
         assertThat(stats.totalSalesQuantity).isEqualTo(0L)
         assertThat(stats.totalSalesAmount).isEqualByComparingTo("0")

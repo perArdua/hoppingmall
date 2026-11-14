@@ -75,41 +75,30 @@ class StatisticsDLQDirectReprocessMySqlIntegrationTest : MySqlIntegrationTestSup
     }
 
     @Test
-    fun 역보상_DLQ가_판매_통계_DLQ보다_먼저_재처리되면_한_번_미뤄졌다가_다음_차례에_판매를_되돌린다() {
+    fun 역보상_DLQ가_판매_통계_DLQ보다_먼저_재처리되면_같은_차례에_둘_다_끝나고_판매가_남지_않는다() {
         val reversal = deadLetter(KafkaTopics.PAYMENT_REVERSAL, REVERSAL_GROUP, 1L, reversalMessage())
         val completed = deadLetter(KafkaTopics.PAYMENT, SALES_GROUP, 2L, completedMessage())
         makeDue(reversal, completed)
 
         retryDueMessages()
 
-        assertThat(dlq(reversal).status).isEqualTo(DLQStatus.PENDING)
+        assertThat(dlq(reversal).status).isEqualTo(DLQStatus.PROCESSED)
         assertThat(dlq(reversal).retryCount).isEqualTo(1)
         assertThat(dlq(completed).status).isEqualTo(DLQStatus.PROCESSED)
-        assertThat(stats().orderCount).isEqualTo(1L)
-
-        makeDue(reversal)
-        retryDueMessages()
-
-        assertThat(dlq(reversal).status).isEqualTo(DLQStatus.PROCESSED)
         assertNoSales(stats())
         verifyNoInteractions(dlqMessagePublisher)
     }
 
     @Test
-    fun 취소_보상_DLQ가_판매_통계_DLQ보다_먼저_재처리되면_한_번_미뤄졌다가_다음_차례에_판매를_되돌린다() {
+    fun 취소_보상_DLQ가_판매_통계_DLQ보다_먼저_재처리되면_같은_차례에_둘_다_끝나고_판매가_남지_않는다() {
         val cancelled = deadLetter(KafkaTopics.PAYMENT_COMPENSATION, REVERSAL_GROUP, 1L, cancelledMessage())
         val completed = deadLetter(KafkaTopics.PAYMENT, SALES_GROUP, 2L, completedMessage())
         makeDue(cancelled, completed)
 
         retryDueMessages()
 
-        assertThat(dlq(cancelled).status).isEqualTo(DLQStatus.PENDING)
-        assertThat(dlq(completed).status).isEqualTo(DLQStatus.PROCESSED)
-
-        makeDue(cancelled)
-        retryDueMessages()
-
         assertThat(dlq(cancelled).status).isEqualTo(DLQStatus.PROCESSED)
+        assertThat(dlq(completed).status).isEqualTo(DLQStatus.PROCESSED)
         assertNoSales(stats())
         verifyNoInteractions(dlqMessagePublisher)
     }
@@ -164,9 +153,10 @@ class StatisticsDLQDirectReprocessMySqlIntegrationTest : MySqlIntegrationTestSup
 
     private fun dlq(id: Long): DLQMessage = dlqMessageRepository.findById(id).orElseThrow()
 
-    private fun stats(): ProductStatistics = productStatisticsRepository.findByProductId(productId)!!
+    private fun stats(): ProductStatistics? = productStatisticsRepository.findByProductId(productId)
 
-    private fun assertNoSales(stats: ProductStatistics) {
+    private fun assertNoSales(stats: ProductStatistics?) {
+        if (stats == null) return
         assertThat(stats.orderCount).isEqualTo(0L)
         assertThat(stats.totalSalesQuantity).isEqualTo(0L)
         assertThat(stats.totalSalesAmount).isEqualByComparingTo("0")

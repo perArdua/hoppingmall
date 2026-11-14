@@ -63,13 +63,19 @@ class StatisticsEventConsumer(
             logger = logger,
             existsCheck = { statisticsEventLogRepository.existsByEventId(event.transactionId) }
         ) {
+            var voided = false
             transactionTemplate.executeWithoutResult {
-                orderItems.forEach { item ->
-                    productStatisticsCommandService.incrementSalesStats(
-                        item.productId,
-                        item.quantity.toLong(),
-                        item.totalPrice
-                    )
+                voided = statisticsEventLogRepository
+                    .lockIdsByOrderIdAndEventTypeIn(event.orderId, VOIDING_EVENT_TYPES)
+                    .isNotEmpty()
+                if (!voided) {
+                    orderItems.forEach { item ->
+                        productStatisticsCommandService.incrementSalesStats(
+                            item.productId,
+                            item.quantity.toLong(),
+                            item.totalPrice
+                        )
+                    }
                 }
 
                 statisticsEventLogRepository.save(
@@ -81,7 +87,11 @@ class StatisticsEventConsumer(
                 )
             }
 
-            logger.info("결제 완료 통계 반영: orderId=${event.orderId}")
+            if (!voided) {
+                logger.info("결제 완료 통계 반영: orderId=${event.orderId}")
+            } else {
+                logger.info("이미 취소·역보상된 결제의 완료 이벤트, 통계에 더하지 않음: orderId=${event.orderId}")
+            }
         }
     }
 
@@ -90,7 +100,7 @@ class StatisticsEventConsumer(
         val node = objectMapper.readTree(message)
         val eventType = node.get("eventType")?.asText()
 
-        if (eventType != "PaymentCancelled") return
+        if (eventType != CANCELLED_EVENT_TYPE) return
 
         val event = kafkaEventMapper.treeToValue(node, PaymentCancelledEvent::class.java)
         handlePaymentCancelled(event)
@@ -99,8 +109,11 @@ class StatisticsEventConsumer(
     private fun handlePaymentCancelled(event: PaymentCancelledEvent) {
         if (statisticsEventLogRepository.existsByEventId(event.eventId)) return
 
-        if (event.transactionId.isNotBlank() && !statisticsEventLogRepository.existsByEventId(event.transactionId)) {
-            throw IllegalStateException("결제 완료 통계가 아직 반영되지 않아 취소를 다시 시도: orderId=${event.orderId}")
+        if (event.transactionId.isNotBlank() &&
+            !statisticsEventLogRepository.existsByEventId(event.transactionId) &&
+            recordBeforeSales(event.eventId, CANCELLED_EVENT_TYPE, event.orderId, "통계 보상")
+        ) {
+            return
         }
 
         val orderItems = orderItemQueryPort.findByOrderId(event.orderId)
@@ -123,7 +136,7 @@ class StatisticsEventConsumer(
                 statisticsEventLogRepository.save(
                     StatisticsEventLog(
                         eventId = event.eventId,
-                        eventType = "PaymentCancelled",
+                        eventType = CANCELLED_EVENT_TYPE,
                         orderId = event.orderId
                     )
                 )
@@ -145,8 +158,10 @@ class StatisticsEventConsumer(
 
         if (statisticsEventLogRepository.existsByEventId(eventId)) return
 
-        if (!statisticsEventLogRepository.existsByOrderIdAndEventType(orderId, COMPLETED_EVENT_TYPE)) {
-            throw IllegalStateException("결제 완료 통계가 아직 반영되지 않아 역보상을 다시 시도: orderId=$orderId")
+        if (!statisticsEventLogRepository.existsByOrderIdAndEventType(orderId, COMPLETED_EVENT_TYPE) &&
+            recordBeforeSales(eventId, REVERSAL_EVENT_TYPE, orderId, "통계 역보상")
+        ) {
+            return
         }
 
         val orderItems = orderItemQueryPort.findByOrderId(orderId)
@@ -179,10 +194,40 @@ class StatisticsEventConsumer(
         }
     }
 
+    private fun recordBeforeSales(eventId: String, eventType: String, orderId: Long, eventDescription: String): Boolean {
+        var recorded = false
+        executeIdempotently(
+            eventId = eventId,
+            eventDescription = eventDescription,
+            logger = logger,
+            existsCheck = { statisticsEventLogRepository.existsByEventId(eventId) }
+        ) {
+            transactionTemplate.executeWithoutResult {
+                val salesReflected = statisticsEventLogRepository
+                    .lockIdsByOrderIdAndEventTypeIn(orderId, listOf(COMPLETED_EVENT_TYPE))
+                    .isNotEmpty()
+                if (!salesReflected) {
+                    statisticsEventLogRepository.save(
+                        StatisticsEventLog(eventId = eventId, eventType = eventType, orderId = orderId)
+                    )
+                    recorded = true
+                }
+            }
+        }
+
+        if (recorded) {
+            logger.info("판매 반영 전에 온 {}, 판매를 빼지 않고 기록만 남김: orderId={}, eventId={}", eventDescription, orderId, eventId)
+            return true
+        }
+        return statisticsEventLogRepository.existsByEventId(eventId)
+    }
+
     private fun cancelledEventId(paymentId: Long) = "payment-cancelled-$paymentId"
 
     companion object {
         private const val COMPLETED_EVENT_TYPE = "PaymentCompleted"
+        private const val CANCELLED_EVENT_TYPE = "PaymentCancelled"
         private const val REVERSAL_EVENT_TYPE = "PaymentReversalRequested"
+        private val VOIDING_EVENT_TYPES = listOf(CANCELLED_EVENT_TYPE, REVERSAL_EVENT_TYPE)
     }
 }
