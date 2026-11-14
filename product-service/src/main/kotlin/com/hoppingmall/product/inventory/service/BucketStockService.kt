@@ -120,6 +120,8 @@ class BucketStockService(
 
     fun hasBuckets(productId: Long): Boolean = inventoryBucketRepository.countByProductId(productId) > 0
 
+    fun createBucketsIfMissing(productId: Long): Boolean = inventoryBucketLocker.createFromInventory(productId, bucketCount)
+
     private fun tryTake(productId: Long, bucketNo: Int, quantity: Int): TakeResult =
         when (val lock = inventoryBucketLocker.lockNowait(productId, bucketNo)) {
             is BucketLock.Acquired -> when {
@@ -136,8 +138,10 @@ class BucketStockService(
 
     private enum class TakeResult { TAKEN, SHORT, BUSY }
 
-    private fun lockAll(productId: Long): List<LockedBucket> =
-        inventoryBucketLocker.lockAll(productId, bucketCount).ifEmpty { throw InventoryNotFoundException() }
+    private fun lockAll(productId: Long): List<LockedBucket> {
+        inventoryBucketLocker.ensureBuckets(productId, bucketCount)
+        return inventoryBucketLocker.lockAll(productId, bucketCount).ifEmpty { throw InventoryNotFoundException() }
+    }
 
     private fun takeAcrossBuckets(productId: Long, quantity: Int) {
         val buckets = lockAll(productId)

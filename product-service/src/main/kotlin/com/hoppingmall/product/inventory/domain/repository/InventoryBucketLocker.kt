@@ -1,5 +1,6 @@
 package com.hoppingmall.product.inventory.domain.repository
 
+import com.hoppingmall.product.inventory.domain.InventoryBucket
 import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -32,6 +33,22 @@ class InventoryBucketLocker(
             (lockWaiting(productId, bucketNo) as? BucketLock.Acquired)?.let { LockedBucket(bucketNo, it.stockQuantity) }
         }
 
+    fun ensureBuckets(productId: Long, bucketCount: Int): Boolean =
+        !hasBuckets(productId) && createFromInventory(productId, bucketCount)
+
+    fun createFromInventory(productId: Long, bucketCount: Int): Boolean {
+        val stock = jdbcTemplate.query(LOCK_INVENTORY_SQL, { rs, _ -> rs.getInt(1) }, productId).firstOrNull() ?: return false
+        if (hasBuckets(productId)) return false
+        jdbcTemplate.batchUpdate(
+            CREATE_SQL,
+            InventoryBucket.split(productId, stock, bucketCount).map { arrayOf<Any>(it.productId, it.bucketNo, it.stockQuantity) }
+        )
+        return true
+    }
+
+    private fun hasBuckets(productId: Long): Boolean =
+        jdbcTemplate.queryForObject(COUNT_SQL, Long::class.java, productId)!! > 0
+
     fun increase(productId: Long, bucketNo: Int, quantity: Int): Int =
         jdbcTemplate.update(INCREASE_SQL, quantity, productId, bucketNo)
 
@@ -58,6 +75,13 @@ class InventoryBucketLocker(
             "SELECT stock_quantity FROM inventory_buckets WHERE product_id = ? AND bucket_no = ? FOR UPDATE NOWAIT"
         private const val LOCK_WAIT_SQL =
             "SELECT stock_quantity FROM inventory_buckets WHERE product_id = ? AND bucket_no = ? FOR UPDATE"
+        private const val LOCK_INVENTORY_SQL =
+            "SELECT stock_quantity FROM inventories WHERE product_id = ? FOR UPDATE"
+        private const val COUNT_SQL =
+            "SELECT COUNT(*) FROM inventory_buckets WHERE product_id = ?"
+        private const val CREATE_SQL =
+            "INSERT INTO inventory_buckets (product_id, bucket_no, stock_quantity) VALUES (?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE stock_quantity = stock_quantity"
         private const val INCREASE_SQL =
             "UPDATE inventory_buckets SET stock_quantity = stock_quantity + ? WHERE product_id = ? AND bucket_no = ?"
         private const val SET_STOCK_SQL =
