@@ -6,6 +6,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import jakarta.persistence.*
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @Entity
 @Table(
@@ -29,6 +30,10 @@ class Order private constructor(
 
     @Column(nullable = false)
     var cancelRetryCount: Int = 0
+
+    @Column
+    var deliveredAt: LocalDateTime? = null
+        private set
 
     companion object {
         val MAX_TOTAL_AMOUNT: BigDecimal = BigDecimal("99999999.99")
@@ -63,7 +68,13 @@ class Order private constructor(
             throw OrderInvalidStatusException()
         }
         this.status = newStatus
+        if (newStatus == OrderStatus.DELIVERED) {
+            deliveredAt = LocalDateTime.now()
+        }
     }
+
+    fun isRefundWindowClosed(deliveredBefore: LocalDateTime): Boolean =
+        deliveredAt?.isBefore(deliveredBefore) == true
 
     fun requestCancellation() {
         updateStatus(OrderStatus.CANCEL_REQUESTED)
