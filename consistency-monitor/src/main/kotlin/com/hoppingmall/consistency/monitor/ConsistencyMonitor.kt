@@ -19,7 +19,8 @@ class ConsistencyMonitor(
     private val jdbcTemplate: JdbcTemplate,
     private val violationRepository: ViolationRepository,
     private val metrics: InvariantMetrics,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val lease: MonitorLease? = null
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
