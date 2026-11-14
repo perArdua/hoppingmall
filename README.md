@@ -85,6 +85,7 @@ MySQL과 앱 컨테이너는 시간대를 따로 정하지 않아 UTC이고, 서
 
 - `update`는 새 표와 새 열은 만들지만, 기존 DB의 열 타입·길이 변경과 인덱스 변경은 자동으로 반영하지 않습니다. 이런 변경이 든 PR은 본문에 적용할 SQL(`ALTER TABLE …`, `CREATE INDEX …`)을 적고, 기존 DB에는 그 SQL을 직접 적용합니다.
 - enum 필드는 MySQL `ENUM` 열이 아니라 `VARCHAR` 열로 만듭니다: `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.VARCHAR)` + `@Column(length = …)`. `ENUM` 열은 값 목록이 열 정의에 들어가 `update`가 새 값을 더하지 않으므로, 값을 추가하면 기존 DB에서 저장이 실패합니다. `VARCHAR` 열은 값 추가에 DB 변경이 필요 없습니다.
+- 기존 DB에 `ENUM` 열이 남아 있으면 앱은 그 열을 그대로 씁니다. 다만 코드가 `ENUM` 선언이던 때는 `VARCHAR`로 바꿔 둔 열 가운데 `@Column(length = …)`가 붙은 열(`dlq_messages.status`, `inventory_reservations.status`)을 `update`가 기동할 때마다 다시 `ENUM`으로 되돌렸습니다(로그에 흔적 없음, binlog로 확인).
 
 ## Canary 배포
 
