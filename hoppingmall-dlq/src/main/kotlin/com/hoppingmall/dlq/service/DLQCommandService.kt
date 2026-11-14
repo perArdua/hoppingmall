@@ -13,26 +13,38 @@ import com.hoppingmall.dlq.publisher.DLQMessagePublisher
 import com.hoppingmall.dlq.publisher.NoOpDLQMessagePublisher
 import com.hoppingmall.dlq.reprocess.DLQReprocessors
 import org.slf4j.LoggerFactory
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 @Transactional
+@EnableConfigurationProperties(DLQBulkRetryProperties::class)
 class DLQCommandService(
     private val dlqMessageRepository: DLQMessageRepository,
     private val dlqMessagePublisher: DLQMessagePublisher,
     private val dlqMetrics: DLQMetrics,
     private val dlqArchivalService: DLQArchivalService,
     private val avroEventConverter: AvroEventConverter? = null,
-    private val dlqReprocessors: DLQReprocessors? = null
+    private val dlqReprocessors: DLQReprocessors? = null,
+    transactionManager: PlatformTransactionManager? = null,
+    private val bulkRetryProperties: DLQBulkRetryProperties = DLQBulkRetryProperties()
 ) {
 
     private val logger = LoggerFactory.getLogger(DLQCommandService::class.java)
 
     private val processingMessages = ConcurrentHashMap<String, Boolean>()
+
+    private val perMessageTransaction: TransactionTemplate? = transactionManager?.let {
+        TransactionTemplate(it).apply { propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW }
+    }
 
     companion object {
         const val MAX_RETRY_COUNT = 3
@@ -248,18 +260,23 @@ class DLQCommandService(
         return exhausted.size
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     fun retryDLQMessagesByTopic(topic: String, maxCount: Int = 50): Map<String, Any> {
-        val pageable = PageRequest.of(0, maxCount)
-        val pendingMessages = dlqMessageRepository.findByOriginalTopicAndStatusOrderByCreatedAtDesc(
-            topic, DLQStatus.PENDING, pageable
-        )
+        val limit = maxCount.coerceAtMost(bulkRetryProperties.bulkRetryMaxCount)
+        val pendingMessages = if (limit > 0) {
+            dlqMessageRepository.findByOriginalTopicAndStatusOrderByCreatedAtDesc(
+                topic, DLQStatus.PENDING, PageRequest.of(0, limit)
+            ).content
+        } else {
+            emptyList()
+        }
 
         var successCount = 0
         var failureCount = 0
         val errors = mutableListOf<String>()
 
-        pendingMessages.content.forEach { message ->
-            if (retryDLQMessage(message.id!!)) {
+        pendingMessages.forEach { message ->
+            if (retryInOwnTransaction(message.id!!)) {
                 successCount++
             } else {
                 failureCount++
@@ -269,11 +286,21 @@ class DLQCommandService(
 
         return mapOf(
             "topic" to topic,
-            "totalAttempted" to pendingMessages.content.size,
+            "totalAttempted" to pendingMessages.size,
             "successCount" to successCount,
             "failureCount" to failureCount,
             "errors" to errors.take(10)
         )
+    }
+
+    private fun retryInOwnTransaction(dlqMessageId: Long): Boolean {
+        val transaction = perMessageTransaction ?: return retryDLQMessage(dlqMessageId)
+        return try {
+            transaction.execute { retryDLQMessage(dlqMessageId) } == true
+        } catch (e: Exception) {
+            logger.error("DLQ 메시지 일괄 재처리 중 트랜잭션 실패: id={}, error={}", dlqMessageId, e.message, e)
+            false
+        }
     }
 
     fun clearProcessedDLQMessages(topic: String): Long {
