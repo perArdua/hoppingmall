@@ -78,7 +78,7 @@ class LoginAttemptLimitRedisIntegrationTest {
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
             loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, clock)
         )
-        val controller = UserController(mock<UserCommandService>(), mock(), authService)
+        val controller = UserController(mock<UserCommandService>(), mock(), authService, ClientIpResolver())
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .addInterceptors(RateLimitInterceptor(InMemoryRateLimitBuckets().proxyManager()))
@@ -87,8 +87,8 @@ class LoginAttemptLimitRedisIntegrationTest {
     }
 
     @Test
-    fun IP를_바꿔_가며_같은_이메일로_10번_틀리면_맞는_비밀번호도_429로_거절된다() {
-        val failures = (1..10).map { login(MEMBER_EMAIL, WRONG_PASSWORD).status }
+    fun IP를_바꿔_가며_같은_이메일로_50번_틀리면_맞는_비밀번호도_429로_거절된다() {
+        val failures = (1..50).map { login(MEMBER_EMAIL, WRONG_PASSWORD).status }
 
         val afterLimit = login(MEMBER_EMAIL, CORRECT_PASSWORD)
 
@@ -97,9 +97,9 @@ class LoginAttemptLimitRedisIntegrationTest {
     }
 
     @Test
-    fun 없는_이메일도_10번_실패하면_있는_이메일과_같은_응답으로_거절된다() {
-        repeat(10) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
-        repeat(10) { login(MISSING_EMAIL, WRONG_PASSWORD) }
+    fun 없는_이메일도_50번_실패하면_있는_이메일과_같은_응답으로_거절된다() {
+        repeat(50) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
+        repeat(50) { login(MISSING_EMAIL, WRONG_PASSWORD) }
 
         val member = login(MEMBER_EMAIL, WRONG_PASSWORD)
         val missing = login(MISSING_EMAIL, WRONG_PASSWORD)
@@ -109,11 +109,11 @@ class LoginAttemptLimitRedisIntegrationTest {
     }
 
     @Test
-    fun 실패가_9번이면_맞는_비밀번호로_로그인되고_실패_횟수가_초기화된다() {
-        repeat(9) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
+    fun 실패가_49번이면_맞는_비밀번호로_로그인되고_실패_횟수가_초기화된다() {
+        repeat(49) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
 
         val success = login(MEMBER_EMAIL, CORRECT_PASSWORD)
-        val failuresAfterReset = (1..9).map { login(MEMBER_EMAIL, WRONG_PASSWORD).status }
+        val failuresAfterReset = (1..49).map { login(MEMBER_EMAIL, WRONG_PASSWORD).status }
 
         assertThat(success.status).isEqualTo(200)
         assertThat(failuresAfterReset).containsOnly(401)
@@ -121,8 +121,8 @@ class LoginAttemptLimitRedisIntegrationTest {
     }
 
     @Test
-    fun 거절은_10번째_실패로부터_15분_동안이고_그_뒤에는_다시_로그인된다() {
-        repeat(10) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
+    fun 거절은_50번째_실패로부터_15분_동안이고_그_뒤에는_다시_로그인된다() {
+        repeat(50) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
 
         clock.advance(Duration.ofMinutes(15).minusSeconds(1))
         val justBefore = login(MEMBER_EMAIL, CORRECT_PASSWORD)
@@ -135,20 +135,20 @@ class LoginAttemptLimitRedisIntegrationTest {
 
     @Test
     fun 실패한_지_15분이_지나면_그_실패는_세지_않는다() {
-        repeat(9) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
+        repeat(49) { login(MEMBER_EMAIL, WRONG_PASSWORD) }
         clock.advance(Duration.ofMinutes(15))
 
-        val tenthFailure = login(MEMBER_EMAIL, WRONG_PASSWORD)
+        val fiftiethFailure = login(MEMBER_EMAIL, WRONG_PASSWORD)
         val next = login(MEMBER_EMAIL, CORRECT_PASSWORD)
 
-        assertThat(tenthFailure.status).isEqualTo(401)
+        assertThat(fiftiethFailure.status).isEqualTo(401)
         assertThat(next.status).isEqualTo(200)
     }
 
     @Test
     fun 대소문자만_바꾼_이메일도_같은_이메일로_센다() {
         val variants = listOf("Member@example.com", "MEMBER@EXAMPLE.COM", "member@Example.com", "mEmber@example.com", "membeR@example.COM")
-        repeat(10) { attempt -> login(variants[attempt % variants.size], WRONG_PASSWORD) }
+        repeat(50) { attempt -> login(variants[attempt % variants.size], WRONG_PASSWORD) }
 
         val afterLimit = login(MEMBER_EMAIL, CORRECT_PASSWORD)
 
@@ -157,7 +157,7 @@ class LoginAttemptLimitRedisIntegrationTest {
 
     @Test
     fun 다른_이메일의_실패는_서로의_횟수에_더해지지_않는다() {
-        repeat(10) { login(MISSING_EMAIL, WRONG_PASSWORD) }
+        repeat(50) { login(MISSING_EMAIL, WRONG_PASSWORD) }
 
         val other = login(MEMBER_EMAIL, CORRECT_PASSWORD)
 

@@ -31,18 +31,18 @@ class AuthServiceImpl(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun login(request: SignInRequest): SignInResponse {
-        val remainingBlock = loginAttemptLimiter.remainingBlock(request.email)
+    override fun login(request: SignInRequest, clientIp: String): SignInResponse {
+        val remainingBlock = loginAttemptLimiter.remainingBlock(request.email, clientIp)
         if (!remainingBlock.isZero) {
             throw LoginAttemptsExceededException(remainingBlock)
         }
         val user = try {
             userQueryService.authenticate(request)
         } catch (e: UserLoginFailedException) {
-            loginAttemptLimiter.recordFailure(request.email)
+            loginAttemptLimiter.recordFailure(request.email, clientIp)
             throw e
         }
-        loginAttemptLimiter.reset(request.email)
+        loginAttemptLimiter.reset(request.email, clientIp)
         val userId = user.id!!
         log.info("로그인 성공: userId={}, role={}", userId, user.getRole())
 

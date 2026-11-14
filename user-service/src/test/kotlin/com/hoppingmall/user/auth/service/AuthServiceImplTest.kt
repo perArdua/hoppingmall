@@ -73,7 +73,7 @@ class AuthServiceImplTest {
         whenever(tokenProvider.generateAccessToken(1L, Role.SELLER)).thenReturn("access-token")
         whenever(tokenProvider.generateRefreshToken(1L)).thenReturn("refresh-token")
 
-        val response = authService.login(request)
+        val response = authService.login(request, "10.0.0.1")
 
         assertThat(response.accessToken).isEqualTo("access-token")
         assertThat(response.refreshToken).isEqualTo("refresh-token")

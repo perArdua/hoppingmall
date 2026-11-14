@@ -4,6 +4,7 @@ import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.user.auth.service.AuthService
 import com.hoppingmall.user.common.enums.Role
+import com.hoppingmall.user.config.ratelimit.ClientIpResolver
 import com.hoppingmall.user.dto.request.SignInRequest
 import com.hoppingmall.user.dto.request.SignUpRequest
 import com.hoppingmall.user.dto.request.UpdateUserRequest
@@ -20,9 +21,11 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Spy
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.mock.web.MockHttpServletRequest
 
 @ExtendWith(MockitoExtension::class)
 @DisplayName("UserController")
@@ -37,6 +40,9 @@ class UserControllerTest {
 
     @Mock
     private lateinit var authService: AuthService
+
+    @Spy
+    private var clientIpResolver = ClientIpResolver()
 
     @InjectMocks
     private lateinit var userController: UserController
@@ -57,12 +63,12 @@ class UserControllerTest {
     fun 로그인_시_응답을_반환한다() {
         val request = SignInRequest("test@example.com", "Password1234")
         val expected = SignInResponse("access-token", "refresh-token")
-        whenever(authService.login(request)).thenReturn(expected)
+        whenever(authService.login(request, "10.0.0.1")).thenReturn(expected)
 
-        val response = userController.login(request)
+        val response = userController.login(request, MockHttpServletRequest().apply { remoteAddr = "10.0.0.1" })
 
         assertThat(response).isEqualTo(ApiResponse.success(expected))
-        verify(authService).login(request)
+        verify(authService).login(request, "10.0.0.1")
     }
 
     @Test

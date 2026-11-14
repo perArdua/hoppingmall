@@ -5,7 +5,7 @@ import com.hoppingmall.user.dto.request.SignInRequest
 import com.hoppingmall.user.dto.response.SignInResponse
 
 interface AuthService {
-    fun login(request: SignInRequest): SignInResponse
+    fun login(request: SignInRequest, clientIp: String): SignInResponse
 
     fun refreshAccessToken(refreshToken: String): TokenRefreshResponse
 
