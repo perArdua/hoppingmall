@@ -13,8 +13,10 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.test.util.ReflectionTestUtils
 import java.time.LocalDateTime
 
 @DisplayName("IdempotencyService")
@@ -192,6 +194,27 @@ class IdempotencyServiceTest {
             idempotencyService.cleanupExpiredRecords()
 
             verify(idempotencyRecordRepository).deleteExpiredRecords(any())
+        }
+
+        @Test
+        fun 배치가_가득_차면_같은_실행에서_이어서_지운다() {
+            whenever(idempotencyRecordRepository.deleteExpiredRecords(any()))
+                .thenReturn(IDEMPOTENCY_CLEANUP_BATCH_SIZE, IDEMPOTENCY_CLEANUP_BATCH_SIZE, 3)
+
+            idempotencyService.cleanupExpiredRecords()
+
+            verify(idempotencyRecordRepository, times(3)).deleteExpiredRecords(any())
+        }
+
+        @Test
+        fun 실행당_배치_상한에서_멈춘다() {
+            ReflectionTestUtils.setField(idempotencyService, "cleanupMaxBatches", 2)
+            whenever(idempotencyRecordRepository.deleteExpiredRecords(any()))
+                .thenReturn(IDEMPOTENCY_CLEANUP_BATCH_SIZE)
+
+            idempotencyService.cleanupExpiredRecords()
+
+            verify(idempotencyRecordRepository, times(2)).deleteExpiredRecords(any())
         }
     }
 }

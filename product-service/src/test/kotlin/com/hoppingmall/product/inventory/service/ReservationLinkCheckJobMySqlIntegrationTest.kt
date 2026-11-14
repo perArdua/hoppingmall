@@ -224,6 +224,35 @@ class ReservationLinkCheckJobMySqlIntegrationTest : MySqlIntegrationTestSupport(
     }
 
     @Test
+    fun 남은_예약이_적어_상태_인덱스로_잠그는_계획에서도_잡_두_개가_동시에_돌면_교착하지_않는다() {
+        seed(PRODUCT_ID)
+        insertFinishedReservations(900)
+        val reservations = (1..10).map { reserve(PRODUCT_ID, 1) }
+        makeExpired(*reservations.toTypedArray())
+        jdbcTemplate.queryForList("ANALYZE TABLE inventory_reservations")
+        val linked = reservations.filterIndexed { index, _ -> index % 2 == 0 }.toSet()
+        port.linked = linked
+        val deadlocksBefore = deadlocks()
+        val start = CountDownLatch(1)
+        val now = LocalDateTime.now()
+
+        val futures = (1..2).map {
+            val job = job()
+            executor.submit<ReservationLinkCheckJob.CycleResult> { start.await(); job.runCycle(now) }
+        }
+        start.countDown()
+        val results = futures.map { it.get(60, TimeUnit.SECONDS) }
+
+        assertThat(results.sumOf { it.linked }).isEqualTo(5)
+        assertThat(results.sumOf { it.aborted }).isEqualTo(5)
+        assertThat(reservations.filter { it in linked }.map { status(it) }).containsOnly("CLAIMED")
+        assertThat(reservations.filterNot { it in linked }.map { status(it) }).containsOnly("EXPIRED")
+        assertThat(bucketSum(PRODUCT_ID)).isEqualTo(75)
+        assertConserved(PRODUCT_ID)
+        assertThat(deadlocks() - deadlocksBefore).isZero()
+    }
+
+    @Test
     fun 대상이_묶음_크기보다_많으면_한_주기_안에서_묶음을_이어_모두_처리한다() {
         seed(PRODUCT_ID)
         val reservations = (1..8).map { reserve(PRODUCT_ID, 1) }
@@ -270,6 +299,19 @@ class ReservationLinkCheckJobMySqlIntegrationTest : MySqlIntegrationTestSupport(
     }
 
     private fun reserve(productId: Long, quantity: Int): String = commandService.reserveStock(productId, quantity)
+
+    private fun insertFinishedReservations(count: Int) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO inventory_reservations (reservation_id, product_id, quantity, status, expires_at, created_at, updated_at)
+            WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < ?)
+            SELECT UUID(), ? + (n % 50), 1, IF(n % 2 = 0, 'CONFIRMED', 'EXPIRED'),
+                   NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 1 DAY
+            FROM seq
+            """.trimIndent(),
+            count, FINISHED_PRODUCT_ID_BASE
+        )
+    }
 
     private fun makeExpired(vararg reservationIds: String) {
         reservationIds.forEach {
@@ -340,6 +382,7 @@ class ReservationLinkCheckJobMySqlIntegrationTest : MySqlIntegrationTestSupport(
     companion object {
         private const val PRODUCT_ID = 14_001L
         private const val OTHER_PRODUCT_ID = 14_002L
+        private const val FINISHED_PRODUCT_ID_BASE = 14_100L
         private const val INITIAL = 80
         private const val FLOOR_SECONDS = 600L
     }

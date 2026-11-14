@@ -20,7 +20,8 @@ import org.hibernate.type.SqlTypes
     ],
     indexes = [
         Index(name = "idx_settlement_summaries_seller_id", columnList = "sellerId"),
-        Index(name = "idx_settlement_summaries_status", columnList = "status")
+        Index(name = "idx_settlement_summaries_status", columnList = "status"),
+        Index(name = "idx_settlement_summaries_settlement_id", columnList = "settlementId")
     ]
 )
 class SettlementSummary(

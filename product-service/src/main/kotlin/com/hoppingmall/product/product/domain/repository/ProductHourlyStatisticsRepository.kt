@@ -11,12 +11,6 @@ import java.time.LocalDate
 @Repository
 interface ProductHourlyStatisticsRepository : JpaRepository<ProductHourlyStatistics, Long> {
 
-    fun findByProductIdAndStatisticsDateAndHour(
-        productId: Long,
-        statisticsDate: LocalDate,
-        hour: Int
-    ): ProductHourlyStatistics?
-
     fun findByStatisticsDateAndHourAndProductIdIn(
         statisticsDate: LocalDate,
         hour: Int,

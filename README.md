@@ -51,21 +51,22 @@ api-gateway         라우팅, JWT 검증, Rate Limiting
 
 ## 로컬 실행
 
-DB 비밀번호, 서비스 간 내부 토큰, JWT 서명 키, Grafana 관리자 비밀번호는 저장소에 두지 않습니다. 서비스 설정은 환경 변수만 읽고, 값이 없으면 기동하지 않습니다.
+DB 비밀번호, 서비스 간 내부 토큰, 게이트웨이 신원 증명 값, JWT 서명 키, Grafana 관리자 비밀번호는 저장소에 두지 않습니다. 서비스 설정은 환경 변수만 읽고, 값이 없으면 기동하지 않습니다.
 
 1. `.env.example`을 `.env`로 복사하고 값을 채웁니다. `.env`는 커밋하지 않습니다.
    - `MYSQL_ROOT_PASSWORD`: MySQL root 비밀번호. MySQL 컨테이너, 각 서비스의 docker 프로필 datasource, consistency-monitor, seed-runner가 같은 값을 씁니다.
    - `INTERNAL_SERVICE_TOKEN`: 서비스 간 내부 API·gRPC 호출 토큰. 모든 서비스가 같은 값을 써야 합니다.
+   - `GATEWAY_IDENTITY_SECRET`: api-gateway가 토큰을 검증한 요청에 신원 헤더(`X-User-Id`·`x-user-role`)와 함께 붙이는 증명 값. 서비스는 이 값이 맞는 요청의 신원 헤더만 믿습니다. api-gateway와 모든 서비스가 같은 값을 써야 하고, docker·k8s 프로필에서는 값이 없으면 기동하지 않습니다.
    - `JWT_SECRET`: 토큰 서명 키. user-service가 서명하고 api-gateway와 consistency-monitor가 검증하므로 모든 서비스가 같은 값을 써야 합니다. HMAC-SHA256 키라 32바이트 이상이어야 합니다.
    - `GRAFANA_ADMIN_PASSWORD`: Grafana `admin` 계정 비밀번호. `scripts/verify-observability.sh`도 이 환경 변수를 읽습니다.
 2. `docker compose up -d`로 띄웁니다. `docker-compose.yml`은 같은 폴더의 `.env`를 읽고, 필수 값이 비어 있으면 시작하지 않습니다.
 
 - MySQL 볼륨(`mysql-data`)이 이미 있으면 root 비밀번호는 볼륨을 처음 만들 때의 값으로 남습니다. 값을 바꿨다면 볼륨을 새로 만들거나 MySQL에서 비밀번호를 바꿉니다.
 - Grafana 볼륨(`grafana-data`)도 이미 있으면 관리자 비밀번호는 볼륨을 처음 만들 때의 값으로 남습니다.
-- IDE에서 기본 프로필로 서비스를 띄울 때도 `INTERNAL_SERVICE_TOKEN` 환경 변수가 있어야 하고, api-gateway·user-service·consistency-monitor는 `JWT_SECRET`도 있어야 합니다. 테스트는 테스트 설정의 값을 쓰므로 환경 변수 없이 돕니다.
+- IDE에서 기본 프로필로 서비스를 띄울 때도 `INTERNAL_SERVICE_TOKEN` 환경 변수가 있어야 하고, api-gateway·user-service·consistency-monitor는 `JWT_SECRET`도 있어야 합니다. 기본 프로필에서 `GATEWAY_IDENTITY_SECRET`이 없으면 신원 헤더를 증명 없이 믿습니다. 테스트는 테스트 설정의 값을 쓰므로 환경 변수 없이 돕니다.
 - 불변식 점검 스크립트(`scripts/invariants/check-*.sh`)는 `MYSQL_PASSWORD` 환경 변수가 있어야 실행됩니다.
 - consistency-monitor의 위반 조회·해결 API(`/api/v1/violations/**`)는 ADMIN 액세스 토큰(`Authorization: Bearer ...`)이 있어야 하고, 해결한 사람은 토큰의 사용자 ID로 기록합니다. `/actuator/**`(헬스체크·Prometheus 수집)만 토큰 없이 열려 있습니다.
-- Kind(K8s): `scripts/setup.sh`는 `JWT_SECRET`·`INTERNAL_SERVICE_TOKEN`·`MYSQL_ROOT_PASSWORD`·`GRAFANA_ADMIN_PASSWORD` 환경 변수로 `hoppingmall-secret`을 만듭니다. 넷 다 있어야 실행됩니다(예: `.env`에 넷을 채운 뒤 `set -a && . ./.env && set +a && ./scripts/setup.sh`). Grafana는 이 시크릿의 `GRAFANA_ADMIN_PASSWORD`를 읽습니다.
+- Kind(K8s): `scripts/setup.sh`는 `JWT_SECRET`·`INTERNAL_SERVICE_TOKEN`·`GATEWAY_IDENTITY_SECRET`·`MYSQL_ROOT_PASSWORD`·`GRAFANA_ADMIN_PASSWORD` 환경 변수로 `hoppingmall-secret`을 만듭니다. 다섯 다 있어야 실행됩니다(예: `.env`에 다섯을 채운 뒤 `set -a && . ./.env && set +a && ./scripts/setup.sh`). Grafana는 이 시크릿의 `GRAFANA_ADMIN_PASSWORD`를 읽습니다.
 
 ## 시각 저장 규칙
 

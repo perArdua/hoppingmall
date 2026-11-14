@@ -2,6 +2,7 @@ package com.hoppingmall.outbox.scheduler
 
 import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.domain.OutboxStatus
+import com.hoppingmall.outbox.repository.OUTBOX_CLEANUP_BATCH_SIZE
 import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.transaction.PlatformTransactionManager
@@ -76,6 +78,27 @@ class OutboxMaintenanceSchedulerTest {
         outboxMaintenanceScheduler.cleanupProcessedEvents()
 
         verify(outboxEventRepository).deleteProcessedEventsBefore(any<LocalDateTime>())
+    }
+
+    @Test
+    fun 배치가_가득_차면_같은_실행에서_이어서_지운다() {
+        whenever(outboxEventRepository.deleteProcessedEventsBefore(any<LocalDateTime>()))
+            .thenReturn(OUTBOX_CLEANUP_BATCH_SIZE, OUTBOX_CLEANUP_BATCH_SIZE, 3)
+
+        outboxMaintenanceScheduler.cleanupProcessedEvents()
+
+        verify(outboxEventRepository, times(3)).deleteProcessedEventsBefore(any<LocalDateTime>())
+    }
+
+    @Test
+    fun 실행당_배치_상한에서_멈춘다() {
+        ReflectionTestUtils.setField(outboxMaintenanceScheduler, "cleanupMaxBatches", 2)
+        whenever(outboxEventRepository.deleteProcessedEventsBefore(any<LocalDateTime>()))
+            .thenReturn(OUTBOX_CLEANUP_BATCH_SIZE)
+
+        outboxMaintenanceScheduler.cleanupProcessedEvents()
+
+        verify(outboxEventRepository, times(2)).deleteProcessedEventsBefore(any<LocalDateTime>())
     }
 
     @Test

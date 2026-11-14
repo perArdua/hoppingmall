@@ -41,6 +41,11 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "k8s"
+            - name: GATEWAY_IDENTITY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hoppingmall-secret
+                  key: GATEWAY_IDENTITY_SECRET
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC"
             - name: INTERNAL_SERVICE_TOKEN

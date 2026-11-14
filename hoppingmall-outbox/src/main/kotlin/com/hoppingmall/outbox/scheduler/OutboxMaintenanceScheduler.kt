@@ -1,13 +1,13 @@
 package com.hoppingmall.outbox.scheduler
 
 import com.hoppingmall.outbox.domain.OutboxStatus
+import com.hoppingmall.outbox.repository.OUTBOX_CLEANUP_BATCH_SIZE
 import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Duration
 import java.time.LocalDateTime
@@ -28,14 +28,22 @@ class OutboxMaintenanceScheduler(
     private var staleThresholdMs: Long = 600_000
     private val cleanupDays = 7L
 
+    @Value("\${outbox.maintenance.cleanup-max-batches:1000}")
+    private var cleanupMaxBatches: Int = 1000
+
     @Scheduled(cron = "\${outbox.maintenance.cleanup-cron:0 0 2 * * ?}")
-    @Transactional
     fun cleanupProcessedEvents() {
         val cutoffDate = LocalDateTime.now().minusDays(cleanupDays)
-        val deletedCount = outboxEventRepository.deleteProcessedEventsBefore(cutoffDate)
+        var deletedCount = 0
+        var batches = 0
+        do {
+            val deleted = outboxEventRepository.deleteProcessedEventsBefore(cutoffDate)
+            deletedCount += deleted
+            batches++
+        } while (deleted == OUTBOX_CLEANUP_BATCH_SIZE && batches < cleanupMaxBatches)
 
         if (deletedCount > 0) {
-            logger.info("Cleaned up $deletedCount processed outbox events older than $cutoffDate")
+            logger.info("Cleaned up $deletedCount processed outbox events older than $cutoffDate in $batches batches")
         }
     }
 

@@ -22,7 +22,6 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 @Service
 class SettlementCommandServiceImpl(
@@ -32,12 +31,10 @@ class SettlementCommandServiceImpl(
     private val refundQueryPort: RefundQueryPort,
     transactionManager: PlatformTransactionManager,
     private val settlementSummarySynchronizer: SettlementSummarySynchronizer? = null,
-    private val settlementSellerLocker: SettlementSellerLocker? = null,
-    private val applicationZone: ZoneId = ZoneId.systemDefault()
+    private val settlementSellerLocker: SettlementSellerLocker? = null
 ) : SettlementCommandService {
 
     private val transactionTemplate = TransactionTemplate(transactionManager)
-    private val settlementZone = ZoneId.of("Asia/Seoul")
 
     override fun createSettlement(request: CreateSettlementRequest): SettlementResponse {
         try {
@@ -120,7 +117,7 @@ class SettlementCommandServiceImpl(
     }
 
     private fun startOfSettlementDay(date: LocalDate): LocalDateTime =
-        date.atStartOfDay(settlementZone).withZoneSameInstant(applicationZone).toLocalDateTime()
+        date.atStartOfDay()
 
     @Transactional
     override fun confirmSettlement(settlementId: Long): SettlementResponse {

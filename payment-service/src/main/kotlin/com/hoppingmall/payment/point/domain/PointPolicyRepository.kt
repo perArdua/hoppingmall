@@ -6,8 +6,6 @@ import org.springframework.stereotype.Repository
 @Repository
 interface PointPolicyRepository : JpaRepository<PointPolicy, Long> {
 
-    fun findByPolicyName(policyName: String): PointPolicy?
-
     fun findByIsActiveTrue(): PointPolicy?
 
     fun existsByPolicyName(policyName: String): Boolean

@@ -19,7 +19,8 @@
         {"name": "productId", "type": "long"},
         {"name": "quantity", "type": "int"},
         {"name": "refundPrice", "type": "string"},
-        {"name": "orderItemId", "type": ["null", "long"], "default": null}
+        {"name": "orderItemId", "type": ["null", "long"], "default": null},
+        {"name": "productPrice", "type": ["null", "string"], "default": null}
       ]
     }}, "default": []},
     {"name": "eventType", "type": "string", "default": ""}

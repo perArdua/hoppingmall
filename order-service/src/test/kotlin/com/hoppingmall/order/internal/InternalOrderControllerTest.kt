@@ -203,7 +203,7 @@ class InternalOrderControllerTest {
         )
         ReflectionTestUtils.setField(orderItem, "id", 1L)
 
-        whenever(orderItemRepository.findDeliveredItemsBySellerAndPeriod(sellerId, startDate, endDate))
+        whenever(orderItemRepository.findDeliveredItemsBySellerAndPeriod(sellerId, SettlementPeriod.toApplicationTime(startDate), SettlementPeriod.toApplicationTime(endDate)))
             .thenReturn(listOf(orderItem))
 
         val response = controller.getDeliveredOrderItems(sellerId, startDate, endDate)
@@ -222,7 +222,7 @@ class InternalOrderControllerTest {
         val startDate = LocalDateTime.of(2026, 1, 1, 0, 0)
         val endDate = LocalDateTime.of(2026, 1, 31, 23, 59, 59)
 
-        whenever(orderItemRepository.findDeliveredItemsBySellerAndPeriod(sellerId, startDate, endDate))
+        whenever(orderItemRepository.findDeliveredItemsBySellerAndPeriod(sellerId, SettlementPeriod.toApplicationTime(startDate), SettlementPeriod.toApplicationTime(endDate)))
             .thenReturn(emptyList())
 
         val response = controller.getDeliveredOrderItems(sellerId, startDate, endDate)
@@ -243,7 +243,7 @@ class InternalOrderControllerTest {
         }
 
         whenever(refundItemRepository.findSettlementRefundsBySellerAndPeriod(
-            sellerId, startDate, endDate
+            sellerId, SettlementPeriod.toApplicationTime(startDate), SettlementPeriod.toApplicationTime(endDate)
         )).thenReturn(listOf(refund))
 
         val response = controller.getCompletedRefunds(sellerId, startDate, endDate)
@@ -261,7 +261,7 @@ class InternalOrderControllerTest {
         val endDate = LocalDateTime.of(2026, 1, 31, 23, 59, 59)
 
         whenever(refundItemRepository.findSettlementRefundsBySellerAndPeriod(
-            sellerId, startDate, endDate
+            sellerId, SettlementPeriod.toApplicationTime(startDate), SettlementPeriod.toApplicationTime(endDate)
         )).thenReturn(emptyList())
 
         val response = controller.getCompletedRefunds(sellerId, startDate, endDate)
