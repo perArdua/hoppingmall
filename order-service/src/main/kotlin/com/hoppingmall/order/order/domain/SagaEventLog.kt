@@ -9,7 +9,7 @@ import java.time.LocalDateTime
     name = "saga_event_logs",
     indexes = [
         Index(name = "idx_saga_event_id", columnList = "eventId", unique = true),
-        Index(name = "idx_saga_timeout", columnList = "timedOut, timeoutAt"),
+        Index(name = "idx_saga_timeout_scan", columnList = "timedOut, eventType, createdAt"),
         Index(name = "idx_saga_order_id", columnList = "orderId")
     ]
 )

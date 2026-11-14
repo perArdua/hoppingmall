@@ -48,7 +48,49 @@ class SagaTimeoutScanLimitMySqlIntegrationTest : MySqlJpaTestSupport() {
             .containsExactlyElementsOf((0 until SCAN_LIMIT).map { "payment-completed-scan-$it" })
     }
 
+    @Test
+    fun 시간_초과_조회는_다른_종류와_시간_초과_처리된_saga를_건너뛰는_전용_인덱스를_탄다() {
+        val base = LocalDateTime.now().minusDays(2)
+        val rows = mutableListOf<Array<Any>>()
+        var seq = 0
+        fun add(eventType: String, timedOut: Boolean) {
+            val createdAt = base.plusSeconds(seq.toLong())
+            rows.add(arrayOf("plan-$seq", eventType, seq + 1L, createdAt, createdAt.plusMinutes(SagaEventLog.DEFAULT_TIMEOUT_MINUTES), timedOut))
+            seq++
+        }
+        repeat(OTHER_TYPE_ROWS) { add(OTHER_EVENT_TYPES[it % OTHER_EVENT_TYPES.size], false) }
+        repeat(TIMED_OUT_ROWS) { add("PAYMENT_COMPLETED", true) }
+        repeat(PENDING_ROWS) { add("PAYMENT_COMPLETED", false) }
+        jdbcTemplate.batchUpdate(
+            "INSERT INTO saga_event_logs (event_id, event_type, order_id, created_at, timeout_at, timed_out) VALUES (?, ?, ?, ?, ?, ?)",
+            rows
+        )
+        jdbcTemplate.execute("ANALYZE TABLE saga_event_logs")
+
+        val plan = jdbcTemplate.queryForList(
+            """
+            EXPLAIN SELECT s.* FROM saga_event_logs s
+            WHERE s.timed_out = false
+            AND s.event_type = 'PAYMENT_COMPLETED'
+            AND s.created_at < NOW()
+            AND NOT EXISTS (
+                SELECT 1 FROM saga_event_log_steps step
+                WHERE step.saga_event_log_id = s.id AND step.step = 'REMOTE_COMPLETED'
+            )
+            ORDER BY s.created_at ASC
+            LIMIT 100
+            """.trimIndent()
+        ).first { it["table"] == "s" }
+
+        assertThat(plan["key"]).describedAs(plan.toString()).isEqualTo("idx_saga_timeout_scan")
+        assertThat(plan["type"]).describedAs(plan.toString()).isNotEqualTo("ALL")
+    }
+
     companion object {
         private const val SCAN_LIMIT = 100
+        private const val OTHER_TYPE_ROWS = 3000
+        private const val TIMED_OUT_ROWS = 500
+        private const val PENDING_ROWS = 300
+        private val OTHER_EVENT_TYPES = listOf("PAYMENT_COMPENSATION", "PAYMENT_CANCELLATION_COMPLETED", "PAYMENT_CANCELLATION_FAILED")
     }
 }

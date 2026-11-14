@@ -78,7 +78,6 @@ dependencies {
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.springframework.kafka:spring-kafka-test")
 	testImplementation("org.testcontainers:testcontainers:1.21.4")
-	testImplementation("org.testcontainers:kafka:1.21.4")
 	testImplementation("org.testcontainers:junit-jupiter:1.21.4")
 	testImplementation("org.testcontainers:mysql:1.21.4")
 
