@@ -72,7 +72,7 @@ class CouponStockReconciliationSchedulerTest {
         scheduler.reconcile()
 
         verify(userCouponRepository, never()).findUserIdsByCouponId(org.mockito.kotlin.any())
-        verify(couponStockRedisRepository, never()).restoreStock(org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        verify(couponStockRedisRepository, never()).restoreStockIfReservedBefore(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())
     }
 
     @Test
@@ -83,20 +83,20 @@ class CouponStockReconciliationSchedulerTest {
 
         scheduler.reconcile()
 
-        verify(couponStockRedisRepository, never()).restoreStock(org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        verify(couponStockRedisRepository, never()).restoreStockIfReservedBefore(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())
     }
 
     @Test
-    fun 고스트_사용자만_restoreStock으로_보정한다() {
+    fun 고스트_사용자만_예약_시각을_다시_확인하며_복원한다() {
         whenever(couponRepository.findAllActive()).thenReturn(listOf(createCoupon(1L)))
         whenever(couponStockRedisRepository.getIssuedUserIds(1L)).thenReturn(setOf(10L, 20L, 30L))
         whenever(userCouponRepository.findUserIdsByCouponId(1L)).thenReturn(listOf(10L))
 
         scheduler.reconcile()
 
-        verify(couponStockRedisRepository).restoreStock(eq(1L), eq(20L))
-        verify(couponStockRedisRepository).restoreStock(eq(1L), eq(30L))
-        verify(couponStockRedisRepository, never()).restoreStock(eq(1L), eq(10L))
+        verify(couponStockRedisRepository).restoreStockIfReservedBefore(eq(1L), eq(20L), org.mockito.kotlin.any())
+        verify(couponStockRedisRepository).restoreStockIfReservedBefore(eq(1L), eq(30L), org.mockito.kotlin.any())
+        verify(couponStockRedisRepository, never()).restoreStockIfReservedBefore(eq(1L), eq(10L), org.mockito.kotlin.any())
     }
 
     @Test
@@ -108,7 +108,7 @@ class CouponStockReconciliationSchedulerTest {
 
         scheduler.reconcile()
 
-        verify(couponStockRedisRepository).restoreStock(eq(2L), eq(10L))
+        verify(couponStockRedisRepository).restoreStockIfReservedBefore(eq(2L), eq(10L), org.mockito.kotlin.any())
     }
 
     @Test
@@ -116,10 +116,10 @@ class CouponStockReconciliationSchedulerTest {
         whenever(couponRepository.findAllActive()).thenReturn(listOf(createCoupon(1L)))
         whenever(couponStockRedisRepository.getIssuedUserIds(1L)).thenReturn(setOf(10L, 20L))
         whenever(userCouponRepository.findUserIdsByCouponId(1L)).thenReturn(emptyList())
-        whenever(couponStockRedisRepository.restoreStock(eq(1L), eq(10L))).thenThrow(RuntimeException("partial fail"))
+        whenever(couponStockRedisRepository.restoreStockIfReservedBefore(eq(1L), eq(10L), org.mockito.kotlin.any())).thenThrow(RuntimeException("partial fail"))
 
         scheduler.reconcile()
 
-        verify(couponStockRedisRepository).restoreStock(eq(1L), eq(20L))
+        verify(couponStockRedisRepository).restoreStockIfReservedBefore(eq(1L), eq(20L), org.mockito.kotlin.any())
     }
 }

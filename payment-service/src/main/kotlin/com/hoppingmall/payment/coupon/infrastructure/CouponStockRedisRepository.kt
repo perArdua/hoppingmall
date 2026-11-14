@@ -47,6 +47,19 @@ class CouponStockRedisRepository(
         )
     }
 
+    fun restoreStockIfReservedBefore(couponId: Long, userId: Long, reservedBeforeMillis: Long): Boolean {
+        val script = redissonClient.getScript(StringCodec.INSTANCE)
+        val result = script.eval<Long>(
+            RScript.Mode.READ_WRITE,
+            RESTORE_IF_RESERVED_BEFORE_SCRIPT,
+            RScript.ReturnType.LONG,
+            listOf(stockKey(couponId), issuedKey(couponId), reservedAtKey(couponId)),
+            userId.toString(),
+            reservedBeforeMillis.toString()
+        )
+        return result == 1L
+    }
+
     fun restoreStockIdempotent(couponId: Long, userId: Long): CouponRestoreResult {
         val script = redissonClient.getScript(StringCodec.INSTANCE)
         val result = script.eval<Long>(
@@ -167,6 +180,29 @@ class CouponStockRedisRepository(
             if redis.call('SREM', userSetKey, userId) == 0 then
                 return 0
             end
+            if redis.call('EXISTS', stockKey) == 1 then
+                redis.call('INCR', stockKey)
+            end
+            return 1
+        """
+
+        const val RESTORE_IF_RESERVED_BEFORE_SCRIPT = """
+            local stockKey = KEYS[1]
+            local userSetKey = KEYS[2]
+            local reservedAtKey = KEYS[3]
+            local userId = ARGV[1]
+            local reservedBefore = tonumber(ARGV[2])
+
+            if redis.call('SISMEMBER', userSetKey, userId) == 0 then
+                return 0
+            end
+            local reservedAt = redis.call('HGET', reservedAtKey, userId)
+            if not reservedAt or tonumber(reservedAt) > reservedBefore then
+                return 0
+            end
+
+            redis.call('SREM', userSetKey, userId)
+            redis.call('HDEL', reservedAtKey, userId)
             if redis.call('EXISTS', stockKey) == 1 then
                 redis.call('INCR', stockKey)
             end

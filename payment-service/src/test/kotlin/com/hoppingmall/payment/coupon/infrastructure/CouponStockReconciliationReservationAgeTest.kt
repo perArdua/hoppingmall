@@ -72,9 +72,9 @@ class CouponStockReconciliationReservationAgeTest {
 
         scheduler.reconcile()
 
-        verify(couponStockRedisRepository).restoreStock(1L, 10L)
-        verify(couponStockRedisRepository, never()).restoreStock(1L, 20L)
-        verify(couponStockRedisRepository, never()).restoreStock(1L, 30L)
+        verify(couponStockRedisRepository).restoreStockIfReservedBefore(1L, 10L, 700_000L)
+        verify(couponStockRedisRepository, never()).restoreStockIfReservedBefore(eq(1L), eq(20L), any())
+        verify(couponStockRedisRepository, never()).restoreStockIfReservedBefore(eq(1L), eq(30L), any())
     }
 
     @Test
@@ -86,7 +86,7 @@ class CouponStockReconciliationReservationAgeTest {
         scheduler.reconcile()
 
         verify(userCouponRepository, never()).findUserIdsByCouponId(any())
-        verify(couponStockRedisRepository, never()).restoreStock(any(), any())
+        verify(couponStockRedisRepository, never()).restoreStockIfReservedBefore(any(), any(), any())
     }
 
     @Test
@@ -99,7 +99,7 @@ class CouponStockReconciliationReservationAgeTest {
 
         scheduler.reconcile()
 
-        verify(couponStockRedisRepository, never()).restoreStock(any(), any())
+        verify(couponStockRedisRepository, never()).restoreStockIfReservedBefore(any(), any(), any())
     }
 
     @Test

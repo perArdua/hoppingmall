@@ -120,6 +120,26 @@ class CouponStockRedisRepositoryTest {
     }
 
     @Test
+    fun restoreStockIfReservedBefore_세_키와_사용자_기준_시각을_Lua에_전달하고_복원했을_때만_true를_반환한다() {
+        whenever(redissonClient.getScript(any<Codec>())).thenReturn(rScript)
+        whenever(rScript.eval<Long>(any(), any<String>(), any(), any<List<Any>>(), any(), any())).thenReturn(1L, 0L)
+
+        val restored = repository.restoreStockIfReservedBefore(1L, 10L, 700_000L)
+        val skipped = repository.restoreStockIfReservedBefore(1L, 10L, 700_000L)
+
+        assertThat(restored).isTrue()
+        assertThat(skipped).isFalse()
+        verify(rScript, org.mockito.kotlin.times(2)).eval<Long>(
+            eq(RScript.Mode.READ_WRITE),
+            eq(CouponStockRedisRepository.RESTORE_IF_RESERVED_BEFORE_SCRIPT),
+            eq(RScript.ReturnType.LONG),
+            eq(listOf("coupon:{1}:stock", "coupon:{1}:issued", "coupon:{1}:reserved-at")),
+            eq("10"),
+            eq("700000")
+        )
+    }
+
+    @Test
     fun restoreStockIdempotent_복원_성공_시_Restored를_반환한다() {
         whenever(redissonClient.getScript(any<Codec>())).thenReturn(rScript)
         whenever(rScript.eval<Long>(any(), any<String>(), any(), any<List<Any>>(), any(), any())).thenReturn(1L)
