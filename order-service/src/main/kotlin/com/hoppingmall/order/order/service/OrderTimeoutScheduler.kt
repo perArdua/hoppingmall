@@ -84,6 +84,7 @@ class OrderTimeoutScheduler(
                 payment?.status == PAYMENT_CANCELLED -> {
                     order.updateStatus(OrderStatus.CANCELLED)
                     restoreConfirmedInventory(orderId)
+                    publishCancellationNotification(order)
                     logger.warn("취소 요청 시간 초과 주문의 결제가 이미 취소됨, 주문 취소: orderId={}", orderId)
                 }
                 order.cancelRetryCount >= cancelMaxRetries -> {
@@ -106,6 +107,25 @@ class OrderTimeoutScheduler(
         } else {
             orderItems.forEach { inventoryCommandPort.increaseStock(it.productId, it.quantity) }
         }
+    }
+
+    private fun publishCancellationNotification(order: Order) {
+        val orderId = order.id!!
+        transactionalEventPublisher.publishEvent(
+            aggregateType = "Order",
+            aggregateId = orderId.toString(),
+            eventType = "OrderCancellationNotificationRequested",
+            eventData = mapOf(
+                "eventType" to "OrderCancellationNotificationRequested",
+                "eventId" to "notif-cancel-timeout-$orderId",
+                "userId" to order.buyerId,
+                "type" to "PAYMENT_CANCELLED",
+                "title" to "주문이 취소되었습니다",
+                "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다."
+            ),
+            topic = KafkaTopics.NOTIFICATION,
+            partitionKey = orderId.toString()
+        )
     }
 
     private fun requestPaymentCancellationAgain(orderId: Long, retry: Int) {
