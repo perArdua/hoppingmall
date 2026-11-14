@@ -17,6 +17,7 @@ interface SagaEventLogRepository : JpaRepository<SagaEventLog, Long> {
         value = """
         SELECT s.* FROM saga_event_logs s
         WHERE s.timed_out = false
+        AND s.remote_completed = false
         AND s.event_type = 'PAYMENT_COMPLETED'
         AND s.created_at < :createdBefore
         AND NOT EXISTS (

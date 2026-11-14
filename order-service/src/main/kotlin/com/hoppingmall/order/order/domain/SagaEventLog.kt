@@ -1,6 +1,7 @@
 package com.hoppingmall.order.order.domain
 
 import jakarta.persistence.*
+import org.hibernate.annotations.ColumnDefault
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -9,7 +10,7 @@ import java.time.LocalDateTime
     name = "saga_event_logs",
     indexes = [
         Index(name = "idx_saga_event_id", columnList = "eventId", unique = true),
-        Index(name = "idx_saga_timeout_scan", columnList = "timedOut, eventType, createdAt"),
+        Index(name = "idx_saga_open_timeout_scan", columnList = "timedOut, remoteCompleted, eventType, createdAt"),
         Index(name = "idx_saga_order_id", columnList = "orderId")
     ]
 )
@@ -47,8 +48,13 @@ class SagaEventLog(
     @Column(nullable = false)
     var timedOut: Boolean = false
 
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    var remoteCompleted: Boolean = false
+
     fun markStepCompleted(step: String) {
         completedSteps.add(step)
+        if (step == REMOTE_COMPLETED) remoteCompleted = true
     }
 
     fun isStepCompleted(step: String): Boolean = step in completedSteps
