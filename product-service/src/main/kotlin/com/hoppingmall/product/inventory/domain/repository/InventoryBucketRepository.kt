@@ -15,4 +15,12 @@ interface InventoryBucketRepository : JpaRepository<InventoryBucket, InventoryBu
     fun sumStockByProductIds(@Param("productIds") productIds: List<Long>): List<Array<Any>>
 
     fun countByProductId(productId: Long): Long
+
+    @Query(
+        value = "SELECT i.product_id FROM inventories i WHERE i.product_id > :afterProductId " +
+            "AND NOT EXISTS (SELECT 1 FROM inventory_buckets b WHERE b.product_id = i.product_id) " +
+            "ORDER BY i.product_id LIMIT :limit",
+        nativeQuery = true
+    )
+    fun findProductIdsWithoutBuckets(@Param("afterProductId") afterProductId: Long, @Param("limit") limit: Int): List<Number>
 }
