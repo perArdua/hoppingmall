@@ -18,12 +18,13 @@ import java.util.UUID
 class MdcFilter @Autowired constructor(
     @Value("\${spring.application.name:unknown}") private val serviceName: String,
     private val tracer: Tracer,
-    @Value("\${gateway.identity.secret:}") identitySecret: String
+    @Value("\${gateway.identity.secret:}") identitySecret: String,
+    @Value("\${gateway.identity.previous-secret:}") previousIdentitySecret: String
 ) : OncePerRequestFilter() {
 
-    constructor(serviceName: String, tracer: Tracer) : this(serviceName, tracer, "")
+    constructor(serviceName: String, tracer: Tracer) : this(serviceName, tracer, "", "")
 
-    private val identityProof = GatewayIdentityProof(identitySecret)
+    private val identityProof = GatewayIdentityProof(identitySecret, previousIdentitySecret)
 
     override fun doFilterInternal(
         request: HttpServletRequest,
