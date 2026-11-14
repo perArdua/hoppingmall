@@ -20,8 +20,8 @@ class GrpcMembershipQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcMembershipQueryAdapter::class.java)
 
-    @CircuitBreaker(name = "membership-query", fallbackMethod = "getPointEarningRateFallback")
-    @Retry(name = "grpc")
+    @CircuitBreaker(name = "membership-query")
+    @Retry(name = "grpc", fallbackMethod = "getPointEarningRateFallback")
     override fun getPointEarningRate(userId: Long): BigDecimal {
         val response = stub.getPointEarningRate(
             UserIdRequest.newBuilder().setUserId(userId).build()

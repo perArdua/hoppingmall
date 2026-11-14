@@ -19,7 +19,8 @@ class ConsistencyMonitor(
     private val jdbcTemplate: JdbcTemplate,
     private val violationRepository: ViolationRepository,
     private val metrics: InvariantMetrics,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val lease: MonitorLease? = null
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -28,6 +29,10 @@ class ConsistencyMonitor(
         fixedDelayString = "\${consistency.interval-ms:60000}"
     )
     fun runCycle() {
+        if (lease != null && !lease.tryAcquire()) {
+            log.debug("invariant cycle skipped: lease held by another instance")
+            return
+        }
         val cycleStart = System.nanoTime()
         val now = violationRepository.now()
         val summary = catalog.definitions.map { definition -> "${definition.id}=${check(definition, now)}" }

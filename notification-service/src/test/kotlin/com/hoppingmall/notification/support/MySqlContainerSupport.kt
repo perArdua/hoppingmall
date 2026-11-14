@@ -16,6 +16,10 @@ object MySqlContainerSupport {
         "jdbc:mysql://${container.host}:${container.getMappedPort(MySQLContainer.MYSQL_PORT)}/$database" +
             "?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true"
 
+    val username: String get() = container.username
+
+    val password: String get() = container.password
+
     fun register(registry: DynamicPropertyRegistry, database: String) {
         registry.add("spring.datasource.url") { jdbcUrl(database) }
         registry.add("spring.datasource.username") { container.username }
