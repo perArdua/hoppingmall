@@ -42,7 +42,7 @@ class DLQMessageMySqlSchemaTest {
     }
 
     @Test
-    fun 상태_열은_길이_20의_VARCHAR이고_상태를_저장하고_읽는다() {
+    fun 상태_열은_길이_32의_VARCHAR이고_상태를_저장하고_읽는다() {
         val status = jdbcTemplate.queryForMap(
             "SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE FROM information_schema.COLUMNS " +
                 "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dlq_messages' AND COLUMN_NAME = 'status'"
@@ -61,11 +61,48 @@ class DLQMessageMySqlSchemaTest {
         )
 
         assertThat(status["DATA_TYPE"]).isEqualTo("varchar")
-        assertThat((status["CHARACTER_MAXIMUM_LENGTH"] as Number).toLong()).isEqualTo(20L)
+        assertThat((status["CHARACTER_MAXIMUM_LENGTH"] as Number).toLong()).isEqualTo(32L)
         assertThat(status["IS_NULLABLE"]).isEqualTo("NO")
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM dlq_messages WHERE id = ?", String::class.java, saved.id))
             .isEqualTo("PROCESSED")
         assertThat(dlqMessageRepository.countByStatus(DLQStatus.PROCESSED)).isEqualTo(1L)
+    }
+
+    @Test
+    fun 스키마의_enum_열에_CHECK_제약이_하나도_없다() {
+        val checkConstraints = jdbcTemplate.queryForList(
+            """
+            SELECT CONCAT(tc.TABLE_NAME, '.', tc.CONSTRAINT_NAME, ' ', cc.CHECK_CLAUSE)
+            FROM information_schema.TABLE_CONSTRAINTS tc
+            JOIN information_schema.CHECK_CONSTRAINTS cc
+            ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+            WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.CONSTRAINT_TYPE = 'CHECK'
+            ORDER BY tc.TABLE_NAME, tc.CONSTRAINT_NAME
+            """.trimIndent(),
+            String::class.java
+        )
+
+        assertThat(checkConstraints).isEmpty()
+    }
+
+    @Test
+    fun enum에_없는_새_값도_상태_열에_저장된다() {
+        val saved = dlqMessageRepository.saveAndFlush(
+            DLQMessage(
+                originalTopic = "payment",
+                originalPartition = 0,
+                originalOffset = 2L,
+                originalKey = "key",
+                originalValue = "{}",
+                exceptionMessage = "error",
+                errorTimestamp = 1L
+            )
+        )
+
+        jdbcTemplate.update("UPDATE dlq_messages SET status = ? WHERE id = ?", "VALUE_ADDED_LATER", saved.id)
+
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM dlq_messages WHERE id = ?", String::class.java, saved.id))
+            .isEqualTo("VALUE_ADDED_LATER")
     }
 
     @Configuration

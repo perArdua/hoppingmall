@@ -1,12 +1,11 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
 import jakarta.persistence.*
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "users")
@@ -20,8 +19,7 @@ class User private constructor(
     @Column(nullable = false)
     private var name: String,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = RoleConverter::class)
     @Column(nullable = false, length = 32)
     private var role: Role = Role.BUYER,
 
@@ -50,3 +48,5 @@ class User private constructor(
     fun getName(): String = name
     fun getRole(): Role = role
 }
+
+class RoleConverter : EnumNameConverter<Role>(Role::class.java)

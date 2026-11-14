@@ -1,11 +1,10 @@
 package com.hoppingmall.payment.point.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.payment.point.enum.PointType
 import jakarta.persistence.*
 import java.math.BigDecimal
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -19,8 +18,7 @@ class PointHistory(
     @Column(nullable = false, precision = 10, scale = 2)
     val amount: BigDecimal,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = PointTypeConverter::class)
     @Column(nullable = false, length = 32)
     val type: PointType,
 
@@ -40,3 +38,5 @@ class PointHistory(
     companion object {
     }
 }
+
+class PointTypeConverter : EnumNameConverter<PointType>(PointType::class.java)

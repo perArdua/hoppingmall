@@ -1,11 +1,10 @@
 package com.hoppingmall.order.order.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import jakarta.persistence.*
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 
 @Entity
@@ -20,8 +19,7 @@ class Order private constructor(
     @Column(nullable = false)
     val buyerId: Long,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = OrderStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: OrderStatus = OrderStatus.CREATED,
 
@@ -97,3 +95,5 @@ class Order private constructor(
 
     fun isRefunded(): Boolean = status == OrderStatus.REFUNDED
 }
+
+class OrderStatusConverter : EnumNameConverter<OrderStatus>(OrderStatus::class.java)

@@ -1,11 +1,10 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.user.domain.enums.MembershipGrade
 import jakarta.persistence.*
 import java.math.BigDecimal
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "memberships")
@@ -13,8 +12,7 @@ class Membership(
     @Column(nullable = false, unique = true)
     val userId: Long,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = MembershipGradeConverter::class)
     @Column(nullable = false, length = 32)
     var grade: MembershipGrade = MembershipGrade.BRONZE,
 
@@ -45,3 +43,5 @@ class Membership(
         }
     }
 }
+
+class MembershipGradeConverter : EnumNameConverter<MembershipGrade>(MembershipGrade::class.java)

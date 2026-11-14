@@ -32,6 +32,42 @@ class EnumColumnTypeMySqlIntegrationTest : MySqlIntegrationTestSupport() {
         assertThat(enumColumns()).isEmpty()
     }
 
+    @Test
+    fun 스키마의_enum_열에_CHECK_제약이_하나도_없다() {
+        val checkConstraints = jdbcTemplate.queryForList(
+            """
+            SELECT CONCAT(tc.TABLE_NAME, '.', tc.CONSTRAINT_NAME, ' ', cc.CHECK_CLAUSE)
+            FROM information_schema.TABLE_CONSTRAINTS tc
+            JOIN information_schema.CHECK_CONSTRAINTS cc
+            ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+            WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.CONSTRAINT_TYPE = 'CHECK'
+            ORDER BY tc.TABLE_NAME, tc.CONSTRAINT_NAME
+            """.trimIndent(),
+            String::class.java
+        )
+
+        assertThat(checkConstraints).isEmpty()
+    }
+
+    @Test
+    fun enum에_없는_새_값도_대량_등록_작업_상태_열에_저장된다() {
+        try {
+            jdbcTemplate.update(
+                """
+                INSERT INTO bulk_import_jobs (created_at, seller_id, file_name, status, total_rows, processed_rows, success_count, fail_count)
+                VALUES (NOW(6), 1, ?, ?, 0, 0, 0, 0)
+                """.trimIndent(),
+                FILE_NAME,
+                VALUE_ADDED_LATER
+            )
+
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM bulk_import_jobs WHERE file_name = ?", String::class.java, FILE_NAME))
+                .isEqualTo(VALUE_ADDED_LATER)
+        } finally {
+            jdbcTemplate.update("DELETE FROM bulk_import_jobs WHERE file_name = ?", FILE_NAME)
+        }
+    }
+
     private fun productTables(): Set<String> =
         entityManagerFactory.metamodel.entities
             .map { it.javaType }
@@ -59,4 +95,9 @@ class EnumColumnTypeMySqlIntegrationTest : MySqlIntegrationTestSupport() {
             """.trimIndent(),
             String::class.java
         )
+
+    companion object {
+        private const val FILE_NAME = "enum-value-added-later.csv"
+        private const val VALUE_ADDED_LATER = "VALUE_ADDED_LATER"
+    }
 }

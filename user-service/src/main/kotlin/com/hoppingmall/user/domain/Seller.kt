@@ -1,11 +1,10 @@
 package com.hoppingmall.user.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.user.exception.seller.SellerAlreadyAppliedException
 import com.hoppingmall.user.exception.seller.SellerInvalidApprovalStatusException
 import jakarta.persistence.*
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -18,8 +17,7 @@ class Seller private constructor(
 
     businessNumber: String,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = ApprovalStatusConverter::class)
     @Column(name = "approval_status", nullable = false, length = 32)
     private var approvalStatus: ApprovalStatus = ApprovalStatus.PENDING
 
@@ -66,3 +64,5 @@ class Seller private constructor(
         PENDING, APPROVED, REJECTED
     }
 }
+
+class ApprovalStatusConverter : EnumNameConverter<Seller.ApprovalStatus>(Seller.ApprovalStatus::class.java)

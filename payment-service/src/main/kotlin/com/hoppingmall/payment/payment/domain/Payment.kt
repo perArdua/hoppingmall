@@ -1,14 +1,13 @@
 package com.hoppingmall.payment.payment.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.payment.payment.enum.PaymentMethod
 import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.exception.PaymentInvalidStateException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -28,13 +27,11 @@ class Payment private constructor(
     @Column(nullable = false, precision = 10, scale = 2)
     val amount: BigDecimal,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = PaymentMethodConverter::class)
     @Column(nullable = false, length = 32)
     val method: PaymentMethod,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = PaymentStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: PaymentStatus = PaymentStatus.PENDING,
 
@@ -139,3 +136,7 @@ class Payment private constructor(
 
     fun isFailed(): Boolean = status == PaymentStatus.FAILED
 }
+
+class PaymentMethodConverter : EnumNameConverter<PaymentMethod>(PaymentMethod::class.java)
+
+class PaymentStatusConverter : EnumNameConverter<PaymentStatus>(PaymentStatus::class.java)

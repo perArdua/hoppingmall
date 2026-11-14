@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.coupon.domain
 
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.payment.coupon.enum.CouponStatus
 import com.hoppingmall.payment.coupon.enum.DiscountType
 import com.hoppingmall.common.BaseEntity
@@ -7,8 +8,6 @@ import jakarta.persistence.*
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "coupons")
@@ -19,8 +18,7 @@ class Coupon private constructor(
     @Column(nullable = false, unique = true)
     val code: String,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = DiscountTypeConverter::class)
     @Column(nullable = false, length = 32)
     val discountType: DiscountType,
 
@@ -45,8 +43,7 @@ class Coupon private constructor(
     @Column(nullable = false)
     val validTo: LocalDateTime,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = CouponStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: CouponStatus = CouponStatus.ACTIVE,
 
@@ -111,3 +108,7 @@ class Coupon private constructor(
         this.status = status
     }
 }
+
+class DiscountTypeConverter : EnumNameConverter<DiscountType>(DiscountType::class.java)
+
+class CouponStatusConverter : EnumNameConverter<CouponStatus>(CouponStatus::class.java)
