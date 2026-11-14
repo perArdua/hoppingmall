@@ -22,12 +22,13 @@ class MembershipEventConsumer(
 ) {
 
     companion object {
+        const val CONSUMER_GROUP = "membership-service"
         private const val REVERT_EVENT_TYPE = "MembershipRevertRequested"
     }
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @KafkaListener(topics = [KafkaTopics.MEMBERSHIP_UPDATE_REQUEST], groupId = "membership-service")
+    @KafkaListener(topics = [KafkaTopics.MEMBERSHIP_UPDATE_REQUEST], groupId = CONSUMER_GROUP)
     fun handleMembershipUpdateRequest(message: String) {
         val node = kafkaEventMapper.readValue(message, JsonNode::class.java)
         if (node.get("eventType")?.asText() == REVERT_EVENT_TYPE) {

@@ -16,7 +16,9 @@ import org.springframework.context.annotation.Profile
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory
+import org.springframework.kafka.listener.ConsumerRecordRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.kafka.support.KafkaUtils
 import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.messaging.converter.MessageConversionException
 import org.springframework.util.backoff.FixedBackOff
@@ -69,23 +71,7 @@ class KafkaConsumerConfig(
         factory.setConcurrency(4)
         factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
 
-        val errorHandler = DefaultErrorHandler(
-            { record, exception ->
-                log.error("Kafka 메시지 처리 실패 (DLQ): topic={}, offset={}, error={}",
-                    record.topic(), record.offset(), exception.message)
-                val deadLetterMessage = DeadLetterMessage(
-                    originalTopic = record.topic(),
-                    originalPartition = record.partition(),
-                    originalOffset = record.offset(),
-                    originalKey = record.key()?.toString(),
-                    originalValue = record.value()?.toString(),
-                    exception = exception.message,
-                    timestamp = System.currentTimeMillis()
-                )
-                dlqCommandService.saveDLQMessage(deadLetterMessage)
-            },
-            FixedBackOff(1000L, 3)
-        )
+        val errorHandler = DefaultErrorHandler(deadLetterRecoverer(), FixedBackOff(1000L, 3))
         errorHandler.addNotRetryableExceptions(
             DeserializationException::class.java,
             SerializationException::class.java,
@@ -94,5 +80,21 @@ class KafkaConsumerConfig(
         factory.setCommonErrorHandler(errorHandler)
 
         return factory
+    }
+
+    fun deadLetterRecoverer(): ConsumerRecordRecoverer = ConsumerRecordRecoverer { record, exception ->
+        log.error("Kafka 메시지 처리 실패 (DLQ): topic={}, offset={}, error={}",
+            record.topic(), record.offset(), exception.message)
+        val deadLetterMessage = DeadLetterMessage(
+            originalTopic = record.topic(),
+            originalPartition = record.partition(),
+            originalOffset = record.offset(),
+            originalKey = record.key()?.toString(),
+            originalValue = record.value()?.toString(),
+            exception = exception.message,
+            timestamp = System.currentTimeMillis(),
+            consumerGroup = KafkaUtils.getConsumerGroupId()
+        )
+        dlqCommandService.saveDLQMessage(deadLetterMessage)
     }
 }
