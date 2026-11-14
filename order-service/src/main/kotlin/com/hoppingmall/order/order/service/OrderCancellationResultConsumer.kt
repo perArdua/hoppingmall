@@ -74,17 +74,22 @@ class OrderCancellationResultConsumer(
 
     private fun executeCompletedLocalPhase(eventId: String, orderId: Long, existingLog: SagaEventLog?): SagaEventLog? {
         return transactionTemplate.execute {
+            orderRepository.lockById(orderId)
             val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
                 logger.error("주문을 찾을 수 없음: orderId=$orderId")
                 return@execute null
             }
 
-            if (order.status != OrderStatus.CANCEL_REQUESTED) {
-                logger.warn("CANCEL_REQUESTED가 아닌 주문: orderId=$orderId, status=${order.status}")
+            if (order.status !in CANCELLATION_COMPLETABLE_STATUSES) {
+                logger.warn("CANCEL_REQUESTED·CANCEL_FAILED가 아닌 주문: orderId=$orderId, status=${order.status}")
                 return@execute null
             }
 
+            if (order.status == OrderStatus.CANCEL_FAILED) {
+                logger.warn("결제 취소 완료 이벤트로 CANCEL_FAILED 주문을 취소 완료로 맞춤: orderId=$orderId, eventId=$eventId")
+                order.updateStatus(OrderStatus.CANCEL_REQUESTED)
+            }
             order.updateStatus(OrderStatus.CANCELLED)
             orderRepository.save(order)
 
@@ -201,5 +206,6 @@ class OrderCancellationResultConsumer(
 
     companion object {
         private const val PAYMENT_CANCELLED = "CANCELLED"
+        private val CANCELLATION_COMPLETABLE_STATUSES = setOf(OrderStatus.CANCEL_REQUESTED, OrderStatus.CANCEL_FAILED)
     }
 }
