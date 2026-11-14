@@ -1,7 +1,6 @@
 package com.hoppingmall.payment.port
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.http.HttpEntity
@@ -17,8 +16,6 @@ class HttpProductStatisticsAdapter(
     @Value("\${services.product-service.url:http://localhost:8083}") private val productServiceUrl: String,
     restTemplateBuilder: RestTemplateBuilder
 ) : ProductStatisticsPort {
-
-    private val logger = LoggerFactory.getLogger(HttpProductStatisticsAdapter::class.java)
 
     private val restTemplate: RestTemplate = restTemplateBuilder
         .connectTimeout(Duration.ofSeconds(2))
