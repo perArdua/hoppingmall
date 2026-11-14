@@ -146,30 +146,43 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
     )
     fun oldestExpiredExpiresAt(@Param("now") now: LocalDateTime): LocalDateTime?
 
-    @Modifying(clearAutomatically = true)
     @Query(
         value = """
-            UPDATE inventory_reservations SET status = 'CLAIMED', expires_at = :until, updated_at = :updatedAt
-            WHERE reservation_id IN (:reservationIds) AND status = 'RESERVED'
-        """,
-        nativeQuery = true
-    )
-    fun claimByReservationIds(
-        @Param("reservationIds") reservationIds: List<String>,
-        @Param("until") until: LocalDateTime,
-        @Param("updatedAt") updatedAt: LocalDateTime
-    ): Int
-
-    @Query(
-        value = """
-            SELECT id, quantity FROM inventory_reservations
-            WHERE reservation_id IN (:reservationIds) AND status = 'RESERVED'
+            SELECT id, quantity, status FROM inventory_reservations
+            WHERE id IN (:ids)
             ORDER BY id
             FOR UPDATE
         """,
         nativeQuery = true
     )
-    fun lockReservedByReservationIds(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
+    fun lockByIds(@Param("ids") ids: List<Long>): List<Array<Any>>
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE inventory_reservations SET status = 'CLAIMED', expires_at = :until, updated_at = :updatedAt
+            WHERE id IN (:ids)
+        """,
+        nativeQuery = true
+    )
+    fun claimLockedByIds(
+        @Param("ids") ids: List<Long>,
+        @Param("until") until: LocalDateTime,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE inventory_reservations SET status = 'EXPIRED', updated_at = :updatedAt
+            WHERE id IN (:ids)
+        """,
+        nativeQuery = true
+    )
+    fun expireLockedByIds(
+        @Param("ids") ids: List<Long>,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
 
     @Query(
         value = """
@@ -183,30 +196,6 @@ interface InventoryReservationRepository : JpaRepository<InventoryReservation, L
         @Param("now") now: LocalDateTime,
         @Param("limit") limit: Int
     ): List<Array<Any>>
-
-    @Query(
-        value = """
-            SELECT id, quantity FROM inventory_reservations
-            WHERE reservation_id IN (:reservationIds) AND status = 'CLAIMED'
-            ORDER BY id
-            FOR UPDATE
-        """,
-        nativeQuery = true
-    )
-    fun lockClaimedByReservationIds(@Param("reservationIds") reservationIds: List<String>): List<Array<Any>>
-
-    @Modifying(clearAutomatically = true)
-    @Query(
-        value = """
-            UPDATE inventory_reservations SET status = 'EXPIRED', updated_at = :updatedAt
-            WHERE id IN (:ids) AND status = 'CLAIMED'
-        """,
-        nativeQuery = true
-    )
-    fun expireClaimedByIds(
-        @Param("ids") ids: List<Long>,
-        @Param("updatedAt") updatedAt: LocalDateTime
-    ): Int
 
     @Query("""
         SELECT r FROM InventoryReservation r
