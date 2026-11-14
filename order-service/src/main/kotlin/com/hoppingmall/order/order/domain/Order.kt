@@ -105,8 +105,9 @@ class Order private constructor(
 
     fun isRefundable(): Boolean = status in refundableStatuses
 
-    fun isTerminalBefore(updatedBefore: LocalDateTime): Boolean =
-        status in TERMINAL_STATUSES && updatedAt?.isBefore(updatedBefore) == true
+    fun isTerminalBefore(updatedBefore: LocalDateTime, deliveredBefore: LocalDateTime): Boolean =
+        (status in TERMINAL_STATUSES && updatedAt?.isBefore(updatedBefore) == true) ||
+            (status == OrderStatus.DELIVERED && isRefundWindowClosed(deliveredBefore))
 
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
 
