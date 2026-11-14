@@ -25,7 +25,7 @@ class SettlementSnapshotService(
         private const val BATCH_SIZE = 200
     }
 
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "\${settlement.snapshot.cron:0 0 3 * * *}")
     fun createSnapshot() {
         log.info("Settlement snapshot job started")
 
