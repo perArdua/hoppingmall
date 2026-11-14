@@ -11,5 +11,6 @@ data class DLQArchivalProperties(
     val secretKey: String = "minioadmin",
     val region: String = "us-east-1",
     val retentionDays: Long = 90,
-    val batchSize: Int = 100
+    val batchSize: Int = 100,
+    val purgeMaxBatches: Int = 1000
 )

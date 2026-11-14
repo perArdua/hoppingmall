@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
+
+const val DLQ_PURGE_BATCH_SIZE = 1000
 
 @Repository
 interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
@@ -140,16 +143,22 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
         pageable: Pageable
     ): Page<DLQMessage>
 
-    @Query("""
-        SELECT d FROM DLQMessage d
-        WHERE d.status = :status
-        AND d.archivedAt IS NOT NULL
-        AND d.archivedAt < :beforeTimestamp
-    """)
-    fun findArchivedMessagesBefore(
-        @Param("status") status: DLQStatus,
+    @Transactional
+    @Modifying
+    @Query(
+        value = """
+        DELETE FROM dlq_messages
+        WHERE status = :status
+        AND archived_at IS NOT NULL
+        AND archived_at < :beforeTimestamp
+        LIMIT $DLQ_PURGE_BATCH_SIZE
+    """,
+        nativeQuery = true
+    )
+    fun deleteArchivedMessagesBefore(
+        @Param("status") status: String,
         @Param("beforeTimestamp") beforeTimestamp: Long
-    ): List<DLQMessage>
+    ): Int
 }
 
 interface DLQStatsProjection {
