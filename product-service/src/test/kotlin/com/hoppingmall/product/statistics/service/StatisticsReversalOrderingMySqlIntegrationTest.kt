@@ -108,7 +108,7 @@ class StatisticsReversalOrderingMySqlIntegrationTest : MySqlIntegrationTestSuppo
 
         deliverReversalBeforeCompleted(timeoutEventId(TRANSACTION_ID), ORDER_ID, PAYMENT_ID, TRANSACTION_ID)
 
-        val stats = stats()
+        val stats = stats()!!
         assertThat(stats.orderCount).isEqualTo(1L)
         assertThat(stats.totalSalesQuantity).isEqualTo(2L)
         assertThat(stats.totalSalesAmount).isEqualByComparingTo("2000")
@@ -116,13 +116,14 @@ class StatisticsReversalOrderingMySqlIntegrationTest : MySqlIntegrationTestSuppo
     }
 
     @Test
-    fun 판매가_반영되기_전에_온_역보상은_처리_완료로_남지_않는다() {
+    fun 판매가_반영되기_전에_온_역보상은_판매를_빼지_않고_처리_기록만_남긴다() {
         val eventId = reversalEventId(TRANSACTION_ID)
 
         val result = runCatching { consumer.handlePaymentReversal(reversalMessage(eventId, ORDER_ID, PAYMENT_ID)) }
 
-        assertThat(result.isFailure).isTrue()
-        assertThat(statisticsEventLogRepository.existsByEventId(eventId)).isFalse()
+        assertThat(result.isSuccess).isTrue()
+        assertThat(statisticsEventLogRepository.existsByEventId(eventId)).isTrue()
+        assertNoSales(stats())
     }
 
     @Test
@@ -148,9 +149,10 @@ class StatisticsReversalOrderingMySqlIntegrationTest : MySqlIntegrationTestSuppo
         }
     }
 
-    private fun stats(): ProductStatistics = productStatisticsRepository.findByProductId(productId)!!
+    private fun stats(): ProductStatistics? = productStatisticsRepository.findByProductId(productId)
 
-    private fun assertNoSales(stats: ProductStatistics) {
+    private fun assertNoSales(stats: ProductStatistics?) {
+        if (stats == null) return
         assertThat(stats.orderCount).isEqualTo(0L)
         assertThat(stats.totalSalesQuantity).isEqualTo(0L)
         assertThat(stats.totalSalesAmount).isEqualByComparingTo("0")
