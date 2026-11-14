@@ -18,13 +18,18 @@ import com.hoppingmall.product.product.dto.response.*
 import com.hoppingmall.product.product.exception.ProductException
 import com.hoppingmall.product.product.exception.code.ProductErrorCode
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.CacheManager
-import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.multipart.MultipartFile
+import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
 
 @Service
 class BulkImportService(
@@ -37,10 +42,16 @@ class BulkImportService(
     private val inventoryCommandService: InventoryCommandService,
     private val objectMapper: ObjectMapper,
     private val cacheManager: CacheManager,
-    private val fileUploadConfig: FileUploadConfig
+    private val fileUploadConfig: FileUploadConfig,
+    @Qualifier("bulkImportExecutor") private val bulkImportExecutor: Executor,
+    transactionManager: PlatformTransactionManager
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    private val newTransaction = TransactionTemplate(transactionManager).apply {
+        propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
+    }
 
     companion object {
         private const val CHUNK_SIZE = 50
@@ -73,19 +84,45 @@ class BulkImportService(
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                 override fun afterCommit() {
-                    processImportAsync(jobId, sellerId, rows, errors)
+                    dispatchImport(jobId, sellerId, rows, errors)
                 }
             })
         } else {
-            processImportAsync(jobId, sellerId, rows, errors)
+            dispatchImport(jobId, sellerId, rows, errors)
         }
 
         return BulkImportProgressResponse.from(job)
     }
 
-    @Async("bulkImportExecutor")
-    fun processImportAsync(jobId: Long, sellerId: Long, rows: List<BulkProductRow>, parseErrors: List<BulkRowError>) {
-        processImport(jobId, sellerId, rows, parseErrors)
+    private fun dispatchImport(jobId: Long, sellerId: Long, rows: List<BulkProductRow>, parseErrors: List<BulkRowError>) {
+        try {
+            bulkImportExecutor.execute { runImport(jobId, sellerId, rows, parseErrors) }
+        } catch (e: RejectedExecutionException) {
+            log.error("대량 등록 작업을 시작하지 못함: jobId={}", jobId, e)
+            markFailed(jobId)
+        }
+    }
+
+    private fun runImport(jobId: Long, sellerId: Long, rows: List<BulkProductRow>, parseErrors: List<BulkRowError>) {
+        try {
+            newTransaction.executeWithoutResult { processImport(jobId, sellerId, rows, parseErrors) }
+        } catch (e: Exception) {
+            log.error("대량 등록 처리 실패: jobId={}", jobId, e)
+            markFailed(jobId)
+        }
+    }
+
+    private fun markFailed(jobId: Long) {
+        try {
+            newTransaction.executeWithoutResult {
+                bulkImportJobRepository.findByIdOrNull(jobId)?.let { job ->
+                    job.fail()
+                    bulkImportJobRepository.save(job)
+                }
+            }
+        } catch (e: Exception) {
+            log.error("대량 등록 작업 실패 상태 기록 실패: jobId={}", jobId, e)
+        }
     }
 
     @Transactional
