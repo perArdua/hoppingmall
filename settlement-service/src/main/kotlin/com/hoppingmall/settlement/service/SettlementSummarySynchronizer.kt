@@ -16,7 +16,7 @@ class SettlementSummarySynchronizer(
             existing.updateFrom(settlement)
             return
         }
-        if (settlementSummaryRepository.count() > 0) {
+        if (settlementSummaryRepository.existsByIdIsNotNull()) {
             settlementSummaryRepository.save(SettlementSummary.from(settlement))
         }
     }
