@@ -65,7 +65,7 @@ class ProductStatisticsScheduler(
         productStatisticsCommandService.flushHourlySnapshot()
     }
 
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "\${product.statistics.daily-close.cron:0 0 0 * * *}")
     fun flushDailyStatistics() {
         logger.info("일별 통계 마감 시작")
         productStatisticsCommandService.flushDailySnapshot()
