@@ -14,7 +14,7 @@ import java.math.BigDecimal
 @Component
 @Profile("grpc")
 class GrpcOrderItemQueryAdapter(
-    @GrpcClient("order-service") private val stub: OrderQueryServiceGrpc.OrderQueryServiceBlockingStub
+    @GrpcClient("order-service", interceptors = [ConnectBackoffResetClientInterceptor::class]) private val stub: OrderQueryServiceGrpc.OrderQueryServiceBlockingStub
 ) : OrderItemQueryPort {
 
     @CircuitBreaker(name = "order-item-query")

@@ -19,7 +19,7 @@ import java.math.BigDecimal
 @Component
 @Profile("grpc")
 class GrpcProductQueryAdapter(
-    @GrpcClient("product-service") private val stub: ProductQueryServiceGrpc.ProductQueryServiceBlockingStub
+    @GrpcClient("product-service", interceptors = [ConnectBackoffResetClientInterceptor::class]) private val stub: ProductQueryServiceGrpc.ProductQueryServiceBlockingStub
 ) : ProductQueryPort {
 
     private val log = LoggerFactory.getLogger(GrpcProductQueryAdapter::class.java)

@@ -20,7 +20,7 @@ import java.math.BigDecimal
 @Component
 @Profile("grpc")
 class GrpcPaymentQueryAdapter(
-    @GrpcClient("payment-service") private val stub: PaymentQueryServiceGrpc.PaymentQueryServiceBlockingStub
+    @GrpcClient("payment-service", interceptors = [ConnectBackoffResetClientInterceptor::class]) private val stub: PaymentQueryServiceGrpc.PaymentQueryServiceBlockingStub
 ) : PaymentQueryPort {
 
     private val log = LoggerFactory.getLogger(GrpcPaymentQueryAdapter::class.java)

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component
 @Component
 @Profile("grpc")
 class GrpcCartItemQueryAdapter(
-    @GrpcClient("order-service") private val stub: CartItemQueryServiceGrpc.CartItemQueryServiceBlockingStub
+    @GrpcClient("order-service", interceptors = [ConnectBackoffResetClientInterceptor::class]) private val stub: CartItemQueryServiceGrpc.CartItemQueryServiceBlockingStub
 ) : CartItemQueryPort {
 
     private val log = LoggerFactory.getLogger(GrpcCartItemQueryAdapter::class.java)
