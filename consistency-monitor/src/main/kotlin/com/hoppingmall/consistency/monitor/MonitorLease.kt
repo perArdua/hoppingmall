@@ -29,6 +29,9 @@ class MonitorLease(
         }
     }
 
+    fun renew() {
+    }
+
     @PreDestroy
     fun release() {
         try {
