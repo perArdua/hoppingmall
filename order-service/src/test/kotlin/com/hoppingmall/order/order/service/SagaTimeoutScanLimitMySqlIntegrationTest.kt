@@ -71,6 +71,7 @@ class SagaTimeoutScanLimitMySqlIntegrationTest : MySqlJpaTestSupport() {
             """
             EXPLAIN SELECT s.* FROM saga_event_logs s
             WHERE s.timed_out = false
+            AND s.remote_completed = false
             AND s.event_type = 'PAYMENT_COMPLETED'
             AND s.created_at < NOW()
             AND NOT EXISTS (
@@ -82,7 +83,7 @@ class SagaTimeoutScanLimitMySqlIntegrationTest : MySqlJpaTestSupport() {
             """.trimIndent()
         ).first { it["table"] == "s" }
 
-        assertThat(plan["key"]).describedAs(plan.toString()).isEqualTo("idx_saga_timeout_scan")
+        assertThat(plan["key"]).describedAs(plan.toString()).isEqualTo("idx_saga_open_timeout_scan")
         assertThat(plan["type"]).describedAs(plan.toString()).isNotEqualTo("ALL")
     }
 

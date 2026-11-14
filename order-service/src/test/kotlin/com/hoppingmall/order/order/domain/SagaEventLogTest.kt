@@ -141,6 +141,21 @@ class SagaEventLogTest {
     }
 
     @Test
+    fun REMOTE_COMPLETED_스텝을_기록할_때만_remoteCompleted가_true가_된다() {
+        val log = SagaEventLog(
+            eventId = "evt-remote-1",
+            eventType = "PAYMENT_COMPLETED",
+            orderId = 1L
+        )
+
+        log.markStepCompleted(SagaEventLog.LOCAL_COMPLETED)
+        assertThat(log.remoteCompleted).isFalse()
+
+        log.markStepCompleted(SagaEventLog.REMOTE_COMPLETED)
+        assertThat(log.remoteCompleted).isTrue()
+    }
+
+    @Test
     fun 커스텀_timeoutAt을_지정할_수_있다() {
         val customTimeout = LocalDateTime.now().plusMinutes(10)
         val log = SagaEventLog(
