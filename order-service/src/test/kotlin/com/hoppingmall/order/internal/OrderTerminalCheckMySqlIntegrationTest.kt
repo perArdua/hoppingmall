@@ -1,6 +1,8 @@
 package com.hoppingmall.order.internal
 
 import com.hoppingmall.order.order.domain.Order
+import com.hoppingmall.order.order.domain.OrderItem
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.support.MySqlJpaTestSupport
@@ -21,55 +23,100 @@ class OrderTerminalCheckMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Autowired
     private lateinit var orderRepository: OrderRepository
 
+    @Autowired
+    private lateinit var orderItemRepository: OrderItemRepository
+
     @Test
-    fun 취소되거나_전체_환불된_지_30일이_지난_주문만_끝난_주문이다() {
-        val cancelledOld = saveOrder(OrderStatus.CANCELLED, daysAgo = 31)
-        val refundedOld = saveOrder(OrderStatus.REFUNDED, daysAgo = 31)
-        val cancelledRecent = saveOrder(OrderStatus.CANCELLED, daysAgo = 29)
-        val refundedRecent = saveOrder(OrderStatus.REFUNDED, daysAgo = 29)
-        val deliveredOld = saveOrder(OrderStatus.DELIVERED, daysAgo = 365)
-        val paidOld = saveOrder(OrderStatus.PAID, daysAgo = 365)
-        val shippedOld = saveOrder(OrderStatus.SHIPPED, daysAgo = 365)
-        val cancelFailedOld = saveOrder(OrderStatus.CANCEL_FAILED, daysAgo = 365)
-        val cancelRequestedOld = saveOrder(OrderStatus.CANCEL_REQUESTED, daysAgo = 365)
-        val missing = cancelRequestedOld + 10_000
+    fun 취소되거나_전체_환불된_지_30일이_지난_주문의_예약만_끝난_것이다() {
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 31, "rsv-cancelled-old")
+        saveOrder(OrderStatus.REFUNDED, daysAgo = 31, "rsv-refunded-old")
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 29, "rsv-cancelled-recent")
+        saveOrder(OrderStatus.REFUNDED, daysAgo = 29, "rsv-refunded-recent")
+        saveOrder(OrderStatus.DELIVERED, daysAgo = 365, "rsv-delivered")
+        saveOrder(OrderStatus.PAID, daysAgo = 365, "rsv-paid")
+        saveOrder(OrderStatus.SHIPPED, daysAgo = 365, "rsv-shipped")
+        saveOrder(OrderStatus.CANCEL_FAILED, daysAgo = 365, "rsv-cancel-failed")
+        saveOrder(OrderStatus.CANCEL_REQUESTED, daysAgo = 365, "rsv-cancel-requested")
 
         val terminal = terminalCheck(
             listOf(
-                cancelledOld, refundedOld, cancelledRecent, refundedRecent, deliveredOld,
-                paidOld, shippedOld, cancelFailedOld, cancelRequestedOld, missing
+                "rsv-cancelled-old", "rsv-refunded-old", "rsv-cancelled-recent", "rsv-refunded-recent",
+                "rsv-delivered", "rsv-paid", "rsv-shipped", "rsv-cancel-failed", "rsv-cancel-requested", "rsv-unknown"
             )
         )
 
-        assertThat(terminal).containsExactly(cancelledOld, refundedOld)
+        assertThat(terminal).containsExactly("rsv-cancelled-old", "rsv-refunded-old")
     }
 
     @Test
-    fun 묻지_않은_주문은_끝났어도_돌려주지_않는다() {
-        val asked = saveOrder(OrderStatus.CANCELLED, daysAgo = 40)
-        saveOrder(OrderStatus.CANCELLED, daysAgo = 40)
+    fun 한_주문의_여러_예약은_각각_끝난_것으로_답한다() {
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 40, "rsv-a", "rsv-b")
 
-        assertThat(terminalCheck(listOf(asked))).containsExactly(asked)
+        assertThat(terminalCheck(listOf("rsv-b", "rsv-a"))).containsExactly("rsv-a", "rsv-b")
     }
 
     @Test
-    fun 상태가_된_시각이_없는_주문은_끝난_주문으로_보지_않는다() {
-        val orderId = saveOrder(OrderStatus.CANCELLED, daysAgo = 40)
+    fun 묻지_않은_예약은_끝났어도_돌려주지_않는다() {
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 40, "rsv-asked")
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 40, "rsv-not-asked")
+
+        assertThat(terminalCheck(listOf("rsv-asked"))).containsExactly("rsv-asked")
+    }
+
+    @Test
+    fun 예약이_없는_주문_항목은_답에_섞이지_않는다() {
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 40, null)
+
+        assertThat(terminalCheck(listOf("rsv-unknown"))).isEmpty()
+    }
+
+    @Test
+    fun 같은_예약을_가진_주문이_하나라도_끝나지_않았으면_끝난_것이_아니다() {
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 40, "rsv-shared")
+        saveOrder(OrderStatus.PAID, daysAgo = 40, "rsv-shared")
+
+        assertThat(terminalCheck(listOf("rsv-shared"))).isEmpty()
+    }
+
+    @Test
+    fun 상태가_된_시각이_없는_주문의_예약은_끝난_것이_아니다() {
+        val orderId = saveOrder(OrderStatus.CANCELLED, daysAgo = 40, "rsv-no-updated-at")
         jdbcTemplate.update("UPDATE orders SET updated_at = NULL WHERE id = ?", orderId)
 
-        assertThat(terminalCheck(listOf(orderId))).isEmpty()
+        assertThat(terminalCheck(listOf("rsv-no-updated-at"))).isEmpty()
     }
 
-    private fun terminalCheck(orderIds: List<Long>): List<Long> =
-        InternalOrderController(orderRepository, mock(), mock(), mock())
-            .terminalCheck(InternalOrderController.TerminalCheckRequest(orderIds))
-            .body!!.data!!.terminalOrderIds
+    @Test
+    fun 예약_id_500개를_한_번에_묻는다() {
+        saveOrder(OrderStatus.CANCELLED, daysAgo = 40, "rsv-250")
+        val asked = (1..500).map { "rsv-$it" }
 
-    private fun saveOrder(status: OrderStatus, daysAgo: Long): Long {
+        assertThat(terminalCheck(asked)).containsExactly("rsv-250")
+    }
+
+    private fun terminalCheck(reservationIds: List<String>): List<String> =
+        InternalOrderController(orderRepository, orderItemRepository, mock(), mock())
+            .terminalCheck(InternalOrderController.TerminalCheckRequest(reservationIds))
+            .body!!.data!!.terminalReservationIds
+
+    private fun saveOrder(status: OrderStatus, daysAgo: Long, vararg reservationIds: String?): Long {
         val order = Order.create(buyerId = 1L, totalAmount = BigDecimal("10000"))
         PATHS.getValue(status).forEach { order.updateStatus(it) }
         if (status == OrderStatus.REFUNDED) order.completeRefund()
         val orderId = orderRepository.save(order).id!!
+        reservationIds.forEachIndexed { index, reservationId ->
+            orderItemRepository.save(
+                OrderItem.create(
+                    orderId = orderId,
+                    sellerId = 7L,
+                    productId = 100L + index,
+                    productName = "상품",
+                    productPrice = BigDecimal("1000"),
+                    quantity = 1,
+                    reservationId = reservationId
+                )
+            )
+        }
         jdbcTemplate.update(
             "UPDATE orders SET updated_at = ? WHERE id = ?",
             LocalDateTime.now().minusDays(daysAgo),
