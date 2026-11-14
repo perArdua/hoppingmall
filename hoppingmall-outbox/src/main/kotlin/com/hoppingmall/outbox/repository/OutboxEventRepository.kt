@@ -6,7 +6,10 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+
+const val OUTBOX_CLEANUP_BATCH_SIZE = 1000
 
 interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
 
@@ -58,13 +61,16 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         @Param("aggregateType") aggregateType: String
     ): List<OutboxEvent>
 
+    @Transactional
     @Modifying(clearAutomatically = true)
     @Query(
-        """
-        DELETE FROM OutboxEvent o
-        WHERE o.processed = true
-        AND o.processedAt < :cutoffDate
-    """
+        value = """
+        DELETE FROM outbox_events
+        WHERE processed = true
+        AND processed_at < :cutoffDate
+        LIMIT $OUTBOX_CLEANUP_BATCH_SIZE
+    """,
+        nativeQuery = true
     )
     fun deleteProcessedEventsBefore(@Param("cutoffDate") cutoffDate: LocalDateTime): Int
 

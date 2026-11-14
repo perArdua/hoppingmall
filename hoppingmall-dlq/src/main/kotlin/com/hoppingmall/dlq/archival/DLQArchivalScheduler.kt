@@ -1,6 +1,7 @@
 package com.hoppingmall.dlq.archival
 
 import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.domain.repository.DLQ_PURGE_BATCH_SIZE
 import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -43,19 +44,21 @@ class DLQArchivalScheduler(
     }
 
     @Scheduled(fixedDelay = 3_600_000)
-    @Transactional
     fun purgeArchivedMessages() {
         val retentionMillis = TimeUnit.DAYS.toMillis(dlqArchivalProperties.retentionDays)
         val cutoffTimestamp = System.currentTimeMillis() - retentionMillis
 
-        val archivedFailedMessages = dlqMessageRepository.findArchivedMessagesBefore(
-            DLQStatus.FAILED, cutoffTimestamp
-        )
+        var purgedCount = 0
+        var batches = 0
+        do {
+            val deleted = dlqMessageRepository.deleteArchivedMessagesBefore(DLQStatus.FAILED.name, cutoffTimestamp)
+            purgedCount += deleted
+            batches++
+        } while (deleted == DLQ_PURGE_BATCH_SIZE && batches < dlqArchivalProperties.purgeMaxBatches)
 
-        if (archivedFailedMessages.isEmpty()) return
+        if (purgedCount == 0) return
 
-        dlqMessageRepository.deleteAll(archivedFailedMessages)
-        log.info("아카이빙 완료된 FAILED DLQ 메시지 퍼지: {} 건 (보존기간 {} 일 초과)",
-            archivedFailedMessages.size, dlqArchivalProperties.retentionDays)
+        log.info("아카이빙 완료된 FAILED DLQ 메시지 퍼지: {} 건, {} 회 (보존기간 {} 일 초과)",
+            purgedCount, batches, dlqArchivalProperties.retentionDays)
     }
 }

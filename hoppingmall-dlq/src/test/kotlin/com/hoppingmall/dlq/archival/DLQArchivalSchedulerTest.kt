@@ -3,6 +3,7 @@ package com.hoppingmall.dlq.archival
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
 import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.domain.repository.DLQ_PURGE_BATCH_SIZE
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -88,23 +89,48 @@ class DLQArchivalSchedulerTest {
 
         @Test
         fun 보존기간_초과_아카이빙된_메시지를_퍼지한다() {
-            val oldMessage = createDLQMessage(id = 1L, status = DLQStatus.FAILED)
-            whenever(dlqMessageRepository.findArchivedMessagesBefore(eq(DLQStatus.FAILED), any()))
-                .thenReturn(listOf(oldMessage))
+            whenever(dlqMessageRepository.deleteArchivedMessagesBefore(eq("FAILED"), any()))
+                .thenReturn(1)
 
             scheduler.purgeArchivedMessages()
 
-            verify(dlqMessageRepository).deleteAll(listOf(oldMessage))
+            verify(dlqMessageRepository, times(1)).deleteArchivedMessagesBefore(eq("FAILED"), any())
+            verify(dlqMessageRepository, never()).deleteAll(any<List<DLQMessage>>())
         }
 
         @Test
-        fun 퍼지_대상이_없으면_deleteAll을_호출하지_않는다() {
-            whenever(dlqMessageRepository.findArchivedMessagesBefore(eq(DLQStatus.FAILED), any()))
-                .thenReturn(emptyList())
+        fun 퍼지_대상이_없으면_한_번만_지운다() {
+            whenever(dlqMessageRepository.deleteArchivedMessagesBefore(eq("FAILED"), any()))
+                .thenReturn(0)
 
             scheduler.purgeArchivedMessages()
 
-            verify(dlqMessageRepository, never()).deleteAll(any<List<DLQMessage>>())
+            verify(dlqMessageRepository, times(1)).deleteArchivedMessagesBefore(eq("FAILED"), any())
+        }
+
+        @Test
+        fun 배치가_가득_차면_같은_실행에서_이어서_지운다() {
+            whenever(dlqMessageRepository.deleteArchivedMessagesBefore(eq("FAILED"), any()))
+                .thenReturn(DLQ_PURGE_BATCH_SIZE, DLQ_PURGE_BATCH_SIZE, 3)
+
+            scheduler.purgeArchivedMessages()
+
+            verify(dlqMessageRepository, times(3)).deleteArchivedMessagesBefore(eq("FAILED"), any())
+        }
+
+        @Test
+        fun 실행당_배치_상한에서_멈춘다() {
+            val limitedScheduler = DLQArchivalScheduler(
+                dlqMessageRepository,
+                dlqArchivalService,
+                properties.copy(purgeMaxBatches = 2)
+            )
+            whenever(dlqMessageRepository.deleteArchivedMessagesBefore(eq("FAILED"), any()))
+                .thenReturn(DLQ_PURGE_BATCH_SIZE)
+
+            limitedScheduler.purgeArchivedMessages()
+
+            verify(dlqMessageRepository, times(2)).deleteArchivedMessagesBefore(eq("FAILED"), any())
         }
     }
 
