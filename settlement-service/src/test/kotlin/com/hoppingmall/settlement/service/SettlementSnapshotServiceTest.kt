@@ -4,6 +4,7 @@ import com.hoppingmall.settlement.domain.Settlement
 import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -18,6 +19,8 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.Limit
 import org.springframework.test.util.ReflectionTestUtils
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.SimpleTransactionStatus
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -31,6 +34,14 @@ class SettlementSnapshotServiceTest {
 
     @Mock
     private lateinit var settlementSummaryRepository: SettlementSummaryRepository
+
+    @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
+
+    @BeforeEach
+    fun setUpTransaction() {
+        whenever(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
+    }
 
     @InjectMocks
     private lateinit var settlementSnapshotService: SettlementSnapshotService
@@ -54,7 +65,7 @@ class SettlementSnapshotServiceTest {
     fun 스냅샷_생성_시_신규_Summary를_생성한다() {
         val settlement = createSettlement(1L)
 
-        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
+        whenever(settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(emptyList())
 
         settlementSnapshotService.createSnapshot()
@@ -67,7 +78,7 @@ class SettlementSnapshotServiceTest {
         val settlement = createSettlement(1L)
         val existingSummary = SettlementSummary.from(settlement)
 
-        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
+        whenever(settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(listOf(existingSummary))
 
         settlementSnapshotService.createSnapshot()

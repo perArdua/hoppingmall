@@ -1,6 +1,5 @@
 package com.hoppingmall.settlement.service
 
-import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.settlement.domain.Settlement
 import com.hoppingmall.settlement.domain.SettlementItem
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
@@ -121,7 +120,7 @@ class SettlementCommandServiceImpl(
 
     @Transactional
     override fun confirmSettlement(settlementId: Long): SettlementResponse {
-        val settlement = settlementRepository.findByIdOrNull(settlementId) ?: throw SettlementNotFoundException() 
+        val settlement = settlementRepository.findWithLockById(settlementId) ?: throw SettlementNotFoundException()
         settlement.confirm()
         settlementSummarySynchronizer?.sync(settlement)
         return SettlementResponse.from(settlement)
@@ -129,7 +128,7 @@ class SettlementCommandServiceImpl(
 
     @Transactional
     override fun paySettlement(settlementId: Long): SettlementResponse {
-        val settlement = settlementRepository.findByIdOrNull(settlementId) ?: throw SettlementNotFoundException() 
+        val settlement = settlementRepository.findWithLockById(settlementId) ?: throw SettlementNotFoundException()
         settlement.pay()
         settlementSummarySynchronizer?.sync(settlement)
         return SettlementResponse.from(settlement)

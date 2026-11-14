@@ -34,7 +34,6 @@ import org.springframework.transaction.support.SimpleTransactionStatus
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.util.Optional
 
 @ExtendWith(MockitoExtension::class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -192,7 +191,7 @@ class SettlementCommandServiceImplTest {
         )
         ReflectionTestUtils.setField(settlement, "id", 1L)
 
-        whenever(settlementRepository.findById(1L)).thenReturn(Optional.of(settlement))
+        whenever(settlementRepository.findWithLockById(1L)).thenReturn(settlement)
 
         val result = settlementCommandServiceImpl.confirmSettlement(1L)
 
@@ -214,7 +213,7 @@ class SettlementCommandServiceImplTest {
         ReflectionTestUtils.setField(settlement, "id", 1L)
         settlement.confirm()
 
-        whenever(settlementRepository.findById(1L)).thenReturn(Optional.of(settlement))
+        whenever(settlementRepository.findWithLockById(1L)).thenReturn(settlement)
 
         val result = settlementCommandServiceImpl.paySettlement(1L)
 
@@ -223,7 +222,7 @@ class SettlementCommandServiceImplTest {
 
     @Test
     fun 존재하지_않는_정산_확인_시_예외가_발생한다() {
-        whenever(settlementRepository.findById(any())).thenReturn(Optional.empty())
+        whenever(settlementRepository.findWithLockById(any())).thenReturn(null)
 
         assertThatThrownBy { settlementCommandServiceImpl.confirmSettlement(999L) }
             .isInstanceOf(SettlementNotFoundException::class.java)
@@ -231,7 +230,7 @@ class SettlementCommandServiceImplTest {
 
     @Test
     fun 존재하지_않는_정산_지급_시_예외가_발생한다() {
-        whenever(settlementRepository.findById(any())).thenReturn(Optional.empty())
+        whenever(settlementRepository.findWithLockById(any())).thenReturn(null)
 
         assertThatThrownBy { settlementCommandServiceImpl.paySettlement(999L) }
             .isInstanceOf(SettlementNotFoundException::class.java)
