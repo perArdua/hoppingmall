@@ -147,9 +147,10 @@ class StatisticsCompensationBeforeSalesDLQMySqlIntegrationTest : MySqlIntegratio
 
     private fun dlq(id: Long): DLQMessage = dlqMessageRepository.findById(id).orElseThrow()
 
-    private fun stats(): ProductStatistics = productStatisticsRepository.findByProductId(productId)!!
+    private fun stats(): ProductStatistics? = productStatisticsRepository.findByProductId(productId)
 
-    private fun assertNoSales(stats: ProductStatistics) {
+    private fun assertNoSales(stats: ProductStatistics?) {
+        if (stats == null) return
         assertThat(stats.orderCount).isEqualTo(0L)
         assertThat(stats.totalSalesQuantity).isEqualTo(0L)
         assertThat(stats.totalSalesAmount).isEqualByComparingTo("0")

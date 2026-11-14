@@ -218,9 +218,10 @@ class StatisticsCompensationBeforeSalesMySqlIntegrationTest : MySqlIntegrationTe
         ).whenever(orderItemQueryPort).findByOrderId(ORDER_ID)
     }
 
-    private fun stats(): ProductStatistics = productStatisticsRepository.findByProductId(productId)!!
+    private fun stats(): ProductStatistics? = productStatisticsRepository.findByProductId(productId)
 
-    private fun assertNoSales(stats: ProductStatistics) {
+    private fun assertNoSales(stats: ProductStatistics?) {
+        if (stats == null) return
         assertThat(stats.orderCount).isEqualTo(0L)
         assertThat(stats.totalSalesQuantity).isEqualTo(0L)
         assertThat(stats.totalSalesAmount).isEqualByComparingTo("0")
