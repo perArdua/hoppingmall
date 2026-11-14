@@ -67,7 +67,8 @@ class OrderCancellationResultRetryMySqlIntegrationTest : MySqlJpaTestSupport() {
             inventoryCommandPort,
             transactionalEventPublisher,
             objectMapper,
-            TransactionTemplate(transactionManager)
+            TransactionTemplate(transactionManager),
+            mock()
         )
     }
 

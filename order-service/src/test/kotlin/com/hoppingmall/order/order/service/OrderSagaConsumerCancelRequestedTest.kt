@@ -107,7 +107,8 @@ class OrderSagaConsumerCancelRequestedTest {
             inventoryCommandPort,
             transactionalEventPublisher,
             objectMapper,
-            transactionTemplate
+            transactionTemplate,
+            mock()
         )
     }
 

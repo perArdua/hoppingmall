@@ -9,6 +9,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.InventoryCommandPort
+import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
@@ -24,7 +25,8 @@ class OrderCancellationResultConsumer(
     private val inventoryCommandPort: InventoryCommandPort,
     private val transactionalEventPublisher: TransactionalEventPublisher,
     private val objectMapper: ObjectMapper,
-    private val transactionTemplate: TransactionTemplate
+    private val transactionTemplate: TransactionTemplate,
+    private val paymentQueryPort: PaymentQueryPort
 ) {
     private val logger = LoggerFactory.getLogger(OrderCancellationResultConsumer::class.java)
 
@@ -50,6 +52,10 @@ class OrderCancellationResultConsumer(
             return
         }
 
+        completeCancellation(eventId, orderId, existingLog)
+    }
+
+    private fun completeCancellation(eventId: String, orderId: Long, existingLog: SagaEventLog?) {
         val log = if (existingLog == null || !existingLog.isStepCompleted(SagaEventLog.LOCAL_COMPLETED)) {
             executeCompletedLocalPhase(eventId, orderId, existingLog) ?: return
         } else {
@@ -133,6 +139,12 @@ class OrderCancellationResultConsumer(
             return
         }
 
+        if (existingLog?.isStepCompleted(SagaEventLog.LOCAL_COMPLETED) == true || isPaymentAlreadyCancelled(orderId)) {
+            logger.warn("결제가 이미 취소돼 취소 실패 이벤트를 취소 완료로 마무리: orderId=$orderId, eventId=$eventId, 사유=$reason")
+            completeCancellation(eventId, orderId, existingLog)
+            return
+        }
+
         val transitioned = transactionTemplate.execute {
             val order = orderRepository.findByIdOrNull(orderId)
             if (order == null) {
@@ -178,5 +190,16 @@ class OrderCancellationResultConsumer(
         if (transitioned == true) {
             logger.warn("결제 취소 실패 처리: orderId=$orderId, CANCEL_FAILED 전환, 사유=$reason")
         }
+    }
+
+    private fun isPaymentAlreadyCancelled(orderId: Long): Boolean {
+        if (orderRepository.findByIdOrNull(orderId)?.status != OrderStatus.CANCEL_REQUESTED) {
+            return false
+        }
+        return paymentQueryPort.findByOrderIdOrThrowIfUnavailable(orderId)?.status == PAYMENT_CANCELLED
+    }
+
+    companion object {
+        private const val PAYMENT_CANCELLED = "CANCELLED"
     }
 }

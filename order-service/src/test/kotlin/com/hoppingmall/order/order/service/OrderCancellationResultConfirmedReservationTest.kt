@@ -59,7 +59,7 @@ class OrderCancellationResultConfirmedReservationTest {
     private fun createConsumer() = OrderCancellationResultConsumer(
         orderRepository, orderItemRepository, sagaEventLogRepository,
         inventoryCommandPort, transactionalEventPublisher,
-        objectMapper, transactionTemplate
+        objectMapper, transactionTemplate, mock()
     )
 
     private fun paidOrder(): Order {
