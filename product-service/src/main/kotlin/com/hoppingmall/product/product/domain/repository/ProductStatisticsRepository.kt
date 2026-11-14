@@ -82,8 +82,8 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     @Query("SELECT ps FROM ProductStatistics ps WHERE ps.id IN :ids ORDER BY ps.id")
     fun findAllByIdInForUpdate(@Param("ids") ids: Collection<Long>): List<ProductStatistics>
 
-    @Query("SELECT ps.id FROM ProductStatistics ps ORDER BY ps.id")
-    fun findIdSlice(pageable: Pageable): Slice<Long>
+    @Query("SELECT ps.id FROM ProductStatistics ps WHERE ps.id > :lastId ORDER BY ps.id")
+    fun findIdsAfter(@Param("lastId") lastId: Long, limit: Pageable): List<Long>
 
     @Query("SELECT COUNT(ps) FROM ProductStatistics ps")
     fun countAllProducts(): Long
@@ -123,6 +123,12 @@ interface ProductStatisticsRepository : JpaRepository<ProductStatistics, Long> {
     """)
     fun findTopSellingBySellerId(@Param("sellerId") sellerId: Long): TopSellingProductDto?
 
-    @Query("SELECT ps FROM ProductStatistics ps WHERE ps.todaySalesQuantity > 0 OR ps.todayRefundQuantity > 0")
-    fun findAllActive(pageable: Pageable): Slice<ProductStatistics>
+    @Query(
+        """
+        SELECT ps FROM ProductStatistics ps
+        WHERE ps.id > :lastId AND (ps.todaySalesQuantity > 0 OR ps.todayRefundQuantity > 0)
+        ORDER BY ps.id
+        """
+    )
+    fun findActiveAfter(@Param("lastId") lastId: Long, limit: Pageable): List<ProductStatistics>
 }

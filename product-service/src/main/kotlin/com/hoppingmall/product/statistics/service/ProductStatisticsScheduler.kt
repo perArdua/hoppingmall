@@ -32,18 +32,17 @@ class ProductStatisticsScheduler(
             .aggregateCartByProduct()
             .associateBy { it.productId }
 
-        var page = 0
+        var lastId = 0L
         var updatedCount = 0
-        var hasNext: Boolean
 
-        do {
-            val currentPage = page
+        while (true) {
+            val currentLastId = lastId
             val batchUpdated = transactionTemplate.execute {
-                val idSlice = productStatisticsRepository.findIdSlice(PageRequest.of(currentPage, 500))
-                val lockedStats = if (idSlice.content.isEmpty()) {
+                val ids = productStatisticsRepository.findIdsAfter(currentLastId, PageRequest.of(0, SYNC_BATCH_SIZE))
+                val lockedStats = if (ids.isEmpty()) {
                     emptyList()
                 } else {
-                    productStatisticsRepository.findAllByIdInForUpdate(idSlice.content)
+                    productStatisticsRepository.findAllByIdInForUpdate(ids)
                 }
                 val productIds = lockedStats.map { it.productId }
                 val stockMap = currentStocks(productIds)
@@ -53,13 +52,13 @@ class ProductStatisticsScheduler(
                     stats.updateCartAndInventory(cart?.buyerCount ?: 0L, stockMap[stats.productId] ?: 0)
                 }
 
-                idSlice.hasNext() to lockedStats.size
+                ids to lockedStats.size
             }!!
 
-            hasNext = batchUpdated.first
             updatedCount += batchUpdated.second
-            page++
-        } while (hasNext)
+            if (batchUpdated.first.size < SYNC_BATCH_SIZE) break
+            lastId = batchUpdated.first.last()
+        }
 
         logger.info("장바구니/재고 동기화 완료: ${updatedCount}건")
 
@@ -79,4 +78,8 @@ class ProductStatisticsScheduler(
         } else {
             inventoryRepository.findAllByProductIdIn(productIds).associate { it.productId to it.stockQuantity }
         }
+
+    companion object {
+        private const val SYNC_BATCH_SIZE = 500
+    }
 }

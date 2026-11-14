@@ -9,7 +9,6 @@ import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -54,16 +53,13 @@ class ProductStatisticsCommandServiceImpl(
 
     override fun flushDailySnapshot() {
         val statisticsDate = LocalDate.now().minusDays(CLOSED_DAY_OFFSET)
-        var page = 0
+        var lastId = 0L
         var totalProcessed = 0
 
         while (true) {
-            val slice = productStatisticsRepository.findAll(
-                PageRequest.of(page, BATCH_SIZE, Sort.by("id"))
-            )
-            if (slice.isEmpty) break
+            val chunkIds = productStatisticsRepository.findIdsAfter(lastId, PageRequest.of(0, BATCH_SIZE))
+            if (chunkIds.isEmpty()) break
 
-            val chunkIds = slice.content.mapNotNull { it.id }
             transactionTemplate.executeWithoutResult {
                 val lockedChunk = productStatisticsRepository.findAllByIdInForUpdate(chunkIds)
                 val closedProductIds = productDailyStatisticsRepository
@@ -106,8 +102,8 @@ class ProductStatisticsCommandServiceImpl(
             }
 
             totalProcessed += chunkIds.size
-            if (!slice.hasNext()) break
-            page++
+            if (chunkIds.size < BATCH_SIZE) break
+            lastId = chunkIds.last()
         }
 
         logger.info("일별 통계 스냅샷 완료: ${totalProcessed}건")
@@ -117,16 +113,13 @@ class ProductStatisticsCommandServiceImpl(
         val now = java.time.LocalDateTime.now()
         val today = now.toLocalDate()
         val currentHour = now.hour
-        var page = 0
+        var lastId = 0L
         var totalProcessed = 0
 
         while (true) {
-            val slice = productStatisticsRepository.findAllActive(
-                PageRequest.of(page, BATCH_SIZE, Sort.by("id"))
-            )
-            if (slice.isEmpty) break
+            val chunk = productStatisticsRepository.findActiveAfter(lastId, PageRequest.of(0, BATCH_SIZE))
+            if (chunk.isEmpty()) break
 
-            val chunk = slice.content
             transactionTemplate.executeWithoutResult {
                 val productIds = chunk.map { it.productId }
 
@@ -149,8 +142,8 @@ class ProductStatisticsCommandServiceImpl(
             }
 
             totalProcessed += chunk.size
-            if (!slice.hasNext()) break
-            page++
+            if (chunk.size < BATCH_SIZE) break
+            lastId = checkNotNull(chunk.last().id)
         }
 
         logger.info("시간별 통계 스냅샷 완료: ${totalProcessed}건 (${currentHour}시)")

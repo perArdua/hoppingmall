@@ -18,12 +18,11 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.data.domain.SliceImpl
-import org.springframework.data.domain.PageRequest
 import org.springframework.transaction.TransactionStatus
 import org.springframework.transaction.support.TransactionCallback
 import org.springframework.transaction.support.TransactionTemplate
@@ -65,16 +64,15 @@ class ProductStatisticsSchedulerTest {
         ).withId(1L)
         val cartAggregations = listOf(CartAggregation(productId = 1L, buyerCount = 5))
         val inventory = Inventory.create(productId = 1L, stockQuantity = 100).withId(1L)
-        val idSlice = SliceImpl(listOf(1L), PageRequest.of(0, 500), false)
 
         whenever(cartItemQueryPort.aggregateCartByProduct()).thenReturn(cartAggregations)
-        whenever(transactionTemplate.execute(any<TransactionCallback<Pair<Boolean, Int>>>()))
+        whenever(transactionTemplate.execute(any<TransactionCallback<Pair<List<Long>, Int>>>()))
             .thenAnswer { invocation ->
                 @Suppress("UNCHECKED_CAST")
-                val callback = invocation.arguments[0] as TransactionCallback<Pair<Boolean, Int>>
+                val callback = invocation.arguments[0] as TransactionCallback<Pair<List<Long>, Int>>
                 callback.doInTransaction(transactionStatus)
             }
-        whenever(productStatisticsRepository.findIdSlice(any())).thenReturn(idSlice)
+        whenever(productStatisticsRepository.findIdsAfter(eq(0L), any())).thenReturn(listOf(1L))
         whenever(productStatisticsRepository.findAllByIdInForUpdate(listOf(1L))).thenReturn(listOf(stats))
         whenever(inventoryRepository.findAllByProductIdIn(listOf(1L))).thenReturn(listOf(inventory))
 
@@ -94,16 +92,15 @@ class ProductStatisticsSchedulerTest {
         val first = ProductStatistics.create(productId = 1L, productName = "테스트", sellerId = 1L, categoryId = 1L).withId(1L)
         val second = ProductStatistics.create(productId = 2L, productName = "테스트", sellerId = 1L, categoryId = 1L).withId(2L)
         val withoutBuckets = ProductStatistics.create(productId = 3L, productName = "테스트", sellerId = 1L, categoryId = 1L).withId(3L)
-        val idSlice = SliceImpl(listOf(1L, 2L, 3L), PageRequest.of(0, 500), false)
 
         whenever(cartItemQueryPort.aggregateCartByProduct()).thenReturn(emptyList())
-        whenever(transactionTemplate.execute(any<TransactionCallback<Pair<Boolean, Int>>>()))
+        whenever(transactionTemplate.execute(any<TransactionCallback<Pair<List<Long>, Int>>>()))
             .thenAnswer { invocation ->
                 @Suppress("UNCHECKED_CAST")
-                val callback = invocation.arguments[0] as TransactionCallback<Pair<Boolean, Int>>
+                val callback = invocation.arguments[0] as TransactionCallback<Pair<List<Long>, Int>>
                 callback.doInTransaction(transactionStatus)
             }
-        whenever(productStatisticsRepository.findIdSlice(any())).thenReturn(idSlice)
+        whenever(productStatisticsRepository.findIdsAfter(eq(0L), any())).thenReturn(listOf(1L, 2L, 3L))
         whenever(productStatisticsRepository.findAllByIdInForUpdate(listOf(1L, 2L, 3L))).thenReturn(listOf(first, second, withoutBuckets))
         whenever(bucketStockService.enabled).thenReturn(true)
         whenever(bucketStockService.totalStocks(listOf(1L, 2L, 3L))).thenReturn(mapOf(1L to 77, 2L to 35))
