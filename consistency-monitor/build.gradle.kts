@@ -41,6 +41,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-jdbc")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 	implementation("io.micrometer:micrometer-registry-prometheus")
 
 	implementation("io.jsonwebtoken:jjwt-api:0.11.5")

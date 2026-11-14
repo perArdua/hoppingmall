@@ -4,10 +4,13 @@ import io.jsonwebtoken.Claims
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Metrics
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
@@ -15,7 +18,11 @@ import org.springframework.web.filter.OncePerRequestFilter
 import org.springframework.web.util.UrlPathHelper
 
 @Component
-class AdminTokenFilter(@Value("\${jwt.secret}") secret: String) : OncePerRequestFilter() {
+class AdminTokenFilter(
+    @Value("\${jwt.secret}") secret: String,
+    private val redisTemplate: StringRedisTemplate? = null,
+    private val meterRegistry: MeterRegistry = Metrics.globalRegistry
+) : OncePerRequestFilter() {
 
     private val parser = Jwts.parserBuilder()
         .setSigningKey(Keys.hmacShaKeyFor(secret.toByteArray()))
