@@ -41,6 +41,38 @@ class TwoLevelCacheManager(
 
     private val cacheMap = ConcurrentHashMap<String, CacheLookupResult>()
 
+    @Volatile
+    private var invalidationPublisher: L1InvalidationPublisher? = null
+
+    private val publisherProxy = object : L1InvalidationPublisher {
+        override fun publishEvict(cacheName: String, key: Any) {
+            invalidationPublisher?.publishEvict(cacheName, key)
+        }
+
+        override fun publishClear(cacheName: String) {
+            invalidationPublisher?.publishClear(cacheName)
+        }
+    }
+
+    fun attachInvalidationPublisher(publisher: L1InvalidationPublisher?) {
+        invalidationPublisher = publisher
+    }
+
+    fun evictLocal(cacheName: String, key: Any) {
+        localCache(cacheName)?.evictLocal(key)
+    }
+
+    fun clearLocal(cacheName: String) {
+        localCache(cacheName)?.clearLocal()
+    }
+
+    fun clearAllLocal() {
+        cacheMap.keys.forEach { clearLocal(it) }
+    }
+
+    private fun localCache(cacheName: String): TwoLevelCache? =
+        (cacheMap[cacheName] as? CacheLookupResult.Present)?.cache as? TwoLevelCache
+
     override fun getCache(name: String): Cache? {
         val existing = cacheMap[name]
         if (existing is CacheLookupResult.Missing) {
@@ -76,7 +108,8 @@ class TwoLevelCacheManager(
                     refreshExecutor = refreshExecutor,
                     refreshGuard = refreshGuard,
                     hotKeyDetector = detector,
-                    meterRegistry = meterRegistry
+                    meterRegistry = meterRegistry,
+                    invalidationPublisher = publisherProxy
                 )
             )
         }
