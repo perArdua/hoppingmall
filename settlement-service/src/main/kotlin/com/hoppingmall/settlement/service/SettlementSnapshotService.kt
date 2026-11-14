@@ -7,22 +7,25 @@ import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Limit
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 
 @Service
 class SettlementSnapshotService(
     private val settlementRepository: SettlementRepository,
-    private val settlementSummaryRepository: SettlementSummaryRepository
+    private val settlementSummaryRepository: SettlementSummaryRepository,
+    transactionManager: PlatformTransactionManager
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    private val transactionTemplate = TransactionTemplate(transactionManager)
 
     companion object {
         private const val BATCH_SIZE = 200
     }
 
     @Scheduled(cron = "0 0 3 * * *")
-    @Transactional
     fun createSnapshot() {
         log.info("Settlement snapshot job started")
 
@@ -31,34 +34,52 @@ class SettlementSnapshotService(
         var lastId = 0L
 
         while (true) {
-            val settlements = settlementRepository.findByIdGreaterThanOrderByIdAsc(lastId, Limit.of(BATCH_SIZE))
+            val page = transactionTemplate.execute { snapshotPage(lastId) }!!
 
-            if (settlements.isEmpty()) break
+            totalCreated += page.created
+            totalUpdated += page.updated
+            lastId = page.lastId ?: break
 
-            val summaryMap = settlementSummaryRepository
-                .findBySettlementIdIn(settlements.map { it.id!! })
-                .associateBy { it.settlementId }
-
-            val newSummaries = mutableListOf<SettlementSummary>()
-
-            settlements.forEach { settlement ->
-                val existing = summaryMap[settlement.id!!]
-                if (existing != null) {
-                    existing.updateFrom(settlement)
-                } else {
-                    newSummaries.add(SettlementSummary.from(settlement))
-                }
-            }
-
-            newSummaries.forEach { settlementSummaryRepository.insertIfAbsent(it) }
-
-            totalCreated += newSummaries.size
-            totalUpdated += settlements.size - newSummaries.size
-            lastId = settlements.last().id!!
-
-            if (settlements.size < BATCH_SIZE) break
+            if (page.size < BATCH_SIZE) break
         }
 
         log.info("Settlement snapshot job completed: created=$totalCreated, updated=$totalUpdated")
     }
+
+    private fun snapshotPage(afterId: Long): PageResult {
+        val settlements = settlementRepository.findByIdGreaterThanOrderByIdAsc(afterId, Limit.of(BATCH_SIZE))
+
+        if (settlements.isEmpty()) return PageResult(size = 0, created = 0, updated = 0, lastId = null)
+
+        val summaryMap = settlementSummaryRepository
+            .findBySettlementIdIn(settlements.map { it.id!! })
+            .associateBy { it.settlementId }
+
+        val newSummaries = mutableListOf<SettlementSummary>()
+
+        settlements.forEach { settlement ->
+            val existing = summaryMap[settlement.id!!]
+            if (existing != null) {
+                existing.updateFrom(settlement)
+            } else {
+                newSummaries.add(SettlementSummary.from(settlement))
+            }
+        }
+
+        newSummaries.forEach { settlementSummaryRepository.insertIfAbsent(it) }
+
+        return PageResult(
+            size = settlements.size,
+            created = newSummaries.size,
+            updated = settlements.size - newSummaries.size,
+            lastId = settlements.last().id!!
+        )
+    }
+
+    private class PageResult(
+        val size: Int,
+        val created: Int,
+        val updated: Int,
+        val lastId: Long?
+    )
 }

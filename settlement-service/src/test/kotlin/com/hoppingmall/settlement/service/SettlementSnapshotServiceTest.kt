@@ -4,6 +4,7 @@ import com.hoppingmall.settlement.domain.Settlement
 import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -18,6 +19,8 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.Limit
 import org.springframework.test.util.ReflectionTestUtils
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.SimpleTransactionStatus
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -31,6 +34,14 @@ class SettlementSnapshotServiceTest {
 
     @Mock
     private lateinit var settlementSummaryRepository: SettlementSummaryRepository
+
+    @Mock
+    private lateinit var transactionManager: PlatformTransactionManager
+
+    @BeforeEach
+    fun setUpTransaction() {
+        whenever(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
+    }
 
     @InjectMocks
     private lateinit var settlementSnapshotService: SettlementSnapshotService
