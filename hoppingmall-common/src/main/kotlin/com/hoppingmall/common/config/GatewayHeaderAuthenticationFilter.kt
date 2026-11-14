@@ -16,12 +16,13 @@ import org.springframework.web.filter.OncePerRequestFilter
 @Component
 class GatewayHeaderAuthenticationFilter @Autowired constructor(
     @Value("\${gateway.identity.secret:}") identitySecret: String,
+    @Value("\${gateway.identity.previous-secret:}") previousIdentitySecret: String,
     environment: Environment?
 ) : OncePerRequestFilter() {
 
-    constructor() : this("", null)
+    constructor() : this("", "", null)
 
-    private val identityProof = GatewayIdentityProof(identitySecret)
+    private val identityProof = GatewayIdentityProof(identitySecret, previousIdentitySecret)
 
     init {
         check(identityProof.enabled || environment?.acceptsProfiles(ENFORCED_PROFILES) != true) {
