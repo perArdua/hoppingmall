@@ -1,6 +1,7 @@
 package com.hoppingmall.idempotency
 
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -13,6 +14,9 @@ class IdempotencyService(
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    @Value("\${idempotency.cleanup.max-batches:1000}")
+    private var cleanupMaxBatches: Int = 1000
 
     @Transactional(readOnly = true)
     fun findByKey(key: String): IdempotencyRecord? =
@@ -40,11 +44,17 @@ class IdempotencyService(
         )
 
     @Scheduled(cron = "0 0 3 * * ?")
-    @Transactional
     fun cleanupExpiredRecords() {
-        val deleted = idempotencyRecordRepository.deleteExpiredRecords(LocalDateTime.now())
-        if (deleted > 0) {
-            log.info("멱등성 만료 레코드 정리: {}건 삭제", deleted)
+        val now = LocalDateTime.now()
+        var deletedCount = 0
+        var batches = 0
+        do {
+            val deleted = idempotencyRecordRepository.deleteExpiredRecords(now)
+            deletedCount += deleted
+            batches++
+        } while (deleted == IDEMPOTENCY_CLEANUP_BATCH_SIZE && batches < cleanupMaxBatches)
+        if (deletedCount > 0) {
+            log.info("멱등성 만료 레코드 정리: {}건 삭제 ({}회)", deletedCount, batches)
         }
     }
 }
