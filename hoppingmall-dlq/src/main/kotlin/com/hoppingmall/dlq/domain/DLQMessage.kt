@@ -84,7 +84,6 @@ class DLQMessage(
 
     fun markAsFailed(notes: String? = null) {
         this.status = DLQStatus.FAILED
-        this.processedAt = System.currentTimeMillis()
         this.notes = notes
     }
 

@@ -27,18 +27,14 @@ class DLQRetentionPurgeScheduler(
         var purgedCount = 0
         var batches = 0
         do {
-            val deleted = dlqMessageRepository.deleteFinishedMessagesBefore(FINISHED_STATUSES, cutoffTimestamp)
+            val deleted = dlqMessageRepository.deleteProcessedMessagesBefore(DLQStatus.PROCESSED.name, cutoffTimestamp)
             purgedCount += deleted
             batches++
         } while (deleted == DLQ_PURGE_BATCH_SIZE && batches < dlqRetentionProperties.purgeMaxBatches)
 
         if (purgedCount == 0) return
 
-        log.info("처리 끝난 DLQ 메시지 퍼지(보관 없음): {} 건, {} 회 (보존기간 {} 일 초과)",
+        log.info("처리 완료된 DLQ 메시지 퍼지(보관 없음): {} 건, {} 회 (보존기간 {} 일 초과)",
             purgedCount, batches, dlqRetentionProperties.days)
-    }
-
-    companion object {
-        private val FINISHED_STATUSES = listOf(DLQStatus.PROCESSED.name, DLQStatus.FAILED.name)
     }
 }

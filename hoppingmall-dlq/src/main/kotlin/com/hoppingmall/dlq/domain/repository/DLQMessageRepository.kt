@@ -165,14 +165,14 @@ interface DLQMessageRepository : JpaRepository<DLQMessage, Long> {
     @Query(
         value = """
         DELETE FROM dlq_messages
-        WHERE status IN (:statuses)
+        WHERE status = :status
         AND processed_at < :beforeTimestamp
         LIMIT $DLQ_PURGE_BATCH_SIZE
     """,
         nativeQuery = true
     )
-    fun deleteFinishedMessagesBefore(
-        @Param("statuses") statuses: List<String>,
+    fun deleteProcessedMessagesBefore(
+        @Param("status") status: String,
         @Param("beforeTimestamp") beforeTimestamp: Long
     ): Int
 }
