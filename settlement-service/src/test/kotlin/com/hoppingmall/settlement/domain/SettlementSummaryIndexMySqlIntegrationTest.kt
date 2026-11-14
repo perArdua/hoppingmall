@@ -24,6 +24,8 @@ class SettlementSummaryIndexMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     @Test
     fun 요약_동기화가_정산_ID로_요약을_찾는_조회는_인덱스를_탄다() {
+        insertSummary(1L)
+
         val plan = explain("SELECT id FROM settlement_summaries WHERE settlement_id = 1")
 
         assertThat(plan["key"]).isEqualTo(SETTLEMENT_ID_INDEX)
@@ -32,7 +34,18 @@ class SettlementSummaryIndexMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     private fun explain(sql: String): Map<String, Any?> = jdbcTemplate.queryForMap("EXPLAIN $sql")
 
+    private fun insertSummary(settlementId: Long) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO settlement_summaries (settlement_id, seller_id, period_start, period_end, total_sales_amount,
+              total_refund_amount, commission_rate, commission_amount, settlement_amount, status, created_at, updated_at)
+            VALUES (?, 1, '2026-01-01', '2026-01-02', 0, 0, 0, 0, 0, 'CALCULATED', NOW(), NOW())
+            """.trimIndent(),
+            settlementId
+        )
+    }
+
     companion object {
-        private const val SETTLEMENT_ID_INDEX = "idx_settlement_summaries_settlement_id"
+        private const val SETTLEMENT_ID_INDEX = "uk_settlement_summaries_settlement_id"
     }
 }
