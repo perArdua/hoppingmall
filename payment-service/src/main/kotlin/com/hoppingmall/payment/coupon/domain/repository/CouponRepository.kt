@@ -24,7 +24,7 @@ interface CouponRepository : JpaRepository<Coupon, Long> {
         @Param("now") now: LocalDateTime = LocalDateTime.now()
     ): List<Coupon>
 
-    @Query("SELECT c FROM Coupon c")
+    @Query("SELECT c FROM Coupon c WHERE c.status = 'ACTIVE'")
     fun findAllActive(): List<Coupon>
 
     @Modifying(clearAutomatically = true)

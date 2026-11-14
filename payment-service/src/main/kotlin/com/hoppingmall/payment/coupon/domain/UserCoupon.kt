@@ -11,7 +11,6 @@ import java.time.LocalDateTime
     name = "user_coupons",
     uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "coupon_id"])],
     indexes = [
-        Index(name = "idx_user_coupons_user_id", columnList = "userId"),
         Index(name = "idx_user_coupons_order_id", columnList = "orderId"),
         Index(name = "idx_user_coupons_coupon_id_user_id", columnList = "couponId, userId")
     ]
