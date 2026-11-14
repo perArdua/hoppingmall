@@ -97,13 +97,21 @@ class InternalOrderController(
         return ResponseEntity.ok(shipping?.status == ShippingStatus.DELIVERED)
     }
 
+    /**
+     * 정산용 배송 완료 주문 항목. 기간의 뜻은 [SettlementPeriod]를 따른다:
+     * `startDate`·`endDate`는 오프셋 없는 한국 시각(Asia/Seoul) 벽시계, 기간은 `[startDate, endDate)`.
+     */
     @GetMapping("/order-items/delivered")
     fun getDeliveredOrderItems(
         @RequestParam sellerId: Long,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) startDate: LocalDateTime,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) endDate: LocalDateTime
     ): ResponseEntity<List<OrderItemResponse>> {
-        val items = orderItemRepository.findDeliveredItemsBySellerAndPeriod(sellerId, startDate, endDate)
+        val items = orderItemRepository.findDeliveredItemsBySellerAndPeriod(
+            sellerId,
+            SettlementPeriod.toApplicationTime(startDate),
+            SettlementPeriod.toApplicationTime(endDate)
+        )
         return ResponseEntity.ok(items.map { item ->
             OrderItemResponse(
                 id = item.id!!,
@@ -118,13 +126,21 @@ class InternalOrderController(
         })
     }
 
+    /**
+     * 정산용 완료 환불(차감). 기간의 뜻은 [SettlementPeriod]를 따른다:
+     * `startDate`·`endDate`는 오프셋 없는 한국 시각(Asia/Seoul) 벽시계, 기간은 `[startDate, endDate)`.
+     */
     @GetMapping("/refunds/completed")
     fun getCompletedRefunds(
         @RequestParam sellerId: Long,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) startDate: LocalDateTime,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) endDate: LocalDateTime
     ): ResponseEntity<List<RefundResponse>> {
-        val refunds = refundItemRepository.findSettlementRefundsBySellerAndPeriod(sellerId, startDate, endDate)
+        val refunds = refundItemRepository.findSettlementRefundsBySellerAndPeriod(
+            sellerId,
+            SettlementPeriod.toApplicationTime(startDate),
+            SettlementPeriod.toApplicationTime(endDate)
+        )
         return ResponseEntity.ok(refunds.map { refund ->
             RefundResponse(
                 id = refund.refundId,

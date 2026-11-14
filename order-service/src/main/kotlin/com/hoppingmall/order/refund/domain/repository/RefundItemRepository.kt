@@ -62,7 +62,11 @@ interface RefundItemRepository : JpaRepository<RefundItem, Long> {
               AND GREATEST(
                     r.completed_at,
                     CASE WHEN o.status = 'DELIVERED' THEN o.updated_at ELSE s.updated_at END
-                  ) BETWEEN :startDate AND :endDate
+                  ) >= :startDate
+              AND GREATEST(
+                    r.completed_at,
+                    CASE WHEN o.status = 'DELIVERED' THEN o.updated_at ELSE s.updated_at END
+                  ) < :endDate
             GROUP BY r.id
             ORDER BY r.id
         """,
