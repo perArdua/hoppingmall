@@ -66,6 +66,41 @@ class OutboxEventMySqlSchemaTest {
         assertThat(outboxEventRepository.countByStatus(OutboxStatus.RETRYING)).isEqualTo(1L)
     }
 
+    @Test
+    fun 스키마의_enum_열에_CHECK_제약이_하나도_없다() {
+        val checkConstraints = jdbcTemplate.queryForList(
+            """
+            SELECT CONCAT(tc.TABLE_NAME, '.', tc.CONSTRAINT_NAME, ' ', cc.CHECK_CLAUSE)
+            FROM information_schema.TABLE_CONSTRAINTS tc
+            JOIN information_schema.CHECK_CONSTRAINTS cc
+            ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+            WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.CONSTRAINT_TYPE = 'CHECK'
+            ORDER BY tc.TABLE_NAME, tc.CONSTRAINT_NAME
+            """.trimIndent(),
+            String::class.java
+        )
+
+        assertThat(checkConstraints).isEmpty()
+    }
+
+    @Test
+    fun enum에_없는_새_값도_상태_열에_저장된다() {
+        val saved = outboxEventRepository.saveAndFlush(
+            OutboxEvent(
+                aggregateType = "Payment",
+                aggregateId = "2",
+                eventType = "PaymentCompleted",
+                eventData = "{}",
+                topic = "payment"
+            )
+        )
+
+        jdbcTemplate.update("UPDATE outbox_events SET status = ? WHERE id = ?", "VALUE_ADDED_LATER", saved.id)
+
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM outbox_events WHERE id = ?", String::class.java, saved.id))
+            .isEqualTo("VALUE_ADDED_LATER")
+    }
+
     @Configuration
     @EntityScan(basePackageClasses = [OutboxEvent::class])
     @EnableJpaRepositories(basePackageClasses = [OutboxEventRepository::class])

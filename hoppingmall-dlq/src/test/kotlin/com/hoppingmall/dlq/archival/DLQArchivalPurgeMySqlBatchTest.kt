@@ -65,6 +65,26 @@ class DLQArchivalPurgeMySqlBatchTest {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM dlq_messages", Long::class.java)).isEqualTo(15L)
     }
 
+    @Test
+    fun 아카이빙_메시지_삭제는_상태와_아카이빙_시각_인덱스로_범위만_읽는다() {
+        val now = System.currentTimeMillis()
+        try {
+            dlqMessageRepository.saveAll((1..2000).map { message(100_000L + it, DLQStatus.FAILED, null) })
+            jdbcTemplate.execute("ANALYZE TABLE dlq_messages")
+
+            val plan = jdbcTemplate.queryForMap(
+                "EXPLAIN DELETE FROM dlq_messages WHERE status = ? AND archived_at IS NOT NULL AND archived_at < ? LIMIT 1000",
+                DLQStatus.FAILED.name,
+                now - TimeUnit.DAYS.toMillis(90)
+            )
+
+            assertThat(plan["key"]).isEqualTo("idx_dlq_status_archived_at")
+            assertThat(plan["type"]).isEqualTo("range")
+        } finally {
+            jdbcTemplate.update("DELETE FROM dlq_messages")
+        }
+    }
+
     private fun message(offset: Long, status: DLQStatus, archivedAt: Long?): DLQMessage =
         DLQMessage(
             originalTopic = "payment",

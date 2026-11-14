@@ -54,7 +54,38 @@ class EnumColumnTypeMySqlIntegrationTest {
         assertThat(columnType).isEqualTo("varchar(32)")
     }
 
+    @Test
+    fun 스키마의_enum_열에_CHECK_제약이_하나도_없다() {
+        val checkConstraints = jdbcTemplate.queryForList(
+            """
+            SELECT CONCAT(tc.TABLE_NAME, '.', tc.CONSTRAINT_NAME, ' ', cc.CHECK_CLAUSE)
+            FROM information_schema.TABLE_CONSTRAINTS tc
+            JOIN information_schema.CHECK_CONSTRAINTS cc
+            ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+            WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.CONSTRAINT_TYPE = 'CHECK'
+            ORDER BY tc.TABLE_NAME, tc.CONSTRAINT_NAME
+            """.trimIndent(),
+            String::class.java
+        )
+
+        assertThat(checkConstraints).isEmpty()
+    }
+
+    @Test
+    fun enum에_없는_새_값도_알림_종류_열에_저장된다() {
+        jdbcTemplate.update(
+            "INSERT INTO notifications (created_at, event_id, user_id, type, title, content, is_read) VALUES (NOW(6), ?, 1, ?, 'title', 'content', false)",
+            EVENT_ID,
+            VALUE_ADDED_LATER
+        )
+
+        assertThat(jdbcTemplate.queryForObject("SELECT type FROM notifications WHERE event_id = ?", String::class.java, EVENT_ID))
+            .isEqualTo(VALUE_ADDED_LATER)
+    }
+
     companion object {
+        private const val EVENT_ID = "enum-value-added-later"
+        private const val VALUE_ADDED_LATER = "VALUE_ADDED_LATER"
         private const val DATABASE = "notification_mysql_test"
 
         @JvmStatic

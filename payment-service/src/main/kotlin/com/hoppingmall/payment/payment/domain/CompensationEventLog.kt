@@ -1,14 +1,12 @@
 package com.hoppingmall.payment.payment.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import jakarta.persistence.Column
+import jakarta.persistence.Convert
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -28,8 +26,7 @@ class CompensationEventLog(
     @Column(nullable = false)
     val orderId: Long,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = CompensationEventLogStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: CompensationEventLogStatus = CompensationEventLogStatus.PENDING
 ) : BaseEntity() {
@@ -40,3 +37,5 @@ class CompensationEventLog(
 
     fun isCompleted(): Boolean = this.status == CompensationEventLogStatus.COMPLETED
 }
+
+class CompensationEventLogStatusConverter : EnumNameConverter<CompensationEventLogStatus>(CompensationEventLogStatus::class.java)

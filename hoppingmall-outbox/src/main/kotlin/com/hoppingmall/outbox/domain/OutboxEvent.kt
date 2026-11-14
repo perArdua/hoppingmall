@@ -1,16 +1,14 @@
 package com.hoppingmall.outbox.domain
 
+import com.hoppingmall.common.EnumNameConverter
 import jakarta.persistence.Column
+import jakarta.persistence.Convert
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 
 @Entity
@@ -19,7 +17,8 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_outbox_processed_created", columnList = "processed, created_at"),
         Index(name = "idx_outbox_aggregate_id", columnList = "aggregate_id"),
-        Index(name = "idx_outbox_status_retry", columnList = "processed, status, retry_count")
+        Index(name = "idx_outbox_status_retry", columnList = "processed, status, retry_count"),
+        Index(name = "idx_outbox_processed_processed_at", columnList = "processed, processed_at")
     ]
 )
 class OutboxEvent(
@@ -41,8 +40,7 @@ class OutboxEvent(
     @Column(name = "partition_key", length = 100)
     val partitionKey: String? = null,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = OutboxStatusConverter::class)
     @Column(name = "status", nullable = false, length = 32)
     var status: OutboxStatus = OutboxStatus.PENDING,
 
@@ -93,3 +91,5 @@ class OutboxEvent(
         this.updatedAt = LocalDateTime.now()
     }
 }
+
+class OutboxStatusConverter : EnumNameConverter<OutboxStatus>(OutboxStatus::class.java)

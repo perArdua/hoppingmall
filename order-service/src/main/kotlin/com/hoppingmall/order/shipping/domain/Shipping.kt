@@ -1,11 +1,10 @@
 package com.hoppingmall.order.shipping.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import com.hoppingmall.order.shipping.exception.ShippingInvalidStatusException
 import jakarta.persistence.*
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -23,8 +22,7 @@ class Shipping private constructor(
     @Column(nullable = false)
     val buyerId: Long,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = ShippingStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: ShippingStatus = ShippingStatus.PREPARING,
 
@@ -82,3 +80,5 @@ class Shipping private constructor(
         this.status = newStatus
     }
 }
+
+class ShippingStatusConverter : EnumNameConverter<ShippingStatus>(ShippingStatus::class.java)

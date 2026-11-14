@@ -1,11 +1,10 @@
 package com.hoppingmall.payment.coupon.domain
 
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.payment.coupon.enum.UserCouponStatus
 import com.hoppingmall.common.BaseEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -24,8 +23,7 @@ class UserCoupon private constructor(
     @Column(nullable = false)
     val couponId: Long,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = UserCouponStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: UserCouponStatus = UserCouponStatus.ISSUED,
 
@@ -60,3 +58,5 @@ class UserCoupon private constructor(
         this.orderId = null
     }
 }
+
+class UserCouponStatusConverter : EnumNameConverter<UserCouponStatus>(UserCouponStatus::class.java)

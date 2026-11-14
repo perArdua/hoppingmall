@@ -1,9 +1,8 @@
 package com.hoppingmall.dlq.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import jakarta.persistence.*
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -13,7 +12,8 @@ import org.hibernate.type.SqlTypes
         Index(name = "idx_dlq_status", columnList = "status"),
         Index(name = "idx_dlq_created_at", columnList = "created_at"),
         Index(name = "idx_dlq_next_retry_at", columnList = "status, next_retry_at"),
-        Index(name = "idx_dlq_topic_content_hash", columnList = "original_topic, content_hash")
+        Index(name = "idx_dlq_topic_content_hash", columnList = "original_topic, content_hash"),
+        Index(name = "idx_dlq_status_archived_at", columnList = "status, archived_at")
     ]
 )
 class DLQMessage(
@@ -38,9 +38,8 @@ class DLQMessage(
     @Column(name = "error_timestamp", nullable = false)
     var errorTimestamp: Long,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
-    @Column(name = "status", nullable = false, length = 20)
+    @Convert(converter = DLQStatusConverter::class)
+    @Column(name = "status", nullable = false, length = 32)
     var status: DLQStatus = DLQStatus.PENDING,
 
     @Column(name = "retry_count", nullable = false)
@@ -138,3 +137,5 @@ class DLQMessage(
         }
     }
 }
+
+class DLQStatusConverter : EnumNameConverter<DLQStatus>(DLQStatus::class.java)

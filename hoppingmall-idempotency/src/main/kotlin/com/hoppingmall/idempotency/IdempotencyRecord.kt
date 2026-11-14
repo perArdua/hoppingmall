@@ -4,7 +4,10 @@ import jakarta.persistence.*
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "idempotency_records")
+@Table(
+    name = "idempotency_records",
+    indexes = [Index(name = "idx_idempotency_records_expires_at", columnList = "expiresAt")]
+)
 class IdempotencyRecord(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

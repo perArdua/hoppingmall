@@ -62,6 +62,25 @@ class OutboxCleanupMySqlBatchTest {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outbox_events", Long::class.java)).isEqualTo(10L)
     }
 
+    @Test
+    fun 처리_완료_이벤트_삭제는_처리_여부와_처리_시각_인덱스로_범위만_읽는다() {
+        val recent = LocalDateTime.now().minusDays(1)
+        try {
+            outboxEventRepository.saveAll((1..2000).map { event(processed = true, processedAt = recent) })
+            jdbcTemplate.execute("ANALYZE TABLE outbox_events")
+
+            val plan = jdbcTemplate.queryForMap(
+                "EXPLAIN DELETE FROM outbox_events WHERE processed = true AND processed_at < ? LIMIT 1000",
+                LocalDateTime.now().minusDays(7)
+            )
+
+            assertThat(plan["key"]).isEqualTo("idx_outbox_processed_processed_at")
+            assertThat(plan["type"]).isEqualTo("range")
+        } finally {
+            jdbcTemplate.update("DELETE FROM outbox_events")
+        }
+    }
+
     private fun event(processed: Boolean, processedAt: LocalDateTime?): OutboxEvent =
         OutboxEvent(
             aggregateType = "Payment",

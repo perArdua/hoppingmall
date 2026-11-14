@@ -1,11 +1,10 @@
 package com.hoppingmall.product.product.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.product.common.enums.ProductStatus
 import jakarta.persistence.*
-import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.SQLRestriction
-import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 
 @Entity
@@ -34,8 +33,7 @@ class Product private constructor(
     @Column(nullable = false, precision = 10, scale = 2)
     var price: BigDecimal,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = ProductStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: ProductStatus = ProductStatus.AVAILABLE
 
@@ -64,3 +62,5 @@ class Product private constructor(
         }
     }
 }
+
+class ProductStatusConverter : EnumNameConverter<ProductStatus>(ProductStatus::class.java)

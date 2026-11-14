@@ -1,14 +1,13 @@
 package com.hoppingmall.settlement.domain
 
 import com.hoppingmall.common.BaseEntity
+import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.settlement.enums.SettlementStatus
 import com.hoppingmall.settlement.exception.SettlementInvalidStatusException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(
@@ -46,8 +45,7 @@ class Settlement private constructor(
     @Column(nullable = false, precision = 12, scale = 2)
     val settlementAmount: BigDecimal,
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Convert(converter = SettlementStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: SettlementStatus = SettlementStatus.CALCULATED,
 
@@ -107,3 +105,5 @@ class Settlement private constructor(
         }
     }
 }
+
+class SettlementStatusConverter : EnumNameConverter<SettlementStatus>(SettlementStatus::class.java)

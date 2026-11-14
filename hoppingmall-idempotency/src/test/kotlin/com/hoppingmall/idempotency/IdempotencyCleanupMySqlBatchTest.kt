@@ -55,6 +55,25 @@ class IdempotencyCleanupMySqlBatchTest {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM idempotency_records", Long::class.java)).isEqualTo(10L)
     }
 
+    @Test
+    fun 만료_레코드_삭제는_만료_시각_인덱스로_범위만_읽는다() {
+        val valid = LocalDateTime.now().plusHours(1)
+        try {
+            idempotencyRecordRepository.saveAll((1..2000).map { record("explain-valid-$it", valid) })
+            jdbcTemplate.execute("ANALYZE TABLE idempotency_records")
+
+            val plan = jdbcTemplate.queryForMap(
+                "EXPLAIN DELETE FROM idempotency_records WHERE expires_at < ? LIMIT 1000",
+                LocalDateTime.now()
+            )
+
+            assertThat(plan["key"]).isEqualTo("idx_idempotency_records_expires_at")
+            assertThat(plan["type"]).isEqualTo("range")
+        } finally {
+            jdbcTemplate.update("DELETE FROM idempotency_records")
+        }
+    }
+
     private fun record(key: String, expiresAt: LocalDateTime): IdempotencyRecord =
         IdempotencyRecord(
             idempotencyKey = key,
