@@ -18,6 +18,7 @@ import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.listener.ConsumerRecordRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.kafka.support.KafkaUtils
 import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.messaging.converter.MessageConversionException
 import org.springframework.util.backoff.FixedBackOff
@@ -91,7 +92,8 @@ class KafkaConsumerConfig(
             originalKey = record.key()?.toString(),
             originalValue = record.value()?.toString(),
             exception = exception.message,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            consumerGroup = KafkaUtils.getConsumerGroupId()
         )
         dlqCommandService.saveDLQMessage(deadLetterMessage)
     }
