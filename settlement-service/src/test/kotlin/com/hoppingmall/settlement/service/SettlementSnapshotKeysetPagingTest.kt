@@ -52,27 +52,27 @@ class SettlementSnapshotKeysetPagingTest {
     fun 다음_묶음은_OFFSET이_아니라_앞_묶음의_마지막_정산_ID_다음부터_읽는다() {
         val first = (1L..BATCH_SIZE.toLong()).map { settlement(it) }
         val second = listOf(settlement(BATCH_SIZE + 7L))
-        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))).thenReturn(first)
-        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(BATCH_SIZE.toLong(), Limit.of(BATCH_SIZE))).thenReturn(second)
+        whenever(settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))).thenReturn(first)
+        whenever(settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(BATCH_SIZE.toLong(), Limit.of(BATCH_SIZE))).thenReturn(second)
         whenever(settlementSummaryRepository.findBySettlementIdIn(any())).thenReturn(emptyList())
 
         settlementSnapshotService.createSnapshot()
 
         val order = inOrder(settlementRepository)
-        order.verify(settlementRepository).findByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))
-        order.verify(settlementRepository).findByIdGreaterThanOrderByIdAsc(BATCH_SIZE.toLong(), Limit.of(BATCH_SIZE))
+        order.verify(settlementRepository).findWithShareLockByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))
+        order.verify(settlementRepository).findWithShareLockByIdGreaterThanOrderByIdAsc(BATCH_SIZE.toLong(), Limit.of(BATCH_SIZE))
         verify(settlementRepository, never()).findAll(anyOrNull<Pageable>())
         verify(settlementSummaryRepository).findBySettlementIdIn(listOf(BATCH_SIZE + 7L))
     }
 
     @Test
     fun 묶음이_가득_차지_않으면_다음_묶음을_더_읽지_않는다() {
-        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))).thenReturn(listOf(settlement(3L)))
+        whenever(settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))).thenReturn(listOf(settlement(3L)))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(3L))).thenReturn(emptyList())
 
         settlementSnapshotService.createSnapshot()
 
-        verify(settlementRepository, never()).findByIdGreaterThanOrderByIdAsc(3L, Limit.of(BATCH_SIZE))
+        verify(settlementRepository, never()).findWithShareLockByIdGreaterThanOrderByIdAsc(3L, Limit.of(BATCH_SIZE))
         verify(settlementRepository, never()).findAll(anyOrNull<Pageable>())
     }
 

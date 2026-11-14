@@ -65,7 +65,7 @@ class SettlementSnapshotServiceTest {
     fun 스냅샷_생성_시_신규_Summary를_생성한다() {
         val settlement = createSettlement(1L)
 
-        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
+        whenever(settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(emptyList())
 
         settlementSnapshotService.createSnapshot()
@@ -78,7 +78,7 @@ class SettlementSnapshotServiceTest {
         val settlement = createSettlement(1L)
         val existingSummary = SettlementSummary.from(settlement)
 
-        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
+        whenever(settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(listOf(existingSummary))
 
         settlementSnapshotService.createSnapshot()

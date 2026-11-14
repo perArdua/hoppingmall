@@ -69,7 +69,7 @@ class SettlementSummaryFirstInsertRaceMySqlIntegrationTest : MySqlJpaTestSupport
             enteredAt.set(System.currentTimeMillis())
             runCatching { settlementCommandService.confirmSettlement(target) }
         }
-        awaitLockWait(confirm, enteredAt, "정산 확정", "settlement_summaries")
+        awaitLockWait(confirm, enteredAt, "정산 확정", "settlements")
         heldSnapshot.release.countDown()
 
         val snapshotResult = heldSnapshot.result.get(30, TimeUnit.SECONDS)
@@ -92,7 +92,7 @@ class SettlementSummaryFirstInsertRaceMySqlIntegrationTest : MySqlJpaTestSupport
             enteredAt.set(System.currentTimeMillis())
             runCatching { settlementCommandService.paySettlement(target) }
         }
-        awaitLockWait(pay, enteredAt, "정산 지급", "settlement_summaries")
+        awaitLockWait(pay, enteredAt, "정산 지급", "settlements")
         heldSnapshot.release.countDown()
 
         val snapshotResult = heldSnapshot.result.get(30, TimeUnit.SECONDS)
@@ -116,7 +116,7 @@ class SettlementSummaryFirstInsertRaceMySqlIntegrationTest : MySqlJpaTestSupport
             enteredAt.set(System.currentTimeMillis())
             runCatching { settlementSnapshotService.createSnapshot() }
         }
-        awaitLockWait(snapshot, enteredAt, "스냅샷 잡", "settlement_summaries")
+        awaitLockWait(snapshot, enteredAt, "스냅샷 잡", "settlements")
         heldConfirm.release.countDown()
 
         val confirmResult = heldConfirm.result.get(30, TimeUnit.SECONDS)

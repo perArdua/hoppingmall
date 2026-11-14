@@ -47,7 +47,7 @@ class SettlementSnapshotService(
     }
 
     private fun snapshotPage(afterId: Long): PageResult {
-        val settlements = settlementRepository.findByIdGreaterThanOrderByIdAsc(afterId, Limit.of(BATCH_SIZE))
+        val settlements = settlementRepository.findWithShareLockByIdGreaterThanOrderByIdAsc(afterId, Limit.of(BATCH_SIZE))
 
         if (settlements.isEmpty()) return PageResult(size = 0, created = 0, updated = 0, lastId = null)
 
