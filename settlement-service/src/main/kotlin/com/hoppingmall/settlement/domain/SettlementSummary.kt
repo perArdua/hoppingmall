@@ -14,12 +14,15 @@ import java.time.LocalDateTime
         UniqueConstraint(
             name = "uk_settlement_summaries_seller_period",
             columnNames = ["sellerId", "periodStart", "periodEnd"]
+        ),
+        UniqueConstraint(
+            name = "uk_settlement_summaries_settlement_id",
+            columnNames = ["settlementId"]
         )
     ],
     indexes = [
         Index(name = "idx_settlement_summaries_seller_id", columnList = "sellerId"),
-        Index(name = "idx_settlement_summaries_status", columnList = "status"),
-        Index(name = "idx_settlement_summaries_settlement_id", columnList = "settlementId")
+        Index(name = "idx_settlement_summaries_status", columnList = "status")
     ]
 )
 class SettlementSummary(

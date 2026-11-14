@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 
 interface SettlementSummaryRepository : JpaRepository<SettlementSummary, Long> {
+    fun existsByIdIsNotNull(): Boolean
     fun findBySettlementId(settlementId: Long): SettlementSummary?
     fun findBySettlementIdIn(settlementIds: List<Long>): List<SettlementSummary>
     fun findBySellerIdAndStatus(sellerId: Long, status: SettlementStatus, pageable: Pageable): Page<SettlementSummary>

@@ -16,10 +16,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.data.domain.PageImpl
-import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Pageable
-import org.springframework.data.domain.Sort
+import org.springframework.data.domain.Limit
 import org.springframework.test.util.ReflectionTestUtils
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -56,10 +53,8 @@ class SettlementSnapshotServiceTest {
     @Test
     fun 스냅샷_생성_시_신규_Summary를_생성한다() {
         val settlement = createSettlement(1L)
-        val pageable = PageRequest.of(0, 200, Sort.by("id"))
-        val page = PageImpl(listOf(settlement), pageable, 1)
 
-        whenever(settlementRepository.findAll(any<Pageable>())).thenReturn(page)
+        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(emptyList())
         whenever(settlementSummaryRepository.saveAll(any<List<SettlementSummary>>())).thenAnswer { it.arguments[0] }
 
@@ -72,10 +67,8 @@ class SettlementSnapshotServiceTest {
     fun 기존_Summary가_있으면_업데이트한다() {
         val settlement = createSettlement(1L)
         val existingSummary = SettlementSummary.from(settlement)
-        val pageable = PageRequest.of(0, 200, Sort.by("id"))
-        val page = PageImpl(listOf(settlement), pageable, 1)
 
-        whenever(settlementRepository.findAll(any<Pageable>())).thenReturn(page)
+        whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(listOf(existingSummary))
 
         settlementSnapshotService.createSnapshot()

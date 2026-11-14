@@ -4,8 +4,7 @@ import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
 import org.slf4j.LoggerFactory
-import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
+import org.springframework.data.domain.Limit
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -29,12 +28,10 @@ class SettlementSnapshotService(
 
         var totalCreated = 0
         var totalUpdated = 0
-        var page = 0
+        var lastId = 0L
 
-        do {
-            val pageable = PageRequest.of(page, BATCH_SIZE, Sort.by("id"))
-            val settlementPage = settlementRepository.findAll(pageable)
-            val settlements = settlementPage.content
+        while (true) {
+            val settlements = settlementRepository.findByIdGreaterThanOrderByIdAsc(lastId, Limit.of(BATCH_SIZE))
 
             if (settlements.isEmpty()) break
 
@@ -59,8 +56,10 @@ class SettlementSnapshotService(
 
             totalCreated += newSummaries.size
             totalUpdated += settlements.size - newSummaries.size
-            page++
-        } while (settlementPage.hasNext())
+            lastId = settlements.last().id!!
+
+            if (settlements.size < BATCH_SIZE) break
+        }
 
         log.info("Settlement snapshot job completed: created=$totalCreated, updated=$totalUpdated")
     }
