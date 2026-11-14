@@ -17,7 +17,8 @@ class SettlementSummarySynchronizer(
             return
         }
         if (settlementSummaryRepository.existsByIdIsNotNull()) {
-            settlementSummaryRepository.save(SettlementSummary.from(settlement))
+            settlementSummaryRepository.insertIfAbsent(SettlementSummary.from(settlement))
+            settlementSummaryRepository.findWithLockBySettlementId(settlement.id!!)?.updateFrom(settlement)
         }
     }
 }

@@ -1,7 +1,6 @@
 package com.hoppingmall.settlement.service
 
 import com.hoppingmall.settlement.domain.Settlement
-import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
 import org.junit.jupiter.api.DisplayName
@@ -45,7 +44,6 @@ class SettlementSnapshotKeysetPagingTest {
         whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))).thenReturn(first)
         whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(BATCH_SIZE.toLong(), Limit.of(BATCH_SIZE))).thenReturn(second)
         whenever(settlementSummaryRepository.findBySettlementIdIn(any())).thenReturn(emptyList())
-        whenever(settlementSummaryRepository.saveAll(any<List<SettlementSummary>>())).thenAnswer { it.arguments[0] }
 
         settlementSnapshotService.createSnapshot()
 
@@ -60,7 +58,6 @@ class SettlementSnapshotKeysetPagingTest {
     fun 묶음이_가득_차지_않으면_다음_묶음을_더_읽지_않는다() {
         whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(BATCH_SIZE))).thenReturn(listOf(settlement(3L)))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(3L))).thenReturn(emptyList())
-        whenever(settlementSummaryRepository.saveAll(any<List<SettlementSummary>>())).thenAnswer { it.arguments[0] }
 
         settlementSnapshotService.createSnapshot()
 

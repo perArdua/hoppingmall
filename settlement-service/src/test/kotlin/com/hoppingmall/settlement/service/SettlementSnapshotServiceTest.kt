@@ -56,11 +56,10 @@ class SettlementSnapshotServiceTest {
 
         whenever(settlementRepository.findByIdGreaterThanOrderByIdAsc(0L, Limit.of(200))).thenReturn(listOf(settlement))
         whenever(settlementSummaryRepository.findBySettlementIdIn(listOf(1L))).thenReturn(emptyList())
-        whenever(settlementSummaryRepository.saveAll(any<List<SettlementSummary>>())).thenAnswer { it.arguments[0] }
 
         settlementSnapshotService.createSnapshot()
 
-        verify(settlementSummaryRepository).saveAll(any<List<SettlementSummary>>())
+        verify(settlementSummaryRepository).insertIfAbsent(any())
     }
 
     @Test
@@ -73,6 +72,6 @@ class SettlementSnapshotServiceTest {
 
         settlementSnapshotService.createSnapshot()
 
-        verify(settlementSummaryRepository, never()).saveAll(any<List<SettlementSummary>>())
+        verify(settlementSummaryRepository, never()).insertIfAbsent(any())
     }
 }

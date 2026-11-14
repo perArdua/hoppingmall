@@ -50,9 +50,7 @@ class SettlementSnapshotService(
                 }
             }
 
-            if (newSummaries.isNotEmpty()) {
-                settlementSummaryRepository.saveAll(newSummaries)
-            }
+            newSummaries.forEach { settlementSummaryRepository.insertIfAbsent(it) }
 
             totalCreated += newSummaries.size
             totalUpdated += settlements.size - newSummaries.size
