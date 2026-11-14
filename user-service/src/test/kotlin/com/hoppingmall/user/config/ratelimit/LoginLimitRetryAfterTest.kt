@@ -77,7 +77,7 @@ class LoginLimitRetryAfterTest {
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
             loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, clock)
         )
-        val controller = UserController(mock<UserCommandService>(), mock(), authService)
+        val controller = UserController(mock<UserCommandService>(), mock(), authService, ClientIpResolver())
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .addInterceptors(RateLimitInterceptor(InMemoryRateLimitBuckets().proxyManager()))
@@ -87,7 +87,7 @@ class LoginLimitRetryAfterTest {
 
     @Test
     fun 이메일_기준_제한의_429는_거절이_풀릴_때까지_남은_초를_Retry_After로_알린다() {
-        repeat(10) { login(MEMBER_EMAIL, WRONG_PASSWORD, nextIp()) }
+        repeat(50) { login(MEMBER_EMAIL, WRONG_PASSWORD, nextIp()) }
 
         val rightAway = login(MEMBER_EMAIL, CORRECT_PASSWORD, nextIp())
         clock.advance(Duration.ofMinutes(5))
@@ -101,7 +101,7 @@ class LoginLimitRetryAfterTest {
 
     @Test
     fun 이메일_기준_제한의_남은_시간이_1초보다_짧아도_Retry_After는_1초로_올려_알린다() {
-        repeat(10) { login(MEMBER_EMAIL, WRONG_PASSWORD, nextIp()) }
+        repeat(50) { login(MEMBER_EMAIL, WRONG_PASSWORD, nextIp()) }
 
         clock.advance(Duration.ofMinutes(15).minusMillis(300))
         val almostReleased = login(MEMBER_EMAIL, CORRECT_PASSWORD, nextIp())

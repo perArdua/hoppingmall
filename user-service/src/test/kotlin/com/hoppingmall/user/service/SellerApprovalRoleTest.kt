@@ -136,7 +136,7 @@ class SellerApprovalRoleTest {
     fun 승인_전에_받은_access_token은_BUYER로_남고_재발급하면_SELLER가_실린다() {
         val user = saveUser("refresh@example.com", Role.BUYER)
         val seller = sellerRepository.save(Seller.create(user, "444-44-44444"))
-        val beforeApproval = authService.login(SignInRequest("refresh@example.com", RAW_PASSWORD))
+        val beforeApproval = authService.login(SignInRequest("refresh@example.com", RAW_PASSWORD), "10.0.0.1")
 
         adminCommandService.updateSellerApprovalStatus(seller.id!!, SellerApprovalRequest("APPROVED"))
         val refreshed = authService.refreshAccessToken(beforeApproval.refreshToken)
@@ -151,7 +151,7 @@ class SellerApprovalRoleTest {
         val seller = sellerRepository.save(Seller.create(user, "555-55-55555"))
 
         adminCommandService.updateSellerApprovalStatus(seller.id!!, SellerApprovalRequest("APPROVED"))
-        val afterApproval = authService.login(SignInRequest("relogin@example.com", RAW_PASSWORD))
+        val afterApproval = authService.login(SignInRequest("relogin@example.com", RAW_PASSWORD), "10.0.0.1")
 
         assertThat(tokenProvider.getUserRoleFromToken(afterApproval.accessToken)).isEqualTo(Role.SELLER)
     }

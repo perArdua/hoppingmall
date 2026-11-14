@@ -12,72 +12,90 @@ import java.util.UUID
 
 class RedisLoginAttemptLimiter(
     private val redissonClient: RedissonClient,
-    private val clock: Clock
+    private val clock: Clock,
+    private val properties: LoginAttemptLimitProperties = LoginAttemptLimitProperties()
 ) : LoginAttemptLimiter {
 
-    override fun remainingBlock(email: String): Duration {
-        val blockedUntil = redissonClient.getBucket<String>(blockedKey(email), StringCodec.INSTANCE).get()
+    override fun remainingBlock(email: String, clientIp: String): Duration {
+        val now = clock.millis()
+        val blockedUntil = listOf(pairBlockedKey(email, clientIp), emailBlockedKey(email))
+            .mapNotNull { redissonClient.getBucket<String>(it, StringCodec.INSTANCE).get()?.toLong() }
+            .maxOrNull()
             ?: return Duration.ZERO
-        val remainingMillis = blockedUntil.toLong() - clock.millis()
+        val remainingMillis = blockedUntil - now
         return if (remainingMillis > 0) Duration.ofMillis(remainingMillis) else Duration.ZERO
     }
 
-    override fun recordFailure(email: String) {
-        val failuresKey = failuresKey(email)
+    override fun recordFailure(email: String, clientIp: String) {
         val now = clock.millis()
+        val blockMillis = properties.blockDuration.toMillis()
         redissonClient.getScript(StringCodec.INSTANCE).eval<Long>(
-            failuresKey,
+            emailFailuresKey(email),
             RScript.Mode.READ_WRITE,
             RECORD_FAILURE_SCRIPT,
             RScript.ReturnType.LONG,
-            listOf<Any>(failuresKey, blockedKey(email)),
+            listOf<Any>(
+                pairFailuresKey(email, clientIp),
+                pairBlockedKey(email, clientIp),
+                emailFailuresKey(email),
+                emailBlockedKey(email)
+            ),
             now.toString(),
-            WINDOW.toMillis().toString(),
-            MAX_FAILURES.toString(),
-            BLOCK_DURATION.toMillis().toString(),
-            (now + BLOCK_DURATION.toMillis()).toString(),
+            properties.window.toMillis().toString(),
+            properties.maxFailuresPerEmailAndIp.toString(),
+            properties.maxFailuresPerEmail.toString(),
+            blockMillis.toString(),
+            (now + blockMillis).toString(),
             UUID.randomUUID().toString()
         )
     }
 
-    override fun reset(email: String) {
-        redissonClient.keys.delete(failuresKey(email), blockedKey(email))
+    override fun reset(email: String, clientIp: String) {
+        redissonClient.keys.delete(
+            pairFailuresKey(email, clientIp),
+            pairBlockedKey(email, clientIp),
+            emailFailuresKey(email),
+            emailBlockedKey(email)
+        )
     }
 
-    private fun failuresKey(email: String): String = "$KEY_PREFIX{${emailHash(email)}}:failures"
+    private fun emailFailuresKey(email: String): String = "${emailPrefix(email)}:failures"
 
-    private fun blockedKey(email: String): String = "$KEY_PREFIX{${emailHash(email)}}:blocked"
+    private fun emailBlockedKey(email: String): String = "${emailPrefix(email)}:blocked"
 
-    private fun emailHash(email: String): String {
-        val normalized = email.trim().lowercase(Locale.ROOT)
-        val digest = MessageDigest.getInstance("SHA-256").digest(normalized.toByteArray(Charsets.UTF_8))
+    private fun pairFailuresKey(email: String, clientIp: String): String = "${emailPrefix(email)}:ip:${sha256(clientIp.trim())}:failures"
+
+    private fun pairBlockedKey(email: String, clientIp: String): String = "${emailPrefix(email)}:ip:${sha256(clientIp.trim())}:blocked"
+
+    private fun emailPrefix(email: String): String = "$KEY_PREFIX{${sha256(email.trim().lowercase(Locale.ROOT))}}"
+
+    private fun sha256(value: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
         return HexFormat.of().formatHex(digest)
     }
 
     companion object {
-        private const val MAX_FAILURES = 10
-        private val WINDOW: Duration = Duration.ofMinutes(15)
-        private val BLOCK_DURATION: Duration = Duration.ofMinutes(15)
-
         private const val KEY_PREFIX = "login-attempt:"
 
         private val RECORD_FAILURE_SCRIPT = """
             local now = tonumber(ARGV[1])
             local window = tonumber(ARGV[2])
-            local blockedUntil = tonumber(redis.call('GET', KEYS[2]) or '0')
-            if now < blockedUntil then
+            if now < tonumber(redis.call('GET', KEYS[2]) or '0') or now < tonumber(redis.call('GET', KEYS[4]) or '0') then
                 return 0
             end
-            redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now - window)
-            redis.call('ZADD', KEYS[1], now, ARGV[6])
-            local count = redis.call('ZCARD', KEYS[1])
-            if count >= tonumber(ARGV[3]) then
-                redis.call('SET', KEYS[2], ARGV[5], 'PX', ARGV[4])
-                redis.call('DEL', KEYS[1])
-            else
-                redis.call('PEXPIRE', KEYS[1], window)
+            local function record(failuresKey, blockedKey, maxFailures)
+                redis.call('ZREMRANGEBYSCORE', failuresKey, '-inf', now - window)
+                redis.call('ZADD', failuresKey, now, ARGV[7])
+                if redis.call('ZCARD', failuresKey) >= maxFailures then
+                    redis.call('SET', blockedKey, ARGV[6], 'PX', ARGV[5])
+                    redis.call('DEL', failuresKey)
+                else
+                    redis.call('PEXPIRE', failuresKey, window)
+                end
             end
-            return count
+            record(KEYS[1], KEYS[2], tonumber(ARGV[3]))
+            record(KEYS[3], KEYS[4], tonumber(ARGV[4]))
+            return 1
         """.trimIndent()
     }
 }

@@ -201,7 +201,7 @@ class TokenTypeClaimTest {
 
     private fun login() = SignInRequest(email = "user@example.com", password = "Password1234").let { request ->
         whenever(userQueryService.authenticate(request)).thenReturn(user)
-        authService.login(request)
+        authService.login(request, "10.0.0.1")
     }
 
     private fun signedToken(typ: String?, role: String?): String {

@@ -67,7 +67,7 @@ class LoginAttemptLimitStoreFailureTest {
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
             loginAttemptLimiter = loginAttemptLimiter
         )
-        val mockMvc = MockMvcBuilders.standaloneSetup(UserController(mock<UserCommandService>(), mock(), authService))
+        val mockMvc = MockMvcBuilders.standaloneSetup(UserController(mock<UserCommandService>(), mock(), authService, ClientIpResolver()))
             .addInterceptors(RateLimitInterceptor(proxyManager))
             .setControllerAdvice(GlobalExceptionHandler())
             .build()

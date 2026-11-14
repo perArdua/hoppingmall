@@ -1,6 +1,7 @@
 package com.hoppingmall.user.controller
 
 import com.hoppingmall.user.auth.service.AuthService
+import com.hoppingmall.user.config.ratelimit.ClientIpResolver
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.user.dto.request.SignInRequest
@@ -13,6 +14,7 @@ import com.hoppingmall.user.exception.user.LoginAttemptsExceededException
 import com.hoppingmall.user.service.UserCommandService
 import com.hoppingmall.user.service.UserQueryService
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -26,7 +28,8 @@ import org.springframework.web.bind.annotation.*
 class UserController(
     private val userCommandService: UserCommandService,
     private val userQueryService: UserQueryService,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val clientIpResolver: ClientIpResolver
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -41,9 +44,10 @@ class UserController(
 
     @PostMapping("/login")
     fun login(
-        @RequestBody @Valid request: SignInRequest
+        @RequestBody @Valid request: SignInRequest,
+        httpRequest: HttpServletRequest
     ): ApiResponse<SignInResponse> {
-        val response = authService.login(request)
+        val response = authService.login(request, clientIpResolver.resolve(httpRequest))
         return ApiResponse.success(response)
     }
 
