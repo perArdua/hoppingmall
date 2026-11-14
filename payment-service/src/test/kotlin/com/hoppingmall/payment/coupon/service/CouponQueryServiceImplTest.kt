@@ -71,7 +71,7 @@ class CouponQueryServiceImplTest {
     @Test
     fun 전체_쿠폰_목록을_조회한다() {
         val coupon = createCoupon()
-        whenever(couponRepository.findAllActive()).thenReturn(listOf(coupon))
+        whenever(couponRepository.findAll()).thenReturn(listOf(coupon))
 
         val result = couponQueryService.getAllCoupons()
 

@@ -27,7 +27,7 @@ class CouponQueryServiceImpl(
 
     @Cacheable(cacheNames = ["coupon:all"], key = "'all'", sync = true)
     override fun getAllCoupons(): List<CouponResponse> {
-        return couponRepository.findAllActive()
+        return couponRepository.findAll()
             .map { CouponResponse.from(it) }
     }
 
