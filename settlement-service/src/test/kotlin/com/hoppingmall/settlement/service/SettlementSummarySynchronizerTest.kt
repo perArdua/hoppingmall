@@ -1,7 +1,6 @@
 package com.hoppingmall.settlement.service
 
 import com.hoppingmall.settlement.domain.Settlement
-import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -38,7 +37,8 @@ class SettlementSummarySynchronizerTest {
 
         settlementSummarySynchronizer.sync(settlement)
 
-        verify(settlementSummaryRepository).save(any<SettlementSummary>())
+        verify(settlementSummaryRepository).insertIfAbsent(any())
+        verify(settlementSummaryRepository).findWithLockBySettlementId(11L)
         verify(settlementSummaryRepository, never()).count()
     }
 
@@ -50,7 +50,7 @@ class SettlementSummarySynchronizerTest {
 
         settlementSummarySynchronizer.sync(settlement)
 
-        verify(settlementSummaryRepository, never()).save(any<SettlementSummary>())
+        verify(settlementSummaryRepository, never()).insertIfAbsent(any())
         verify(settlementSummaryRepository, never()).count()
     }
 
