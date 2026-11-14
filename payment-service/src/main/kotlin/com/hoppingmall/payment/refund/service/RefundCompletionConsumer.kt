@@ -49,7 +49,8 @@ class RefundCompletionConsumer(
                 productId = itemNode.get("productId").asLong(),
                 quantity = itemNode.get("quantity").asInt(),
                 refundPrice = BigDecimal(itemNode.get("refundPrice").asText()),
-                orderItemId = itemNode.get("orderItemId")?.takeIf { !it.isNull }?.asLong()
+                orderItemId = itemNode.get("orderItemId")?.takeIf { !it.isNull }?.asLong(),
+                productPrice = itemNode.get("productPrice")?.takeIf { !it.isNull }?.let { BigDecimal(it.asText()) }
             )
         } ?: emptyList()
 
@@ -122,18 +123,25 @@ class RefundCompletionConsumer(
             event.items.forEachIndexed { index, item ->
                 runStepOnce(event.eventId, eventLog, RefundEventLog.statsItemStep(index)) {
                     val requestKey = inventoryRequestKey(event.refundId, item)?.let { "$it$STATS_REQUEST_KEY_SUFFIX" }
-                    if (requestKey == null) {
-                        productStatisticsPort.incrementRefundStats(item.productId, item.quantity.toLong(), item.refundPrice)
-                    } else {
-                        productStatisticsPort.incrementRefundStats(
-                            item.productId,
-                            item.quantity.toLong(),
-                            item.refundPrice,
-                            requestKey
-                        )
-                    }
+                    incrementRefundStats(item, requestKey)
                 }
             }
+        }
+    }
+
+    private fun incrementRefundStats(item: RefundItemEvent, requestKey: String?) {
+        val quantity = item.quantity.toLong()
+        val productPrice = item.productPrice
+        if (productPrice == null) {
+            if (requestKey == null) {
+                productStatisticsPort.incrementRefundStats(item.productId, quantity, item.refundPrice)
+            } else {
+                productStatisticsPort.incrementRefundStats(item.productId, quantity, item.refundPrice, requestKey)
+            }
+        } else if (requestKey == null) {
+            productStatisticsPort.incrementRefundStats(item.productId, quantity, item.refundPrice, productPrice)
+        } else {
+            productStatisticsPort.incrementRefundStats(item.productId, quantity, item.refundPrice, productPrice, requestKey)
         }
     }
 

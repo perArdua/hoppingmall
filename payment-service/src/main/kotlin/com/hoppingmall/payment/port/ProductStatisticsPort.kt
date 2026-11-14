@@ -6,4 +6,14 @@ interface ProductStatisticsPort {
     fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal)
 
     fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal, requestKey: String)
+
+    fun incrementRefundStats(productId: Long, quantity: Long, amount: BigDecimal, productPrice: BigDecimal)
+
+    fun incrementRefundStats(
+        productId: Long,
+        quantity: Long,
+        amount: BigDecimal,
+        productPrice: BigDecimal,
+        requestKey: String
+    )
 }
