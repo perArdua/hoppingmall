@@ -3,7 +3,6 @@ package com.hoppingmall.order.internal
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.hoppingmall.common.ApiResponse
-import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.exception.OrderNotFoundException
@@ -159,27 +158,29 @@ class InternalOrderController(
 
     @PostMapping("/orders/terminal-check")
     fun terminalCheck(@Valid @RequestBody request: TerminalCheckRequest): ResponseEntity<ApiResponse<TerminalCheckResponse>> {
-        val orderIds = request.orderIds.orEmpty().distinct()
-        val terminalOrderIds = if (orderIds.isEmpty()) {
-            emptyList()
-        } else {
-            orderRepository.findTerminalOrderIds(
-                orderIds,
-                Order.TERMINAL_STATUSES,
-                LocalDateTime.now().minusDays(terminalRetentionDays)
-            ).sorted()
+        val reservationIds = request.reservationIds.orEmpty().distinct()
+        if (reservationIds.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(emptyList())))
         }
-        return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(terminalOrderIds)))
+        val items = orderItemRepository.findByReservationIdIn(reservationIds)
+        val orders = orderRepository.findAllById(items.map { it.orderId }.distinct()).associateBy { it.id!! }
+        val updatedBefore = LocalDateTime.now().minusDays(terminalRetentionDays)
+        val terminalReservationIds = items
+            .groupBy { it.reservationId!! }
+            .filterValues { held -> held.all { orders[it.orderId]?.isTerminalBefore(updatedBefore) == true } }
+            .keys
+            .sorted()
+        return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(terminalReservationIds)))
     }
 
     data class TerminalCheckRequest(
-        @field:NotNull(message = "order_ids는 필수입니다")
-        @field:Size(max = MAX_TERMINAL_CHECK_ORDER_IDS, message = "order_ids는 최대 500개입니다")
-        val orderIds: List<Long>?
+        @field:NotNull(message = "reservation_ids는 필수입니다")
+        @field:Size(max = MAX_TERMINAL_CHECK_RESERVATION_IDS, message = "reservation_ids는 최대 500개입니다")
+        val reservationIds: List<String>?
     )
 
     data class TerminalCheckResponse(
-        val terminalOrderIds: List<Long>
+        val terminalReservationIds: List<String>
     )
 
     data class OrderItemResponse(
@@ -207,6 +208,6 @@ class InternalOrderController(
     )
 
     companion object {
-        const val MAX_TERMINAL_CHECK_ORDER_IDS = 500
+        const val MAX_TERMINAL_CHECK_RESERVATION_IDS = 500
     }
 }

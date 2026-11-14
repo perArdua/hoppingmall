@@ -6,6 +6,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import jakarta.persistence.*
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @Entity
 @Table(
@@ -93,6 +94,9 @@ class Order private constructor(
     }
 
     fun isRefundable(): Boolean = status in refundableStatuses
+
+    fun isTerminalBefore(updatedBefore: LocalDateTime): Boolean =
+        status in TERMINAL_STATUSES && updatedAt?.isBefore(updatedBefore) == true
 
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
 
