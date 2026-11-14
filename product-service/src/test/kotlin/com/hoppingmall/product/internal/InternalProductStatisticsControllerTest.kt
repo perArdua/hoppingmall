@@ -1,6 +1,7 @@
 package com.hoppingmall.product.internal
 
 import com.hoppingmall.product.internal.service.AppliedRequestKeyGuard
+import com.hoppingmall.product.product.dto.request.RefundStatisticsRequest
 import com.hoppingmall.product.product.service.ProductStatisticsCommandService
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -39,5 +40,22 @@ class InternalProductStatisticsControllerTest {
 
         assertEquals(HttpStatus.OK, response.statusCode)
         verify(productStatisticsCommandService).incrementRefundStats(productId, quantity, amount)
+    }
+
+    @Test
+    fun 정가가_오면_정가_곱하기_환불_수량으로_환불_통계를_증가시킨다() {
+        val response = controller.incrementRefundStats(
+            1L, 3L, BigDecimal("12000"), null, RefundStatisticsRequest(productPrice = BigDecimal("5000"))
+        )
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        verify(productStatisticsCommandService).incrementRefundStats(1L, 3L, BigDecimal("15000"))
+    }
+
+    @Test
+    fun 정가가_null이면_환불_금액으로_환불_통계를_증가시킨다() {
+        controller.incrementRefundStats(1L, 3L, BigDecimal("12000"), null, RefundStatisticsRequest(productPrice = null))
+
+        verify(productStatisticsCommandService).incrementRefundStats(1L, 3L, BigDecimal("12000"))
     }
 }
