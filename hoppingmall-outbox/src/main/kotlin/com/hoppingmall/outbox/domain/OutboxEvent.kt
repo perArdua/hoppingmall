@@ -17,7 +17,8 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_outbox_processed_created", columnList = "processed, created_at"),
         Index(name = "idx_outbox_aggregate_id", columnList = "aggregate_id"),
-        Index(name = "idx_outbox_status_retry", columnList = "processed, status, retry_count")
+        Index(name = "idx_outbox_status_retry", columnList = "processed, status, retry_count"),
+        Index(name = "idx_outbox_processed_processed_at", columnList = "processed, processed_at")
     ]
 )
 class OutboxEvent(

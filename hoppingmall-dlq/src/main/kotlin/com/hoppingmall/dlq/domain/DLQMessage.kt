@@ -12,7 +12,8 @@ import jakarta.persistence.*
         Index(name = "idx_dlq_status", columnList = "status"),
         Index(name = "idx_dlq_created_at", columnList = "created_at"),
         Index(name = "idx_dlq_next_retry_at", columnList = "status, next_retry_at"),
-        Index(name = "idx_dlq_topic_content_hash", columnList = "original_topic, content_hash")
+        Index(name = "idx_dlq_topic_content_hash", columnList = "original_topic, content_hash"),
+        Index(name = "idx_dlq_status_archived_at", columnList = "status, archived_at")
     ]
 )
 class DLQMessage(
