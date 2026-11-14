@@ -83,11 +83,11 @@ MySQL과 앱 컨테이너는 시간대를 따로 정하지 않아 UTC이고, 서
 
 ## 스키마 관리
 
-스키마는 Hibernate `ddl-auto`가 관리합니다(서비스는 `update`, 테스트는 `create-drop`). 마이그레이션 도구(Flyway 등)는 쓰지 않기로 했습니다.
+스키마는 Hibernate `ddl-auto`가 관리합니다. 서비스는 `update`입니다. 테스트는 MySQL 컨테이너를 쓰는 스키마·배치 테스트와 product·settlement가 `create-drop`이고, 그 밖의 H2 테스트는 기본 설정(`application.yml`)의 `update`를 매번 빈 메모리 DB에 씁니다. consistency-monitor는 JPA를 쓰지 않고 `schema.sql`(`CREATE TABLE IF NOT EXISTS`)로 표를 만듭니다. 마이그레이션 도구(Flyway 등)는 쓰지 않기로 했습니다.
 
-- `update`는 새 표와 새 열은 만들지만, 기존 열의 타입 변경과 인덱스 변경은 일반적으로 반영하지 않습니다. 이런 변경이 든 PR은 본문에 적용할 SQL(`ALTER TABLE …`, `CREATE INDEX …`)을 적고, 기존 DB에는 그 SQL을 직접 적용합니다.
-- 예외로 `@Column(length = …)`를 적은 문자열 열은 DB의 길이가 선언과 다르면 `update`가 기동할 때 그 열을 매핑 타입으로 `MODIFY`합니다. Hibernate 6.6은 MySQL `ENUM`과 `VARCHAR`를 같은 타입으로 보고 길이만 비교하기 때문입니다. 그래서 enum 필드가 `ENUM`으로 매핑되던 옛 코드에서는 `VARCHAR`로 바꿔 둔 열 가운데 길이를 적은 열(`dlq_messages.status`, `inventory_reservations.status`)이 기동할 때마다 `ENUM`으로 되돌려졌습니다(로그에 흔적 없음, binlog로 확인).
-- enum 필드는 MySQL `ENUM` 열이 아니라 `VARCHAR` 열로 만듭니다: `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.VARCHAR)` + `@Column(length = …)`. `ENUM` 열은 값 목록이 열 정의에 들어가 `update`가 새 값을 더하지 않으므로, 값을 추가하면 기존 DB에서 저장이 실패합니다. enum 열에는 CHECK 제약을 만들지 않으므로(테스트가 지킵니다) `VARCHAR` 열은 값 추가에 DB 변경이 필요 없습니다.
+- `update`는 새 표·새 열과, 기존 표에 없는 이름의 인덱스·유니크 제약을 기동할 때 만듭니다. 지우지는 않습니다: 엔티티에서 뺀 열·인덱스·제약(CHECK 포함)은 남고, 이름이 같은 인덱스의 열 구성을 바꿔도 반영되지 않습니다. 이런 변경이 든 PR은 본문에 적용할 SQL(`ALTER TABLE …`, `CREATE INDEX …`)을 적고, 기존 DB에는 그 SQL을 직접 적용합니다. 미리 만든 인덱스는 `update`가 이름으로 알아보고 다시 만들지 않습니다.
+- 기존 열의 타입은 바꿉니다(MySQL 방언, Hibernate 6.6 `StandardTableMigrator`). 타입 계열이 다르거나, 문자열 열의 길이·소수 열의 자릿수가 선언(`@Column(length/precision/scale)`, 문자열은 적지 않으면 255)과 다르면 기동할 때 그 열을 매핑 타입으로 `MODIFY`합니다. Hibernate 6.6은 MySQL `ENUM`과 `VARCHAR`를 같은 타입으로 보고 길이만 비교합니다. 그래서 enum 필드가 `ENUM`으로 매핑되던 옛 코드에서는 `VARCHAR`로 바꿔 둔 열 가운데 길이가 선언과 다른 열(`dlq_messages.status`, `inventory_reservations.status`)이 기동할 때마다 `ENUM`으로 되돌려졌습니다(로그에 흔적 없음, binlog로 확인).
+- enum 필드는 MySQL `ENUM` 열이 아니라 `VARCHAR(32)` 열로 만듭니다: `@Convert(converter = …)` + `@Column(length = 32)`. 변환기는 enum마다 `hoppingmall-common`의 `EnumNameConverter`를 이은 한 줄 클래스이고 enum 이름을 그대로 저장합니다. `ENUM` 열은 값 목록이 열 정의에 들어가 `update`가 새 값을 더하지 않고, 변환기 없는 `@Enumerated(EnumType.STRING)`은 Hibernate가 새 표에 `col in (…)` CHECK 제약을 만들어, 어느 쪽이든 값을 추가하면 저장이 실패합니다. 지금은 enum 열에 CHECK 제약이 생기지 않으므로(테스트가 지킵니다) 값 추가에 DB 변경이 필요 없습니다. 다만 #917 앞의 코드로 만든 DB에는 옛 CHECK 제약이 남아 있으므로(`update`는 지우지 않음) #917 본문의 `DROP CHECK` SQL을 먼저 적용합니다.
 - 지금 코드에서는 기존 DB에 `ENUM` 열이 남아 있으면, 그 길이가 선언과 다르므로 `update`가 기동할 때 선언한 `VARCHAR`로 바꿉니다(값은 그대로).
 
 ## Canary 배포
@@ -127,11 +127,13 @@ graph LR
 - **로그인 시도 제한으로 남의 계정을 막을 수 있음** (#845·#849): 같은 이메일로 15분 안에 10번 틀리면 그 계정의 로그인을 15분 막습니다(429, `Retry-After`). 남이 일부러 10번 틀려 계정 주인을 15분 막을 수 있지만, 여러 IP로 한 계정을 노리는 대입을 막는 쪽을 골랐습니다. 이런 신고가 생기면 추가 인증 단계 같은 다른 방법을 봅니다.
 - **쿠폰 정합성 스윕의 남는 틈** (#861·#882): 스윕은 Redis에 예약한 지 5분(`coupon.reconciliation.min-reservation-age-ms`)이 지난 사용자만 복원합니다. 스윕이 예약 시각을 읽은 뒤 복원하기 전 수 ms 사이에 그 사용자가 복원되고 다시 예약하면 새 예약을 복원할 수 있습니다. 발급이 몰리는 쿠폰에서 재고가 어긋나면 다시 봅니다.
 - **확정(CONFIRMED) 예약 행은 지우지 않음** (#864): 예약 정리 작업은 끝난 지 30일 지난 CANCELLED·EXPIRED 행만 지웁니다. 결제된 주문을 취소할 때 기한 없이 CONFIRMED 행을 다시 읽어 재고를 되돌리므로 지우지 않습니다. 표가 커지면 취소 가능 기한을 정한 뒤 그보다 오래된 행을 지웁니다.
-- **관리자 DLQ 일괄 재처리의 잠금** (#798): 토픽별 일괄 재처리는 한 트랜잭션에서 최대 50건을 차례로 선점해 끝날 때까지 잠급니다. 관리자가 손으로 하는 작업이라 그대로 둡니다. 자동 재처리와 겹쳐 잠금 대기가 보이면 건마다 트랜잭션을 나눕니다.
+- **관리자 DLQ 일괄 재처리의 잠금** (#798): 토픽별 일괄 재처리는 한 트랜잭션에서 `maxCount`건(기본 50, 상한 없음)을 차례로 선점해 끝날 때까지 잠급니다. 관리자가 손으로 하는 작업이라 그대로 둡니다. 자동 재처리와 겹쳐 잠금 대기가 보이면 건마다 트랜잭션을 나눕니다.
 - **역보상이 재시도를 먼저 다 쓰는 경우** (#878): product 통계 DLQ에서 판매 통계가 오래 실패하면(order 장시간 다운) 뒤따르는 역보상·취소 통계가 재시도 3번을 먼저 써서 FAILED가 될 수 있습니다. 그때는 판매 통계부터 차례로 손으로 재처리합니다. 자주 생기면 순서를 기다리는 동안 재시도 횟수를 쓰지 않게 바꿉니다.
 - **consistency-monitor** (#884): 점검 주기에 분산 잠금이 없어 한 인스턴스로만 띄웁니다(compose 1개, `127.0.0.1`에만 열림, k8s 매니페스트 없음). 위반 API는 ADMIN 토큰을 검증하지만 게이트웨이의 로그아웃 목록(Redis)은 보지 않아, 로그아웃한 토큰도 만료(1시간)까지 통합니다. 외부에 열거나 여러 개 띄우게 되면 다시 봅니다.
 - **신원 헤더 증명** (#887): `GATEWAY_IDENTITY_SECRET`은 한 값만 받으므로 값을 바꾸려면 게이트웨이와 모든 서비스를 함께 재시작해야 합니다. IDE 기본 프로필에서 값이 없으면 검사를 끄고 신원 헤더를 그대로 믿습니다(docker·k8s 프로필은 값이 없으면 기동하지 않음). 무중단 회전이 필요해지면 두 값을 함께 받게 합니다.
 - **마이그레이션 도구 없음** (#766·#874): Flyway 없이 `ddl-auto: update`로 스키마를 관리하고, 기존 DB에는 PR 본문의 SQL을 직접 적용합니다("스키마 관리"). 운영 DB가 생기면 도입을 다시 봅니다.
+- **enum 값 삭제·이름 변경** (#766·#901): enum 열은 이름을 그대로 저장하는 `VARCHAR`라 값 추가에는 DB 변경이 필요 없지만, 값을 지우거나 이름을 바꾸면 DB에 남은 옛 이름을 읽을 때 변환기(`EnumNameConverter`)가 예외를 냅니다. 값을 지우거나 이름을 바꾸는 PR은 기존 행을 새 이름으로 옮기는 SQL을 먼저 적용합니다.
+- **데이터가 있는 DB에서 버킷 모드로 바꾸기**: 버킷은 bucket 모드에서 재고를 만들 때만 생기고, 기존 상품의 버킷을 채우는 기능은 없습니다. 이미 데이터가 있는 DB에서 `inventory.mode`를 `bucket`으로 바꾸면 버킷이 없는 상품의 예약 만료가 `InventoryNotFoundException`으로 주기마다 계속 실패합니다(`single`로 되돌리면 정상 만료). 스위치를 켜려면 기존 상품의 버킷을 먼저 채웁니다.
 - **DB 시각의 두 기준** (#804): 앱이 쓰는 열은 KST 벽시계, `NOW()`는 UTC이고 한 쿼리에서 섞지 않습니다("시각 저장 규칙"). JDBC 시간대를 바꾸려면 기존 데이터 이전을 함께 해야 합니다.
 - **프록시 뒤 IP** (#734·#785·#787): 요청 제한의 IP 키는 믿는 프록시 단수(`gateway.rate-limit.trusted-proxy-count`·`user.rate-limit.trusted-proxy-count`)가 기본 0이라 연결 주소를 씁니다. 앞에 로드밸런서·Ingress를 두면 모든 요청이 그 주소 하나로 묶이므로, 그 단수만큼 값을 정해야 합니다.
 - **브랜치 보호** (#773): develop의 필수 CI 검사·PR 필수 규칙은 코드가 아니라 저장소 설정이라 이 저장소의 파일로는 고칠 수 없습니다. 저장소 관리자가 설정합니다.
