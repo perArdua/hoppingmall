@@ -13,23 +13,24 @@ import org.springframework.context.annotation.Profile
 
 @Configuration
 @Profile("docker")
-@ConditionalOnClass(RedissonClient::class)
+@ConditionalOnClass(RedissonClient::class, RedissonAutoConfigurationCustomizer::class)
 class RedissonDockerConfig(
     @Value("\${spring.data.redis.cluster.nodes:redis-node-1:7001,redis-node-2:7002,redis-node-3:7003}")
     private val clusterNodes: List<String>,
-    customizers: ObjectProvider<RedissonAutoConfigurationCustomizer>
+    private val customizers: ObjectProvider<RedissonAutoConfigurationCustomizer>
 ) {
 
-    fun clientConfig(): Config = Config()
-
-    @Bean(destroyMethod = "shutdown")
-    fun redissonClient(): RedissonClient {
+    fun clientConfig(): Config {
         val config = Config()
         val clusterConfig = config.useClusterServers()
         clusterConfig.scanInterval = 1000
         clusterNodes.forEach { node ->
             clusterConfig.addNodeAddress("redis://$node")
         }
-        return Redisson.create(config)
+        customizers.orderedStream().forEach { it.customize(config) }
+        return config
     }
+
+    @Bean(destroyMethod = "shutdown")
+    fun redissonClient(): RedissonClient = Redisson.create(clientConfig())
 }
