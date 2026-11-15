@@ -121,14 +121,17 @@ class OrderCommandServiceImpl(
             )
 
             val orderItems = cartItems.map { cartItem ->
+                val product = productMap.getValue(cartItem.productId)
                 OrderItem.create(
                     orderId = order.id!!,
-                    sellerId = productMap[cartItem.productId]!!.sellerId,
+                    sellerId = product.sellerId,
                     productId = cartItem.productId,
                     productName = cartItem.productName,
                     productPrice = cartItem.productPrice,
                     quantity = cartItem.quantity,
-                    reservationId = reservationMap[cartItem.productId]
+                    reservationId = reservationMap[cartItem.productId],
+                    withdrawalRestricted = product.withdrawalRestricted,
+                    withdrawalRestrictionReason = product.withdrawalRestrictionReason
                 )
             }
             val savedOrderItems = orderItemRepository.saveAll(orderItems)

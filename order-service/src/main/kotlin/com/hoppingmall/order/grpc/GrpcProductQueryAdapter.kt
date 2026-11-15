@@ -35,7 +35,9 @@ class GrpcProductQueryAdapter(
             name = response.name,
             price = response.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
             sellerId = response.sellerId,
-            imageUrl = response.imageUrl.takeIf { it.isNotBlank() }
+            imageUrl = response.imageUrl.takeIf { it.isNotBlank() },
+            withdrawalRestricted = response.withdrawalRestricted,
+            withdrawalRestrictionReason = response.withdrawalRestrictionReason.takeIf { it.isNotBlank() }
         )
     }
 
@@ -50,7 +52,9 @@ class GrpcProductQueryAdapter(
                 id = it.id,
                 name = it.name,
                 price = it.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                sellerId = it.sellerId
+                sellerId = it.sellerId,
+                withdrawalRestricted = it.withdrawalRestricted,
+                withdrawalRestrictionReason = it.withdrawalRestrictionReason.takeIf { reason -> reason.isNotBlank() }
             )
         }
     }

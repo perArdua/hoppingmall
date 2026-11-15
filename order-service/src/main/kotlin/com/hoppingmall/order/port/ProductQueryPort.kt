@@ -12,5 +12,7 @@ data class ProductInfo(
     val name: String,
     val price: BigDecimal,
     val sellerId: Long,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val withdrawalRestricted: Boolean = false,
+    val withdrawalRestrictionReason: String? = null
 )
