@@ -3,8 +3,8 @@ package com.hoppingmall.product.product.service
 import com.hoppingmall.product.category.domain.Category
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
+import com.hoppingmall.product.common.file.exception.UnregisteredImageException
 import com.hoppingmall.product.common.enums.ProductStatus
-import com.hoppingmall.product.common.file.FileUploadConfig
 import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.service.InventoryCommandService
@@ -27,6 +27,8 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.math.BigDecimal
 import java.util.Optional
@@ -46,7 +48,7 @@ class ProductCommandServiceImplTest {
     private lateinit var categoryRepository: CategoryRepository
 
     @Mock
-    private lateinit var fileUploadConfig: FileUploadConfig
+    private lateinit var productImageLinker: ProductImageLinker
 
     @Mock
     private lateinit var inventoryCommandService: InventoryCommandService
@@ -72,7 +74,7 @@ class ProductCommandServiceImplTest {
 
         whenever(categoryRepository.findNullableById(1L)).thenReturn(category)
         whenever(productRepository.save(any<Product>())).thenReturn(product)
-        whenever(fileUploadConfig.defaultImagePath).thenReturn("/default.jpg")
+        whenever(productImageLinker.link(1L, null)).thenReturn(listOf("/default.jpg"))
         whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenReturn(listOf(image))
 
         val result = service.createProduct(request)
@@ -94,6 +96,7 @@ class ProductCommandServiceImplTest {
         )
 
         whenever(categoryRepository.findNullableById(1L)).thenReturn(category)
+        whenever(productImageLinker.link(1L, listOf("http://img.jpg"))).thenReturn(listOf("http://img.jpg"))
         whenever(productRepository.save(any<Product>())).thenReturn(product)
         whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenReturn(listOf(image))
 
@@ -138,6 +141,50 @@ class ProductCommandServiceImplTest {
         assertThat(result.name).isEqualTo("수정상품")
         assertThat(result.imageUrls).containsExactly("/default.jpg")
         assertThat(image.deletedAt).isNull()
+    }
+
+    @Test
+    fun 업로드하지_않은_이미지_주소로는_상품을_만들지_않는다() {
+        val category = Category.create(name = "전자기기", parentCategoryId = null, depth = 0).withId(1L)
+        val request = ProductCreateRequest(
+            sellerId = 1L, categoryId = 1L, name = "테스트상품",
+            description = "설명", price = BigDecimal("10000"), imageUrls = listOf("https://tracker.example.com/a.gif")
+        )
+
+        whenever(categoryRepository.findNullableById(1L)).thenReturn(category)
+        whenever(productImageLinker.link(1L, request.imageUrls)).thenThrow(UnregisteredImageException())
+
+        assertThatThrownBy { service.createProduct(request) }
+            .isInstanceOf(UnregisteredImageException::class.java)
+        verify(productRepository, never()).save(any<Product>())
+    }
+
+    @Test
+    fun 이미지를_바꾸면_지금_이미지를_넘겨_새_주소만_확인하고_옛_이미지를_지운다() {
+        val category = Category.create(name = "전자기기", parentCategoryId = null, depth = 0).withId(1L)
+        val product = Product.create(
+            sellerId = 7L, categoryId = 1L, name = "테스트상품",
+            description = "설명", price = BigDecimal("10000"), status = ProductStatus.AVAILABLE
+        ).withId(1L)
+        val oldImage = ProductImage.create(productId = 1L, imageUrl = "http://cdn/old.jpg", sortOrder = 0).withId(1L)
+        val newImage = ProductImage.create(productId = 1L, imageUrl = "http://cdn/new.jpg", sortOrder = 0).withId(2L)
+        val request = ProductUpdateRequest(
+            categoryId = 1L, name = "수정상품",
+            description = "수정설명", price = BigDecimal("20000"), imageUrls = listOf("http://cdn/new.jpg")
+        )
+
+        whenever(categoryRepository.findNullableById(1L)).thenReturn(category)
+        whenever(productRepository.findById(1L)).thenReturn(Optional.of(product))
+        whenever(productRepository.save(any<Product>())).thenReturn(product)
+        whenever(productImageRepository.findByProductIdOrderBySortOrder(1L)).thenReturn(listOf(oldImage))
+        whenever(productImageLinker.link(7L, listOf("http://cdn/new.jpg"), listOf("http://cdn/old.jpg")))
+            .thenReturn(listOf("http://cdn/new.jpg"))
+        whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenReturn(listOf(newImage))
+
+        val result = service.updateProduct(1L, request)
+
+        assertThat(result.imageUrls).containsExactly("http://cdn/new.jpg")
+        assertThat(oldImage.deletedAt).isNotNull()
     }
 
     @Test

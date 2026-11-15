@@ -17,6 +17,7 @@ import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.statistics.port.OrderItemInfo
 import com.hoppingmall.product.statistics.port.OrderItemQueryPort
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -175,7 +176,7 @@ class StatisticsCompensationBeforeSalesDLQMySqlIntegrationTest : MySqlIntegratio
                 name = "통계 판매 전 보상 DLQ 상품",
                 description = "통계 판매 전 보상 DLQ 설명",
                 price = BigDecimal("1000"),
-                imageUrls = listOf("a.jpg"),
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, listOf("a.jpg")),
                 status = ProductStatus.AVAILABLE
             )
         ).id
