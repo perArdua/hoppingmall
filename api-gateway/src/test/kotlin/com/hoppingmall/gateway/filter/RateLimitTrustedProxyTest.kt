@@ -122,6 +122,6 @@ class RateLimitTrustedProxyTest {
         val status = post("/api/v1/auth/refresh", "198.51.100.1, 203.0.113.7")
 
         assertThat(status).isEqualTo(200)
-        assertThat(limitKeys()).containsExactly("rl:refresh:203.0.113.7")
+        assertThat(limitKeys()).containsExactly("rl:refresh:ip:203.0.113.7")
     }
 }
