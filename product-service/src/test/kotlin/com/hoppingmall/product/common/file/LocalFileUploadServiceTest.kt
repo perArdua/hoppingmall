@@ -14,6 +14,7 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.whenever
 import org.springframework.web.multipart.MultipartFile
+import java.io.ByteArrayInputStream
 
 @DisplayName("LocalFileUploadService")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -119,6 +120,7 @@ class LocalFileUploadServiceTest {
         whenever(fileUploadConfig.allowedDomains).thenReturn(setOf("product"))
         whenever(fileUploadConfig.baseUploadDir).thenReturn(System.getProperty("java.io.tmpdir"))
         whenever(fileUploadConfig.subDirectory).thenReturn("images")
+        whenever(file.inputStream).thenReturn(ByteArrayInputStream(JPEG_HEADER))
         val request = FileUploadRequest(file = file, domain = "product")
         val response = service.uploadFile(request)
         assertThat(response.domain).isEqualTo("product")
@@ -136,6 +138,7 @@ class LocalFileUploadServiceTest {
         whenever(fileUploadConfig.allowedDomains).thenReturn(setOf("product"))
         whenever(fileUploadConfig.baseUploadDir).thenReturn(System.getProperty("java.io.tmpdir"))
         whenever(fileUploadConfig.subDirectory).thenReturn("images")
+        whenever(file.inputStream).thenReturn(ByteArrayInputStream(WEBP_HEADER))
         val request = FileUploadRequest(file = file, domain = "product")
         val response = service.uploadFile(request)
         assertThat(response.domain).isEqualTo("product")
@@ -152,6 +155,7 @@ class LocalFileUploadServiceTest {
         whenever(fileUploadConfig.allowedDomains).thenReturn(setOf("product"))
         whenever(fileUploadConfig.baseUploadDir).thenReturn(System.getProperty("java.io.tmpdir"))
         whenever(fileUploadConfig.subDirectory).thenReturn("images")
+        whenever(file.inputStream).thenReturn(ByteArrayInputStream(PNG_HEADER))
         val request = FileUploadRequest(file = file, domain = "product")
         val response = service.uploadFile(request)
         assertThat(response.fileUrl).contains("product")
@@ -159,5 +163,11 @@ class LocalFileUploadServiceTest {
         assertThat(response.fileName).endsWith(".png")
         assertThat(response.fileSize).isEqualTo(2048L)
         assertThat(response.domain).isEqualTo("product")
+    }
+
+    companion object {
+        private val JPEG_HEADER = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte())
+        private val PNG_HEADER = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+        private val WEBP_HEADER = "RIFF".toByteArray() + byteArrayOf(0, 0, 0, 0) + "WEBP".toByteArray()
     }
 }
