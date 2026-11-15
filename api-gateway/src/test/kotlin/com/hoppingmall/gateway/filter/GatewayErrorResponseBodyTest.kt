@@ -127,7 +127,7 @@ class GatewayErrorResponseBodyTest {
         assertThat(exchange.response.statusCode).isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
         assertThat(exchange.response.headers.contentType).isEqualTo(MediaType.APPLICATION_JSON)
         assertThat(exchange.body()).isEqualTo(
-            mapOf("code" to "G001", "message" to "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "data" to null)
+            mapOf("code" to "REQ005", "message" to "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "data" to null)
         )
     }
 
