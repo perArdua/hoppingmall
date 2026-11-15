@@ -13,6 +13,7 @@ import com.hoppingmall.payment.refund.dto.event.RefundCompletedEvent
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Service
 class RefundLocalOperationService(
@@ -34,6 +35,9 @@ class RefundLocalOperationService(
 
     @Transactional
     fun execute(event: RefundCompletedEvent, eventLog: RefundEventLog) {
+        if (event.pointRefundAmount > BigDecimal.ZERO) {
+            paymentRepository.findByIdForUpdate(event.paymentId)
+        }
         val refundedPayment by lazy { paymentRepository.findByIdOrNull(event.paymentId) }
 
         if (event.isFullRefund) {
@@ -64,7 +68,8 @@ class RefundLocalOperationService(
                 userId = event.buyerId,
                 amount = event.pointRefundAmount,
                 paymentId = event.paymentId,
-                orderId = event.orderId
+                orderId = event.orderId,
+                refundId = event.refundId
             )
             refundPointsService.reclaimForRefund(
                 userId = event.buyerId,
