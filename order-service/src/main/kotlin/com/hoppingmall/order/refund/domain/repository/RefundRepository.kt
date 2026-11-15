@@ -12,6 +12,7 @@ import java.time.LocalDateTime
 interface RefundRepository : JpaRepository<Refund, Long> {
     fun findByOrderIdAndStatusNot(orderId: Long, status: RefundStatus): List<Refund>
     fun existsByOrderIdAndStatusInAndDeletedAtIsNull(orderId: Long, statuses: Collection<RefundStatus>): Boolean
+    fun existsByOrderIdAndStatusAndIsFullRefundTrueAndDeletedAtIsNull(orderId: Long, status: RefundStatus): Boolean
     fun findByBuyerId(buyerId: Long, pageable: Pageable): Slice<Refund>
     fun findBySellerId(sellerId: Long, pageable: Pageable): Slice<Refund>
     fun findBySellerIdAndStatusAndCompletedAtBetween(
