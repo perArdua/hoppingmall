@@ -110,4 +110,23 @@ class WishlistCommandServiceImplTest {
         assertThatThrownBy { service.removeWishlist(999L, 1L) }
             .isInstanceOf(WishlistNotFoundException::class.java)
     }
+
+    @Test
+    fun 상품_id로_내_위시리스트를_제거한다() {
+        val wishlist = Wishlist.create(buyerId = 1L, productId = 10L).withId(1L)
+
+        whenever(wishlistRepository.findByBuyerIdAndProductId(1L, 10L)).thenReturn(wishlist)
+
+        service.removeWishlistByProductId(1L, 10L)
+
+        assertThat(wishlist.deletedAt).isNotNull()
+    }
+
+    @Test
+    fun 상품_id로_제거할_내_위시리스트가_없으면_예외를_발생시킨다() {
+        whenever(wishlistRepository.findByBuyerIdAndProductId(1L, 10L)).thenReturn(null)
+
+        assertThatThrownBy { service.removeWishlistByProductId(1L, 10L) }
+            .isInstanceOf(WishlistNotFoundException::class.java)
+    }
 }

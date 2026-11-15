@@ -68,7 +68,7 @@ class WishlistCheckDeletedProductTest {
             header("x-user-role", "BUYER")
         }.andExpect {
             status { isOk() }
-            jsonPath("$.data") { value(false) }
+            jsonPath("$.data.wishlisted") { value(false) }
         }
     }
 
@@ -90,7 +90,7 @@ class WishlistCheckDeletedProductTest {
             header("x-user-role", "BUYER")
         }.andExpect {
             status { isOk() }
-            jsonPath("$.data") { value(false) }
+            jsonPath("$.data.wishlisted") { value(false) }
         }
     }
 
@@ -104,7 +104,7 @@ class WishlistCheckDeletedProductTest {
             header("x-user-role", "BUYER")
         }.andExpect {
             status { isOk() }
-            jsonPath("$.data") { value(true) }
+            jsonPath("$.data.wishlisted") { value(true) }
         }
     }
 

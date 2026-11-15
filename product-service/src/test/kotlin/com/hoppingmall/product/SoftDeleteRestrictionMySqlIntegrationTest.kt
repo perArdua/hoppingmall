@@ -238,7 +238,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
         wishlistCommandService.removeWishlist(BUYER_ID, wishlistId)
 
         assertThat(wishlistQueryService.getWishlists(BUYER_ID, page).content).isEmpty()
-        assertThat(wishlistQueryService.isWishlisted(BUYER_ID, productId)).isFalse()
+        assertThat(wishlistQueryService.checkWishlist(BUYER_ID, productId).wishlisted).isFalse()
     }
 
     @Test
@@ -251,7 +251,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
         assertThat(again.id).isNotEqualTo(firstId)
         assertThat(wishlistQueryService.getWishlists(BUYER_ID, page).content.map { it.id }).containsExactly(again.id)
-        assertThat(wishlistQueryService.isWishlisted(BUYER_ID, productId)).isTrue()
+        assertThat(wishlistQueryService.checkWishlist(BUYER_ID, productId).wishlisted).isTrue()
     }
 
     @Test
