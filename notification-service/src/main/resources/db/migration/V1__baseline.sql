@@ -27,7 +27,7 @@ CREATE TABLE `dlq_messages` (
   KEY `idx_dlq_topic_content_hash` (`original_topic`,`content_hash`),
   KEY `idx_dlq_status_archived_at` (`status`,`archived_at`),
   KEY `idx_dlq_status_processed_at` (`status`,`processed_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `notifications` (
   `is_read` bit(1) DEFAULT NULL,
@@ -45,4 +45,4 @@ CREATE TABLE `notifications` (
   UNIQUE KEY `UKac78n2m06mq3l84owt8kudisn` (`event_id`),
   KEY `idx_notifications_user_id` (`user_id`),
   KEY `idx_notifications_user_id_is_read` (`user_id`,`is_read`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
