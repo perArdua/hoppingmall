@@ -15,7 +15,8 @@ import org.springframework.security.web.SecurityFilterChain
 @EnableWebSecurity
 class SecurityConfig(
     gatewayHeaderAuthenticationFilter: GatewayHeaderAuthenticationFilter,
-    internalTokenFilter: InternalTokenFilter
+    internalTokenFilter: InternalTokenFilter,
+    private val unauthorizedEntryPoint: UnauthorizedEntryPoint
 ) : BaseSecurityConfig(gatewayHeaderAuthenticationFilter, internalTokenFilter) {
 
     override fun configureServiceEndpoints(
@@ -35,10 +36,34 @@ class SecurityConfig(
             .requestMatchers(HttpMethod.POST, "/api/v1/categories").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PUT, "/api/v1/categories/{categoryId}").hasRole("ADMIN")
             .requestMatchers(HttpMethod.DELETE, "/api/v1/categories/{categoryId}").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET, *IDENTITY_REQUIRED_READ_PATHS).authenticated()
+            .requestMatchers(HttpMethod.GET, *VISITOR_READ_PATHS).permitAll()
     }
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
-        return configureBase(http).build()
+        return configureBase(http)
+            .exceptionHandling { it.authenticationEntryPoint(unauthorizedEntryPoint) }
+            .build()
+    }
+
+    companion object {
+        val IDENTITY_REQUIRED_READ_PATHS = arrayOf(
+            "/api/v1/reviews/my",
+            "/api/v1/products/bulk/**"
+        )
+
+        val VISITOR_READ_PATHS = arrayOf(
+            "/api/v1/products",
+            "/api/v1/products/search",
+            "/api/v1/products/{productId}",
+            "/api/v1/products/seller/{sellerId}",
+            "/api/v1/products/category/{categoryId}",
+            "/api/v1/products/{productId}/reviews",
+            "/api/v1/reviews/{reviewId}",
+            "/api/v1/categories/root",
+            "/api/v1/categories/{categoryId}",
+            "/api/v1/categories/{categoryId}/sub"
+        )
     }
 }

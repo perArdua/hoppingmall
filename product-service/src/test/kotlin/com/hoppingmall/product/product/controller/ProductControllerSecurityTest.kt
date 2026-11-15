@@ -88,11 +88,11 @@ class ProductControllerSecurityTest {
         }
 
         @Test
-        fun 인증되지_않은_상품_생성_요청_시_403_응답() {
+        fun 인증되지_않은_상품_생성_요청_시_401_응답() {
             mockMvc.post("/api/v1/products") {
                 contentType = MediaType.APPLICATION_JSON
                 content = productJson
-            }.andExpect { status { isForbidden() } }
+            }.andExpect { status { isUnauthorized() } }
         }
     }
 
