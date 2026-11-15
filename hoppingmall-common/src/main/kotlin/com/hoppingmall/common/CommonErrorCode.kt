@@ -17,5 +17,6 @@ enum class CommonErrorCode(
     RESOURCE_NOT_FOUND("REQ001", "요청한 경로를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     METHOD_NOT_ALLOWED("REQ002", "지원하지 않는 요청 메서드입니다.", HttpStatus.METHOD_NOT_ALLOWED),
     UNSUPPORTED_MEDIA_TYPE("REQ003", "지원하지 않는 Content-Type입니다.", HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-    PAYLOAD_TOO_LARGE("REQ004", "업로드 크기 한도를 넘었습니다.", HttpStatus.PAYLOAD_TOO_LARGE)
+    PAYLOAD_TOO_LARGE("REQ004", "업로드 크기 한도를 넘었습니다.", HttpStatus.PAYLOAD_TOO_LARGE),
+    TOO_MANY_REQUESTS("REQ005", "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", HttpStatus.TOO_MANY_REQUESTS)
 }

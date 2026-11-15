@@ -4,5 +4,7 @@ import org.springframework.web.multipart.MultipartFile
 
 data class FileUploadRequest(
     val file: MultipartFile,
-    val domain: String
+    val domain: String,
+    val uploaderId: Long,
+    val uploaderRole: String
 )

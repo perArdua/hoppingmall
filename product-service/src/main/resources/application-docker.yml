@@ -53,6 +53,10 @@ services:
   order-service:
     url: http://order-service:8084
 
+file:
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://minio:9000}
+
 springdoc:
   api-docs:
     enabled: ${API_DOCS_ENABLED:false}

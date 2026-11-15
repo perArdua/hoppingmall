@@ -64,6 +64,9 @@ dependencies {
 
 	implementation("org.apache.commons:commons-csv:1.12.0")
 
+	implementation("software.amazon.awssdk:s3:2.31.9")
+	implementation("software.amazon.awssdk:apache-client:2.31.9")
+
 	implementation("io.micrometer:micrometer-registry-prometheus")
 	implementation("io.micrometer:micrometer-tracing-bridge-otel")
 	implementation("io.opentelemetry:opentelemetry-exporter-otlp")
@@ -93,6 +96,21 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+tasks.test {
+	useJUnitPlatform {
+		excludeTags("startup")
+	}
+}
+
+tasks.register<Test>("startupCheck") {
+	group = "verification"
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	useJUnitPlatform {
+		includeTags("startup")
+	}
 }
 
 val jacocoExcludedDirs = listOf(

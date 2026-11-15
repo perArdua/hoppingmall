@@ -30,6 +30,7 @@ import com.hoppingmall.product.support.MySqlIntegrationTestSupport
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
 import com.hoppingmall.product.wishlist.service.WishlistQueryService
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.AfterEach
@@ -150,8 +151,8 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
         productCommandService.updateProduct(productId, updateRequest(categoryId, listOf("new-1.jpg")))
 
-        assertThat(productQueryService.getProductById(productId)!!.imageUrls).containsExactly("new-1.jpg")
-        assertThat(productQueryService.getProducts(page).content.single().imageUrls).containsExactly("new-1.jpg")
+        assertThat(productQueryService.getProductById(productId)!!.imageUrls).containsExactly(UploadedImageSupport.url("new-1.jpg"))
+        assertThat(productQueryService.getProducts(page).content.single().imageUrls).containsExactly(UploadedImageSupport.url("new-1.jpg"))
     }
 
     @Test
@@ -302,7 +303,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
                 name = "소프트삭제 상품",
                 description = "소프트삭제 설명",
                 price = BigDecimal("10000"),
-                imageUrls = imageUrls,
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, imageUrls),
                 status = ProductStatus.AVAILABLE
             )
         ).id
@@ -313,7 +314,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
             name = "소프트삭제 상품 수정",
             description = "소프트삭제 설명 수정",
             price = BigDecimal("12000"),
-            imageUrls = imageUrls
+            imageUrls = UploadedImageSupport.register(jdbcTemplate, imageUrls)
         )
 
     companion object {

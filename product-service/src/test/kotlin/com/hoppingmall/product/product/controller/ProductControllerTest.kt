@@ -173,9 +173,9 @@ class ProductControllerTest {
         val file = MockMultipartFile("image", "test.jpg", "image/jpeg", "test".toByteArray())
         val imageResponse = ProductImageResponse("http://img.jpg", "test.jpg", 4L)
 
-        whenever(productImageService.uploadProductImage(any())).thenReturn(imageResponse)
+        whenever(productImageService.uploadProductImage(any(), eq(1L), eq("SELLER"))).thenReturn(imageResponse)
 
-        val result = controller.uploadProductImage(file)
+        val result = controller.uploadProductImage(file, seller)
 
         assertThat(result.data!!.imageUrl).isEqualTo("http://img.jpg")
     }

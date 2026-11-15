@@ -8,6 +8,7 @@ import com.hoppingmall.dlq.domain.DLQStatus
 import com.hoppingmall.dlq.domain.DLQMessageContentHash
 import com.hoppingmall.dlq.domain.DeadLetterMessage
 import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.dto.DLQRetryResultResponse
 import com.hoppingmall.dlq.metrics.DLQMetrics
 import com.hoppingmall.dlq.publisher.DLQMessagePublisher
 import com.hoppingmall.dlq.publisher.NoOpDLQMessagePublisher
@@ -261,7 +262,7 @@ class DLQCommandService(
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    fun retryDLQMessagesByTopic(topic: String, maxCount: Int = 50): Map<String, Any> {
+    fun retryDLQMessagesByTopic(topic: String, maxCount: Int = 50): DLQRetryResultResponse {
         val limit = maxCount.coerceAtMost(bulkRetryProperties.bulkRetryMaxCount)
         val pendingMessages = if (limit > 0) {
             dlqMessageRepository.findByOriginalTopicAndStatusOrderByCreatedAtDesc(
@@ -284,12 +285,12 @@ class DLQCommandService(
             }
         }
 
-        return mapOf(
-            "topic" to topic,
-            "totalAttempted" to pendingMessages.size,
-            "successCount" to successCount,
-            "failureCount" to failureCount,
-            "errors" to errors.take(10)
+        return DLQRetryResultResponse(
+            topic = topic,
+            totalAttempted = pendingMessages.size,
+            successCount = successCount,
+            failureCount = failureCount,
+            errors = errors.take(10)
         )
     }
 

@@ -6,6 +6,7 @@ import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.dto.response.OrderResponse
+import com.hoppingmall.order.order.dto.response.SellerOrderResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.service.OrderCommandService
@@ -32,6 +33,7 @@ class OrderController(
 
     @Idempotent(ttlHours = 24)
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: OrderCreateRequest
@@ -57,6 +59,25 @@ class OrderController(
     ): ResponseEntity<ApiResponse<Slice<OrderResponse>>> {
         val orders = orderQueryService.getMyOrders(userPrincipal.getUserId(), pageable)
         return ResponseEntity.ok(ApiResponse.success(orders))
+    }
+
+    @GetMapping("/seller")
+    fun getSellerOrders(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @RequestParam(required = false) status: OrderStatus?,
+        @PageableDefault(size = 20) pageable: Pageable
+    ): ResponseEntity<ApiResponse<Slice<SellerOrderResponse>>> {
+        val orders = orderQueryService.getSellerOrders(userPrincipal.getUserId(), status, pageable)
+        return ResponseEntity.ok(ApiResponse.success(orders))
+    }
+
+    @GetMapping("/seller/{orderId}")
+    fun getSellerOrder(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PathVariable orderId: Long
+    ): ResponseEntity<ApiResponse<SellerOrderResponse>> {
+        val order = orderQueryService.getSellerOrder(orderId, userPrincipal.getUserId())
+        return ResponseEntity.ok(ApiResponse.success(order))
     }
 
     @Idempotent(ttlHours = 24)

@@ -113,8 +113,15 @@ class ProductController(
     }
 
     @PostMapping("/images/upload")
-    fun uploadProductImage(@RequestParam("image") imageFile: MultipartFile): ApiResponse<ProductImageResponse> {
-        val productImageResponse = productImageService.uploadProductImage(imageFile)
+    fun uploadProductImage(
+        @RequestParam("image") imageFile: MultipartFile,
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
+    ): ApiResponse<ProductImageResponse> {
+        val productImageResponse = productImageService.uploadProductImage(
+            imageFile,
+            userPrincipal.getUserId(),
+            userPrincipal.getRole()
+        )
         return ApiResponse.success(productImageResponse)
     }
 

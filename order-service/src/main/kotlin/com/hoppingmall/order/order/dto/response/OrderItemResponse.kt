@@ -10,7 +10,9 @@ data class OrderItemResponse(
     val productName: String,
     val productPrice: BigDecimal,
     val quantity: Int,
-    val totalPrice: BigDecimal
+    val totalPrice: BigDecimal,
+    val withdrawalRestricted: Boolean = false,
+    val withdrawalRestrictionReason: String? = null
 ) {
     companion object {
         fun from(orderItem: OrderItem): OrderItemResponse {
@@ -21,7 +23,9 @@ data class OrderItemResponse(
                 productName = orderItem.productName,
                 productPrice = orderItem.productPrice,
                 quantity = orderItem.quantity,
-                totalPrice = orderItem.totalPrice
+                totalPrice = orderItem.totalPrice,
+                withdrawalRestricted = orderItem.withdrawalRestricted,
+                withdrawalRestrictionReason = orderItem.withdrawalRestrictionReason
             )
         }
     }
