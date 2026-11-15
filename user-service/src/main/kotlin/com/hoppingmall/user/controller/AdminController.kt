@@ -1,8 +1,11 @@
 package com.hoppingmall.user.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.user.domain.Seller
 import com.hoppingmall.user.dto.request.SellerApprovalRequest
+import com.hoppingmall.user.dto.response.SellerApplicationPageResponse
 import com.hoppingmall.user.service.AdminCommandService
+import com.hoppingmall.user.service.SellerQueryService
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.*
@@ -11,8 +14,17 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/v1/admin")
 @Tag(name = "관리자")
 class AdminController(
-    private val adminCommandService: AdminCommandService
+    private val adminCommandService: AdminCommandService,
+    private val sellerQueryService: SellerQueryService
 ) {
+
+    @GetMapping("/sellers")
+    fun getSellerApplications(
+        @RequestParam(required = false) status: Seller.ApprovalStatus?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): ApiResponse<SellerApplicationPageResponse> =
+        ApiResponse.success(sellerQueryService.getApplications(status, page, size))
 
     @PatchMapping("/sellers/{id}/approve")
     fun updateSellerApprovalStatus(

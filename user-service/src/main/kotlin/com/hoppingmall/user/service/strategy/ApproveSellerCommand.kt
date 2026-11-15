@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class ApproveSellerCommand : SellerApprovalCommand {
-    override fun execute(seller: Seller) {
+    override fun execute(seller: Seller, rejectionReason: String?) {
         seller.approve()
     }
 }

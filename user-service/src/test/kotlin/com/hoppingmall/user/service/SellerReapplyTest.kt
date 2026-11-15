@@ -101,7 +101,7 @@ class SellerReapplyTest {
     }
 
     private fun rejectedSellerOf(userId: Long, businessNumber: String): Seller =
-        Seller.fixture(userId = userId, businessNumber = businessNumber).also { it.reject() }
+        Seller.fixture(userId = userId, businessNumber = businessNumber).withId(userId).also { it.reject() }
 
     private fun givenUserAndApplication(seller: Seller) {
         whenever(userRepository.findNullableById(USER_ID)).thenReturn(User.fixture().withId(USER_ID))

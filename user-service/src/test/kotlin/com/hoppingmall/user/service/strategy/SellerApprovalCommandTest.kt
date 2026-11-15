@@ -26,7 +26,7 @@ class SellerApprovalCommandTest {
     fun APPROVED_전략은_판매자_상태를_승인으로_변경한다() {
         val seller = Seller.fixture()
 
-        mapper.getCommand(Seller.ApprovalStatus.APPROVED).execute(seller)
+        mapper.getCommand(Seller.ApprovalStatus.APPROVED).execute(seller, null)
 
         assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.APPROVED)
     }
@@ -35,7 +35,7 @@ class SellerApprovalCommandTest {
     fun REJECTED_전략은_판매자_상태를_거절로_변경한다() {
         val seller = Seller.fixture()
 
-        mapper.getCommand(Seller.ApprovalStatus.REJECTED).execute(seller)
+        mapper.getCommand(Seller.ApprovalStatus.REJECTED).execute(seller, null)
 
         assertThat(seller.getApprovalStatus()).isEqualTo(Seller.ApprovalStatus.REJECTED)
     }
