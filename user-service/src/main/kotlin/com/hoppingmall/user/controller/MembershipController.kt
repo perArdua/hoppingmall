@@ -20,6 +20,7 @@ class MembershipController(
 ) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createMembership(
         @AuthenticationPrincipal userPrincipal: UserPrincipal
     ): ResponseEntity<ApiResponse<MembershipResponse>> {

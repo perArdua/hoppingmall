@@ -29,6 +29,7 @@ class CouponController(
 ) {
 
     @PostMapping("/admin/coupons")
+    @ResponseStatus(HttpStatus.CREATED)
     fun createCoupon(
         @Valid @RequestBody request: CouponCreateRequest
     ): ResponseEntity<ApiResponse<CouponResponse>> {
@@ -63,6 +64,7 @@ class CouponController(
     }
 
     @PostMapping("/coupons/{couponId}/issue")
+    @ResponseStatus(HttpStatus.CREATED)
     @Idempotent(ttlHours = 24)
     fun issueCoupon(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
