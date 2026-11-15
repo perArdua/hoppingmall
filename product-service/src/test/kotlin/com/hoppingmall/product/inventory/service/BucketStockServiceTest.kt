@@ -251,7 +251,7 @@ class BucketStockServiceTest {
         fun 재고를_버킷에_다시_나눈다() {
             whenever(locker.lockAll(productId, bucketCount)).thenReturn(locked(0, 0, 0, 0))
 
-            service.redistribute(productId, 9)
+            assertThat(service.replaceTotal(productId, 0, 9)).isTrue()
 
             verify(locker).setStock(productId, 0, 3)
             verify(locker).setStock(productId, 1, 2)
@@ -263,8 +263,17 @@ class BucketStockServiceTest {
         fun 재분배할_버킷이_없으면_예외를_던진다() {
             whenever(locker.lockAll(productId, bucketCount)).thenReturn(emptyList())
 
-            assertThatThrownBy { service.redistribute(productId, 1) }
+            assertThatThrownBy { service.replaceTotal(productId, 0, 1) }
                 .isInstanceOf(InventoryNotFoundException::class.java)
+        }
+
+        @Test
+        fun 잠근_버킷_합이_읽은_값과_다르면_다시_나누지_않는다() {
+            whenever(locker.lockAll(productId, bucketCount)).thenReturn(locked(1, 0, 0, 0))
+
+            assertThat(service.replaceTotal(productId, 0, 9)).isFalse()
+
+            verify(locker, never()).setStock(any(), any(), any())
         }
 
         @Test

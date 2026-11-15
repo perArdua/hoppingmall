@@ -89,7 +89,7 @@ class InventoryControllerSecurityTest {
     @DisplayName("PATCH /api/v1/inventories/{productId}")
     inner class UpdateStock {
 
-        private val updateJson = """{"stock_quantity":50}"""
+        private val updateJson = """{"stock_quantity":50,"expected_stock_quantity":40}"""
 
         @Test
         fun SELLER_역할로_재고_수정_성공() {

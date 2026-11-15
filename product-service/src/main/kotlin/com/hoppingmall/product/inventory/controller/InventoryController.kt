@@ -58,11 +58,15 @@ class InventoryController(
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
+    @Idempotent(ttlHours = 24)
+    @PostMapping("/{productId}/adjustments")
     fun adjustStock(
-        productId: Long,
-        request: InventoryAdjustRequest,
-        userPrincipal: UserPrincipal
+        @PathVariable productId: Long,
+        @Valid @RequestBody request: InventoryAdjustRequest,
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
     ): ResponseEntity<ApiResponse<InventoryResponse>> {
-        return ResponseEntity.ok(ApiResponse.success(inventoryCommandService.adjustStock(productId, request)))
+        productOwnershipPolicy.checkOwner(productId, userPrincipal)
+        val response = inventoryCommandService.adjustStock(productId, request)
+        return ResponseEntity.ok(ApiResponse.success(response))
     }
 }

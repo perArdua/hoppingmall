@@ -8,5 +8,7 @@ data class InventoryUpdateRequest(
     @field:Min(value = 0, message = "재고 수량은 0 이상이어야 합니다")
     val stockQuantity: Int?,
 
+    @field:NotNull(message = "읽은 재고 수량은 필수입니다")
+    @field:Min(value = 0, message = "읽은 재고 수량은 0 이상이어야 합니다")
     val expectedStockQuantity: Int? = null
 )
