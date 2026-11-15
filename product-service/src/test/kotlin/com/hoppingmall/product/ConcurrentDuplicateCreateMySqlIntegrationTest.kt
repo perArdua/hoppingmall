@@ -16,6 +16,7 @@ import com.hoppingmall.product.review.service.ReviewCommandServiceImpl
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -132,7 +133,7 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
                 name = "동시찜 상품",
                 description = "동시찜 설명",
                 price = BigDecimal("10000"),
-                imageUrls = listOf("a.jpg"),
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, listOf("a.jpg")),
                 status = ProductStatus.AVAILABLE
             )
         ).id

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController
 class ViolationController(private val violationRepository: ViolationRepository) {
 
     @GetMapping
-    fun list(@RequestParam(defaultValue = "true") openOnly: Boolean): List<Violation> =
+    fun list(@RequestParam(name = "open_only", defaultValue = "true") openOnly: Boolean): List<Violation> =
         violationRepository.findAll(openOnly)
 
     @PostMapping("/{id}/resolve")

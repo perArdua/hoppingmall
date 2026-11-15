@@ -28,6 +28,7 @@ class InventoryController(
 
     @Idempotent(ttlHours = 24)
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun initStock(
         @Valid @RequestBody request: InventoryInitRequest,
         @AuthenticationPrincipal userPrincipal: UserPrincipal

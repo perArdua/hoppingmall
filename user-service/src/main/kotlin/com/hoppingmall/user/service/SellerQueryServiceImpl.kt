@@ -1,5 +1,7 @@
 package com.hoppingmall.user.service
 
+import com.hoppingmall.common.BusinessException
+import com.hoppingmall.common.CommonErrorCode
 import com.hoppingmall.user.domain.Seller
 import com.hoppingmall.user.domain.repository.SellerRepository
 import com.hoppingmall.user.domain.repository.UserRepository
@@ -24,11 +26,19 @@ class SellerQueryServiceImpl(
         return SellerApplicationResponse.from(application)
     }
 
-    override fun getApplications(status: Seller.ApprovalStatus?, page: Int, size: Int): SellerApplicationPageResponse {
+    override fun getApplications(
+        status: Seller.ApprovalStatus?,
+        page: Int,
+        size: Int,
+        keyword: String?
+    ): SellerApplicationPageResponse {
         val pageable = PageRequest.of(page.coerceAtLeast(0), size.coerceIn(1, MAX_PAGE_SIZE), Sort.by(Sort.Direction.ASC, "id"))
-        val applications = status
-            ?.let { sellerRepository.findAllByApprovalStatus(it, pageable) }
-            ?: sellerRepository.findAll(pageable)
+        val pattern = applicantPattern(keyword)
+        val applications = when {
+            pattern != null -> sellerRepository.searchByApplicant(status, pattern, pageable)
+            status != null -> sellerRepository.findAllByApprovalStatus(status, pageable)
+            else -> sellerRepository.findAll(pageable)
+        }
         val applicants = userRepository.findAllById(applications.content.map { it.userId }.toSet())
             .associateBy { it.id }
 
@@ -41,7 +51,18 @@ class SellerQueryServiceImpl(
         )
     }
 
+    private fun applicantPattern(keyword: String?): String? {
+        val trimmed = keyword?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (trimmed.length > MAX_KEYWORD_LENGTH) throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        val escaped = trimmed.lowercase()
+            .replace(SellerRepository.LIKE_ESCAPE, SellerRepository.LIKE_ESCAPE + SellerRepository.LIKE_ESCAPE)
+            .replace("%", SellerRepository.LIKE_ESCAPE + "%")
+            .replace("_", SellerRepository.LIKE_ESCAPE + "_")
+        return "%$escaped%"
+    }
+
     companion object {
         const val MAX_PAGE_SIZE = 100
+        const val MAX_KEYWORD_LENGTH = 100
     }
 }

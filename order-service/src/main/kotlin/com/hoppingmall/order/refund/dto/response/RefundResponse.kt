@@ -25,7 +25,8 @@ data class RefundResponse(
     val updatedAt: LocalDateTime,
     val items: List<RefundItemResponse>,
     val productAmount: BigDecimal = refundAmount,
-    val returnShippingFee: BigDecimal = BigDecimal.ZERO
+    val returnShippingFee: BigDecimal = BigDecimal.ZERO,
+    val pointRefundAmount: BigDecimal = BigDecimal.ZERO
 ) {
     companion object {
         fun from(refund: Refund, items: List<RefundItem>): RefundResponse {
@@ -47,7 +48,8 @@ data class RefundResponse(
                 updatedAt = refund.updatedAt ?: refund.createdAt,
                 items = items.map { RefundItemResponse.from(it) },
                 productAmount = refund.productAmount(),
-                returnShippingFee = refund.returnShippingFee
+                returnShippingFee = refund.returnShippingFee,
+                pointRefundAmount = refund.pointRefundAmount
             )
         }
     }

@@ -77,6 +77,21 @@ tasks.withType<Test> {
 	useJUnitPlatform()
 }
 
+tasks.test {
+	useJUnitPlatform {
+		excludeTags("startup")
+	}
+}
+
+tasks.register<Test>("startupCheck") {
+	group = "verification"
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	useJUnitPlatform {
+		includeTags("startup")
+	}
+}
+
 val jacocoExcludedDirs = listOf(
 	"**/config/**",
 	"**/dto/**",

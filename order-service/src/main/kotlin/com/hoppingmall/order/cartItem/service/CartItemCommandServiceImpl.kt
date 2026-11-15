@@ -10,7 +10,9 @@ import com.hoppingmall.order.cartItem.exception.CartItemAccessDeniedException
 import com.hoppingmall.order.cartItem.exception.CartItemConcurrentAddException
 import com.hoppingmall.order.cartItem.exception.CartItemInvalidQuantityException
 import com.hoppingmall.order.cartItem.exception.CartItemNotFoundException
+import com.hoppingmall.order.cartItem.exception.CartItemOutOfStockException
 import com.hoppingmall.order.cartItem.exception.CartItemProductNotFoundException
+import com.hoppingmall.order.cartItem.exception.CartItemProductNotOnSaleException
 import com.hoppingmall.order.cartItem.exception.CartItemProductUnavailableException
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
@@ -29,16 +31,19 @@ class CartItemCommandServiceImpl(
 
     override fun addCartItem(buyerId: Long, request: CartItemCreateRequest): CartItemResponse {
         val product = findProduct(request.productId) ?: throw CartItemProductNotFoundException()
+        if (!product.isOnSale()) {
+            throw CartItemProductNotOnSaleException()
+        }
 
         val existingCartItem = cartItemRepository.findByBuyerIdAndProductId(buyerId, request.productId)
 
         val cartItem = if (existingCartItem != null) {
-            updateExistingCartItem(existingCartItem, request.quantity)
+            updateExistingCartItem(existingCartItem, product, request.quantity)
         } else {
             createNewCartItem(buyerId, product, product.imageUrl, request.quantity)
         }
 
-        return CartItemResponse.from(cartItem)
+        return CartItemResponse.of(cartItem, product)
     }
 
     private fun findProduct(productId: Long): ProductInfo? =
@@ -48,9 +53,18 @@ class CartItemCommandServiceImpl(
             throw CartItemProductUnavailableException()
         }
 
-    private fun updateExistingCartItem(existingCartItem: CartItem, additionalQuantity: Int): CartItem {
-        existingCartItem.updateQuantity(validQuantity(existingCartItem.quantity.toLong() + additionalQuantity))
+    private fun updateExistingCartItem(existingCartItem: CartItem, product: ProductInfo, additionalQuantity: Int): CartItem {
+        val quantity = validQuantity(existingCartItem.quantity.toLong() + additionalQuantity)
+        checkStock(product, quantity)
+        existingCartItem.updateQuantity(quantity)
+        existingCartItem.refreshProduct(product.name, product.price, product.imageUrl ?: existingCartItem.productImageUrl)
         return existingCartItem
+    }
+
+    private fun checkStock(product: ProductInfo, quantity: Int) {
+        if (!product.hasStock(quantity)) {
+            throw CartItemOutOfStockException()
+        }
     }
 
     private fun createNewCartItem(
@@ -60,6 +74,7 @@ class CartItemCommandServiceImpl(
         quantity: Int
     ): CartItem {
         validQuantity(quantity.toLong())
+        checkStock(product, quantity)
         val newCartItem = CartItem.create(
             buyerId = buyerId,
             productId = product.id,
@@ -85,9 +100,21 @@ class CartItemCommandServiceImpl(
             throw CartItemAccessDeniedException()
         }
 
-        cartItem.updateQuantity(validQuantity(request.quantity.toLong()))
+        val quantity = validQuantity(request.quantity.toLong())
+        val product = try {
+            productQueryPort.findProductById(cartItem.productId)
+        } catch (e: ProductQueryUnavailableException) {
+            cartItem.updateQuantity(quantity)
+            return CartItemResponse.from(cartItem)
+        }
+        if (product == null) {
+            cartItem.updateQuantity(quantity)
+            return CartItemResponse.deleted(cartItem)
+        }
+        checkStock(product, quantity)
+        cartItem.updateQuantity(quantity)
 
-        return CartItemResponse.from(cartItem)
+        return CartItemResponse.of(cartItem, product)
     }
 
     override fun removeCartItem(buyerId: Long, cartItemId: Long) {

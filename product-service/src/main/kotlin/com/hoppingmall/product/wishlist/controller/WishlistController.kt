@@ -28,6 +28,7 @@ class WishlistController(
 
     @Idempotent(ttlHours = 24)
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun addWishlist(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: WishlistCreateRequest

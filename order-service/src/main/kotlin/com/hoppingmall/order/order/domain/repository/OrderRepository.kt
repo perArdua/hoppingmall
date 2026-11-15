@@ -15,6 +15,28 @@ import java.time.LocalDateTime
 interface OrderRepository : JpaRepository<Order, Long> {
     fun findByBuyerId(buyerId: Long, pageable: Pageable): Slice<Order>
 
+    @Query(
+        "SELECT o FROM Order o WHERE o.status NOT IN :hiddenStatuses " +
+            "AND EXISTS (SELECT 1 FROM OrderItem i WHERE i.orderId = o.id AND i.sellerId = :sellerId) " +
+            "ORDER BY o.id DESC"
+    )
+    fun findSellerOrders(
+        @Param("sellerId") sellerId: Long,
+        @Param("hiddenStatuses") hiddenStatuses: Collection<OrderStatus>,
+        pageable: Pageable
+    ): Slice<Order>
+
+    @Query(
+        "SELECT o FROM Order o WHERE o.status = :status " +
+            "AND EXISTS (SELECT 1 FROM OrderItem i WHERE i.orderId = o.id AND i.sellerId = :sellerId) " +
+            "ORDER BY o.id DESC"
+    )
+    fun findSellerOrdersByStatus(
+        @Param("sellerId") sellerId: Long,
+        @Param("status") status: OrderStatus,
+        pageable: Pageable
+    ): Slice<Order>
+
     @Query(value = "SELECT id FROM orders WHERE id = :id FOR UPDATE", nativeQuery = true)
     fun lockById(@Param("id") id: Long): Long?
 

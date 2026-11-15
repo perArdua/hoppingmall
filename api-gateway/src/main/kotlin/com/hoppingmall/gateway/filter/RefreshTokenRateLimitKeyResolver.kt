@@ -18,8 +18,8 @@ class RefreshTokenRateLimitKeyResolver(
         .setSigningKey(Keys.hmacShaKeyFor(secret.toByteArray()))
         .build()
 
-    fun userId(body: ByteArray): String? {
-        val token = refreshToken(body) ?: return null
+    fun userId(body: ByteArray, cookieToken: String? = null): String? {
+        val token = refreshToken(body) ?: cookieToken?.takeIf { it.isNotBlank() } ?: return null
         val claims = signedClaims(token) ?: return null
         if (claims[TOKEN_TYPE_CLAIM] != REFRESH_TOKEN_TYPE) return null
         return claims.subject?.takeIf { it.isNotBlank() }

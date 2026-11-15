@@ -2,6 +2,8 @@ package com.hoppingmall.dlq.controller
 
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.dto.DLQRetryResultResponse
+import com.hoppingmall.dlq.dto.DLQStatsResponse
 import com.hoppingmall.dlq.service.DLQCommandService
 import com.hoppingmall.dlq.service.DLQQueryService
 import org.junit.jupiter.api.DisplayName
@@ -30,19 +32,21 @@ class DLQControllerTest {
 
         @Test
         fun DLQ_통계_조회_성공() {
-            val expectedStats = mapOf(
-                "totalMessages" to 100L,
-                "pendingCount" to 50L,
-                "processedCount" to 30L,
-                "failedCount" to 20L
+            val expectedStats = DLQStatsResponse(
+                totalMessages = 100L,
+                pendingCount = 50L,
+                processedCount = 30L,
+                failedCount = 20L,
+                topicStats = emptyList(),
+                lastUpdated = 0L
             )
             whenever(dlqQueryService.getDLQStats()).thenReturn(expectedStats)
 
             val response = controller.getDLQStats()
 
             assertEquals("SUCCESS", response.code)
-            assertEquals(100L, response.data!!["totalMessages"])
-            assertEquals(50L, response.data!!["pendingCount"])
+            assertEquals(100L, response.data!!.totalMessages)
+            assertEquals(50L, response.data!!.pendingCount)
             verify(dlqQueryService).getDLQStats()
         }
     }
@@ -122,11 +126,12 @@ class DLQControllerTest {
         fun 토픽별_DLQ_메시지_일괄_재처리_성공() {
             val topic = "payment"
             val maxCount = 30
-            val expectedResult = mapOf(
-                "topic" to topic,
-                "totalAttempted" to 10,
-                "successCount" to 8,
-                "failureCount" to 2
+            val expectedResult = DLQRetryResultResponse(
+                topic = topic,
+                totalAttempted = 10,
+                successCount = 8,
+                failureCount = 2,
+                errors = emptyList()
             )
             whenever(dlqCommandService.retryDLQMessagesByTopic(topic, maxCount)).thenReturn(expectedResult)
 

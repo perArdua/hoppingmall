@@ -49,4 +49,28 @@ class InternalMembershipControllerTest {
         assertEquals(HttpStatus.OK, response.statusCode)
         assertEquals(BigDecimal("0.01"), response.body)
     }
+
+    @Test
+    fun 회원_등급과_할인율을_조회한다() {
+        val userId = 2L
+        val membership = Membership(userId = userId, grade = MembershipGrade.GOLD, totalSpent = BigDecimal("500000"))
+        whenever(membershipRepository.findByUserId(userId)).thenReturn(membership)
+
+        val response = controller.getMembershipDiscount(userId)
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertEquals(MembershipGrade.GOLD, response.body?.grade)
+        assertEquals(BigDecimal("0.02"), response.body?.discountRate)
+    }
+
+    @Test
+    fun 멤버십이_없으면_BRONZE_할인율_0을_반환한다() {
+        val userId = 998L
+        whenever(membershipRepository.findByUserId(userId)).thenReturn(null)
+
+        val response = controller.getMembershipDiscount(userId)
+
+        assertEquals(MembershipGrade.BRONZE, response.body?.grade)
+        assertEquals(BigDecimal.ZERO, response.body?.discountRate)
+    }
 }

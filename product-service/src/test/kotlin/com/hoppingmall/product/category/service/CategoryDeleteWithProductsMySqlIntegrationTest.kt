@@ -7,6 +7,7 @@ import com.hoppingmall.product.common.enums.ProductStatus
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.AfterEach
@@ -88,7 +89,7 @@ class CategoryDeleteWithProductsMySqlIntegrationTest : MySqlIntegrationTestSuppo
                 name = "카테고리 삭제 상품",
                 description = "카테고리 삭제 설명",
                 price = BigDecimal("10000"),
-                imageUrls = listOf("a.jpg"),
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, listOf("a.jpg")),
                 status = ProductStatus.AVAILABLE
             )
         ).id
