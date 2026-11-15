@@ -42,7 +42,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true")
     }
 
     @Test
@@ -69,7 +69,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
         assertThat(jdbc(database).queryForList("SELECT status FROM dlq_messages", String::class.java)).containsExactly("PENDING")
     }
 
@@ -84,12 +84,31 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
         LEGACY_ENUM_COLUMNS.forEach {
             assertThat(columnType(database, it.table, it.column)).isEqualTo("varchar(32)")
             assertThat(columnNullable(database, it.table, it.column)).isEqualTo(if (it.nullable) "YES" else "NO")
         }
         assertThat(jdbc(database).queryForList("SELECT status FROM dlq_messages", String::class.java)).containsExactly("FAILED")
+    }
+
+    @Test
+    fun 활성_정책_유일_열이_없던_기존_DB는_가장_최근_활성_정책만_남기고_열과_유일_인덱스를_더한다() {
+        val database = freshDatabase("legacy_point_policy")
+        legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
+        jdbc(database).execute("ALTER TABLE point_policies DROP INDEX uk_point_policies_active_key")
+        jdbc(database).execute("ALTER TABLE point_policies DROP COLUMN active_key")
+        listOf("old", "new").forEach { insertActivePointPolicy(database, it) }
+
+        runner(database, "docker").run { context ->
+            assertThat(context).hasNotFailed()
+        }
+
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
+        assertThat(jdbc(database).queryForList("SELECT policy_name FROM point_policies WHERE is_active = 1", String::class.java))
+            .containsExactly("new")
+        assertThat(columnType(database, "point_policies", "active_key")).isEqualTo("tinyint")
+        assertThat(indexes(database)).contains("point_policies|uk_point_policies_active_key|0|active_key")
     }
 
     @Test
@@ -124,6 +143,14 @@ class FlywayMigrationMySqlTest {
             "INSERT INTO dlq_messages (original_topic, original_partition, original_offset, error_timestamp, retry_count, status, created_at) " +
                 "VALUES ('kept-topic', 0, 1, 1, 0, ?, NOW(6))",
             status
+        )
+    }
+
+    private fun insertActivePointPolicy(database: String, name: String) {
+        jdbc(database).update(
+            "INSERT INTO point_policies (policy_name, earn_rate, max_earn_rate, min_use_amount, max_use_amount, is_active, created_at) " +
+                "VALUES (?, 0.0100, 0.1000, 0, 100000, 1, NOW(6))",
+            name
         )
     }
 
