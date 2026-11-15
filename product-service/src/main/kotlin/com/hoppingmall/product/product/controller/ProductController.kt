@@ -17,6 +17,7 @@ import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.web.SortDefault
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
@@ -77,10 +78,10 @@ class ProductController(
     fun createProduct(
         @Valid @RequestBody request: ProductCreateRequest,
         @AuthenticationPrincipal userPrincipal: UserPrincipal
-    ): ApiResponse<ProductResponse> {
+    ): ResponseEntity<ApiResponse<ProductResponse>> {
         val sellerId = productOwnershipPolicy.sellerIdForCreate(userPrincipal, request.sellerId)
         val productResponse = productCommandService.createProduct(request.copy(sellerId = sellerId))
-        return ApiResponse.success(productResponse)
+        return ResponseEntity.ok(ApiResponse.success(productResponse))
     }
 
     @PutMapping("/{productId}")
