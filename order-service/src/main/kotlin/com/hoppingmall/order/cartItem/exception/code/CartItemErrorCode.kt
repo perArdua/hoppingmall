@@ -14,4 +14,6 @@ enum class CartItemErrorCode(
     CART_ITEM_CONCURRENT_ADD("CART004", "같은 상품을 동시에 담는 요청이 있어 처리하지 못했습니다. 다시 시도해 주세요.", HttpStatus.CONFLICT),
     CART_ITEM_INVALID_QUANTITY("CART005", "장바구니 수량은 1개 이상 999,999,999개 이하여야 합니다.", HttpStatus.BAD_REQUEST),
     CART_ITEM_PRODUCT_UNAVAILABLE("CART006", "상품 정보를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.", HttpStatus.SERVICE_UNAVAILABLE),
+    CART_ITEM_PRODUCT_NOT_ON_SALE("CART007", "판매 중이 아닌 상품은 담을 수 없습니다.", HttpStatus.CONFLICT),
+    CART_ITEM_OUT_OF_STOCK("CART008", "담으려는 수량만큼 재고가 없습니다.", HttpStatus.CONFLICT),
 }

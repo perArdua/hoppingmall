@@ -87,7 +87,7 @@ class PasswordChangeWrongCurrentPasswordStatusTest {
         }
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
-        assertThat(response.body!!.code).isEqualTo("P003")
+        assertThat(response.body!!.code).isEqualTo("PWD003")
         assertThat(user.getPassword()).isEqualTo(originalPassword)
         verify(refreshTokenService, never()).revokeAll(any(), any())
     }
@@ -104,7 +104,7 @@ class PasswordChangeWrongCurrentPasswordStatusTest {
         }
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
-        assertThat(response.body!!.code).isEqualTo("P003")
+        assertThat(response.body!!.code).isEqualTo("PWD003")
         assertThat(user.getPassword()).isEqualTo(originalPassword)
         verify(refreshTokenService, never()).revokeAll(any(), any())
     }
