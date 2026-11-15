@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -73,7 +74,8 @@ class PaymentDirectCancelOrderStatusTest {
         paymentMetrics,
         pointEarnRateStrategy,
         orderSummaryQueryPort,
-        transactionManager
+        transactionManager,
+        mock()
     )
 
     private fun successPayment(): Payment {

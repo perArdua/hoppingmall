@@ -37,7 +37,7 @@ class OpenApiDocsTest {
         val docs = apiDocs()
         val actual = createCategory("{\"name\":\"명세확인\"}")
 
-        val envelope = schema(docs, responseSchemaRef(docs, "/api/v1/categories", "post", "200"))
+        val envelope = schema(docs, responseSchemaRef(docs, "/api/v1/categories", "post", "201"))
         val data = schema(docs, envelope.path("properties").path("data").path("\$ref").asText())
 
         assertDocumented(envelope, actual)
@@ -118,6 +118,22 @@ class OpenApiDocsTest {
             .map { it.path("name").asText() }
 
         assertThat(parameters).containsExactlyInAnyOrder("page", "size", "sort")
+    }
+
+    @Test
+    fun 생성_입구의_명세_성공_응답은_실제와_같은_201이다() {
+        val docs = apiDocs()
+        listOf(
+            "/api/v1/categories" to "post",
+            "/api/v1/inventories" to "post",
+            "/api/v1/reviews" to "post",
+            "/api/v1/wishlists" to "post",
+            "/api/v1/files/upload" to "post"
+        ).forEach { (path, method) ->
+            val responses = docs.path("paths").path(path).path(method).path("responses")
+            assertThat(responses.has("201")).describedAs("%s %s 201", method, path).isTrue()
+            assertThat(responses.has("200")).describedAs("%s %s 200", method, path).isFalse()
+        }
     }
 
     private fun apiDocs(): JsonNode =

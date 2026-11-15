@@ -11,6 +11,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import com.hoppingmall.common.UserPrincipal
+import com.hoppingmall.product.common.file.dto.FileUploadRequest
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -38,7 +41,7 @@ class FileUploadControllerTest {
         )
         whenever(fileUploadService.uploadFile(any())).thenReturn(expectedResponse)
 
-        val result = controller.uploadFile(mockFile, "product")
+        val result = controller.uploadFile(mockFile, "product", UserPrincipal.of(4L, "SELLER"))
 
         assertThat(result.code).isEqualTo("SUCCESS")
         assertThat(result.message).isEqualTo("성공")
@@ -47,6 +50,9 @@ class FileUploadControllerTest {
         assertThat(result.data!!.fileName).isEqualTo(expectedResponse.fileName)
         assertThat(result.data!!.fileSize).isEqualTo(expectedResponse.fileSize)
         assertThat(result.data!!.domain).isEqualTo(expectedResponse.domain)
-        verify(fileUploadService).uploadFile(any())
+        val captor = argumentCaptor<FileUploadRequest>()
+        verify(fileUploadService).uploadFile(captor.capture())
+        assertThat(captor.firstValue.uploaderId).isEqualTo(4L)
+        assertThat(captor.firstValue.uploaderRole).isEqualTo("SELLER")
     }
 }

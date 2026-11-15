@@ -1,6 +1,7 @@
 package com.hoppingmall.order.cartItem.service
 
 import com.hoppingmall.order.cartItem.dto.request.CartItemCreateRequest
+import com.hoppingmall.order.cartItem.enum.CartProductStatus
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
@@ -36,27 +37,27 @@ class CartItemDeletedProductListMySqlIntegrationTest : OrderMySqlServiceTestSupp
     }
 
     @Test
-    fun 삭제된_상품을_담은_장바구니_행은_목록에_나오지_않는다() {
+    fun 삭제된_상품을_담은_장바구니_행은_목록에_남고_DELETED로_표시된다() {
         val deletedId = add(DELETED_PRODUCT_ID)
         val keptId = add(KEPT_PRODUCT_ID)
         productsAliveAre(KEPT_PRODUCT_ID)
 
-        val listed = cartItemQueryService.getCartItems(BUYER_ID, PageRequest.of(0, 10)).content.map { it.id }
+        val listed = cartItemQueryService.getCartItems(BUYER_ID, PageRequest.of(0, 10, Sort.by("id"))).content
 
-        assertThat(listed).containsExactly(keptId)
-        assertThat(listed).doesNotContain(deletedId)
+        assertThat(listed.map { it.id }).containsExactly(deletedId, keptId)
+        assertThat(listed.map { it.productStatus }).containsExactly(CartProductStatus.DELETED, null)
     }
 
     @Test
-    fun 삭제된_상품을_빼도_다음_쪽이_있는지는_장바구니_행_기준으로_알려준다() {
-        add(DELETED_PRODUCT_ID)
+    fun 삭제된_상품이_있어도_쪽_크기와_다음_쪽_여부는_장바구니_행_기준이다() {
+        val deletedId = add(DELETED_PRODUCT_ID)
         val keptId = add(KEPT_PRODUCT_ID)
         add(OTHER_PRODUCT_ID)
         productsAliveAre(KEPT_PRODUCT_ID, OTHER_PRODUCT_ID)
 
         val page = cartItemQueryService.getCartItems(BUYER_ID, PageRequest.of(0, 2, Sort.by("id")))
 
-        assertThat(page.content.map { it.id }).containsExactly(keptId)
+        assertThat(page.content.map { it.id }).containsExactly(deletedId, keptId)
         assertThat(page.hasNext()).isTrue()
     }
 

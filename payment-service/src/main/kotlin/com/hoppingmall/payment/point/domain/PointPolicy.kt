@@ -5,7 +5,10 @@ import jakarta.persistence.*
 import java.math.BigDecimal
 
 @Entity
-@Table(name = "point_policies")
+@Table(
+    name = "point_policies",
+    uniqueConstraints = [UniqueConstraint(name = PointPolicy.ACTIVE_KEY_CONSTRAINT, columnNames = ["active_key"])]
+)
 class PointPolicy private constructor(
     policyName: String,
     earnRate: BigDecimal,
@@ -42,6 +45,14 @@ class PointPolicy private constructor(
     @Column
     var description: String? = description
         private set
+
+    @Column(
+        name = "active_key",
+        insertable = false,
+        updatable = false,
+        columnDefinition = "TINYINT GENERATED ALWAYS AS (CASE WHEN is_active THEN 1 END)"
+    )
+    private val activeKey: Int? = null
 
     init {
         validatePolicy()
@@ -90,6 +101,8 @@ class PointPolicy private constructor(
         useAmount >= minUseAmount && useAmount <= maxUseAmount
 
     companion object {
+        const val ACTIVE_KEY_CONSTRAINT = "uk_point_policies_active_key"
+
         fun create(
             policyName: String,
             earnRate: BigDecimal,

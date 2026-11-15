@@ -64,7 +64,8 @@ class PaymentDuplicateOrderMySqlIntegrationTest : MySqlJpaTestSupport() {
             PaymentMetrics(SimpleMeterRegistry()),
             pointEarnRateStrategy,
             orderSummaryQueryPort,
-            transactionManager
+            transactionManager,
+            mock()
         )
     }
 

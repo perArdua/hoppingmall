@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
@@ -79,7 +80,8 @@ class PaymentCancelTransactionIdTest {
         paymentMetrics,
         pointEarnRateStrategy,
         orderSummaryQueryPort,
-        transactionManager
+        transactionManager,
+        mock()
     )
 
     private fun successPayment(): Payment {
