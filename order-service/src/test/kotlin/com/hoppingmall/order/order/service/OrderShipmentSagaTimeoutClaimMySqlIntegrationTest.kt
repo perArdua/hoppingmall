@@ -3,7 +3,9 @@ package com.hoppingmall.order.order.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.order.domain.Order
+import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.SagaEventLog
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
 import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
@@ -56,6 +58,9 @@ class OrderShipmentSagaTimeoutClaimMySqlIntegrationTest : MySqlJpaTestSupport() 
 
     @Autowired
     private lateinit var orderRepository: OrderRepository
+
+    @Autowired
+    private lateinit var orderItemRepository: OrderItemRepository
 
     @Autowired
     private lateinit var sagaEventLogRepository: SagaEventLogRepository
@@ -165,7 +170,14 @@ class OrderShipmentSagaTimeoutClaimMySqlIntegrationTest : MySqlJpaTestSupport() 
         val order = Order.create(buyerId = BUYER_ID, totalAmount = BigDecimal("5000.00"))
         order.updateStatus(OrderStatus.PAYING)
         order.updateStatus(OrderStatus.PAID)
-        return orderRepository.save(order).id!!
+        val orderId = orderRepository.save(order).id!!
+        orderItemRepository.save(
+            OrderItem.create(
+                orderId = orderId, sellerId = SELLER_ID, productId = 100L,
+                productName = "상품", productPrice = BigDecimal("5000.00"), quantity = 1
+            )
+        )
+        return orderId
     }
 
     private fun savePaymentCompletedSaga(orderId: Long, claimed: Boolean): String {

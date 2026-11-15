@@ -128,6 +128,7 @@ class OrderStatusUpdateAuthorizationTest {
     @Test
     fun 판매자는_PAID_주문을_SHIPPED로_바꿀_수_있다() {
         val order = orderOf(OrderStatus.PAID)
+        whenever(orderItemRepository.existsByOrderIdAndSellerId(ORDER_ID, SELLER_ID)).thenReturn(true)
 
         changeStatus(SELLER_ID, "SELLER", OrderStatus.SHIPPED)
             .andExpect {

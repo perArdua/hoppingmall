@@ -11,4 +11,5 @@ enum class ShippingErrorCode(
     SHIPPING_NOT_FOUND("SHP001", "배송 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     SHIPPING_ALREADY_EXISTS("SHP002", "이미 배송 정보가 존재합니다.", HttpStatus.CONFLICT),
     SHIPPING_INVALID_STATUS("SHP003", "유효하지 않은 배송 상태 변경입니다.", HttpStatus.BAD_REQUEST),
+    SHIPPING_ACCESS_DENIED("SHP004", "주문의 구매자·판매자·관리자만 배송 정보에 접근할 수 있습니다.", HttpStatus.FORBIDDEN),
 }
