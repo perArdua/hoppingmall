@@ -4,6 +4,7 @@ import com.hoppingmall.common.EnumNameConverter
 
 enum class SessionRevokeReason {
     LOGOUT,
+    LOGOUT_ALL,
     PASSWORD_CHANGED,
     REUSE_DETECTED,
     EVICTED

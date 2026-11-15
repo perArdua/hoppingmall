@@ -128,6 +128,18 @@ class TokenProviderImplTest {
         assertThat(remaining).isPositive()
     }
 
+    @Test
+    fun 액세스_토큰에_밀리초_발급_시각을_싣는다() {
+        val before = System.currentTimeMillis()
+        val token = tokenProvider.generateAccessToken(1L, Role.BUYER, SESSION_ID)
+        val after = System.currentTimeMillis()
+
+        val claims = tokenProvider.parseClaims(token)
+        val issuedAtMs = (claims["iat_ms"] as Number).toLong()
+        assertThat(issuedAtMs).isBetween(before, after)
+        assertThat(issuedAtMs / 1000).isEqualTo(claims.issuedAt.time / 1000)
+    }
+
     companion object {
         private const val SESSION_ID = "11111111-1111-1111-1111-111111111111"
         private val ISSUED_AT: Instant = Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.SECONDS)

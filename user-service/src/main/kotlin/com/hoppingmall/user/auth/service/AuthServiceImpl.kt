@@ -2,6 +2,7 @@ package com.hoppingmall.user.auth.service
 
 import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.user.auth.TokenProvider
+import com.hoppingmall.user.auth.domain.SessionRevokeReason
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
 import com.hoppingmall.user.auth.exception.InvalidTokenException
@@ -23,7 +24,8 @@ class AuthServiceImpl(
     private val refreshTokenService: RefreshTokenService,
     private val userRepository: UserRepository,
     private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository,
-    private val loginAttemptLimiter: LoginAttemptLimiter
+    private val loginAttemptLimiter: LoginAttemptLimiter,
+    private val issuedTokenInvalidator: IssuedTokenInvalidator
 ) : AuthService {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -73,5 +75,14 @@ class AuthServiceImpl(
         }
         refreshTokenService.revokeSession(userId, sessionId)
         log.info("로그아웃: userId={}, sessionId={}", userId, sessionId)
+    }
+
+    override fun logoutAll(userId: Long, accessToken: String?) {
+        accessToken
+            ?.takeIf { runCatching { tokenProvider.parseAccessToken(it) == userId }.getOrDefault(false) }
+            ?.let { accessTokenBlacklistRepository.add(it, tokenProvider.getRemainingExpirationMs(it)) }
+        refreshTokenService.revokeAll(userId, SessionRevokeReason.LOGOUT_ALL)
+        issuedTokenInvalidator.invalidateIssuedBefore(userId)
+        log.info("전체 로그아웃: userId={}", userId)
     }
 }

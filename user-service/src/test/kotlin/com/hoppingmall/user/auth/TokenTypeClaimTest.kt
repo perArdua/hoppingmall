@@ -5,6 +5,7 @@ import com.hoppingmall.user.auth.domain.repository.RefreshTokenRepository
 import com.hoppingmall.user.auth.exception.RefreshTokenNotFoundException
 import com.hoppingmall.user.auth.exception.InvalidTokenException
 import com.hoppingmall.user.auth.service.AuthServiceImpl
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.auth.service.RefreshTokenServiceImpl
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.config.ratelimit.NoOpLoginAttemptLimiter
@@ -30,6 +31,7 @@ import org.mockito.Mock
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -86,7 +88,8 @@ class TokenTypeClaimTest {
             ),
             userRepository = userRepository,
             accessTokenBlacklistRepository = accessTokenBlacklistRepository,
-            loginAttemptLimiter = NoOpLoginAttemptLimiter()
+            loginAttemptLimiter = NoOpLoginAttemptLimiter(),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         user = User.fixture().withId(1L)
 

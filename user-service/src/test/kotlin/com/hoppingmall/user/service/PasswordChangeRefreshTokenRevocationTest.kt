@@ -7,6 +7,7 @@ import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepositor
 import com.hoppingmall.user.auth.domain.repository.RefreshTokenRepository
 import com.hoppingmall.user.auth.exception.RefreshTokenNotFoundException
 import com.hoppingmall.user.auth.service.AuthServiceImpl
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.auth.service.RefreshTokenServiceImpl
 import com.hoppingmall.user.common.vo.PasswordCreator
 import com.hoppingmall.user.common.vo.PasswordPolicy
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.util.Optional
@@ -93,7 +95,8 @@ class PasswordChangeRefreshTokenRevocationTest {
             refreshTokenService = refreshTokenService,
             userRepository = userRepository,
             accessTokenBlacklistRepository = accessTokenBlacklistRepository,
-            loginAttemptLimiter = NoOpLoginAttemptLimiter()
+            loginAttemptLimiter = NoOpLoginAttemptLimiter(),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         userCommandService = UserCommandServiceImpl(
             userRepository = userRepository,

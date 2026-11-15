@@ -27,6 +27,7 @@ class TokenProviderImpl(
             .claim(TYPE_CLAIM, ACCESS_TYPE)
             .claim(ROLE_CLAIM, role.name)
             .claim(SESSION_CLAIM, sessionId)
+            .claim(ISSUED_AT_MS_CLAIM, now.time)
             .setIssuedAt(now)
             .setExpiration(expiry)
             .signWith(key, SignatureAlgorithm.HS256)
@@ -139,6 +140,7 @@ class TokenProviderImpl(
         private const val ROLE_CLAIM = "role"
         private const val SESSION_CLAIM = "sid"
         private const val GENERATION_CLAIM = "gen"
+        private const val ISSUED_AT_MS_CLAIM = "iat_ms"
         private const val ACCESS_TYPE = "access"
         private const val REFRESH_TYPE = "refresh"
     }

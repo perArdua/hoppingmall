@@ -4,6 +4,7 @@ import com.hoppingmall.user.UserServiceApplicationTests
 import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.service.AuthServiceImpl
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.Email
@@ -72,7 +73,8 @@ class SellerApprovalRoleTest {
             refreshTokenService = refreshTokenService,
             userRepository = userRepository,
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
-            loginAttemptLimiter = NoOpLoginAttemptLimiter()
+            loginAttemptLimiter = NoOpLoginAttemptLimiter(),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
     }
 

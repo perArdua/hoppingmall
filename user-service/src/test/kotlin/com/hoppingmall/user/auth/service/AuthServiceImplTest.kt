@@ -1,6 +1,7 @@
 package com.hoppingmall.user.auth.service
 
 import com.hoppingmall.user.auth.TokenProvider
+import com.hoppingmall.user.auth.domain.SessionRevokeReason
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
 import com.hoppingmall.user.common.enums.Role
@@ -21,6 +22,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.any
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.util.Optional
@@ -45,6 +48,9 @@ class AuthServiceImplTest {
     @Mock
     private lateinit var accessTokenBlacklistRepository: AccessTokenBlacklistRepository
 
+    @Mock
+    private lateinit var issuedTokenInvalidator: IssuedTokenInvalidator
+
     private lateinit var authService: AuthServiceImpl
 
     @BeforeEach
@@ -55,7 +61,8 @@ class AuthServiceImplTest {
             refreshTokenService = refreshTokenService,
             userRepository = userRepository,
             accessTokenBlacklistRepository = accessTokenBlacklistRepository,
-            loginAttemptLimiter = NoOpLoginAttemptLimiter()
+            loginAttemptLimiter = NoOpLoginAttemptLimiter(),
+            issuedTokenInvalidator = issuedTokenInvalidator
         )
     }
 
@@ -105,5 +112,27 @@ class AuthServiceImplTest {
 
         verify(accessTokenBlacklistRepository).add("access-token", 1000L)
         verify(refreshTokenService).revokeSession(7L, "session-7")
+    }
+
+    @Test
+    fun 전체_로그아웃은_모든_세션을_끊고_이전_발급_토큰_무효_시각을_쓰고_자기_액세스_토큰을_블랙리스트에_올린다() {
+        whenever(tokenProvider.parseAccessToken("access-token")).thenReturn(7L)
+        whenever(tokenProvider.getRemainingExpirationMs("access-token")).thenReturn(1000L)
+
+        authService.logoutAll(7L, "access-token")
+
+        verify(refreshTokenService).revokeAll(7L, SessionRevokeReason.LOGOUT_ALL)
+        verify(issuedTokenInvalidator).invalidateIssuedBefore(7L)
+        verify(accessTokenBlacklistRepository).add("access-token", 1000L)
+    }
+
+    @Test
+    fun 전체_로그아웃에_다른_사용자의_액세스_토큰이_오면_블랙리스트에_올리지_않는다() {
+        whenever(tokenProvider.parseAccessToken("other-access-token")).thenReturn(8L)
+
+        authService.logoutAll(7L, "other-access-token")
+
+        verify(accessTokenBlacklistRepository, never()).add(any(), any())
+        verify(refreshTokenService).revokeAll(7L, SessionRevokeReason.LOGOUT_ALL)
     }
 }

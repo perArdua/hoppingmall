@@ -6,6 +6,7 @@ import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProviderImpl
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.service.AuthServiceImpl
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
 import com.hoppingmall.user.common.vo.PasswordVerifier
@@ -75,7 +76,8 @@ class LoginAttemptLimitRedisIntegrationTest {
             refreshTokenService = issuingRefreshTokenService(),
             userRepository = userRepository,
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
-            loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, clock)
+            loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, clock),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         val controller = UserController(mock<UserCommandService>(), mock(), authService, ClientIpResolver())
 

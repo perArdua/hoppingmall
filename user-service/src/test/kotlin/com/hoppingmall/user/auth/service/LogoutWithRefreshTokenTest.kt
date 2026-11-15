@@ -32,6 +32,7 @@ import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -83,7 +84,8 @@ class LogoutWithRefreshTokenTest {
             ),
             userRepository = userRepository,
             accessTokenBlacklistRepository = accessTokenBlacklistRepository,
-            loginAttemptLimiter = NoOpLoginAttemptLimiter()
+            loginAttemptLimiter = NoOpLoginAttemptLimiter(),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         lenient().`when`(userRepository.findForUpdateById(USER_ID)).thenReturn(user)
     }

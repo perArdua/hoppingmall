@@ -1,6 +1,7 @@
 package com.hoppingmall.user.service
 
 import com.hoppingmall.user.auth.domain.SessionRevokeReason
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.CurrentPasswordNotMatchedException
@@ -24,7 +25,8 @@ class UserCommandServiceImpl(
     private val passwordVerifier: PasswordVerifier,
     private val userDomainService: UserDomainService,
     private val membershipCommandService: MembershipCommandService,
-    private val refreshTokenService: RefreshTokenService? = null
+    private val refreshTokenService: RefreshTokenService? = null,
+    private val issuedTokenInvalidator: IssuedTokenInvalidator? = null
 ) : UserCommandService {
 
     override fun signUp(request: SignUpRequest): SignUpResponse {
@@ -68,6 +70,7 @@ class UserCommandServiceImpl(
             val encodedPassword = passwordCreator.encode(newPassword)
             user.updatePassword(encodedPassword)
             refreshTokenService?.revokeAll(userId, SessionRevokeReason.PASSWORD_CHANGED)
+            issuedTokenInvalidator?.invalidateIssuedBefore(userId)
         }
     }
 }

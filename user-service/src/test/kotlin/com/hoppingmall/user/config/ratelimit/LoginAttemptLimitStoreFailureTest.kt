@@ -6,6 +6,7 @@ import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProviderImpl
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.service.AuthServiceImpl
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.controller.UserController
 import com.hoppingmall.user.domain.repository.UserRepository
@@ -64,7 +65,8 @@ class LoginAttemptLimitStoreFailureTest {
             refreshTokenService = issuingRefreshTokenService(),
             userRepository = userRepository,
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
-            loginAttemptLimiter = loginAttemptLimiter
+            loginAttemptLimiter = loginAttemptLimiter,
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         val mockMvc = MockMvcBuilders.standaloneSetup(UserController(mock<UserCommandService>(), mock(), authService, ClientIpResolver()))
             .addInterceptors(RateLimitInterceptor(proxyManager))
