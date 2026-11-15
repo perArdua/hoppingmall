@@ -5,12 +5,15 @@ import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import com.hoppingmall.order.shipping.exception.ShippingInvalidStatusException
 import jakarta.persistence.*
+import org.hibernate.annotations.ColumnDefault
 
 @Entity
 @Table(
     name = "shippings",
+    uniqueConstraints = [
+        UniqueConstraint(name = "uk_shippings_order_id", columnNames = ["orderId"])
+    ],
     indexes = [
-        Index(name = "idx_shippings_order_id", columnList = "orderId"),
         Index(name = "idx_shippings_buyer_id", columnList = "buyerId"),
         Index(name = "idx_shippings_tracking_number", columnList = "trackingNumber")
     ]
@@ -26,21 +29,37 @@ class Shipping private constructor(
     @Column(nullable = false, length = 32)
     var status: ShippingStatus = ShippingStatus.PREPARING,
 
-    @Column(nullable = false)
-    val carrierName: String,
-
-    @Column(nullable = false)
-    val trackingNumber: String,
-
-    @Column(nullable = false)
-    val recipientName: String,
-
-    @Column(nullable = false)
-    val recipientPhone: String,
-
-    @Column(nullable = false)
-    val recipientAddress: String
+    carrierName: String,
+    trackingNumber: String,
+    recipientName: String,
+    recipientPhone: String,
+    recipientAddress: String
 ) : BaseEntity() {
+
+    @ColumnDefault("1")
+    @Column(nullable = false)
+    var attempt: Int = 1
+        private set
+
+    @Column(nullable = false)
+    var carrierName: String = carrierName
+        private set
+
+    @Column(nullable = false)
+    var trackingNumber: String = trackingNumber
+        private set
+
+    @Column(nullable = false)
+    var recipientName: String = recipientName
+        private set
+
+    @Column(nullable = false)
+    var recipientPhone: String = recipientPhone
+        private set
+
+    @Column(nullable = false)
+    var recipientAddress: String = recipientAddress
+        private set
 
     companion object {
         private val allowedTransitions: Map<ShippingStatus, Set<ShippingStatus>> = mapOf(
@@ -50,6 +69,8 @@ class Shipping private constructor(
             ShippingStatus.FAILED to emptySet(),
             ShippingStatus.CANCELLED to emptySet()
         )
+
+        private val restartableStatuses: Set<ShippingStatus> = setOf(ShippingStatus.FAILED, ShippingStatus.CANCELLED)
 
         fun create(
             orderId: Long,
@@ -70,6 +91,27 @@ class Shipping private constructor(
                 recipientAddress = recipientAddress
             )
         }
+    }
+
+    fun canRestart(): Boolean = status in restartableStatuses
+
+    fun restart(
+        carrierName: String,
+        trackingNumber: String,
+        recipientName: String,
+        recipientPhone: String,
+        recipientAddress: String
+    ) {
+        if (!canRestart()) {
+            throw ShippingInvalidStatusException()
+        }
+        this.status = ShippingStatus.PREPARING
+        this.attempt += 1
+        this.carrierName = carrierName
+        this.trackingNumber = trackingNumber
+        this.recipientName = recipientName
+        this.recipientPhone = recipientPhone
+        this.recipientAddress = recipientAddress
     }
 
     fun updateStatus(newStatus: ShippingStatus) {

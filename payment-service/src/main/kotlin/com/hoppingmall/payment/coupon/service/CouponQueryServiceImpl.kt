@@ -25,6 +25,11 @@ class CouponQueryServiceImpl(
             .map { CouponResponse.from(it) }
     }
 
+    override fun getIssuedCouponIds(userId: Long, couponIds: Collection<Long>): Set<Long> {
+        if (couponIds.isEmpty()) return emptySet()
+        return userCouponRepository.findCouponIdsByUserIdAndCouponIdIn(userId, couponIds).toSet()
+    }
+
     @Cacheable(cacheNames = ["coupon:all"], key = "'all'", sync = true)
     override fun getAllCoupons(): List<CouponResponse> {
         return couponRepository.findAll()

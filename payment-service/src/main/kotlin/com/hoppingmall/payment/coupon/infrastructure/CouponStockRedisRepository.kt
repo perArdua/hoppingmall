@@ -36,6 +36,25 @@ class CouponStockRedisRepository(
         return bucket.setIfAbsent(remaining.toString())
     }
 
+    fun initializeStock(couponId: Long, remaining: Int, issuedUserIds: Collection<Long>): Boolean {
+        val issued = redissonClient.getSet<String>(issuedKey(couponId), StringCodec.INSTANCE)
+        issuedUserIds.chunked(ISSUED_RESTORE_CHUNK_SIZE).forEach { chunk ->
+            issued.addAll(chunk.map { it.toString() })
+        }
+        return initializeStock(couponId, remaining)
+    }
+
+    fun releaseStock(couponId: Long, userId: Long) {
+        val script = redissonClient.getScript(StringCodec.INSTANCE)
+        script.eval<Long>(
+            RScript.Mode.READ_WRITE,
+            RELEASE_STOCK_SCRIPT,
+            RScript.ReturnType.LONG,
+            listOf(stockKey(couponId), reservedAtKey(couponId)),
+            userId.toString()
+        )
+    }
+
     fun restoreStock(couponId: Long, userId: Long) {
         val script = redissonClient.getScript(StringCodec.INSTANCE)
         script.eval<Long>(
@@ -121,6 +140,16 @@ class CouponStockRedisRepository(
 
     companion object {
         const val RESTORED_TTL_SECONDS = 86_400L
+        const val ISSUED_RESTORE_CHUNK_SIZE = 1_000
+
+        const val RELEASE_STOCK_SCRIPT = """
+            redis.call('HDEL', KEYS[2], ARGV[1])
+            if redis.call('EXISTS', KEYS[1]) == 1 then
+                redis.call('INCR', KEYS[1])
+                return 1
+            end
+            return 0
+        """
 
         const val RESERVE_SCRIPT = """
             local stockKey = KEYS[1]

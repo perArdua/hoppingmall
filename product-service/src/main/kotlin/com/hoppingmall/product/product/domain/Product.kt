@@ -48,13 +48,13 @@ class Product private constructor(
     @Column(nullable = false, precision = 3, scale = 2, insertable = false, updatable = false)
     var averageRating: BigDecimal = BigDecimal.ZERO
 
-    fun update(name: String, description: String, price: BigDecimal, categoryId: Long, status: ProductStatus) {
+    fun update(name: String, description: String, price: BigDecimal, categoryId: Long, status: ProductStatus?) {
         require(price > BigDecimal.ZERO) { "가격은 0보다 커야 합니다" }
         this.name = name
         this.description = description
         this.price = price
         this.categoryId = categoryId
-        this.status = status
+        status?.let { this.status = it }
     }
 
     companion object {

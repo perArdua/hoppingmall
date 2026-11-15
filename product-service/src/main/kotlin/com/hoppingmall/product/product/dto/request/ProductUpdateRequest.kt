@@ -21,5 +21,5 @@ data class ProductUpdateRequest(
     
     val imageUrls: List<String>? = null,
     
-    val status: ProductStatus = ProductStatus.AVAILABLE
+    val status: ProductStatus? = null
 ) 

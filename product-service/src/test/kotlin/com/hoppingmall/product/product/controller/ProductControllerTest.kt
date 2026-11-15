@@ -12,6 +12,7 @@ import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.product.service.ProductImageService
 import com.hoppingmall.product.product.service.ProductOwnershipPolicy
 import com.hoppingmall.product.product.service.ProductQueryService
+import com.hoppingmall.product.product.service.ProductStockReader
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -28,6 +29,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
+import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockMultipartFile
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -48,6 +50,9 @@ class ProductControllerTest {
 
     @Mock
     private lateinit var productOwnershipPolicy: ProductOwnershipPolicy
+
+    @Mock
+    private lateinit var productStockReader: ProductStockReader
 
     private val seller = UserPrincipal.of(1L, "SELLER")
 
@@ -75,6 +80,7 @@ class ProductControllerTest {
     @Test
     fun 상품을_단건_조회한다() {
         whenever(productQueryService.getProductById(1L)).thenReturn(productResponse())
+        whenever(productStockReader.withInStock(any())).thenAnswer { (it.arguments[0] as ProductResponse).copy(inStock = true) }
 
         val result = controller.getProduct(1L)
 
@@ -96,7 +102,7 @@ class ProductControllerTest {
         whenever(productQueryService.getProductsBySellerId(eq(1L), eq(pageable)))
             .thenReturn(SliceImpl(listOf(productResponse()), pageable, false))
 
-        val result = controller.getProductsBySeller(1L, pageable)
+        val result = controller.getProductsBySeller(1L, pageable, null)
 
         assertThat(result.data).isNotNull
     }
@@ -137,7 +143,8 @@ class ProductControllerTest {
 
         val result = controller.createProduct(request, seller)
 
-        assertThat(result.data!!.name).isEqualTo("테스트")
+        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
+        assertThat(result.body!!.data!!.name).isEqualTo("테스트")
     }
 
     @Test

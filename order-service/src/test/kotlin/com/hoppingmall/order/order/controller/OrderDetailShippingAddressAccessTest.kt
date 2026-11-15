@@ -9,6 +9,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.service.OrderCommandService
 import com.hoppingmall.order.order.service.OrderQueryServiceImpl
+import com.hoppingmall.order.shipping.service.ShippingCommandService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -28,7 +29,9 @@ class OrderDetailShippingAddressAccessTest {
 
     private val orderRepository: OrderRepository = mock()
     private val orderItemRepository: OrderItemRepository = mock()
-    private val controller = OrderController(mock<OrderCommandService>(), OrderQueryServiceImpl(orderRepository, orderItemRepository))
+    private val controller = OrderController(
+        mock<OrderCommandService>(), OrderQueryServiceImpl(orderRepository, orderItemRepository), mock<ShippingCommandService>()
+    )
 
     @BeforeEach
     fun setUp() {

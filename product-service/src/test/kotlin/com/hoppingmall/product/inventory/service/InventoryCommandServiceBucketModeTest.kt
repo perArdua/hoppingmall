@@ -188,9 +188,11 @@ class InventoryCommandServiceBucketModeTest {
     fun 재고_변경은_버킷을_다시_나눈다() {
         whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(Inventory.create(1L, 5).withId(1L))
 
-        service.updateStock(1L, InventoryUpdateRequest(stockQuantity = 9))
+        whenever(bucketStockService.replaceTotal(1L, 5, 9)).thenReturn(true)
 
-        verify(bucketStockService).redistribute(1L, 9)
+        service.updateStock(1L, InventoryUpdateRequest(stockQuantity = 9, expectedStockQuantity = 5))
+
+        verify(bucketStockService).replaceTotal(1L, 5, 9)
     }
 
     @Test
