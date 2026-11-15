@@ -2,6 +2,7 @@ package com.hoppingmall.product.product.controller
 
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import com.hoppingmall.product.product.dto.request.ProductSearchCondition
@@ -71,6 +72,7 @@ class ProductController(
         return ApiResponse.success(products)
     }
 
+    @Idempotent(ttlHours = 24)
     @PostMapping
     fun createProduct(
         @Valid @RequestBody request: ProductCreateRequest,

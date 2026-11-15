@@ -83,6 +83,7 @@ class InventoryCommandServiceImpl(
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun updateStock(productId: Long, request: InventoryUpdateRequest): InventoryResponse {
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+            ?.takeIf { it.deletedAt == null }
             ?: throw InventoryNotFoundException()
 
         val stockQuantity = requireNotNull(request.stockQuantity)

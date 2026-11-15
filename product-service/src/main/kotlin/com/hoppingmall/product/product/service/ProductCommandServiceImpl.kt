@@ -4,6 +4,9 @@ import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import com.hoppingmall.product.common.file.FileUploadConfig
+import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
+import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
+import com.hoppingmall.product.inventory.service.InventoryCommandService
 import com.hoppingmall.product.product.domain.Product
 import com.hoppingmall.product.product.domain.ProductImage
 import com.hoppingmall.product.product.domain.repository.ProductImageRepository
@@ -13,6 +16,7 @@ import com.hoppingmall.product.product.dto.request.ProductUpdateRequest
 import com.hoppingmall.product.product.dto.response.ProductResponse
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -22,7 +26,9 @@ class ProductCommandServiceImpl(
     private val productRepository: ProductRepository,
     private val productImageRepository: ProductImageRepository,
     private val categoryRepository: CategoryRepository,
-    private val fileUploadConfig: FileUploadConfig
+    private val fileUploadConfig: FileUploadConfig,
+    private val inventoryCommandService: InventoryCommandService,
+    private val inventoryRepository: InventoryRepository
 ) : ProductCommandService {
 
     override fun createProduct(request: ProductCreateRequest): ProductResponse {
@@ -48,6 +54,9 @@ class ProductCommandServiceImpl(
             )
         }
         val savedImages = productImageRepository.saveAll(productImages)
+        inventoryCommandService.initStock(
+            InventoryInitRequest(productId = savedProduct.id!!, stockQuantity = request.stockQuantity ?: 0)
+        )
 
         return ProductResponse.from(savedProduct, savedImages, category.name)
     }
@@ -70,9 +79,11 @@ class ProductCommandServiceImpl(
         val updatedProduct = productRepository.save(product)
 
         val existingImages = productImageRepository.findByProductIdOrderBySortOrder(productId)
+        val requestedImageUrls = request.imageUrls
+            ?: return ProductResponse.from(updatedProduct, existingImages, category.name)
         existingImages.forEach { it.softDelete() }
 
-        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(fileUploadConfig.defaultImagePath)
+        val imageUrls = requestedImageUrls.ifEmpty { listOf(fileUploadConfig.defaultImagePath) }
         val newImages = imageUrls.mapIndexed { index, url ->
             ProductImage.create(
                 productId = productId,
@@ -85,13 +96,19 @@ class ProductCommandServiceImpl(
         return ProductResponse.from(updatedProduct, savedImages, category.name)
     }
 
-    @CacheEvict(cacheNames = ["product"], key = "#productId")
+    @Caching(
+        evict = [
+            CacheEvict(cacheNames = ["product"], key = "#productId"),
+            CacheEvict(cacheNames = ["inventory"], key = "#productId")
+        ]
+    )
     override fun deleteProduct(productId: Long) {
         val product = productRepository.findByIdOrNull(productId) ?: throw ProductNotFoundException() 
 
         val productImages = productImageRepository.findByProductIdOrderBySortOrder(productId)
         productImages.forEach { it.softDelete() }
 
+        inventoryRepository.findByProductIdForUpdate(productId)?.softDelete()
         product.softDelete()
     }
 }
