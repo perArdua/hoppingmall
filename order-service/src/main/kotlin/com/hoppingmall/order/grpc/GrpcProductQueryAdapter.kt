@@ -36,6 +36,8 @@ class GrpcProductQueryAdapter(
             price = response.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
             sellerId = response.sellerId,
             imageUrl = response.imageUrl.takeIf { it.isNotBlank() },
+            status = response.status.takeIf { it.isNotBlank() },
+            stockQuantity = response.stockQuantity.takeIf { response.status.isNotBlank() },
             withdrawalRestricted = response.withdrawalRestricted,
             withdrawalRestrictionReason = response.withdrawalRestrictionReason.takeIf { it.isNotBlank() }
         )
@@ -47,14 +49,16 @@ class GrpcProductQueryAdapter(
         val response = stub.findProductsByIds(
             ProductIdsRequest.newBuilder().addAllProductIds(productIds).build()
         )
-        return response.productsList.map {
+        return response.productsList.map { product ->
             ProductInfo(
-                id = it.id,
-                name = it.name,
-                price = it.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                sellerId = it.sellerId,
-                withdrawalRestricted = it.withdrawalRestricted,
-                withdrawalRestrictionReason = it.withdrawalRestrictionReason.takeIf { reason -> reason.isNotBlank() }
+                id = product.id,
+                name = product.name,
+                price = product.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                sellerId = product.sellerId,
+                status = product.status.takeIf { it.isNotBlank() },
+                stockQuantity = product.stockQuantity.takeIf { product.status.isNotBlank() },
+                withdrawalRestricted = product.withdrawalRestricted,
+                withdrawalRestrictionReason = product.withdrawalRestrictionReason.takeIf { reason -> reason.isNotBlank() }
             )
         }
     }

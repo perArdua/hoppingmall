@@ -13,6 +13,16 @@ data class ProductInfo(
     val price: BigDecimal,
     val sellerId: Long,
     val imageUrl: String? = null,
+    val status: String? = null,
+    val stockQuantity: Int? = null,
     val withdrawalRestricted: Boolean = false,
     val withdrawalRestrictionReason: String? = null
-)
+) {
+    fun isOnSale(): Boolean = status != SOLD_OUT
+
+    fun hasStock(quantity: Int): Boolean = stockQuantity == null || stockQuantity >= quantity
+
+    companion object {
+        const val SOLD_OUT = "SOLD_OUT"
+    }
+}

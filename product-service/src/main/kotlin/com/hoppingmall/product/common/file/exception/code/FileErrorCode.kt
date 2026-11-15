@@ -14,5 +14,6 @@ enum class FileErrorCode(
     UNSUPPORTED_FILE_TYPE("F004", "허용되지 않는 파일 형식입니다.", HttpStatus.BAD_REQUEST),
     UNSUPPORTED_DOMAIN("F005", "허용되지 않는 도메인입니다.", HttpStatus.BAD_REQUEST),
     DIRECTORY_ACCESS_ERROR("F006", "업로드 디렉토리에 접근할 수 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
-    FILE_UPLOAD_ERROR("F007", "파일 업로드 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR)
+    FILE_UPLOAD_ERROR("F007", "파일 업로드 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
+    FILE_CONTENT_MISMATCH("F008", "파일 내용이 허용된 이미지 형식이 아니거나 확장자와 맞지 않습니다.", HttpStatus.BAD_REQUEST)
 }
