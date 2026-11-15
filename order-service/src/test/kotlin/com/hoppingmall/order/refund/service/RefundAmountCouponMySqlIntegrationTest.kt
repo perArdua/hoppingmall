@@ -5,7 +5,6 @@ import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.port.PaymentInfo
-import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.order.refund.dto.event.RefundCompletedEvent
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.order.refund.dto.request.RefundItemRequest
@@ -14,7 +13,7 @@ import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
-import com.hoppingmall.order.support.MySqlJpaTestSupport
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -26,15 +25,12 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Import
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @DisplayName("쿠폰을 쓴 주문의 환불 금액 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(RefundCommandServiceImpl::class)
-class RefundAmountCouponMySqlIntegrationTest : MySqlJpaTestSupport() {
+class RefundAmountCouponMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var refundCommandService: RefundCommandServiceImpl
@@ -47,12 +43,6 @@ class RefundAmountCouponMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     @Autowired
     private lateinit var shippingRepository: ShippingRepository
-
-    @MockitoBean
-    private lateinit var paymentQueryPort: PaymentQueryPort
-
-    @MockitoBean
-    private lateinit var refundEventPublisher: RefundEventPublisher
 
     @BeforeEach
     fun setUp() {
