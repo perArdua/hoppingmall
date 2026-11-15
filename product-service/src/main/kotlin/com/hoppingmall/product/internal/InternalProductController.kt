@@ -29,7 +29,9 @@ class InternalProductController(
                 sellerId = product.sellerId,
                 imageUrl = firstImageUrl,
                 status = product.status.name,
-                stockQuantity = inventoryRepository.findByProductId(id)?.stockQuantity ?: 0
+                stockQuantity = inventoryRepository.findByProductId(id)?.stockQuantity ?: 0,
+                withdrawalRestricted = product.withdrawalRestricted,
+                withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name
             )
         )
     }
@@ -46,7 +48,9 @@ class InternalProductController(
                     price = product.price,
                     sellerId = product.sellerId,
                     status = product.status.name,
-                    stockQuantity = stocks[product.id] ?: 0
+                    stockQuantity = stocks[product.id] ?: 0,
+                    withdrawalRestricted = product.withdrawalRestricted,
+                    withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name
                 )
             }
         )
@@ -65,6 +69,8 @@ class InternalProductController(
         val sellerId: Long,
         val imageUrl: String? = null,
         val status: String,
-        val stockQuantity: Int
+        val stockQuantity: Int,
+        val withdrawalRestricted: Boolean = false,
+        val withdrawalRestrictionReason: String? = null
     )
 }

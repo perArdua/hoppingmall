@@ -27,6 +27,8 @@ class GrpcProductQueryService(
             imageUrl = firstImageUrl
             status = product.status.name
             stockQuantity = inventoryRepository.findByProductId(request.productId)?.stockQuantity ?: 0
+            withdrawalRestricted = product.withdrawalRestricted
+            withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name ?: ""
         }
     }
 
@@ -43,6 +45,8 @@ class GrpcProductQueryService(
                         sellerId = product.sellerId
                         status = product.status.name
                         stockQuantity = stocks[product.id] ?: 0
+                        withdrawalRestricted = product.withdrawalRestricted
+                        withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name ?: ""
                     }
                 }
             )
