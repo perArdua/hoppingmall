@@ -6,6 +6,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.domain.repository.SettlementRefundProjection
+import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -114,6 +115,7 @@ class InternalOrderControllerTest {
         ReflectionTestUtils.setField(order, "id", 10L)
         whenever(orderRepository.findById(10L)).thenReturn(java.util.Optional.of(order))
         whenever(orderRepository.save(order)).thenReturn(order)
+        whenever(refundRepository.existsByOrderIdAndStatusAndIsFullRefundTrueAndDeletedAtIsNull(10L, RefundStatus.COMPLETED)).thenReturn(true)
 
         controller.cancelOrder(10L)
 
