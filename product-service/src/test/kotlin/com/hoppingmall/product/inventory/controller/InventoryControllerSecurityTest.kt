@@ -73,11 +73,11 @@ class InventoryControllerSecurityTest {
         }
 
         @Test
-        fun 인증되지_않은_재고_초기화_요청_시_403_응답() {
+        fun 인증되지_않은_재고_초기화_요청_시_401_응답() {
             mockMvc.post("/api/v1/inventories") {
                 contentType = MediaType.APPLICATION_JSON
                 content = inventoryJson
-            }.andExpect { status { isForbidden() } }
+            }.andExpect { status { isUnauthorized() } }
         }
     }
 
