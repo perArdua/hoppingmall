@@ -88,6 +88,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 전체_환불의_내부_취소_입구는_PAID_주문을_REFUNDED로_보낸다() {
         val orderId = saveOrder("PAID")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
 
@@ -97,6 +98,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 전체_환불의_내부_취소_입구는_SHIPPED_주문을_REFUNDED로_보낸다() {
         val orderId = saveOrder("SHIPPED")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
 
@@ -106,6 +108,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 전체_환불의_내부_취소_입구는_DELIVERED_주문을_REFUNDED로_보낸다() {
         val orderId = saveOrder("DELIVERED")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
 
@@ -115,6 +118,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 내부_취소_입구를_두_번_불러도_200이고_REFUNDED_그대로다() {
         val orderId = saveOrder("DELIVERED")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
         internalCancel(orderId).andExpect { status { isOk() } }
@@ -180,6 +184,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun REFUNDED_주문은_사용자가_취소할_수_없다() {
         val orderId = saveOrder("PAID")
+        saveRefund(orderId, complete = true, full = true)
         internalCancel(orderId).andExpect { status { isOk() } }
 
         assertThatThrownBy { orderCommandService.cancelOrder(BUYER_ID, orderId) }
@@ -188,6 +193,56 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
         assertThat(orderStatus(orderId)).isEqualTo("REFUNDED")
         verifyNoInteractions(inventoryCommandPort)
         verifyNoInteractions(paymentCommandPort)
+    }
+
+    @Test
+    fun 완료된_전체_환불이_없는_PAID_SHIPPED_DELIVERED_주문은_내부_취소_입구가_409_RFD014로_거절하고_상태를_그대로_둔다() {
+        listOf("PAID", "SHIPPED", "DELIVERED").forEach { before ->
+            val orderId = saveOrder(before)
+
+            internalCancel(orderId).andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("RFD014") }
+            }
+
+            assertThat(orderStatus(orderId)).isEqualTo(before)
+        }
+    }
+
+    @Test
+    fun 기한이_한참_지난_배송_완료_주문도_내부_취소_입구로는_REFUNDED가_되지_않는다() {
+        val orderId = saveOrder("DELIVERED")
+        jdbcTemplate.update(
+            "UPDATE orders SET delivered_at = ? WHERE id = ?", java.time.LocalDateTime.now().minusYears(1), orderId
+        )
+
+        internalCancel(orderId).andExpect { status { isConflict() } }
+
+        assertThat(orderStatus(orderId)).isEqualTo("DELIVERED")
+    }
+
+    @Test
+    fun 부분_환불만_완료됐거나_전체_환불이_판매자_확인을_기다리면_내부_취소_입구가_거절한다() {
+        val partial = saveOrder("DELIVERED")
+        saveRefund(partial, complete = true)
+        val pendingFull = saveOrder("DELIVERED")
+        saveRefund(pendingFull, complete = false, full = true)
+
+        internalCancel(partial).andExpect { status { isConflict() } }
+        internalCancel(pendingFull).andExpect { status { isConflict() } }
+
+        assertThat(orderStatus(partial)).isEqualTo("DELIVERED")
+        assertThat(orderStatus(pendingFull)).isEqualTo("DELIVERED")
+    }
+
+    @Test
+    fun 완료된_전체_환불이_있으면_내부_취소_입구가_REFUNDED로_보낸다() {
+        val orderId = saveOrder("DELIVERED")
+        saveRefund(orderId, complete = true, full = true)
+
+        internalCancel(orderId).andExpect { status { isOk() } }
+
+        assertThat(orderStatus(orderId)).isEqualTo("REFUNDED")
     }
 
     private fun internalCancel(orderId: Long) =
@@ -206,11 +261,11 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
         return orderId
     }
 
-    private fun saveRefund(orderId: Long, complete: Boolean, reject: Boolean = false) {
+    private fun saveRefund(orderId: Long, complete: Boolean, reject: Boolean = false, full: Boolean = false) {
         val refund = Refund.create(
             orderId = orderId, paymentId = 900L, buyerId = BUYER_ID, sellerId = SELLER_ID,
             reason = RefundReason.CHANGE_OF_MIND, reasonDetail = null,
-            refundAmount = BigDecimal("10000"), isFullRefund = false
+            refundAmount = BigDecimal(if (full) "30000" else "10000"), isFullRefund = full
         )
         if (complete) {
             refund.approve(BUYER_ID)

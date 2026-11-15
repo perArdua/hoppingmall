@@ -7,8 +7,10 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.port.PaymentInfo
 import com.hoppingmall.order.port.PaymentQueryPort
+import com.hoppingmall.order.refund.config.RefundPolicyProperties
 import com.hoppingmall.order.refund.domain.Refund
 import com.hoppingmall.order.refund.domain.RefundAmountCalculator
+import com.hoppingmall.order.refund.domain.RefundDeadline
 import com.hoppingmall.order.refund.domain.RefundItem
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
@@ -25,7 +27,7 @@ import com.hoppingmall.order.refund.exception.RefundPaymentNotFoundException
 import com.hoppingmall.order.refund.exception.code.RefundErrorCode
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
-import org.springframework.beans.factory.annotation.Value
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
@@ -47,10 +49,14 @@ class RefundCommandServiceImpl(
 
     private val refundableOrderStatuses = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
 
-    @Value("\${order.refund.window-days:30}")
-    private var refundWindowDays: Long = 30
+    @Autowired(required = false)
+    private var refundPolicy: RefundPolicyProperties = RefundPolicyProperties()
 
     override fun requestRefund(buyerId: Long, request: RefundCreateRequest): RefundResponse {
+        if (!request.reason.acceptsNewRequest) {
+            throw RefundException(RefundErrorCode.REFUND_REASON_NOT_ACCEPTED)
+        }
+
         if (request.items.distinctBy { it.orderItemId }.size != request.items.size) {
             throw RefundException(RefundErrorCode.REFUND_DUPLICATE_ITEM)
         }
@@ -73,8 +79,13 @@ class RefundCommandServiceImpl(
                 throw RefundException(RefundErrorCode.REFUND_INVALID_ORDER_STATUS)
             }
 
-            if (order.isRefundWindowClosed(LocalDateTime.now().minusDays(refundWindowDays))) {
-                throw RefundException(RefundErrorCode.REFUND_WINDOW_EXPIRED)
+            val shipping = shippingRepository.findByOrderId(request.orderId)
+            val receivedAt = RefundDeadline.receivedAt(order, shipping)
+            if (receivedAt != null && RefundDeadline(refundPolicy).isClosed(request.reason, receivedAt, LocalDateTime.now())) {
+                throw RefundException(
+                    if (request.reason.isSellerFault) RefundErrorCode.REFUND_SELLER_FAULT_WINDOW_EXPIRED
+                    else RefundErrorCode.REFUND_WINDOW_EXPIRED
+                )
             }
 
             val orderItems = orderItemRepository.findByOrderId(request.orderId)
@@ -141,8 +152,8 @@ class RefundCommandServiceImpl(
             }
             val savedRefundItems = refundItemRepository.saveAll(refundItems)
 
-            val shipping = shippingRepository.findByOrderId(request.orderId)
-            val isAutoApprove = shipping == null || shipping.status == ShippingStatus.PREPARING
+            val isAutoApprove = !request.reason.isSellerFault &&
+                (shipping == null || shipping.status == ShippingStatus.PREPARING)
 
             if (isAutoApprove) {
                 savedRefund.approve(buyerId)
