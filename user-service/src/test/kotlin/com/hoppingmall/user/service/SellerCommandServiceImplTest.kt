@@ -45,7 +45,7 @@ class SellerCommandServiceImplTest {
         whenever(userRepository.findNullableById(1L)).thenReturn(user)
         whenever(sellerRepository.findNullableByUserId(1L)).thenReturn(null)
         whenever(sellerRepository.existsByBusinessNumber("123-45-67890")).thenReturn(false)
-        whenever(sellerRepository.save(sellerCaptor.capture())).thenReturn(Seller.fixture())
+        whenever(sellerRepository.save(sellerCaptor.capture())).thenReturn(Seller.fixture().withId(1L))
 
         sellerCommandService.apply(1L, SellerApplyRequest("123-45-67890"))
 

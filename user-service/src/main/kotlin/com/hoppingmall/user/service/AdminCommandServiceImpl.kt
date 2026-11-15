@@ -26,7 +26,7 @@ class AdminCommandServiceImpl(
         if (seller.getApprovalStatus() != Seller.ApprovalStatus.PENDING) {
             throw SellerAlreadyProcessedException()
         }
-        command.execute(seller)
+        command.execute(seller, request.normalizedRejectionReason())
 
         if (seller.getApprovalStatus() == Seller.ApprovalStatus.APPROVED) {
             grantSellerRole(seller.userId)
