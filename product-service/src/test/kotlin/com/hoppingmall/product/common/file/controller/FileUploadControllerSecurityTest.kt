@@ -106,7 +106,7 @@ class FileUploadControllerSecurityTest {
 
         @Test
         fun SELLER_역할로_상품_이미지_업로드_성공() {
-            whenever(productImageService.uploadProductImage(any())).thenReturn(
+            whenever(productImageService.uploadProductImage(any(), any(), any())).thenReturn(
                 ProductImageResponse(imageUrl = "/uploads/product/test.jpg", fileName = "test.jpg", fileSize = 7L)
             )
 
@@ -121,7 +121,7 @@ class FileUploadControllerSecurityTest {
 
         @Test
         fun ADMIN_역할로_상품_이미지_업로드_성공() {
-            whenever(productImageService.uploadProductImage(any())).thenReturn(
+            whenever(productImageService.uploadProductImage(any(), any(), any())).thenReturn(
                 ProductImageResponse(imageUrl = "/uploads/product/test.jpg", fileName = "test.jpg", fileSize = 7L)
             )
 

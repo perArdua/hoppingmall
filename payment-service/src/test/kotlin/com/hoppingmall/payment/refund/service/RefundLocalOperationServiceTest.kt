@@ -113,7 +113,8 @@ class RefundLocalOperationServiceTest {
             userId = event.buyerId,
             amount = event.pointRefundAmount,
             paymentId = event.paymentId,
-            orderId = event.orderId
+            orderId = event.orderId,
+            refundId = event.refundId
         )
         verify(refundEventLogRepository).save(eventLog)
     }
@@ -161,7 +162,8 @@ class RefundLocalOperationServiceTest {
             userId = event.buyerId,
             amount = event.pointRefundAmount,
             paymentId = event.paymentId,
-            orderId = event.orderId
+            orderId = event.orderId,
+            refundId = event.refundId
         )
         verify(refundEventLogRepository).save(eventLog)
     }
@@ -180,7 +182,7 @@ class RefundLocalOperationServiceTest {
 
         verify(paymentRepository, never()).findById(any())
         verify(couponCommandService, never()).restoreCouponByOrder(any())
-        verify(pointCommandService, never()).refundPoints(any(), any(), any(), any())
+        verify(pointCommandService, never()).refundPoints(any(), any(), any(), any(), any())
         verify(refundEventLogRepository).save(eventLog)
     }
 }

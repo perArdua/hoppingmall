@@ -18,7 +18,9 @@ import com.hoppingmall.payment.payment.exception.PaymentNotFoundException
 import com.hoppingmall.payment.payment.exception.PaymentOrderNotFoundException
 import com.hoppingmall.payment.payment.exception.PaymentOrderNotPayableException
 import com.hoppingmall.payment.payment.exception.PaymentOrderUnavailableException
-import com.hoppingmall.payment.payment.exception.PaymentPointUseNotAllowedException
+import com.hoppingmall.payment.point.exception.PointUseExceedsPayableException
+import com.hoppingmall.payment.point.exception.PointUseUnitInvalidException
+import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
 import com.hoppingmall.payment.port.OrderSummary
 import com.hoppingmall.payment.port.OrderSummaryQueryPort
@@ -41,7 +43,8 @@ class PaymentCommandServiceImpl(
     private val paymentMetrics: PaymentMetrics,
     private val pointEarnRateStrategy: PointEarnRateStrategy,
     private val orderSummaryQueryPort: OrderSummaryQueryPort,
-    transactionManager: PlatformTransactionManager
+    transactionManager: PlatformTransactionManager,
+    private val pointCommandService: PointCommandService
 ) : PaymentCommandService {
 
     private val transactionTemplate = TransactionTemplate(transactionManager)
@@ -49,8 +52,9 @@ class PaymentCommandServiceImpl(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun processPayment(paymentRequest: PaymentRequest, userId: Long): PaymentResponse = paymentMetrics.recordProcessingTime {
-        if (paymentRequest.pointAmount > BigDecimal.ZERO) {
-            throw PaymentPointUseNotAllowedException()
+        val pointAmount = paymentRequest.pointAmount
+        if (pointAmount.stripTrailingZeros().scale() > 0) {
+            throw PointUseUnitInvalidException()
         }
         verifyOrder(paymentRequest, userId)
 
@@ -69,17 +73,26 @@ class PaymentCommandServiceImpl(
                     couponId = paymentRequest.couponId
                 }
 
+                val payableAfterCoupon = paymentRequest.amount.subtract(couponDiscountAmount)
+                if (pointAmount > payableAfterCoupon) {
+                    throw PointUseExceedsPayableException()
+                }
+
                 val payment = Payment.create(
                     orderId = paymentRequest.orderId,
                     userId = userId,
-                    amount = paymentRequest.amount.subtract(couponDiscountAmount),
+                    amount = payableAfterCoupon.subtract(pointAmount),
                     method = paymentRequest.method,
-                    pointAmount = paymentRequest.pointAmount,
+                    pointAmount = pointAmount,
                     couponId = couponId,
                     couponDiscountAmount = couponDiscountAmount
                 )
 
-                paymentRepository.save(payment)
+                val saved = paymentRepository.save(payment)
+                if (pointAmount.signum() > 0) {
+                    pointCommandService.useForPayment(userId, saved.id!!, saved.orderId, pointAmount)
+                }
+                saved
             }!!
         } catch (e: DataIntegrityViolationException) {
             log.warn("같은 주문의 결제가 이미 있어 결제 요청 거절: orderId={}, userId={}", paymentRequest.orderId, userId)
@@ -112,6 +125,7 @@ class PaymentCommandServiceImpl(
                 if (couponId != null) {
                     couponCommandService.restoreCouponByPayment(couponId!!, userId)
                 }
+                restoreUsedPoints(saved, "use-restore-${saved.id}", "결제 실패 포인트 반환")
                 paymentNotificationService.publishPaymentFailedNotification(saved)
             }
 
@@ -166,6 +180,7 @@ class PaymentCommandServiceImpl(
         if (cancelledPayment.couponId != null) {
             couponCommandService.restoreCouponByOrder(cancelledPayment.orderId)
         }
+        restoreUsedPoints(cancelledPayment, "use-cancel-${cancelledPayment.id}", "결제 취소 포인트 반환")
 
         paymentMetrics.recordPaymentCancelled()
         paymentEventService.publishPaymentCancelledEvent(cancelledPayment)
@@ -174,6 +189,11 @@ class PaymentCommandServiceImpl(
 
         log.info("결제 취소: paymentId={}, orderId={}, userId={}", payment.id, payment.orderId, payment.userId)
         return PaymentResponse.from(cancelledPayment)
+    }
+
+    private fun restoreUsedPoints(payment: Payment, eventId: String, reason: String) {
+        if (payment.pointAmount.signum() <= 0) return
+        pointCommandService.restoreUsedPoints(payment.userId, payment.id!!, payment.orderId, eventId, reason)
     }
 
     private fun verifyOrder(paymentRequest: PaymentRequest, userId: Long) {

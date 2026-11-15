@@ -32,5 +32,15 @@ enum class PointErrorCode(
         code = "PNT005",
         message = "다른 요청이 동시에 활성 정책을 바꿨습니다. 정책 목록을 다시 확인해 주세요",
         status = HttpStatus.CONFLICT
+    ),
+    POINT_USE_UNIT_INVALID(
+        code = "PNT006",
+        message = "포인트는 1포인트 단위로 사용할 수 있습니다",
+        status = HttpStatus.BAD_REQUEST
+    ),
+    POINT_USE_EXCEEDS_PAYABLE(
+        code = "PNT007",
+        message = "포인트는 쿠폰 할인 뒤 결제할 금액까지만 사용할 수 있습니다",
+        status = HttpStatus.BAD_REQUEST
     )
 }

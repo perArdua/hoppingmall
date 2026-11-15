@@ -3,7 +3,6 @@ package com.hoppingmall.product.product.service
 import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
-import com.hoppingmall.product.common.file.FileUploadConfig
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.service.InventoryCommandService
@@ -26,7 +25,7 @@ class ProductCommandServiceImpl(
     private val productRepository: ProductRepository,
     private val productImageRepository: ProductImageRepository,
     private val categoryRepository: CategoryRepository,
-    private val fileUploadConfig: FileUploadConfig,
+    private val productImageLinker: ProductImageLinker,
     private val inventoryCommandService: InventoryCommandService,
     private val inventoryRepository: InventoryRepository
 ) : ProductCommandService {
@@ -34,9 +33,11 @@ class ProductCommandServiceImpl(
     override fun createProduct(request: ProductCreateRequest): ProductResponse {
         val categoryId = requireNotNull(request.categoryId)
         val category = categoryRepository.findNullableById(categoryId) ?: throw CategoryNotFoundException()
+        val sellerId = requireNotNull(request.sellerId)
+        val imageUrls = productImageLinker.link(sellerId, request.imageUrls)
 
         val product = Product.create(
-            sellerId = requireNotNull(request.sellerId),
+            sellerId = sellerId,
             categoryId = categoryId,
             name = request.name,
             description = request.description,
@@ -46,7 +47,6 @@ class ProductCommandServiceImpl(
         product.changeWithdrawalRestriction(request.withdrawalRestricted, request.withdrawalRestrictionReason)
         val savedProduct = productRepository.save(product)
 
-        val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(fileUploadConfig.defaultImagePath)
         val productImages = imageUrls.mapIndexed { index, url ->
             ProductImage.create(
                 productId = savedProduct.id!!,
@@ -83,9 +83,9 @@ class ProductCommandServiceImpl(
         val existingImages = productImageRepository.findByProductIdOrderBySortOrder(productId)
         val requestedImageUrls = request.imageUrls
             ?: return ProductResponse.from(updatedProduct, existingImages, category.name)
+        val imageUrls = productImageLinker.link(product.sellerId, requestedImageUrls, existingImages.map { it.imageUrl })
         existingImages.forEach { it.softDelete() }
 
-        val imageUrls = requestedImageUrls.ifEmpty { listOf(fileUploadConfig.defaultImagePath) }
         val newImages = imageUrls.mapIndexed { index, url ->
             ProductImage.create(
                 productId = productId,
