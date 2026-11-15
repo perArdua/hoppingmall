@@ -5,6 +5,7 @@ import com.hoppingmall.dlq.archival.NoOpDLQArchivalService
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
 import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.dto.DLQRetryResultResponse
 import com.hoppingmall.dlq.metrics.DLQMetrics
 import com.hoppingmall.dlq.metrics.NoOpDLQMetrics
 import com.hoppingmall.dlq.publisher.DLQMessagePublisher
@@ -80,7 +81,7 @@ class DLQBulkRetryMySqlTransactionTest {
     fun 일괄_재처리는_메시지마다_커밋해_다음_메시지를_처리하는_동안_앞_메시지의_행을_잠그지_않는다() {
         val ids = savePending(3)
 
-        val batch = executor.submit<Map<String, Any>> { dlqCommandService.retryDLQMessagesByTopic(TOPIC, 50) }
+        val batch = executor.submit<DLQRetryResultResponse> { dlqCommandService.retryDLQMessagesByTopic(TOPIC, 50) }
         assertThat(publisher.secondEntered.await(15, TimeUnit.SECONDS)).isTrue()
 
         val lockedIds = ids.filter { isRowLocked(it) }
@@ -90,7 +91,7 @@ class DLQBulkRetryMySqlTransactionTest {
 
         assertThat(lockedIds).hasSize(1)
         assertThat(processedVisible).isEqualTo(1L)
-        assertThat(result["successCount"]).isEqualTo(3)
+        assertThat(result.successCount).isEqualTo(3)
         assertThat(countByStatus(DLQStatus.PROCESSED)).isEqualTo(3L)
     }
 
@@ -101,7 +102,7 @@ class DLQBulkRetryMySqlTransactionTest {
 
         val result = dlqCommandService.retryDLQMessagesByTopic(TOPIC, 50)
 
-        assertThat(result["totalAttempted"]).isEqualTo(3)
+        assertThat(result.totalAttempted).isEqualTo(3)
         assertThat(countByStatus(DLQStatus.PROCESSED)).isEqualTo(3L)
         assertThat(countByStatus(DLQStatus.PENDING)).isEqualTo(2L)
     }
@@ -113,7 +114,7 @@ class DLQBulkRetryMySqlTransactionTest {
 
         val result = dlqCommandService.retryDLQMessagesByTopic(TOPIC, 0)
 
-        assertThat(result["totalAttempted"]).isEqualTo(0)
+        assertThat(result.totalAttempted).isEqualTo(0)
         assertThat(countByStatus(DLQStatus.PENDING)).isEqualTo(2L)
     }
 

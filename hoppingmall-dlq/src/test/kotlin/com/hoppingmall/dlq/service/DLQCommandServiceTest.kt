@@ -329,10 +329,10 @@ class DLQCommandServiceTest {
 
             val result = dlqCommandService.retryDLQMessagesByTopic(topic, maxCount)
 
-            assertEquals(topic, result["topic"])
-            assertEquals(2, result["totalAttempted"])
-            assertEquals(2, result["successCount"])
-            assertEquals(0, result["failureCount"])
+            assertEquals(topic, result.topic)
+            assertEquals(2, result.totalAttempted)
+            assertEquals(2, result.successCount)
+            assertEquals(0, result.failureCount)
         }
     }
 
