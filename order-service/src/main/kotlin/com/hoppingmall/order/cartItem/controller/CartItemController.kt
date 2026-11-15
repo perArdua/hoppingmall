@@ -26,6 +26,7 @@ class CartItemController(
 ) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun addCartItem(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: CartItemCreateRequest

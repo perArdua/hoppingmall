@@ -14,6 +14,7 @@ import com.hoppingmall.product.product.controller.ProductController
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.dto.request.ProductUpdateRequest
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -136,22 +137,22 @@ abstract class ProductWriteInventoryScenarios : MySqlIntegrationTestSupport() {
 
     @Test
     fun 수정에서_이미지를_보내지_않으면_기존_이미지를_그대로_둔다() {
-        val product = productCommandService.createProduct(createRequest(imageUrls = listOf("/a.jpg", "/b.jpg")))
+        val product = productCommandService.createProduct(createRequest(imageUrls = listOf("a.jpg", "b.jpg")))
 
         val updated = productCommandService.updateProduct(product.id, updateRequest(status = null, imageUrls = null))
 
-        assertThat(updated.imageUrls).containsExactly("/a.jpg", "/b.jpg")
-        assertThat(activeImages(product.id)).containsExactly("/a.jpg", "/b.jpg")
+        assertThat(updated.imageUrls).containsExactly(UploadedImageSupport.url("a.jpg"), UploadedImageSupport.url("b.jpg"))
+        assertThat(activeImages(product.id)).containsExactly(UploadedImageSupport.url("a.jpg"), UploadedImageSupport.url("b.jpg"))
     }
 
     @Test
     fun 수정에서_이미지를_보내면_그_목록으로_바꾼다() {
-        val product = productCommandService.createProduct(createRequest(imageUrls = listOf("/a.jpg")))
+        val product = productCommandService.createProduct(createRequest(imageUrls = listOf("a.jpg")))
 
-        val updated = productCommandService.updateProduct(product.id, updateRequest(status = null, imageUrls = listOf("/c.jpg")))
+        val updated = productCommandService.updateProduct(product.id, updateRequest(status = null, imageUrls = listOf("c.jpg")))
 
-        assertThat(updated.imageUrls).containsExactly("/c.jpg")
-        assertThat(activeImages(product.id)).containsExactly("/c.jpg")
+        assertThat(updated.imageUrls).containsExactly(UploadedImageSupport.url("c.jpg"))
+        assertThat(activeImages(product.id)).containsExactly(UploadedImageSupport.url("c.jpg"))
     }
 
     @Test
@@ -171,13 +172,13 @@ abstract class ProductWriteInventoryScenarios : MySqlIntegrationTestSupport() {
         name = "재고 함께 등록",
         description = "설명",
         price = BigDecimal("1000"),
-        imageUrls = imageUrls,
+        imageUrls = imageUrls?.let { UploadedImageSupport.register(jdbcTemplate, it) },
         status = status,
         stockQuantity = stockQuantity
     )
 
     private fun updateRequest(status: ProductStatus?, imageUrls: List<String>?): ProductUpdateRequest {
-        val base = ProductUpdateRequest(categoryId = categoryId, name = "바뀐 이름", description = "바뀐 설명", price = BigDecimal("2000"), imageUrls = imageUrls)
+        val base = ProductUpdateRequest(categoryId = categoryId, name = "바뀐 이름", description = "바뀐 설명", price = BigDecimal("2000"), imageUrls = imageUrls?.let { UploadedImageSupport.register(jdbcTemplate, it) })
         return if (status == null) base else base.copy(status = status)
     }
 

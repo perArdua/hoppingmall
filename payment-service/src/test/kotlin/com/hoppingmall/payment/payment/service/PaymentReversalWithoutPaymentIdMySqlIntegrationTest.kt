@@ -82,7 +82,8 @@ class PaymentReversalWithoutPaymentIdMySqlIntegrationTest : MySqlJpaTestSupport(
             mock(),
             mock(),
             FakeOrderSummaryQueryPort(),
-            transactionManager
+            transactionManager,
+            mock()
         )
         val transactionTemplate = TransactionTemplate(transactionManager)
         val transactional = object : PaymentCommandService by target {

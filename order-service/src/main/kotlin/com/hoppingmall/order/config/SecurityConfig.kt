@@ -27,5 +27,6 @@ class SecurityConfig(
     ) {
         auth.requestMatchers("/ops/**", "/api/v1/admin/**").hasRole("ADMIN")
         auth.requestMatchers(HttpMethod.PATCH, "/api/v1/orders/*/status").hasAnyRole("SELLER", "ADMIN")
+        auth.requestMatchers(HttpMethod.GET, "/api/v1/orders/seller", "/api/v1/orders/seller/*").hasRole("SELLER")
     }
 }

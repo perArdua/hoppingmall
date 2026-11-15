@@ -3,6 +3,7 @@ package com.hoppingmall.product.product.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.common.enums.WithdrawalRestrictionReason
 import jakarta.persistence.*
 import org.hibernate.annotations.ColumnDefault
 import org.hibernate.annotations.SQLRestriction
@@ -48,6 +49,22 @@ class Product private constructor(
     @Column(nullable = false, precision = 3, scale = 2, insertable = false, updatable = false)
     var averageRating: BigDecimal = BigDecimal.ZERO
 
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    var withdrawalRestricted: Boolean = false
+        private set
+
+    @Convert(converter = WithdrawalRestrictionReasonConverter::class)
+    @Column(length = 32)
+    var withdrawalRestrictionReason: WithdrawalRestrictionReason? = null
+        private set
+
+    fun changeWithdrawalRestriction(restricted: Boolean, reason: WithdrawalRestrictionReason?) {
+        require(restricted == (reason != null)) { "청약철회를 제한하면 사유가 있어야 하고, 제한하지 않으면 사유가 없어야 합니다" }
+        this.withdrawalRestricted = restricted
+        this.withdrawalRestrictionReason = reason
+    }
+
     fun update(name: String, description: String, price: BigDecimal, categoryId: Long, status: ProductStatus?) {
         require(price > BigDecimal.ZERO) { "가격은 0보다 커야 합니다" }
         this.name = name
@@ -73,3 +90,5 @@ class Product private constructor(
 }
 
 class ProductStatusConverter : EnumNameConverter<ProductStatus>(ProductStatus::class.java)
+
+class WithdrawalRestrictionReasonConverter : EnumNameConverter<WithdrawalRestrictionReason>(WithdrawalRestrictionReason::class.java)

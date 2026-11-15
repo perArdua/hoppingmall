@@ -29,13 +29,13 @@ class CartItem private constructor(
     val productId: Long,
 
     @Column
-    val productName: String,
+    var productName: String,
 
     @Column(precision = 10, scale = 2)
-    val productPrice: BigDecimal,
+    var productPrice: BigDecimal,
 
     @Column
-    val productImageUrl: String?,
+    var productImageUrl: String?,
 
     @Column
     var quantity: Int,
@@ -47,6 +47,13 @@ class CartItem private constructor(
     fun updateQuantity(newQuantity: Int) {
         this.quantity = newQuantity
         this.totalPrice = productPrice.multiply(BigDecimal(newQuantity))
+    }
+
+    fun refreshProduct(productName: String, productPrice: BigDecimal, productImageUrl: String?) {
+        this.productName = productName
+        this.productPrice = productPrice
+        this.productImageUrl = productImageUrl
+        this.totalPrice = productPrice.multiply(BigDecimal(quantity))
     }
     companion object {
         fun create(

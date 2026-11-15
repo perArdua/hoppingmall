@@ -12,6 +12,7 @@ import com.hoppingmall.order.refund.domain.Refund
 import com.hoppingmall.order.refund.domain.RefundAmountCalculator
 import com.hoppingmall.order.refund.domain.RefundDeadline
 import com.hoppingmall.order.refund.domain.RefundItem
+import com.hoppingmall.order.refund.domain.RefundPointShare
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.dto.event.RefundCompletedEvent
@@ -19,6 +20,7 @@ import com.hoppingmall.order.refund.dto.event.RefundItemEvent
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.order.refund.dto.response.RefundResponse
+import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.refund.exception.RefundAccessDeniedException
 import com.hoppingmall.order.refund.exception.RefundAlreadyExistsException
@@ -33,7 +35,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
-import java.math.RoundingMode
 import java.time.LocalDateTime
 
 @Service
@@ -103,6 +104,12 @@ class RefundCommandServiceImpl(
                 throw RefundAlreadyExistsException()
             }
 
+            if (request.reason == RefundReason.CHANGE_OF_MIND &&
+                request.items.any { orderItemMap[it.orderItemId]?.withdrawalRestricted == true }
+            ) {
+                throw RefundException(RefundErrorCode.REFUND_WITHDRAWAL_RESTRICTED)
+            }
+
             val refundedQuantities = refundItemRepository.findRefundedQuantitiesByOrderId(request.orderId)
             val refundedMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedQuantity.toInt() }
             val refundedAmountMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedAmount }
@@ -144,6 +151,17 @@ class RefundCommandServiceImpl(
                 alreadyRefunded + currentRefund == orderItem.quantity
             }
 
+            val pointRefundAmount = RefundPointShare.of(
+                usedPoints = payment.pointAmount,
+                orderTotal = order.totalAmount,
+                refundedGross = request.items.fold(BigDecimal.ZERO) { acc, item ->
+                    acc.add(orderItemMap.getValue(item.orderItemId).productPrice.multiply(BigDecimal(item.quantity)))
+                },
+                alreadyRefundedPoints = refundRepository.findByOrderIdAndStatusNot(request.orderId, RefundStatus.REJECTED)
+                    .fold(BigDecimal.ZERO) { acc, it -> acc.add(it.pointRefundAmount) },
+                isFullRefund = isFullRefund
+            )
+
             val firstOrderItem = orderItemMap[request.items.first().orderItemId]!!
             val sellerId = firstOrderItem.sellerId
 
@@ -156,7 +174,8 @@ class RefundCommandServiceImpl(
                 reasonDetail = request.reasonDetail,
                 refundAmount = refundAmount,
                 isFullRefund = isFullRefund,
-                returnShippingFee = returnShippingFee
+                returnShippingFee = returnShippingFee,
+                pointRefundAmount = pointRefundAmount
             )
             val savedRefund = refundRepository.save(refund)
 
@@ -231,17 +250,6 @@ class RefundCommandServiceImpl(
         refundItems: List<RefundItem>,
         payment: PaymentInfo
     ) {
-        val pointRefundAmount = if (refund.isFullRefund) {
-            payment.pointAmount
-        } else {
-            if (payment.amount > BigDecimal.ZERO) {
-                payment.pointAmount.multiply(refund.refundAmount)
-                    .divide(payment.amount, 0, RoundingMode.HALF_UP)
-            } else {
-                BigDecimal.ZERO
-            }
-        }
-
         refundEventPublisher.publishRefundCompletedEvent(
             RefundCompletedEvent(
                 refundId = refund.id!!,
@@ -249,7 +257,7 @@ class RefundCommandServiceImpl(
                 paymentId = payment.id,
                 buyerId = refund.buyerId,
                 refundAmount = refund.refundAmount,
-                pointRefundAmount = pointRefundAmount,
+                pointRefundAmount = refund.pointRefundAmount,
                 isFullRefund = refund.isFullRefund,
                 couponId = if (refund.isFullRefund) payment.couponId else null,
                 items = refundItems.map { item ->

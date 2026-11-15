@@ -74,10 +74,12 @@ class PointReclaimHistoryTypeMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 환불로_포인트를_돌려주는_이력은_지금처럼_반환_타입에_양수_금액으로_남는다() {
         val payment = savedSucceededPayment()
+        pointRepository.save(Point(userId = USER_ID, balance = BigDecimal("1000")))
+        pointCommandService.useForPayment(USER_ID, payment.id!!, payment.orderId, BigDecimal("500"))
 
-        pointCommandService.refundPoints(USER_ID, BigDecimal("500"), payment.id!!, payment.orderId)
+        pointCommandService.refundPoints(USER_ID, BigDecimal("500"), payment.id!!, payment.orderId, 1L)
 
-        assertThat(history("refund-point-${payment.id}-${payment.orderId}")).isEqualTo("REFUND" to BigDecimal("500.00"))
+        assertThat(history("refund-point-1")).isEqualTo("REFUND" to BigDecimal("500.00"))
     }
 
     @Test

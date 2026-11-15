@@ -113,7 +113,7 @@ class NotificationEventConsumer(
             )
             redisTemplate.convertAndSend(
                 NotificationSseService.CHANNEL_NAME,
-                objectMapper.writeValueAsString(message)
+                objectMapper.writeValueAsString(message.toRedisMessage())
             )
         } catch (e: Exception) {
             log.warn("SSE Redis publish 실패: userId={}, error={}", notification.userId, e.message)

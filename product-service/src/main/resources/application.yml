@@ -82,7 +82,6 @@ services:
 
 file:
   upload:
-    base-upload-dir: ${FILE_UPLOAD_BASE_DIR:/tmp/hoppingmall}
     max-file-size: 5242880
     allowed-extensions:
       - jpg
@@ -93,6 +92,16 @@ file:
     allowed-domains:
       - product
     sub-directory: images
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    region: ${STORAGE_REGION:ap-northeast-2}
+    bucket: ${STORAGE_BUCKET:hoppingmall-product}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    path-style-access: ${STORAGE_PATH_STYLE_ACCESS:true}
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:9000/hoppingmall-product}
+    orphan-ttl-hours: 24
+    orphan-cron: "0 30 * * * *"
 
 internal:
   service:
