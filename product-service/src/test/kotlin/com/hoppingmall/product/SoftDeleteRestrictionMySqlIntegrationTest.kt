@@ -23,6 +23,7 @@ import com.hoppingmall.product.review.dto.request.ReviewCreateRequest
 import com.hoppingmall.product.review.port.OrderItemInfo
 import com.hoppingmall.product.review.port.OrderQueryPort
 import com.hoppingmall.product.review.service.ReviewCommandService
+import com.hoppingmall.product.review.service.ProductReviewSummaryService
 import com.hoppingmall.product.review.service.ReviewCommandServiceImpl
 import com.hoppingmall.product.review.service.ReviewQueryService
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
@@ -64,6 +65,9 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
     @Autowired
     private lateinit var productStatisticsRepository: ProductStatisticsRepository
+
+    @Autowired
+    private lateinit var productReviewSummaryService: ProductReviewSummaryService
 
     @Autowired
     private lateinit var categoryCommandService: CategoryCommandService
@@ -218,7 +222,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
             OrderItemInfo(ORDER_ITEM_ID, ORDER_ID, SELLER_ID, PRODUCT_ID, "리뷰 상품", BigDecimal("10000"), 1, BigDecimal("10000"))
         )
         whenever(orderQueryPort.isDelivered(any(), any())).thenReturn(true)
-        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository)
+        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService)
         val tx = TransactionTemplate(transactionManager)
         val request = ReviewCreateRequest(orderItemId = ORDER_ITEM_ID, rating = 2, content = "처음 쓴 리뷰 내용입니다")
         val firstId = tx.execute { service.createReview(BUYER_ID, request) }!!.id
