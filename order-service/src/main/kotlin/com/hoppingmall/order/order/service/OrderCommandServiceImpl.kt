@@ -22,6 +22,7 @@ import com.hoppingmall.order.order.exception.OrderPriceChangedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
+import com.hoppingmall.order.order.exception.OrderSelfPurchaseException
 import com.hoppingmall.order.order.exception.OrderTotalAmountExceededException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.common.KafkaTopics
@@ -79,6 +80,9 @@ class OrderCommandServiceImpl(
         val productMap = findProducts(productIds).associateBy { it.id }
         productIds.forEach { productId ->
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
+        }
+        if (productMap.values.any { it.sellerId == buyerId }) {
+            throw OrderSelfPurchaseException()
         }
 
         val priceChanges = priceChanges(cartItems, productMap, request)
