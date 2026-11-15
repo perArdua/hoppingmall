@@ -4,6 +4,7 @@ import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.InventoryReservation
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
+import com.hoppingmall.product.inventory.dto.request.InventoryAdjustRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
@@ -90,6 +91,13 @@ class InventoryCommandServiceImpl(
         if (bucketStockService.enabled) {
             bucketStockService.redistribute(productId, stockQuantity)
         }
+        return InventoryResponse.from(inventory)
+    }
+
+    @CacheEvict(cacheNames = ["inventory"], key = "#productId")
+    override fun adjustStock(productId: Long, request: InventoryAdjustRequest): InventoryResponse {
+        val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+            ?: throw InventoryNotFoundException()
         return InventoryResponse.from(inventory)
     }
 

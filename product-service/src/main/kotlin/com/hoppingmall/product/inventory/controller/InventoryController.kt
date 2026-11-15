@@ -3,6 +3,7 @@ package com.hoppingmall.product.inventory.controller
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.idempotency.Idempotent
+import com.hoppingmall.product.inventory.dto.request.InventoryAdjustRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
@@ -55,5 +56,13 @@ class InventoryController(
         productOwnershipPolicy.checkOwner(productId, userPrincipal)
         val response = inventoryCommandService.updateStock(productId, request)
         return ResponseEntity.ok(ApiResponse.success(response))
+    }
+
+    fun adjustStock(
+        productId: Long,
+        request: InventoryAdjustRequest,
+        userPrincipal: UserPrincipal
+    ): ResponseEntity<ApiResponse<InventoryResponse>> {
+        return ResponseEntity.ok(ApiResponse.success(inventoryCommandService.adjustStock(productId, request)))
     }
 }
