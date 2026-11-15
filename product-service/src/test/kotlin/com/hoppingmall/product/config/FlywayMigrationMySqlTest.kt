@@ -37,7 +37,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true")
     }
 
     @Test
@@ -58,13 +58,14 @@ class FlywayMigrationMySqlTest {
     fun ddl_auto가_만든_기존_DB에_붙이면_기준선으로_표시하고_데이터를_그대로_둔다() {
         val database = freshDatabase("existing")
         legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
+        dropObjectsAddedAfterBaseline(database)
         insertDlqMessage(database, "PENDING")
 
         runner(database, "docker").run { context ->
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
         assertThat(jdbc(database).queryForList("SELECT status FROM dlq_messages", String::class.java)).containsExactly("PENDING")
     }
 
@@ -72,6 +73,7 @@ class FlywayMigrationMySqlTest {
     fun 옛_코드가_만든_ENUM_열은_값을_그대로_둔_채_VARCHAR로_바꾸고_기동한다() {
         val database = freshDatabase("legacy_enum")
         legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
+        dropObjectsAddedAfterBaseline(database)
         LEGACY_ENUM_COLUMNS.forEach { it.revertToEnum(jdbc(database)) }
         insertDlqMessage(database, "FAILED")
 
@@ -79,7 +81,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
         LEGACY_ENUM_COLUMNS.forEach {
             assertThat(columnType(database, it.table, it.column)).isEqualTo("varchar(32)")
             assertThat(columnNullable(database, it.table, it.column)).isEqualTo(if (it.nullable) "YES" else "NO")
@@ -112,6 +114,10 @@ class FlywayMigrationMySqlTest {
             assertThat(context.startupFailure).rootCause().isInstanceOf(SchemaManagementException::class.java)
             assertThat(context.startupFailure).rootCause().hasMessageContaining("average_rating")
         }
+    }
+
+    private fun dropObjectsAddedAfterBaseline(database: String) {
+        jdbc(database).execute("DROP TABLE uploaded_files")
     }
 
     private fun insertDlqMessage(database: String, status: String) {
