@@ -1,6 +1,8 @@
 package com.hoppingmall.product.inventory.service
 
 import com.hoppingmall.product.inventory.port.OrderTerminalCheckPort
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -22,6 +24,7 @@ class ConfirmedReservationCleanupRegistrationTest {
     private val contextRunner = ApplicationContextRunner()
         .withBean(JdbcTemplate::class.java, { mock<JdbcTemplate>() })
         .withBean(OrderTerminalCheckPort::class.java, { mock<OrderTerminalCheckPort>() })
+        .withBean(MeterRegistry::class.java, { SimpleMeterRegistry() })
         .withUserConfiguration(
             SchedulingTestConfig::class.java,
             ConfirmedReservationCleanupProperties::class.java,

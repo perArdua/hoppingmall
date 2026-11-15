@@ -3,6 +3,7 @@ package com.hoppingmall.product.inventory.service
 import com.hoppingmall.common.config.InternalRestTemplateConfig
 import com.hoppingmall.product.inventory.port.HttpOrderTerminalCheckAdapter
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -41,6 +42,7 @@ class ConfirmedReservationCleanupMySqlIntegrationTest : MySqlIntegrationTestSupp
 
     private lateinit var server: MockRestServiceServer
     private lateinit var adapter: HttpOrderTerminalCheckAdapter
+    private val meterRegistry = SimpleMeterRegistry()
 
     @BeforeEach
     fun setUpOrderServer() {
@@ -69,6 +71,56 @@ class ConfirmedReservationCleanupMySqlIntegrationTest : MySqlIntegrationTestSupp
         assertThat(remaining()).containsExactlyInAnyOrder(
             "old-unknown", "young-confirmed", "old-cancelled", "old-reserved", "old-claimed"
         )
+    }
+
+    @Test
+    fun 취소된_주문의_확정_예약은_지우지_않고_건너뛴_수를_센다() {
+        insert("old-cancelled-order", "CONFIRMED", old)
+        insert("old-delivered-order", "CONFIRMED", old)
+        expectCheck(
+            listOf("old-cancelled-order", "old-delivered-order"),
+            answer(listOf("old-cancelled-order", "old-delivered-order"), cancelledIds = listOf("old-cancelled-order"))
+        )
+
+        val result = job().cleanUp(now)
+
+        server.verify()
+        assertThat(result.deleted).isEqualTo(1)
+        assertThat(result.skipped).isEqualTo(1)
+        assertThat(result.failed).isFalse()
+        assertThat(remaining()).containsExactly("old-cancelled-order")
+        assertThat(statusOf("old-cancelled-order")).isEqualTo("CONFIRMED")
+        assertThat(skippedCount("cancelled_order")).isEqualTo(1.0)
+    }
+
+    @Test
+    fun order가_끝난_이유를_알려주지_않으면_아무것도_지우지_않고_건너뛴_수를_센다() {
+        insert("old-a", "CONFIRMED", old)
+        insert("old-b", "CONFIRMED", old)
+        expectCheck(listOf("old-a", "old-b"), answer(listOf("old-a", "old-b"), cancelledIds = null))
+
+        val result = job().cleanUp(now)
+
+        server.verify()
+        assertThat(result.deleted).isZero()
+        assertThat(result.skipped).isEqualTo(2)
+        assertThat(result.failed).isFalse()
+        assertThat(remaining()).containsExactlyInAnyOrder("old-a", "old-b")
+        assertThat(skippedCount("reason_unknown")).isEqualTo(2.0)
+    }
+
+    @Test
+    fun 끝나지_않은_예약이_취소_목록에_있어도_건너뛴_수에_넣지_않는다() {
+        insert("old-a", "CONFIRMED", old)
+        insert("old-b", "CONFIRMED", old)
+        expectCheck(listOf("old-a", "old-b"), answer(listOf("old-b"), cancelledIds = listOf("old-a", "not-asked")))
+
+        val result = job().cleanUp(now)
+
+        server.verify()
+        assertThat(result.deleted).isEqualTo(1)
+        assertThat(result.skipped).isZero()
+        assertThat(remaining()).containsExactly("old-a")
     }
 
     @Test
@@ -132,6 +184,8 @@ class ConfirmedReservationCleanupMySqlIntegrationTest : MySqlIntegrationTestSupp
             """{"code":"SUCCESS","message":"성공","data":{"terminal_reservation_ids":[1]}}""",
             """{"code":"SUCCESS","message":"성공","data":null}""",
             """{"code":"FAIL","message":"실패","data":{"terminal_reservation_ids":["old-a"]}}""",
+            """{"code":"SUCCESS","message":"성공","data":{"terminal_reservation_ids":["old-a"],"cancelled_reservation_ids":"old-a"}}""",
+            """{"code":"SUCCESS","message":"성공","data":{"terminal_reservation_ids":["old-a"],"cancelled_reservation_ids":[1]}}""",
             """["old-a"]"""
         ]
     )
@@ -259,7 +313,7 @@ class ConfirmedReservationCleanupMySqlIntegrationTest : MySqlIntegrationTestSupp
             this.batchSize = batchSize
             this.maxBatches = maxBatches
         }
-        return ConfirmedReservationCleanupJob(jdbcTemplate, adapter, properties)
+        return ConfirmedReservationCleanupJob(jdbcTemplate, adapter, properties, meterRegistry)
     }
 
     private fun expectCheck(reservationIds: List<String>, response: ResponseCreator) {
@@ -271,13 +325,17 @@ class ConfirmedReservationCleanupMySqlIntegrationTest : MySqlIntegrationTestSupp
             .andRespond(response)
     }
 
-    private fun answer(terminalIds: List<String>): ResponseCreator {
+    private fun answer(terminalIds: List<String>, cancelledIds: List<String>? = emptyList()): ResponseCreator {
         val ids = terminalIds.joinToString(",") { "\"$it\"" }
+        val cancelled = cancelledIds?.joinToString(",", prefix = ""","cancelled_reservation_ids":[""", postfix = "]") { "\"$it\"" }.orEmpty()
         return withSuccess(
-            """{"code":"SUCCESS","message":"성공","data":{"terminal_reservation_ids":[$ids]}}""",
+            """{"code":"SUCCESS","message":"성공","data":{"terminal_reservation_ids":[$ids]$cancelled}}""",
             MediaType.APPLICATION_JSON
         )
     }
+
+    private fun skippedCount(reason: String): Double =
+        meterRegistry.find("inventory.reservation.confirmed_cleanup.skipped").tag("reason", reason).counter()?.count() ?: 0.0
 
     private fun insert(reservationId: String, status: String, updatedAt: LocalDateTime) {
         jdbcTemplate.update(

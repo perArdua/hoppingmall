@@ -2,6 +2,7 @@ package com.hoppingmall.product.inventory.service
 
 import com.hoppingmall.product.inventory.port.HttpOrderTerminalCheckAdapter
 import com.hoppingmall.product.inventory.port.OrderTerminalCheckPort
+import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.JdbcTemplate
@@ -15,7 +16,8 @@ import java.time.LocalDateTime
 class ConfirmedReservationCleanupJob(
     private val jdbcTemplate: JdbcTemplate,
     private val terminalCheckPort: OrderTerminalCheckPort,
-    private val properties: ConfirmedReservationCleanupProperties
+    private val properties: ConfirmedReservationCleanupProperties,
+    meterRegistry: MeterRegistry
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -78,7 +80,7 @@ class ConfirmedReservationCleanupJob(
         )
     }
 
-    data class CleanupResult(val asked: Int, val deleted: Int, val failed: Boolean)
+    data class CleanupResult(val asked: Int, val deleted: Int, val failed: Boolean, val skipped: Int = 0)
 
     companion object {
         private val SELECT_CONFIRMED = """
