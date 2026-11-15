@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
+@ConditionalOnProperty(name = [Constants.SPRINGDOC_ENABLED], matchIfMissing = true)
 class OpenApiConfig {
     init {
         SpringDocUtils.getConfig().addRequestWrapperToIgnore(UserPrincipal::class.java)
