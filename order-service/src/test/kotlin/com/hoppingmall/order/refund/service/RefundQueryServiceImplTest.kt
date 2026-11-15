@@ -2,6 +2,8 @@ package com.hoppingmall.order.refund.service
 
 import com.hoppingmall.order.refund.domain.Refund
 import com.hoppingmall.order.refund.domain.RefundItem
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
+import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundReason
@@ -34,6 +36,12 @@ class RefundQueryServiceImplTest {
 
     @Mock
     private lateinit var refundItemRepository: RefundItemRepository
+
+    @Mock
+    private lateinit var orderRepository: OrderRepository
+
+    @Mock
+    private lateinit var orderItemRepository: OrderItemRepository
 
     @InjectMocks
     private lateinit var service: RefundQueryServiceImpl

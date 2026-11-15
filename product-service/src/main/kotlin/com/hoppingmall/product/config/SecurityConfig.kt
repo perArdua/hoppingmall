@@ -33,6 +33,7 @@ class SecurityConfig(
             .requestMatchers(HttpMethod.POST, "/api/v1/products/bulk/import").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.POST, "/api/v1/inventories").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/api/v1/inventories/{productId}").hasAnyRole("SELLER", "ADMIN")
+            .requestMatchers(HttpMethod.POST, "/api/v1/inventories/{productId}/adjustments").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.POST, "/api/v1/categories").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PUT, "/api/v1/categories/{categoryId}").hasRole("ADMIN")
             .requestMatchers(HttpMethod.DELETE, "/api/v1/categories/{categoryId}").hasRole("ADMIN")

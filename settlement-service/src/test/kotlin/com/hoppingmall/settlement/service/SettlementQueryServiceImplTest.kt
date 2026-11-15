@@ -1,8 +1,10 @@
 package com.hoppingmall.settlement.service
 
 import com.hoppingmall.settlement.domain.Settlement
+import com.hoppingmall.settlement.domain.SettlementRefund
 import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
+import com.hoppingmall.settlement.domain.repository.SettlementRefundRepository
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
 import com.hoppingmall.settlement.enums.SettlementStatus
@@ -41,6 +43,9 @@ class SettlementQueryServiceImplTest {
 
     @Mock
     private lateinit var settlementSummaryRepository: SettlementSummaryRepository
+
+    @Mock
+    private lateinit var settlementRefundRepository: SettlementRefundRepository
 
     @InjectMocks
     private lateinit var settlementQueryServiceImpl: SettlementQueryServiceImpl
@@ -120,6 +125,35 @@ class SettlementQueryServiceImplTest {
 
         assertThat(result.id).isEqualTo(1L)
         assertThat(result.sellerId).isEqualTo(1L)
+    }
+
+    @Test
+    fun 정산_상세는_이월_금액과_차감한_환불을_함께_보여준다() {
+        val settlement = Settlement.create(
+            sellerId = 1L,
+            periodStart = LocalDate.of(2026, 2, 1),
+            periodEnd = LocalDate.of(2026, 2, 28),
+            totalSalesAmount = BigDecimal.ZERO,
+            totalRefundAmount = BigDecimal("30000"),
+            commissionRate = BigDecimal("0.05"),
+            commissionAmount = BigDecimal("-1500.00"),
+            settlementAmount = BigDecimal.ZERO,
+            carriedInAmount = BigDecimal("1000.00"),
+            carryOverAmount = BigDecimal("29500.00")
+        )
+        ReflectionTestUtils.setField(settlement, "id", 2L)
+        val refund = SettlementRefund.create(settlementId = 2L, refundId = 901L, refundAmount = BigDecimal("30000"))
+
+        whenever(settlementRepository.findById(2L)).thenReturn(Optional.of(settlement))
+        whenever(settlementItemRepository.findBySettlementId(2L)).thenReturn(emptyList())
+        whenever(settlementRefundRepository.findBySettlementId(2L)).thenReturn(listOf(refund))
+
+        val result = settlementQueryServiceImpl.getSettlementDetail(2L, 1L)
+
+        assertThat(result.carriedInAmount).isEqualByComparingTo("1000")
+        assertThat(result.carryOverAmount).isEqualByComparingTo("29500")
+        assertThat(result.refunds.map { it.refundId to it.refundAmount }).containsExactly(901L to BigDecimal("30000"))
+        assertThat(refund.settlementId).isEqualTo(2L)
     }
 
     @Test

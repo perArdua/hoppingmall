@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Positive
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
+@ValidCouponTerms
 data class CouponCreateRequest(
     @field:NotBlank(message = "쿠폰명은 필수입니다.")
     val name: String,

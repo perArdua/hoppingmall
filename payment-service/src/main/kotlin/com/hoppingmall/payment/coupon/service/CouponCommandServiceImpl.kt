@@ -76,7 +76,7 @@ class CouponCommandServiceImpl(
             if (status == CouponStatus.INACTIVE) {
                 couponStockRedisRepository.deleteStock(couponId)
             } else if (status == CouponStatus.ACTIVE) {
-                couponStockRedisRepository.initializeStock(couponId, saved.totalQuantity - saved.issuedQuantity)
+                initializeRedisFromDb(saved)
             }
         } catch (e: Exception) {
             log.warn("Redis 재고 상태 변경 실패: couponId={}, status={}", couponId, status, e)
@@ -92,7 +92,7 @@ class CouponCommandServiceImpl(
         if (result is CouponReserveResult.NotInitialized) {
             val coupon = couponRepository.findActiveById(couponId)
                 ?: throw CouponNotFoundException()
-            couponStockRedisRepository.initializeStock(couponId, coupon.totalQuantity - coupon.issuedQuantity)
+            initializeRedisFromDb(coupon)
             result = couponStockRedisRepository.tryReserve(couponId, userId)
         }
 
@@ -101,6 +101,11 @@ class CouponCommandServiceImpl(
             is CouponReserveResult.AlreadyIssued -> throw CouponAlreadyIssuedException()
             is CouponReserveResult.NotInitialized -> throw CouponNotFoundException()
             is CouponReserveResult.Success -> {}
+        }
+
+        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
+            releaseReservedStock(couponId, userId)
+            throw CouponAlreadyIssuedException()
         }
 
         registerStockRestoreOnRollback(couponId, userId)
@@ -121,6 +126,24 @@ class CouponCommandServiceImpl(
         val savedUserCoupon = userCouponRepository.save(userCoupon)
         log.info("쿠폰 발급: userId={}, couponId={}", userId, couponId)
         return UserCouponResponse.from(savedUserCoupon, coupon)
+    }
+
+    private fun initializeRedisFromDb(coupon: Coupon) {
+        val couponId = coupon.id!!
+        couponStockRedisRepository.initializeStock(
+            couponId,
+            coupon.totalQuantity - coupon.issuedQuantity,
+            userCouponRepository.findUserIdsByCouponId(couponId)
+        )
+    }
+
+    private fun releaseReservedStock(couponId: Long, userId: Long) {
+        try {
+            couponStockRedisRepository.releaseStock(couponId, userId)
+            log.warn("DB에 이미 발급된 사용자가 Redis 발급 집합에 없어 예약 재고를 되돌림: couponId={}, userId={}", couponId, userId)
+        } catch (e: Exception) {
+            log.error("이미 발급된 사용자의 예약 재고 되돌림 실패: couponId={}, userId={}", couponId, userId, e)
+        }
     }
 
     private fun registerStockRestoreOnRollback(couponId: Long, userId: Long) {

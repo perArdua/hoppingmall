@@ -5,6 +5,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -27,6 +28,13 @@ interface OrderRepository : JpaRepository<Order, Long> {
     """
     )
     fun isHeldBySagaTimeout(@Param("orderId") orderId: Long): Boolean
+
+    @Modifying(flushAutomatically = true)
+    @Query(
+        value = "UPDATE shippings SET status = 'CANCELLED', updated_at = NOW(6) WHERE order_id = :orderId AND status = 'PREPARING'",
+        nativeQuery = true
+    )
+    fun cancelPreparingShipping(@Param("orderId") orderId: Long): Int
 
     fun findByStatusAndUpdatedAtBefore(status: OrderStatus, updatedBefore: LocalDateTime, pageable: Pageable): List<Order>
 }

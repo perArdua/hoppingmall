@@ -140,7 +140,7 @@ class RequiredNumberFieldRequestTest {
 
         mockMvc.patch("/api/v1/inventories/$productId") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"stockQuantity":50}"""
+            content = """{"stockQuantity":50,"expected_stock_quantity":10}"""
             header("X-User-Id", SELLER.toString())
             header("x-user-role", "SELLER")
         }.andExpect { status { isBadRequest() } }
@@ -154,7 +154,7 @@ class RequiredNumberFieldRequestTest {
 
         mockMvc.patch("/api/v1/inventories/$productId") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"stock_quantity":null}"""
+            content = """{"stock_quantity":null,"expected_stock_quantity":10}"""
             header("X-User-Id", SELLER.toString())
             header("x-user-role", "SELLER")
         }.andExpect { status { isBadRequest() } }

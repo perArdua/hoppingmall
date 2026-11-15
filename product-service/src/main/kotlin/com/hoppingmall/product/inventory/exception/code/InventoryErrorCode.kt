@@ -18,4 +18,6 @@ enum class InventoryErrorCode(
     INVALID_STOCK_CHANGE_QUANTITY("INV008", "재고 증감 수량은 1개 이상이어야 합니다.", HttpStatus.BAD_REQUEST),
     RESERVATION_REQUEST_KEY_CONFLICT("INV009", "같은 요청 키로 내용이 다른 예약 요청이 왔습니다.", HttpStatus.CONFLICT),
     INVALID_RESERVATION_REQUEST_KEY("INV010", "예약 요청 키는 비어 있지 않은 64자 이하 문자열이어야 합니다.", HttpStatus.BAD_REQUEST),
+    INVENTORY_STOCK_CHANGED("INV011", "재고가 그 사이 바뀌었습니다. 재고를 다시 조회한 뒤 고쳐주세요.", HttpStatus.CONFLICT),
+    INVALID_STOCK_ADJUSTMENT("INV012", "재고 증감 수량은 0이 아니어야 합니다.", HttpStatus.BAD_REQUEST),
 }

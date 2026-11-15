@@ -80,6 +80,7 @@ class SagaTimeoutScheduler(
             order.updateStatus(OrderStatus.CANCEL_REQUESTED)
             order.updateStatus(OrderStatus.CANCELLED)
             orderRepository.save(order)
+            orderRepository.cancelPreparingShipping(orderId)
 
             transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",

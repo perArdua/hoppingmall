@@ -8,5 +8,4 @@ interface OrderCommandService {
     fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse
     fun cancelOrder(buyerId: Long, orderId: Long): OrderResponse
     fun cancelPayingOrder(orderId: Long): Boolean
-    fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse
 }

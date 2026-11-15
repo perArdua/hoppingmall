@@ -30,5 +30,6 @@ class SecurityConfig(
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
             .requestMatchers(HttpMethod.POST, "/api/v1/point-policies", "/api/v1/point-policies/**").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PUT, "/api/v1/point-policies/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET, "/api/v1/point-policies").hasRole("ADMIN")
     }
 }

@@ -3,6 +3,7 @@ package com.hoppingmall.settlement.domain
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.settlement.enums.SettlementStatus
 import jakarta.persistence.*
+import org.hibernate.annotations.ColumnDefault
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -53,6 +54,14 @@ class SettlementSummary(
     @Column(nullable = false, precision = 12, scale = 2)
     var settlementAmount: BigDecimal,
 
+    @ColumnDefault("0")
+    @Column(nullable = false, precision = 12, scale = 2)
+    var carriedInAmount: BigDecimal = BigDecimal.ZERO,
+
+    @ColumnDefault("0")
+    @Column(nullable = false, precision = 12, scale = 2)
+    var carryOverAmount: BigDecimal = BigDecimal.ZERO,
+
     @Convert(converter = SettlementStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: SettlementStatus,
@@ -76,6 +85,8 @@ class SettlementSummary(
                 commissionRate = settlement.commissionRate,
                 commissionAmount = settlement.commissionAmount,
                 settlementAmount = settlement.settlementAmount,
+                carriedInAmount = settlement.carriedInAmount,
+                carryOverAmount = settlement.carryOverAmount,
                 status = settlement.status,
                 confirmedAt = settlement.confirmedAt,
                 paidAt = settlement.paidAt
@@ -89,6 +100,8 @@ class SettlementSummary(
         this.commissionRate = settlement.commissionRate
         this.commissionAmount = settlement.commissionAmount
         this.settlementAmount = settlement.settlementAmount
+        this.carriedInAmount = settlement.carriedInAmount
+        this.carryOverAmount = settlement.carryOverAmount
         this.status = settlement.status
         this.confirmedAt = settlement.confirmedAt
         this.paidAt = settlement.paidAt
