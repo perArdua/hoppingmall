@@ -33,20 +33,21 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true")
     }
 
     @Test
     fun ddl_auto가_만든_기존_DB에_붙이면_기준선으로_표시하고_데이터를_그대로_둔다() {
         val database = freshDatabase("existing")
         legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
+        dropObjectsAddedAfterBaseline(database)
         jdbc(database).update("INSERT INTO settlement_seller_locks (seller_id) VALUES (7)")
 
         runner(database, "docker").run { context ->
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
         assertThat(jdbc(database).queryForList("SELECT seller_id FROM settlement_seller_locks", Long::class.java)).containsExactly(7L)
     }
 
@@ -54,6 +55,7 @@ class FlywayMigrationMySqlTest {
     fun 옛_코드가_만든_ENUM_상태_열은_값을_그대로_둔_채_VARCHAR로_바꾸고_기동한다() {
         val database = freshDatabase("legacy_enum")
         legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
+        dropObjectsAddedAfterBaseline(database)
         jdbc(database).execute("ALTER TABLE settlements MODIFY status enum('CALCULATED','CONFIRMED','PAID') NOT NULL")
         jdbc(database).execute("ALTER TABLE settlement_summaries MODIFY status enum('CALCULATED','CONFIRMED','PAID') NOT NULL")
         jdbc(database).update(
@@ -66,7 +68,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
         assertThat(columnType(database, "settlements", "status")).isEqualTo("varchar(32)")
         assertThat(columnType(database, "settlement_summaries", "status")).isEqualTo("varchar(32)")
         assertThat(jdbc(database).queryForList("SELECT status FROM settlements", String::class.java)).containsExactly("PAID")
@@ -97,6 +99,66 @@ class FlywayMigrationMySqlTest {
             assertThat(context.startupFailure).rootCause().isInstanceOf(SchemaManagementException::class.java)
             assertThat(context.startupFailure).rootCause().hasMessageContaining("paid_at")
         }
+    }
+
+    @Test
+    fun V3는_지급되지_않은_음수_정산을_지급액_0과_이월로_바꾸고_지급된_정산은_그대로_둔다() {
+        val database = freshDatabase("negative")
+        runner(database, "docker")
+            .withPropertyValues("spring.flyway.target=2", "spring.jpa.hibernate.ddl-auto=none")
+            .run { context -> assertThat(context).hasNotFailed() }
+        val calculated = insertSettlement(database, sellerId = 5, month = 1, amount = "-20500.00", status = "CALCULATED")
+        val paid = insertSettlement(database, sellerId = 5, month = 2, amount = "-100.00", status = "PAID")
+        val positive = insertSettlement(database, sellerId = 5, month = 3, amount = "95000.00", status = "CONFIRMED")
+        jdbc(database).update(
+            "INSERT INTO settlement_summaries (settlement_id, seller_id, period_start, period_end, total_sales_amount, " +
+                "total_refund_amount, commission_rate, commission_amount, settlement_amount, status, created_at) " +
+                "VALUES (?, 5, '2026-01-01', '2026-01-31', 10000.00, 30000.00, 0.0500, 500.00, -20500.00, 'CALCULATED', NOW(6))",
+            calculated
+        )
+
+        runner(database, "docker").run { context -> assertThat(context).hasNotFailed() }
+
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true")
+        assertThat(amounts(database, "settlements", "id")).containsExactly(
+            "$calculated|0.00|20500.00|0.00",
+            "$paid|-100.00|0.00|0.00",
+            "$positive|95000.00|0.00|0.00"
+        )
+        assertThat(amounts(database, "settlement_summaries", "settlement_id")).containsExactly("$calculated|0.00|20500.00|0.00")
+        assertThat(
+            jdbc(database).queryForList(
+                "SELECT CONCAT_WS('|', seller_id, source_settlement_id, amount, IFNULL(applied_settlement_id, 'NULL')) FROM settlement_carry_overs",
+                String::class.java
+            )
+        ).containsExactly("5|$calculated|20500.00|NULL")
+    }
+
+    private fun insertSettlement(database: String, sellerId: Long, month: Int, amount: String, status: String): Long {
+        jdbc(database).update(
+            "INSERT INTO settlements (seller_id, period_start, period_end, total_sales_amount, total_refund_amount, " +
+                "commission_rate, commission_amount, settlement_amount, status, created_at) " +
+                "VALUES (?, ?, ?, 10000.00, 30000.00, 0.0500, 500.00, ?, ?, NOW(6))",
+            sellerId,
+            "2026-%02d-01".format(month),
+            "2026-%02d-28".format(month),
+            amount,
+            status
+        )
+        return jdbc(database).queryForObject("SELECT MAX(id) FROM settlements", Long::class.java)!!
+    }
+
+    private fun amounts(database: String, table: String, idColumn: String): List<String> =
+        jdbc(database).queryForList(
+            "SELECT CONCAT_WS('|', $idColumn, settlement_amount, carry_over_amount, carried_in_amount) FROM $table ORDER BY $idColumn",
+            String::class.java
+        )
+
+    private fun dropObjectsAddedAfterBaseline(database: String) {
+        jdbc(database).execute("DROP TABLE settlement_refunds")
+        jdbc(database).execute("DROP TABLE settlement_carry_overs")
+        jdbc(database).execute("ALTER TABLE settlements DROP COLUMN carried_in_amount, DROP COLUMN carry_over_amount")
+        jdbc(database).execute("ALTER TABLE settlement_summaries DROP COLUMN carried_in_amount, DROP COLUMN carry_over_amount")
     }
 
     private fun runner(database: String, profile: String): ApplicationContextRunner =

@@ -7,6 +7,7 @@ import com.hoppingmall.settlement.dto.response.SettlementResponse
 import com.hoppingmall.settlement.exception.SettlementAlreadyExistsException
 import com.hoppingmall.settlement.port.OrderItemInfo
 import com.hoppingmall.settlement.port.OrderItemQueryPort
+import com.hoppingmall.settlement.port.RefundInfo
 import com.hoppingmall.settlement.port.RefundQueryPort
 import com.hoppingmall.settlement.support.MySqlJpaTestSupport
 import org.assertj.core.api.Assertions.assertThat
@@ -140,6 +141,82 @@ class SettlementConcurrentCreationMySqlIntegrationTest : MySqlJpaTestSupport() {
         assertThat(periodsOf(otherSellerId)).containsExactly(date(1, 1) to date(1, 31))
         assertThat(periodsOf(heldSellerId)).containsExactly(date(1, 1) to date(1, 31))
     }
+
+    @Test
+    fun 같은_환불이_두_정산에_동시에_잡혀도_한_번만_차감된다() {
+        val sellerId = 41L
+        whenever(refundQueryPort.findCompletedBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
+            .thenReturn(listOf(RefundInfo(id = 7001L, refundAmount = BigDecimal("20000"))))
+        val held = holdCreation(sellerId, date(1, 1), date(1, 31))
+
+        val enteredAt = AtomicLong(0L)
+        val second = executor.submit<Result<SettlementResponse>> {
+            enteredAt.set(System.currentTimeMillis())
+            runCatching { create(sellerId, date(3, 1), date(3, 31)) }
+        }
+        awaitLockWait(second, enteredAt, "두 번째 정산 생성", "settlement_seller_locks")
+        held.release.countDown()
+
+        val firstResult = held.result.get(30, TimeUnit.SECONDS)
+        val secondResult = second.get(30, TimeUnit.SECONDS)
+
+        assertThat(firstResult.isSuccess).describedAs("첫째=%s", firstResult).isTrue()
+        assertThat(secondResult.isSuccess).describedAs("둘째=%s", secondResult).isTrue()
+        assertThat(sumOf(sellerId, "total_refund_amount")).isEqualByComparingTo("20000")
+    }
+
+    @Test
+    fun 이월된_금액은_동시에_만든_두_정산_중_하나에서만_뺀다() {
+        val sellerId = 51L
+        whenever(orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
+            .thenAnswer { invocation ->
+                val month = invocation.getArgument<LocalDateTime>(1).monthValue
+                listOf(
+                    OrderItemInfo(
+                        id = sellerId * 1000 + month,
+                        orderId = 100L + month,
+                        sellerId = sellerId,
+                        productId = 1L,
+                        productName = "상품A",
+                        productPrice = BigDecimal(if (month == 1) "10000" else "100000"),
+                        quantity = 1,
+                        totalPrice = BigDecimal(if (month == 1) "10000" else "100000")
+                    )
+                )
+            }
+        whenever(refundQueryPort.findCompletedBySellerAndPeriod(any(), any<LocalDateTime>(), any<LocalDateTime>()))
+            .thenAnswer { invocation ->
+                if (invocation.getArgument<LocalDateTime>(1).monthValue == 1) {
+                    listOf(RefundInfo(id = 7101L, refundAmount = BigDecimal("30000")))
+                } else {
+                    emptyList()
+                }
+            }
+        create(sellerId, date(1, 1), date(1, 31))
+        val held = holdCreation(sellerId, date(2, 1), date(2, 28))
+
+        val enteredAt = AtomicLong(0L)
+        val second = executor.submit<Result<SettlementResponse>> {
+            enteredAt.set(System.currentTimeMillis())
+            runCatching { create(sellerId, date(3, 1), date(3, 31)) }
+        }
+        awaitLockWait(second, enteredAt, "두 번째 정산 생성", "settlement_seller_locks")
+        held.release.countDown()
+
+        val firstResult = held.result.get(30, TimeUnit.SECONDS)
+        val secondResult = second.get(30, TimeUnit.SECONDS)
+
+        assertThat(firstResult.isSuccess).describedAs("첫째=%s", firstResult).isTrue()
+        assertThat(secondResult.isSuccess).describedAs("둘째=%s", secondResult).isTrue()
+        assertThat(sumOf(sellerId, "settlement_amount")).isEqualByComparingTo("171000")
+    }
+
+    private fun sumOf(sellerId: Long, column: String): BigDecimal =
+        jdbcTemplate.queryForObject(
+            "SELECT COALESCE(SUM($column), 0) FROM settlements WHERE seller_id = ?",
+            BigDecimal::class.java,
+            sellerId
+        )!!
 
     private fun holdCreation(sellerId: Long, start: LocalDate, end: LocalDate): HeldCreation {
         val transactionTemplate = TransactionTemplate(transactionManager)
