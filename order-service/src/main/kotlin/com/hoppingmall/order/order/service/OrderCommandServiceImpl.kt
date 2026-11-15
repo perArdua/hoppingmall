@@ -144,7 +144,9 @@ class OrderCommandServiceImpl(
                     productName = product.name,
                     productPrice = product.price,
                     quantity = cartItem.quantity,
-                    reservationId = reservationMap[cartItem.productId]
+                    reservationId = reservationMap[cartItem.productId],
+                    withdrawalRestricted = product.withdrawalRestricted,
+                    withdrawalRestrictionReason = product.withdrawalRestrictionReason
                 )
             }
             val savedOrderItems = orderItemRepository.saveAll(orderItems)

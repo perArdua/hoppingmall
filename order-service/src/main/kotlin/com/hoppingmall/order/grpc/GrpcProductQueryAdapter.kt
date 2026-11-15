@@ -37,7 +37,9 @@ class GrpcProductQueryAdapter(
             sellerId = response.sellerId,
             imageUrl = response.imageUrl.takeIf { it.isNotBlank() },
             status = response.status.takeIf { it.isNotBlank() },
-            stockQuantity = response.stockQuantity.takeIf { response.status.isNotBlank() }
+            stockQuantity = response.stockQuantity.takeIf { response.status.isNotBlank() },
+            withdrawalRestricted = response.withdrawalRestricted,
+            withdrawalRestrictionReason = response.withdrawalRestrictionReason.takeIf { it.isNotBlank() }
         )
     }
 
@@ -54,7 +56,9 @@ class GrpcProductQueryAdapter(
                 price = product.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
                 sellerId = product.sellerId,
                 status = product.status.takeIf { it.isNotBlank() },
-                stockQuantity = product.stockQuantity.takeIf { product.status.isNotBlank() }
+                stockQuantity = product.stockQuantity.takeIf { product.status.isNotBlank() },
+                withdrawalRestricted = product.withdrawalRestricted,
+                withdrawalRestrictionReason = product.withdrawalRestrictionReason.takeIf { reason -> reason.isNotBlank() }
             )
         }
     }

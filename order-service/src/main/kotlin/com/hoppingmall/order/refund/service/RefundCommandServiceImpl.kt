@@ -20,6 +20,7 @@ import com.hoppingmall.order.refund.dto.event.RefundItemEvent
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.order.refund.dto.response.RefundResponse
+import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.refund.exception.RefundAccessDeniedException
 import com.hoppingmall.order.refund.exception.RefundAlreadyExistsException
@@ -101,6 +102,12 @@ class RefundCommandServiceImpl(
                 .toSet()
             if (request.items.any { it.orderItemId in inProgressItemIds }) {
                 throw RefundAlreadyExistsException()
+            }
+
+            if (request.reason == RefundReason.CHANGE_OF_MIND &&
+                request.items.any { orderItemMap[it.orderItemId]?.withdrawalRestricted == true }
+            ) {
+                throw RefundException(RefundErrorCode.REFUND_WITHDRAWAL_RESTRICTED)
             }
 
             val refundedQuantities = refundItemRepository.findRefundedQuantitiesByOrderId(request.orderId)

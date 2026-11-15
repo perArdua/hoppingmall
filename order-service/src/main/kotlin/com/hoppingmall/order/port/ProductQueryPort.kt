@@ -14,7 +14,9 @@ data class ProductInfo(
     val sellerId: Long,
     val imageUrl: String? = null,
     val status: String? = null,
-    val stockQuantity: Int? = null
+    val stockQuantity: Int? = null,
+    val withdrawalRestricted: Boolean = false,
+    val withdrawalRestrictionReason: String? = null
 ) {
     fun isOnSale(): Boolean = status != SOLD_OUT
 
