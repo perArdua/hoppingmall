@@ -142,7 +142,7 @@ class PaymentCommandServiceImpl(
         return executeCancelPayment(payment)
     }
 
-    override fun findPaymentIdByOrderId(orderId: Long): Long? = paymentRepository.findByOrderId(orderId)?.id
+    override fun findPaymentIdByOrderId(orderId: Long): Long? = paymentRepository.findByActiveOrderId(orderId)?.id
 
     private fun executeCancelPayment(payment: Payment): PaymentResponse {
         if (payment.isCancelled()) {

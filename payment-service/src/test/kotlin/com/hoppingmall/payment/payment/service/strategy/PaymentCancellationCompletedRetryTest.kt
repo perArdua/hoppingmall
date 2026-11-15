@@ -79,7 +79,7 @@ class PaymentCancellationCompletedRetryTest {
     @Test
     fun 취소가_커밋된_뒤_완료_이벤트_쓰기가_실패하면_재처리에서_완료_이벤트를_내고_실패_이벤트는_내지_않는다() {
         val payment = payment(orderId = 100L, id = 1L)
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(100L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(1L)).thenAnswer {
             if (payment.status != PaymentStatus.CANCELLED) {
                 payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
@@ -109,7 +109,7 @@ class PaymentCancellationCompletedRetryTest {
     fun 처리_전부터_취소돼_있던_결제에_취소_요청이_오면_완료_이벤트를_낸다() {
         val payment = payment(orderId = 200L, id = 2L)
         payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
-        whenever(paymentRepository.findByOrderId(200L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(200L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(2L)).thenReturn(mock<PaymentResponse>())
 
         handler.handle(request("cancel-200-1", 200L))
@@ -126,7 +126,7 @@ class PaymentCancellationCompletedRetryTest {
     @Test
     fun 다른_요청이_결제를_취소한_뒤_새_취소_요청이_와도_완료_이벤트를_낸다() {
         val payment = payment(orderId = 300L, id = 3L)
-        whenever(paymentRepository.findByOrderId(300L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(300L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(3L)).thenAnswer {
             if (payment.status != PaymentStatus.CANCELLED) {
                 payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)

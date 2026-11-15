@@ -98,7 +98,7 @@ class PaymentKafkaRecordRecovererTest {
 
     @Test
     fun 결제_취소가_예상_밖_예외로_재시도를_모두_소진하면_취소_실패_이벤트를_한_건_낸다() {
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment(orderId = 100L, id = 1L))
+        whenever(paymentRepository.findByActiveOrderId(100L)).thenReturn(payment(orderId = 100L, id = 1L))
         whenever(paymentCommandService.cancelPaymentInternal(1L))
             .thenThrow(DataAccessResourceFailureException("저장소 연결 실패"))
 
@@ -128,7 +128,7 @@ class PaymentKafkaRecordRecovererTest {
 
     @Test
     fun 취소_실패를_알린_뒤_같은_요청이_다시_오면_결제_취소를_다시_시도하지_않는다() {
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment(orderId = 100L, id = 1L))
+        whenever(paymentRepository.findByActiveOrderId(100L)).thenReturn(payment(orderId = 100L, id = 1L))
         whenever(paymentCommandService.cancelPaymentInternal(1L))
             .thenThrow(DataAccessResourceFailureException("저장소 연결 실패"))
         repeat(4) {
@@ -144,7 +144,7 @@ class PaymentKafkaRecordRecovererTest {
 
     @Test
     fun 일시_오류_뒤_다음_시도에서_취소되면_완료_이벤트만_내고_실패_이벤트는_내지_않는다() {
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment(orderId = 100L, id = 1L))
+        whenever(paymentRepository.findByActiveOrderId(100L)).thenReturn(payment(orderId = 100L, id = 1L))
         whenever(paymentCommandService.cancelPaymentInternal(1L))
             .thenThrow(DataAccessResourceFailureException("저장소 연결 실패"))
             .thenReturn(mock())

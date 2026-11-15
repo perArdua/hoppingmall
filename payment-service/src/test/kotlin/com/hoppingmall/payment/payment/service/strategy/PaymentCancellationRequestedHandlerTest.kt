@@ -61,7 +61,7 @@ class PaymentCancellationRequestedHandlerTest {
         setEntityId(payment, 1L)
 
         whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any())).thenReturn(log)
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(100L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(1L)).thenReturn(mock())
 
         handler.handle(node)
@@ -87,7 +87,7 @@ class PaymentCancellationRequestedHandlerTest {
         )
 
         whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any())).thenReturn(log)
-        whenever(paymentRepository.findByOrderId(200L)).thenReturn(null)
+        whenever(paymentRepository.findByActiveOrderId(200L)).thenReturn(null)
 
         handler.handle(node)
 
@@ -114,7 +114,7 @@ class PaymentCancellationRequestedHandlerTest {
         setEntityId(payment, 3L)
 
         whenever(compensationEventLogService.saveIfAbsent(any(), any(), any(), any())).thenReturn(log)
-        whenever(paymentRepository.findByOrderId(300L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(300L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(3L)).thenThrow(PaymentInvalidStateException())
 
         handler.handle(node)

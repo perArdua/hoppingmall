@@ -29,7 +29,7 @@ class PaymentCancellationRequestedHandler(
         val orderId = node.get("orderId")?.asLong() ?: return
 
         try {
-            val payment = paymentRepository.findByOrderId(orderId)
+            val payment = paymentRepository.findByActiveOrderId(orderId)
             val log = compensationEventLogService.saveIfAbsent(
                 eventId = eventId,
                 compensationType = "PAYMENT_CANCELLATION_REQUESTED",
@@ -72,7 +72,7 @@ class PaymentCancellationRequestedHandler(
         val eventId = node.get("eventId")?.asText() ?: return
         val orderId = node.get("orderId")?.asLong() ?: return
 
-        val payment = paymentRepository.findByOrderId(orderId)
+        val payment = paymentRepository.findByActiveOrderId(orderId)
         val log = compensationEventLogService.saveIfAbsent(
             eventId = eventId,
             compensationType = "PAYMENT_CANCELLATION_REQUESTED",
