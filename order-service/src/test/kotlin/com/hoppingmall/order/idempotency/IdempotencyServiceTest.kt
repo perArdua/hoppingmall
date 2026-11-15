@@ -97,6 +97,7 @@ class IdempotencyServiceTest {
                 endpoint = "/api/v1/payments",
                 responseStatus = 200,
                 responseBody = """{"id":1}""",
+                requestFingerprint = "fp",
                 ttlHours = 24
             )
 
