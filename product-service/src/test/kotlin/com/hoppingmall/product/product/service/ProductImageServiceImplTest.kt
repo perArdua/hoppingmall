@@ -1,6 +1,7 @@
 package com.hoppingmall.product.product.service
 
 import com.hoppingmall.product.common.file.FileUploadService
+import com.hoppingmall.product.common.file.dto.FileUploadRequest
 import com.hoppingmall.product.common.file.dto.FileUploadResponse
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -11,7 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.mock.web.MockMultipartFile
 
@@ -34,9 +34,9 @@ class ProductImageServiceImplTest {
             fileSize = 4L, domain = "product"
         )
 
-        whenever(fileUploadService.uploadFile(any())).thenReturn(fileResponse)
+        whenever(fileUploadService.uploadFile(FileUploadRequest(file, "product", 3L, "SELLER"))).thenReturn(fileResponse)
 
-        val result = service.uploadProductImage(file)
+        val result = service.uploadProductImage(file, 3L, "SELLER")
 
         assertThat(result.imageUrl).isEqualTo("http://img/test.jpg")
         assertThat(result.fileName).isEqualTo("test.jpg")

@@ -1,14 +1,9 @@
 package com.hoppingmall.payment.point.controller
 
 import com.hoppingmall.common.ApiResponse
-import com.hoppingmall.idempotency.Idempotent
-import com.hoppingmall.payment.point.dto.request.PointUseRequest
 import com.hoppingmall.payment.point.dto.response.PointBalanceResponse
 import com.hoppingmall.payment.point.dto.response.PointHistoryResponse
-import com.hoppingmall.payment.point.dto.response.PointUseResponse
-import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.point.service.PointQueryService
-import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import org.springframework.data.domain.PageRequest
@@ -16,15 +11,13 @@ import org.springframework.data.domain.Slice
 import com.hoppingmall.common.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/points")
 @Tag(name = "포인트")
 class PointController(
-    private val pointQueryService: PointQueryService,
-    private val pointCommandService: PointCommandService
+    private val pointQueryService: PointQueryService
 ) {
 
     @GetMapping("/my-balance")
@@ -46,17 +39,6 @@ class PointController(
         val pageable = PageRequest.of(page, size)
         val history = pointQueryService.getPointHistory(userId, pageable)
         return ApiResponse.success(history)
-    }
-
-    @PostMapping("/use")
-    @Idempotent(ttlHours = 24)
-    fun usePoint(
-        @Valid @RequestBody request: PointUseRequest,
-        @AuthenticationPrincipal principal: UserPrincipal
-    ): ResponseEntity<ApiResponse<PointUseResponse>> {
-        val userId = principal.getUserId()
-        val result = pointCommandService.usePoint(userId, request)
-        return ResponseEntity.ok(ApiResponse.success(result))
     }
 
     companion object {

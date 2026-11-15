@@ -81,6 +81,9 @@ class Order private constructor(
         }
     }
 
+    fun autoCancelAt(payingTimeoutMinutes: Long): LocalDateTime? =
+        if (status == OrderStatus.PAYING) updatedAt?.plusMinutes(payingTimeoutMinutes) else null
+
     fun isRefundWindowClosed(deliveredBefore: LocalDateTime): Boolean =
         deliveredAt?.isBefore(deliveredBefore) == true
 

@@ -2,6 +2,7 @@ package com.hoppingmall.product.product.dto.response
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.common.enums.WithdrawalRestrictionReason
 import com.hoppingmall.product.product.domain.Product
 import com.hoppingmall.product.product.domain.ProductImage
 import java.math.BigDecimal
@@ -25,7 +26,9 @@ data class ProductResponse(
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val inStock: Boolean? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
-    val stockQuantity: Int? = null
+    val stockQuantity: Int? = null,
+    val withdrawalRestricted: Boolean = false,
+    val withdrawalRestrictionReason: WithdrawalRestrictionReason? = null
 ) {
     companion object {
         private const val RATING_SCALE = 1
@@ -44,7 +47,9 @@ data class ProductResponse(
                 updatedAt = product.updatedAt,
                 categoryName = categoryName,
                 averageRating = product.averageRating.setScale(RATING_SCALE, RoundingMode.HALF_UP),
-                reviewCount = product.reviewCount
+                reviewCount = product.reviewCount,
+                withdrawalRestricted = product.withdrawalRestricted,
+                withdrawalRestrictionReason = product.withdrawalRestrictionReason
             )
         }
     }

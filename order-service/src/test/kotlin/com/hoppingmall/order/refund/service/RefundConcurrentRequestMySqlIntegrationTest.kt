@@ -6,7 +6,6 @@ import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.port.PaymentInfo
-import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.order.refund.dto.request.RefundItemRequest
@@ -15,7 +14,7 @@ import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
-import com.hoppingmall.order.support.MySqlJpaTestSupport
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -24,8 +23,6 @@ import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Import
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
@@ -37,8 +34,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 @DisplayName("같은 항목의 환불 요청 동시 처리 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(RefundCommandServiceImpl::class)
-class RefundConcurrentRequestMySqlIntegrationTest : MySqlJpaTestSupport() {
+class RefundConcurrentRequestMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var refundCommandService: RefundCommandServiceImpl
@@ -57,12 +53,6 @@ class RefundConcurrentRequestMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
-
-    @MockitoBean
-    private lateinit var paymentQueryPort: PaymentQueryPort
-
-    @MockitoBean
-    private lateinit var refundEventPublisher: RefundEventPublisher
 
     @BeforeEach
     fun setUp() {

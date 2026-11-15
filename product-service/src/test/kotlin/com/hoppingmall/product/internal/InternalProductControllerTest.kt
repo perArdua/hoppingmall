@@ -1,6 +1,8 @@
 package com.hoppingmall.product.internal
 
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.inventory.domain.Inventory
+import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.product.domain.Product
 import com.hoppingmall.product.product.domain.ProductImage
 import com.hoppingmall.product.product.domain.repository.ProductImageRepository
@@ -29,6 +31,9 @@ class InternalProductControllerTest {
 
     @Mock
     private lateinit var productImageRepository: ProductImageRepository
+
+    @Mock
+    private lateinit var inventoryRepository: InventoryRepository
 
     @InjectMocks
     private lateinit var controller: InternalProductController
@@ -79,6 +84,44 @@ class InternalProductControllerTest {
 
         assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
         assertThat(result.body).hasSize(2)
+    }
+
+    @Test
+    fun 상품_단건_조회는_판매_상태와_재고_수량을_함께_준다() {
+        val product = Product.create(
+            sellerId = 1L, categoryId = 1L, name = "품절상품",
+            description = "설명", price = BigDecimal("10000"), status = ProductStatus.SOLD_OUT
+        ).withId(1L)
+        whenever(productRepository.findNullableById(1L)).thenReturn(product)
+        whenever(productImageRepository.findByProductIdOrderBySortOrder(1L)).thenReturn(emptyList())
+        whenever(inventoryRepository.findByProductId(1L)).thenReturn(Inventory.create(productId = 1L, stockQuantity = 7))
+
+        val body = controller.getProduct(1L).body!!
+
+        assertThat(body.status).isEqualTo("SOLD_OUT")
+        assertThat(body.stockQuantity).isEqualTo(7)
+    }
+
+    @Test
+    fun 상품_목록_조회는_상품마다_판매_상태와_재고_수량을_한_번에_묶어_준다() {
+        val products = listOf(
+            Product.create(
+                sellerId = 1L, categoryId = 1L, name = "상품1",
+                description = "설명", price = BigDecimal("10000"), status = ProductStatus.AVAILABLE
+            ).withId(1L),
+            Product.create(
+                sellerId = 1L, categoryId = 1L, name = "상품2",
+                description = "설명", price = BigDecimal("20000"), status = ProductStatus.SOLD_OUT
+            ).withId(2L)
+        )
+        whenever(productRepository.findAllById(listOf(1L, 2L))).thenReturn(products)
+        whenever(inventoryRepository.findAllByProductIdIn(listOf(1L, 2L)))
+            .thenReturn(listOf(Inventory.create(productId = 1L, stockQuantity = 3)))
+
+        val body = controller.getProductsByIds(listOf(1L, 2L)).body!!
+
+        assertThat(body.map { Triple(it.id, it.status, it.stockQuantity) })
+            .containsExactly(Triple(1L, "AVAILABLE", 3), Triple(2L, "SOLD_OUT", 0))
     }
 
     @Test

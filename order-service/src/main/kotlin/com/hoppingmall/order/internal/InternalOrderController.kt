@@ -175,21 +175,24 @@ class InternalOrderController(
     fun terminalCheck(@Valid @RequestBody request: TerminalCheckRequest): ResponseEntity<ApiResponse<TerminalCheckResponse>> {
         val reservationIds = request.reservationIds.orEmpty().distinct()
         if (reservationIds.isEmpty()) {
-            return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(emptyList())))
+            return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(emptyList(), emptyList())))
         }
         val items = orderItemRepository.findByReservationIdIn(reservationIds)
         val orders = orderRepository.findAllById(items.map { it.orderId }.distinct()).associateBy { it.id!! }
         val now = LocalDateTime.now()
         val updatedBefore = now.minusDays(terminalRetentionDays)
         val deliveredBefore = RefundDeadline(refundPolicy).allWindowsClosedBefore(now.toLocalDate(), terminalRetentionDays)
-        val terminalReservationIds = items
+        val terminal = items
             .groupBy { it.reservationId!! }
             .filterValues { held ->
                 held.all { orders[it.orderId]?.isTerminalBefore(updatedBefore, deliveredBefore) == true }
             }
+            .toSortedMap()
+        val cancelledReservationIds = terminal
+            .filterValues { held -> held.any { orders[it.orderId]?.isCancelled() == true } }
             .keys
-            .sorted()
-        return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(terminalReservationIds)))
+            .toList()
+        return ResponseEntity.ok(ApiResponse.success(TerminalCheckResponse(terminal.keys.toList(), cancelledReservationIds)))
     }
 
     data class TerminalCheckRequest(
@@ -199,7 +202,8 @@ class InternalOrderController(
     )
 
     data class TerminalCheckResponse(
-        val terminalReservationIds: List<String>
+        val terminalReservationIds: List<String>,
+        val cancelledReservationIds: List<String>
     )
 
     data class OrderItemResponse(

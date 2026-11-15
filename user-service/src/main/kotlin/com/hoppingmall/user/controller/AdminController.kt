@@ -23,10 +23,11 @@ class AdminController(
     fun getSellerApplications(
         @RequestParam(required = false) status: Seller.ApprovalStatus?,
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(required = false) keyword: String? = null
     ): ApiResponse<SellerApplicationPageResponse> {
         PageRequestLimits.requireValid(page, size)
-        return ApiResponse.success(sellerQueryService.getApplications(status, page, size))
+        return ApiResponse.success(sellerQueryService.getApplications(status, page, size, keyword))
     }
 
     @PatchMapping("/sellers/{id}/approve")

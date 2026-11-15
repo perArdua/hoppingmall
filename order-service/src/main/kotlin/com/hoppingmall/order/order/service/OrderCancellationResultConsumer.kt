@@ -111,7 +111,8 @@ class OrderCancellationResultConsumer(
                     "userId" to order.buyerId,
                     "type" to "PAYMENT_CANCELLED",
                     "title" to "주문이 취소되었습니다",
-                    "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다."
+                    "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다.",
+                    "metadata" to orderNotificationMetadata(orderId)
                 ),
                 topic = KafkaTopics.NOTIFICATION,
                 partitionKey = orderId.toString()
@@ -184,7 +185,8 @@ class OrderCancellationResultConsumer(
                     "userId" to (order.buyerId),
                     "type" to "PAYMENT_CANCELLED",
                     "title" to "취소 처리에 실패했습니다",
-                    "content" to "주문번호 ${orderId}의 결제 취소가 실패했습니다. 고객센터로 문의해주세요. 사유: $reason"
+                    "content" to "주문번호 ${orderId}의 결제 취소가 실패했습니다. 고객센터로 문의해주세요. 사유: $reason",
+                    "metadata" to orderNotificationMetadata(orderId)
                 ),
                 topic = KafkaTopics.NOTIFICATION,
                 partitionKey = orderId.toString()

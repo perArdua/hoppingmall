@@ -25,6 +25,7 @@ class ShippingController(
 
     @Idempotent(ttlHours = 24)
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createShipping(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: ShippingCreateRequest

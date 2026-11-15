@@ -4,8 +4,7 @@ import com.hoppingmall.common.BusinessException
 import com.hoppingmall.order.cartItem.dto.request.CartItemCreateRequest
 import com.hoppingmall.order.cartItem.dto.response.CartItemResponse
 import com.hoppingmall.order.port.ProductInfo
-import com.hoppingmall.order.port.ProductQueryPort
-import com.hoppingmall.order.support.MySqlJpaTestSupport
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -14,12 +13,7 @@ import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.util.concurrent.CountDownLatch
@@ -31,8 +25,7 @@ import javax.sql.DataSource
 
 @DisplayName("장바구니 담기 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(CartItemCommandServiceImpl::class, CartItemAddMySqlIntegrationTest.TestConfig::class)
-class CartItemAddMySqlIntegrationTest : MySqlJpaTestSupport() {
+class CartItemAddMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var cartItemCommandService: CartItemCommandServiceImpl
@@ -42,9 +35,6 @@ class CartItemAddMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     @Autowired
     private lateinit var dataSource: DataSource
-
-    @MockitoBean
-    private lateinit var productQueryPort: ProductQueryPort
 
     @BeforeEach
     fun setUp() {
@@ -211,13 +201,6 @@ class CartItemAddMySqlIntegrationTest : MySqlJpaTestSupport() {
             Long::class.java,
             TABLE
         )!!
-
-    @TestConfiguration(proxyBeanMethods = false)
-    class TestConfig {
-        @Bean
-        fun transactionTemplate(transactionManager: PlatformTransactionManager): TransactionTemplate =
-            TransactionTemplate(transactionManager)
-    }
 
     companion object {
         private const val BUYER_ID = 10L

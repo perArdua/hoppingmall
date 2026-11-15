@@ -22,9 +22,7 @@ import com.hoppingmall.payment.payment.enum.PaymentStatus
 import com.hoppingmall.payment.payment.service.PaymentCommandService
 import com.hoppingmall.payment.payment.service.PaymentQueryService
 import com.hoppingmall.payment.point.controller.PointController
-import com.hoppingmall.payment.point.dto.request.PointUseRequest
-import com.hoppingmall.payment.point.dto.response.PointUseResponse
-import com.hoppingmall.payment.point.service.PointCommandService
+import com.hoppingmall.payment.payment.dto.request.PaymentRequest
 import com.hoppingmall.payment.point.service.PointQueryService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -57,7 +55,6 @@ class MoneyEntryIdempotencyTest {
 
     private val paymentCommandService: PaymentCommandService = mock()
     private val paymentQueryService: PaymentQueryService = mock()
-    private val pointCommandService: PointCommandService = mock()
     private val pointQueryService: PointQueryService = mock()
     private val couponCommandService: CouponCommandService = mock()
     private val couponQueryService: CouponQueryService = mock()
@@ -67,11 +64,16 @@ class MoneyEntryIdempotencyTest {
     private val records = ConcurrentHashMap<String, IdempotencyRecord>()
 
     private val paymentController = PaymentController(paymentCommandService, paymentQueryService)
-    private val pointController = PointController(pointQueryService, pointCommandService)
+    private val pointController = PointController(pointQueryService)
     private val couponController = CouponController(couponCommandService, couponQueryService)
 
     private val buyer = UserPrincipal.of(BUYER_ID, "BUYER")
-    private val pointUseRequest = PointUseRequest(amount = BigDecimal("500.00"), orderId = ORDER_ID)
+    private val pointPaymentRequest = PaymentRequest(
+        orderId = ORDER_ID,
+        amount = BigDecimal("30000.50"),
+        method = PaymentMethod.CREDIT_CARD,
+        pointAmount = BigDecimal("500")
+    )
 
     @BeforeEach
     fun setUp() {
@@ -113,15 +115,14 @@ class MoneyEntryIdempotencyTest {
     }
 
     @Test
-    fun 같은_키로_포인트_사용을_두_번_요청하면_포인트는_한_번만_차감되고_첫_응답을_받는다() {
-        whenever(pointCommandService.usePoint(BUYER_ID, pointUseRequest))
-            .thenReturn(PointUseResponse(usedAmount = BigDecimal("500.00"), remainingBalance = BigDecimal("1500.00"), orderId = ORDER_ID))
-        val proxy = proxyOf(pointController)
+    fun 같은_키로_포인트를_쓴_결제를_두_번_요청하면_결제와_차감은_한_번만_실행되고_첫_응답을_받는다() {
+        whenever(paymentCommandService.processPayment(pointPaymentRequest, BUYER_ID)).thenReturn(pointPayment())
+        val proxy = proxyOf(paymentController)
 
-        val first = call(POINT_USE_URI, "use-key") { proxy.usePoint(pointUseRequest, buyer) }
-        val second = call(POINT_USE_URI, "use-key") { proxy.usePoint(pointUseRequest, buyer) }
+        val first = call(PAYMENT_URI, "pay-key") { proxy.processPayment(pointPaymentRequest, buyer) }
+        val second = call(PAYMENT_URI, "pay-key") { proxy.processPayment(pointPaymentRequest, buyer) }
 
-        verify(pointCommandService, times(1)).usePoint(BUYER_ID, pointUseRequest)
+        verify(paymentCommandService, times(1)).processPayment(pointPaymentRequest, BUYER_ID)
         assertSameReplay(first, second)
     }
 
@@ -141,32 +142,30 @@ class MoneyEntryIdempotencyTest {
     @Test
     fun 멱등성_키_없이_보내면_세_입구_모두_실행하지_않고_거절한다() {
         val paymentProxy = proxyOf(paymentController)
-        val pointProxy = proxyOf(pointController)
         val couponProxy = proxyOf(couponController)
 
         assertThatThrownBy { call(CANCEL_URI, null) { paymentProxy.cancelPayment(PAYMENT_ID, buyer) } }
             .isInstanceOf(IdempotencyKeyMissingException::class.java)
-        assertThatThrownBy { call(POINT_USE_URI, null) { pointProxy.usePoint(pointUseRequest, buyer) } }
+        assertThatThrownBy { call(PAYMENT_URI, null) { paymentProxy.processPayment(pointPaymentRequest, buyer) } }
             .isInstanceOf(IdempotencyKeyMissingException::class.java)
         assertThatThrownBy { call(COUPON_ISSUE_URI, null) { couponProxy.issueCoupon(buyer, COUPON_ID) } }
             .isInstanceOf(IdempotencyKeyMissingException::class.java)
         verify(paymentCommandService, never()).cancelPayment(any(), any())
-        verify(pointCommandService, never()).usePoint(any(), any())
+        verify(paymentCommandService, never()).processPayment(any(), any())
         verify(couponCommandService, never()).issueCoupon(any(), any())
     }
 
     @Test
-    fun 같은_키로_다른_포인트_금액을_보내면_차감하지_않고_거절한다() {
-        whenever(pointCommandService.usePoint(BUYER_ID, pointUseRequest))
-            .thenReturn(PointUseResponse(usedAmount = BigDecimal("500.00"), remainingBalance = BigDecimal("1500.00"), orderId = ORDER_ID))
-        val proxy = proxyOf(pointController)
-        val other = pointUseRequest.copy(amount = BigDecimal("900.00"))
+    fun 같은_키로_다른_포인트_금액의_결제를_보내면_결제하지_않고_거절한다() {
+        whenever(paymentCommandService.processPayment(pointPaymentRequest, BUYER_ID)).thenReturn(pointPayment())
+        val proxy = proxyOf(paymentController)
+        val other = pointPaymentRequest.copy(pointAmount = BigDecimal("900"))
 
-        call(POINT_USE_URI, "use-key") { proxy.usePoint(pointUseRequest, buyer) }
+        call(PAYMENT_URI, "pay-key") { proxy.processPayment(pointPaymentRequest, buyer) }
 
-        assertThatThrownBy { call(POINT_USE_URI, "use-key") { proxy.usePoint(other, buyer) } }
+        assertThatThrownBy { call(PAYMENT_URI, "pay-key") { proxy.processPayment(other, buyer) } }
             .hasFieldOrPropertyWithValue("errorCode.code", "IDEM003")
-        verify(pointCommandService, never()).usePoint(BUYER_ID, other)
+        verify(paymentCommandService, never()).processPayment(other, BUYER_ID)
     }
 
     @Test
@@ -212,6 +211,17 @@ class MoneyEntryIdempotencyTest {
         )
     }
 
+    private fun pointPayment(): PaymentResponse {
+        val now = LocalDateTime.of(2026, 11, 15, 9, 0)
+        return PaymentResponse(
+            id = PAYMENT_ID, orderId = ORDER_ID, userId = BUYER_ID, amount = BigDecimal("29500.50"),
+            pointAmount = BigDecimal("500"), couponId = null, couponDiscountAmount = BigDecimal.ZERO,
+            method = PaymentMethod.CREDIT_CARD.name, status = PaymentStatus.SUCCESS,
+            transactionId = "MOCK_1_2000", errorMessage = null, completedAt = now,
+            createdAt = now, updatedAt = now
+        )
+    }
+
     private fun issuedCoupon(): UserCouponResponse {
         val now = LocalDateTime.of(2026, 11, 15, 9, 0)
         return UserCouponResponse(
@@ -227,7 +237,7 @@ class MoneyEntryIdempotencyTest {
         private const val PAYMENT_ID = 20L
         private const val COUPON_ID = 5L
         private const val CANCEL_URI = "/api/v1/payments/20/cancel"
-        private const val POINT_USE_URI = "/api/v1/points/use"
+        private const val PAYMENT_URI = "/api/v1/payments"
         private const val COUPON_ISSUE_URI = "/api/v1/coupons/5/issue"
     }
 }

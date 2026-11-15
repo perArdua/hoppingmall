@@ -1,6 +1,9 @@
 package com.hoppingmall.product.product.dto.request
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.common.enums.WithdrawalRestrictionReason
+import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
@@ -21,5 +24,14 @@ data class ProductUpdateRequest(
     
     val imageUrls: List<String>? = null,
     
-    val status: ProductStatus? = null
-) 
+    val status: ProductStatus? = null,
+
+    val withdrawalRestricted: Boolean? = null,
+
+    val withdrawalRestrictionReason: WithdrawalRestrictionReason? = null
+) {
+    @get:JsonIgnore
+    @get:AssertTrue(message = "청약철회를 제한하면 사유를 정해야 하고, 제한하지 않으면 사유를 둘 수 없습니다.")
+    val isWithdrawalRestrictionConsistent: Boolean
+        get() = if (withdrawalRestricted == true) withdrawalRestrictionReason != null else withdrawalRestrictionReason == null
+} 
