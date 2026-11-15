@@ -150,7 +150,7 @@ class ProductWithdrawalRestrictionTest {
         whenever(productRepository.findNullableById(PRODUCT_ID)).thenReturn(product)
         whenever(productRepository.findAllById(listOf(PRODUCT_ID))).thenReturn(listOf(product))
         whenever(productImageRepository.findByProductIdOrderBySortOrder(PRODUCT_ID)).thenReturn(emptyList())
-        val controller = InternalProductController(productRepository, productImageRepository)
+        val controller = InternalProductController(productRepository, productImageRepository, inventoryRepository)
 
         val single = json(controller.getProduct(PRODUCT_ID).body!!)
         val many = json(controller.getProductsByIds(listOf(PRODUCT_ID)).body!!.single())
@@ -167,7 +167,7 @@ class ProductWithdrawalRestrictionTest {
         whenever(productRepository.findNullableById(PRODUCT_ID)).thenReturn(product)
         whenever(productRepository.findAllById(listOf(PRODUCT_ID))).thenReturn(listOf(product))
         whenever(productImageRepository.findByProductIdOrderBySortOrder(PRODUCT_ID)).thenReturn(emptyList())
-        val grpc = GrpcProductQueryService(productRepository, productImageRepository)
+        val grpc = GrpcProductQueryService(productRepository, productImageRepository, inventoryRepository)
 
         val single = runBlocking { grpc.findProductById(ProductIdRequest.newBuilder().setProductId(PRODUCT_ID).build()) }
         val many = runBlocking {
