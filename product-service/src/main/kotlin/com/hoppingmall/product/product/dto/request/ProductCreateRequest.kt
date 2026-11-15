@@ -24,5 +24,7 @@ data class ProductCreateRequest(
     val imageUrls: List<String>? = null,
     
     @field:NotNull(message = "상품 상태는 필수입니다.")
-    val status: ProductStatus = ProductStatus.AVAILABLE
+    val status: ProductStatus = ProductStatus.AVAILABLE,
+
+    val stockQuantity: Int? = null
 ) 
