@@ -43,6 +43,7 @@ class ProductCommandServiceImpl(
             price = request.price,
             status = request.status
         )
+        product.changeWithdrawalRestriction(request.withdrawalRestricted, request.withdrawalRestrictionReason)
         val savedProduct = productRepository.save(product)
 
         val imageUrls = request.imageUrls?.ifEmpty { null } ?: listOf(fileUploadConfig.defaultImagePath)
@@ -75,6 +76,7 @@ class ProductCommandServiceImpl(
             categoryId = categoryId,
             status = request.status
         )
+        request.withdrawalRestricted?.let { product.changeWithdrawalRestriction(it, request.withdrawalRestrictionReason) }
 
         val updatedProduct = productRepository.save(product)
 

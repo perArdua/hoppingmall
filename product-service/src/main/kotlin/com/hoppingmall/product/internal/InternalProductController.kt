@@ -25,7 +25,9 @@ class InternalProductController(
                 name = product.name,
                 price = product.price,
                 sellerId = product.sellerId,
-                imageUrl = firstImageUrl
+                imageUrl = firstImageUrl,
+                withdrawalRestricted = product.withdrawalRestricted,
+                withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name
             )
         )
     }
@@ -39,7 +41,9 @@ class InternalProductController(
                     id = product.id!!,
                     name = product.name,
                     price = product.price,
-                    sellerId = product.sellerId
+                    sellerId = product.sellerId,
+                    withdrawalRestricted = product.withdrawalRestricted,
+                    withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name
                 )
             }
         )
@@ -56,6 +60,8 @@ class InternalProductController(
         val name: String,
         val price: BigDecimal,
         val sellerId: Long,
-        val imageUrl: String? = null
+        val imageUrl: String? = null,
+        val withdrawalRestricted: Boolean = false,
+        val withdrawalRestrictionReason: String? = null
     )
 }

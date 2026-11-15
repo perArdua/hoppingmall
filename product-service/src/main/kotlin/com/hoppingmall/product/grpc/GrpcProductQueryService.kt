@@ -23,6 +23,8 @@ class GrpcProductQueryService(
             price = product.price.toPlainString()
             sellerId = product.sellerId
             imageUrl = firstImageUrl
+            withdrawalRestricted = product.withdrawalRestricted
+            withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name ?: ""
         }
     }
 
@@ -36,6 +38,8 @@ class GrpcProductQueryService(
                         name = product.name
                         price = product.price.toPlainString()
                         sellerId = product.sellerId
+                        withdrawalRestricted = product.withdrawalRestricted
+                        withdrawalRestrictionReason = product.withdrawalRestrictionReason?.name ?: ""
                     }
                 }
             )
