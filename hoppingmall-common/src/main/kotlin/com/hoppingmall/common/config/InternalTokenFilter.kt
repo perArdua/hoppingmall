@@ -1,5 +1,8 @@
 package com.hoppingmall.common.config
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.CommonErrorCode
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -8,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
+import java.nio.charset.StandardCharsets
 
 @Component
 @ConditionalOnProperty(name = ["internal.service.token"])
@@ -26,11 +30,16 @@ class InternalTokenFilter(
     ) {
         val token = request.getHeader("X-Internal-Token")
         if (token == null || token != serviceToken) {
-            response.status = HttpServletResponse.SC_UNAUTHORIZED
+            response.status = CommonErrorCode.UNAUTHORIZED.status.value()
             response.contentType = MediaType.APPLICATION_JSON_VALUE
-            response.writer.write("""{"code":"UNAUTHORIZED","message":"Invalid internal service token"}""")
+            response.characterEncoding = StandardCharsets.UTF_8.name()
+            objectMapper.writeValue(response.writer, ApiResponse.failure<Unit>(CommonErrorCode.UNAUTHORIZED))
             return
         }
         filterChain.doFilter(request, response)
+    }
+
+    private companion object {
+        val objectMapper = ObjectMapper()
     }
 }
