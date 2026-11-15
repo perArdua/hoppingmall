@@ -19,6 +19,7 @@ import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.order.refund.dto.response.RefundResponse
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.refund.exception.RefundAccessDeniedException
+import com.hoppingmall.order.refund.exception.RefundAlreadyExistsException
 import com.hoppingmall.order.refund.exception.RefundException
 import com.hoppingmall.order.refund.exception.RefundNotFoundException
 import com.hoppingmall.order.refund.exception.RefundPaymentNotFoundException
@@ -63,6 +64,7 @@ class RefundCommandServiceImpl(
         }
 
         return transactionTemplate.execute { _ ->
+            orderRepository.lockById(request.orderId)
             val order = orderRepository.findByIdOrNull(request.orderId) ?: throw OrderNotFoundException() 
 
             if (order.buyerId != buyerId) {
@@ -79,6 +81,14 @@ class RefundCommandServiceImpl(
 
             val orderItems = orderItemRepository.findByOrderId(request.orderId)
             val orderItemMap = orderItems.associateBy { it.id!! }
+
+            val inProgressItemIds = refundItemRepository.findRefundQuantitiesByStatus(request.orderId)
+                .filter { it.status in IN_PROGRESS_STATUSES && it.quantity > 0 }
+                .map { it.orderItemId }
+                .toSet()
+            if (request.items.any { it.orderItemId in inProgressItemIds }) {
+                throw RefundAlreadyExistsException()
+            }
 
             val refundedQuantities = refundItemRepository.findRefundedQuantitiesByOrderId(request.orderId)
             val refundedMap = refundedQuantities.associate { it.orderItemId to it.totalRefundedQuantity.toInt() }
@@ -230,5 +240,9 @@ class RefundCommandServiceImpl(
                 }
             )
         )
+    }
+
+    companion object {
+        private val IN_PROGRESS_STATUSES = setOf(RefundStatus.REQUESTED.name, RefundStatus.APPROVED.name)
     }
 }
