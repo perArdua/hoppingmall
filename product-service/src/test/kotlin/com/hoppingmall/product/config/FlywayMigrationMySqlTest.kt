@@ -70,6 +70,35 @@ class FlywayMigrationMySqlTest {
     }
 
     @Test
+    fun 기준선_뒤의_표와_열이_이미_있는_기존_DB에_붙이면_V3_V4는_건너뛰고_데이터를_그대로_둔다() {
+        val database = freshDatabase("existing_with_later_objects")
+        legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
+        jdbc(database).update(
+            "INSERT INTO uploaded_files (object_key, uploader_id, uploader_role, content_type, file_size, status, created_at) " +
+                "VALUES ('product/images/kept.jpg', 7, 'SELLER', 'image/jpeg', 10, 'ATTACHED', NOW(6))"
+        )
+        jdbc(database).update(
+            "INSERT INTO products (name, price, category_id, seller_id, status, withdrawal_restricted, withdrawal_restriction_reason, created_at) " +
+                "VALUES ('kept', 1000.00, 1, 7, 'AVAILABLE', 1, 'PERISHABLE', NOW(6))"
+        )
+
+        runner(database, "docker").run { context ->
+            assertThat(context).hasNotFailed()
+        }
+
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(jdbc(database).queryForList("SELECT object_key FROM uploaded_files", String::class.java))
+            .containsExactly("product/images/kept.jpg")
+        assertThat(jdbc(database).queryForList("SELECT withdrawal_restriction_reason FROM products WHERE withdrawal_restricted = 1", String::class.java))
+            .containsExactly("PERISHABLE")
+        assertThat(indexes(database).filter { it.startsWith("uploaded_files|") }).containsExactlyInAnyOrder(
+            "uploaded_files|PRIMARY|0|id",
+            "uploaded_files|idx_uploaded_files_status_created_at|1|status,created_at",
+            "uploaded_files|uk_uploaded_files_object_key|0|object_key"
+        )
+    }
+
+    @Test
     fun 옛_코드가_만든_ENUM_열은_값을_그대로_둔_채_VARCHAR로_바꾸고_기동한다() {
         val database = freshDatabase("legacy_enum")
         legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
