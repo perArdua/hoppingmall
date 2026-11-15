@@ -39,7 +39,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
     }
 
     @Test
@@ -66,7 +66,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
         assertThat(jdbc(database).queryForList("SELECT status FROM dlq_messages", String::class.java)).containsExactly("PENDING")
     }
 
@@ -81,7 +81,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
         LEGACY_ENUM_COLUMNS.forEach {
             assertThat(columnType(database, it.table, it.column)).isEqualTo("varchar(32)")
             assertThat(columnNullable(database, it.table, it.column)).isEqualTo(if (it.nullable) "YES" else "NO")
@@ -136,7 +136,7 @@ class FlywayMigrationMySqlTest {
 
         runner(database, "docker").run { context -> assertThat(context).hasNotFailed() }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
         assertThat(
             jdbc(database).queryForList(
                 "SELECT CONCAT_WS('|', id, IFNULL(CAST(delivered_at AS CHAR), 'NULL'), CAST(updated_at AS CHAR)) FROM orders ORDER BY id",
