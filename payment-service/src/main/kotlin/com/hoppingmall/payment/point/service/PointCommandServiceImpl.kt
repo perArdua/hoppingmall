@@ -3,8 +3,6 @@ package com.hoppingmall.payment.point.service
 import com.hoppingmall.payment.point.domain.PointHistory
 import com.hoppingmall.payment.point.domain.PointRepository
 import com.hoppingmall.payment.point.domain.PointHistoryRepository
-import com.hoppingmall.payment.point.dto.request.PointUseRequest
-import com.hoppingmall.payment.point.dto.response.PointUseResponse
 import com.hoppingmall.payment.point.enum.PointType
 import com.hoppingmall.payment.point.exception.PointInsufficientBalanceException
 import org.springframework.cache.annotation.CacheEvict
@@ -19,29 +17,6 @@ class PointCommandServiceImpl(
     private val pointHistoryRepository: PointHistoryRepository,
     private val pointDomainService: PointDomainService
 ) : PointCommandService {
-
-    @CacheEvict(cacheNames = ["point-balance"], key = "#userId")
-    override fun usePoint(userId: Long, request: PointUseRequest): PointUseResponse {
-        val point = pointDomainService.findOrCreatePoint(userId)
-        point.usePoints(request.amount)
-        val savedPoint = pointRepository.save(point)
-
-        val pointHistory = PointHistory(
-            userId = userId,
-            amount = request.amount.negate(),
-            type = PointType.USE,
-            reason = request.reason ?: "상품 구매",
-            orderId = request.orderId,
-            paymentId = null
-        )
-        pointHistoryRepository.save(pointHistory)
-
-        return PointUseResponse(
-            usedAmount = request.amount,
-            remainingBalance = savedPoint.balance,
-            orderId = request.orderId
-        )
-    }
 
     @CacheEvict(cacheNames = ["point-balance"], key = "#userId")
     override fun refundPoints(userId: Long, amount: BigDecimal, paymentId: Long, orderId: Long, refundId: Long) {

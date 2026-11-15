@@ -5,7 +5,6 @@ import com.hoppingmall.payment.point.domain.Point
 import com.hoppingmall.payment.point.domain.PointHistory
 import com.hoppingmall.payment.point.domain.PointHistoryRepository
 import com.hoppingmall.payment.point.domain.PointRepository
-import com.hoppingmall.payment.point.dto.request.PointUseRequest
 import com.hoppingmall.payment.point.enum.PointType
 import com.hoppingmall.payment.point.exception.PointInsufficientBalanceException
 import org.assertj.core.api.Assertions.assertThat
@@ -42,35 +41,6 @@ class PointCommandServiceImplTest {
 
     @InjectMocks
     private lateinit var pointCommandService: PointCommandServiceImpl
-
-    @Test
-    fun 포인트_사용_성공() {
-        val point = Point(userId = 1L, balance = BigDecimal("5000"))
-        val idField = BaseEntity::class.java.getDeclaredField("id")
-        idField.isAccessible = true
-        idField.set(point, 1L)
-        whenever(pointDomainService.findOrCreatePoint(1L)).thenReturn(point)
-        doAnswer { it.arguments[0] }.whenever(pointRepository).save(any())
-        doAnswer { it.arguments[0] }.whenever(pointHistoryRepository).save(any())
-
-        val request = PointUseRequest(amount = BigDecimal("1000"), orderId = 10L, reason = "구매")
-        val result = pointCommandService.usePoint(1L, request)
-
-        assertThat(result.usedAmount).isEqualByComparingTo(BigDecimal("1000"))
-        assertThat(result.remainingBalance).isEqualByComparingTo(BigDecimal("4000"))
-        verify(pointHistoryRepository).save(any())
-    }
-
-    @Test
-    fun 잔액_부족_시_예외가_발생한다() {
-        val point = Point(userId = 1L, balance = BigDecimal("100"))
-        whenever(pointDomainService.findOrCreatePoint(1L)).thenReturn(point)
-
-        val request = PointUseRequest(amount = BigDecimal("500"), orderId = 10L, reason = "구매")
-
-        assertThatThrownBy { pointCommandService.usePoint(1L, request) }
-            .isInstanceOf(PointInsufficientBalanceException::class.java)
-    }
 
     @Test
     fun 포인트_환불_성공() {
@@ -157,6 +127,15 @@ class PointCommandServiceImplTest {
 
         assertThatThrownBy { pointCommandService.useForPayment(1L, 10L, 20L, BigDecimal("100")) }
             .isInstanceOf(PointInsufficientBalanceException::class.java)
+    }
+
+    @Test
+    fun 잔액보다_많은_포인트를_결제에_쓰면_잔액_부족이고_이력을_남기지_않는다() {
+        whenever(pointRepository.findByUserIdForUpdate(1L)).thenReturn(Point(userId = 1L, balance = BigDecimal("100")))
+
+        assertThatThrownBy { pointCommandService.useForPayment(1L, 10L, 20L, BigDecimal("500")) }
+            .isInstanceOf(PointInsufficientBalanceException::class.java)
+        verify(pointHistoryRepository, never()).save(any())
     }
 
     @Test
