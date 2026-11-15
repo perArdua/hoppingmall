@@ -62,6 +62,9 @@ dependencies {
 
 	implementation("org.apache.commons:commons-csv:1.12.0")
 
+	implementation("software.amazon.awssdk:s3:2.31.9")
+	implementation("software.amazon.awssdk:apache-client:2.31.9")
+
 	implementation("io.micrometer:micrometer-registry-prometheus")
 	implementation("io.micrometer:micrometer-tracing-bridge-otel")
 	implementation("io.opentelemetry:opentelemetry-exporter-otlp")
