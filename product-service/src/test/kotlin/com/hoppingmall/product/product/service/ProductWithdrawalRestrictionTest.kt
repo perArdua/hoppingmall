@@ -9,7 +9,6 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.hoppingmall.product.category.domain.Category
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.common.enums.ProductStatus
-import com.hoppingmall.product.common.file.FileUploadConfig
 import com.hoppingmall.product.grpc.GrpcProductQueryService
 import com.hoppingmall.product.grpc.ProductIdRequest
 import com.hoppingmall.product.grpc.ProductIdsRequest
@@ -35,6 +34,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.whenever
 import org.springframework.test.util.ReflectionTestUtils
 import java.math.BigDecimal
@@ -54,7 +54,7 @@ class ProductWithdrawalRestrictionTest {
     private lateinit var categoryRepository: CategoryRepository
 
     @Mock
-    private lateinit var fileUploadConfig: FileUploadConfig
+    private lateinit var productImageLinker: ProductImageLinker
 
     @Mock
     private lateinit var inventoryCommandService: InventoryCommandService
@@ -72,7 +72,7 @@ class ProductWithdrawalRestrictionTest {
 
     private fun service() = ProductCommandServiceImpl(
         productRepository, productImageRepository, categoryRepository,
-        fileUploadConfig, inventoryCommandService, inventoryRepository
+        productImageLinker, inventoryCommandService, inventoryRepository
     )
 
     @Test
@@ -200,7 +200,7 @@ class ProductWithdrawalRestrictionTest {
     private fun stubCreate() {
         whenever(categoryRepository.findNullableById(CATEGORY_ID)).thenReturn(category())
         whenever(productRepository.save(any<Product>())).thenAnswer { it.getArgument<Product>(0).withId(PRODUCT_ID) }
-        whenever(fileUploadConfig.defaultImagePath).thenReturn("/default.jpg")
+        whenever(productImageLinker.link(any(), anyOrNull(), any())).thenReturn(listOf("/default.jpg"))
         whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenAnswer { it.getArgument<List<ProductImage>>(0) }
     }
 
