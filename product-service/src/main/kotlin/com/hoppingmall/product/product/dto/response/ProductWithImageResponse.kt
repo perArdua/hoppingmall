@@ -19,7 +19,9 @@ data class ProductResponse(
     val updatedAt: LocalDateTime?,
     val categoryName: String? = null,
     val averageRating: BigDecimal = BigDecimal.ZERO,
-    val reviewCount: Long = 0
+    val reviewCount: Long = 0,
+    val inStock: Boolean? = null,
+    val stockQuantity: Int? = null
 ) {
     companion object {
         fun from(product: Product, images: List<ProductImage>, categoryName: String?): ProductResponse {

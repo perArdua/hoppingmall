@@ -42,6 +42,11 @@ class ProductQueryServiceImpl(
         return toProductResponseSlice(productSlice, pageable)
     }
 
+    override fun getProductsBySellerIdWithStock(
+        sellerId: Long,
+        pageable: Pageable
+    ): Slice<ProductResponse> = getProductsBySellerId(sellerId, pageable)
+
     override fun getProductsByCategoryId(
         categoryId: Long,
         pageable: Pageable
