@@ -1,5 +1,10 @@
 package com.hoppingmall.product.inventory.port
 
 interface OrderTerminalCheckPort {
-    fun terminalReservationIds(reservationIds: List<String>): List<String>
+    fun check(reservationIds: List<String>): TerminalCheck
+
+    data class TerminalCheck(
+        val terminalReservationIds: List<String>,
+        val cancelledReservationIds: List<String>?
+    )
 }
