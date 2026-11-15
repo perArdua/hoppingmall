@@ -16,6 +16,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
@@ -92,5 +93,23 @@ class CouponQueryServiceImplTest {
         val result = couponQueryService.getMyCoupons(1L, pageable)
 
         assertThat(result.content).hasSize(1)
+    }
+
+    @Test
+    fun 받은_쿠폰_id는_요청한_쿠폰_중_사용자가_받은_것만이다() {
+        whenever(userCouponRepository.findCouponIdsByUserIdAndCouponIdIn(10L, listOf(1L, 2L, 3L)))
+            .thenReturn(listOf(3L, 1L))
+
+        val result = couponQueryService.getIssuedCouponIds(10L, listOf(1L, 2L, 3L))
+
+        assertThat(result).containsExactlyInAnyOrder(1L, 3L)
+    }
+
+    @Test
+    fun 쿠폰이_없으면_받은_쿠폰을_조회하지_않는다() {
+        val result = couponQueryService.getIssuedCouponIds(10L, emptyList())
+
+        assertThat(result).isEmpty()
+        verifyNoInteractions(userCouponRepository)
     }
 }

@@ -157,14 +157,37 @@ class CouponCommandServiceImplTest {
             .thenReturn(CouponReserveResult.NotInitialized)
             .thenReturn(CouponReserveResult.Success)
         whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
-        whenever(couponStockRedisRepository.initializeStock(1L, 90)).thenReturn(true)
+        whenever(userCouponRepository.findUserIdsByCouponId(1L)).thenReturn(listOf(20L))
+        whenever(couponStockRedisRepository.initializeStock(1L, 90, listOf(20L))).thenReturn(true)
         whenever(couponRepository.incrementIssuedQuantity(1L)).thenReturn(1)
         whenever(userCouponRepository.save(any<UserCoupon>())).thenReturn(userCoupon)
 
         service.issueCoupon(10L, 1L)
 
-        verify(couponStockRedisRepository).initializeStock(1L, 90)
+        verify(couponStockRedisRepository).initializeStock(1L, 90, listOf(20L))
         verify(couponStockRedisRepository, times(2)).tryReserve(1L, 10L)
+    }
+
+    @Test
+    fun 쿠폰_발급_시_Redis는_통과했지만_DB에_이미_발급됐으면_예약_재고를_되돌리고_이미_발급_예외를_던진다() {
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(userCouponRepository.existsByUserIdAndCouponId(10L, 1L)).thenReturn(true)
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponAlreadyIssuedException::class.java)
+        verify(couponStockRedisRepository).releaseStock(1L, 10L)
+        verify(couponRepository, never()).incrementIssuedQuantity(any())
+        verify(userCouponRepository, never()).save(any<UserCoupon>())
+    }
+
+    @Test
+    fun 쿠폰_발급_시_DB에_이미_발급됐고_예약_재고_되돌림이_실패해도_이미_발급_예외를_던진다() {
+        whenever(couponStockRedisRepository.tryReserve(1L, 10L)).thenReturn(CouponReserveResult.Success)
+        whenever(userCouponRepository.existsByUserIdAndCouponId(10L, 1L)).thenReturn(true)
+        whenever(couponStockRedisRepository.releaseStock(1L, 10L)).thenThrow(RuntimeException("redis down"))
+
+        assertThatThrownBy { service.issueCoupon(10L, 1L) }
+            .isInstanceOf(CouponAlreadyIssuedException::class.java)
     }
 
     @Test
@@ -207,7 +230,7 @@ class CouponCommandServiceImplTest {
             .thenReturn(CouponReserveResult.NotInitialized)
             .thenReturn(CouponReserveResult.NotInitialized)
         whenever(couponRepository.findActiveById(1L)).thenReturn(coupon)
-        whenever(couponStockRedisRepository.initializeStock(eq(1L), any())).thenReturn(true)
+        whenever(couponStockRedisRepository.initializeStock(eq(1L), any(), any())).thenReturn(true)
 
         assertThatThrownBy { service.issueCoupon(10L, 1L) }
             .isInstanceOf(CouponNotFoundException::class.java)
@@ -494,10 +517,11 @@ class CouponCommandServiceImplTest {
         val coupon = createCoupon(id = 1L, status = CouponStatus.INACTIVE, totalQuantity = 100, issuedQuantity = 20)
         whenever(couponRepository.findById(1L)).thenReturn(Optional.of(coupon))
         whenever(couponRepository.save(any<Coupon>())).thenReturn(coupon)
+        whenever(userCouponRepository.findUserIdsByCouponId(1L)).thenReturn(listOf(10L, 20L))
 
         service.changeCouponStatus(1L, CouponStatus.ACTIVE)
 
-        verify(couponStockRedisRepository).initializeStock(1L, 80)
+        verify(couponStockRedisRepository).initializeStock(1L, 80, listOf(10L, 20L))
     }
 
     @Test
