@@ -1,5 +1,6 @@
 package com.hoppingmall.user.service
 
+import com.hoppingmall.user.auth.domain.SessionRevokeReason
 import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.common.vo.CurrentPasswordNotMatchedException
@@ -66,7 +67,7 @@ class UserCommandServiceImpl(
         request.password?.let { newPassword ->
             val encodedPassword = passwordCreator.encode(newPassword)
             user.updatePassword(encodedPassword)
-            refreshTokenService?.delete(userId)
+            refreshTokenService?.revokeAll(userId, SessionRevokeReason.PASSWORD_CHANGED)
         }
     }
 }

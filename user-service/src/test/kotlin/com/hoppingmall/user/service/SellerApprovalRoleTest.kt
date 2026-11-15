@@ -1,7 +1,6 @@
 package com.hoppingmall.user.service
 
 import com.hoppingmall.user.UserServiceApplicationTests
-import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.service.AuthServiceImpl
@@ -61,7 +60,7 @@ class SellerApprovalRoleTest {
     private lateinit var tokenProvider: TokenProvider
 
     @Autowired
-    private lateinit var jwtProperties: JwtProperties
+    private lateinit var refreshTokenService: RefreshTokenService
 
     private lateinit var authService: AuthServiceImpl
 
@@ -70,8 +69,7 @@ class SellerApprovalRoleTest {
         authService = AuthServiceImpl(
             userQueryService = userQueryService,
             tokenProvider = tokenProvider,
-            refreshTokenService = mock<RefreshTokenService>(),
-            jwtProperties = jwtProperties,
+            refreshTokenService = refreshTokenService,
             userRepository = userRepository,
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
             loginAttemptLimiter = NoOpLoginAttemptLimiter()

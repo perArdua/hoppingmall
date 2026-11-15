@@ -1,6 +1,7 @@
 package com.hoppingmall.user.service
 
 import com.hoppingmall.user.auth.JwtProperties
+import com.hoppingmall.user.auth.SessionProperties
 import com.hoppingmall.user.auth.TokenProviderImpl
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.domain.repository.RefreshTokenRepository
@@ -15,6 +16,7 @@ import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
 import com.hoppingmall.user.dto.request.UpdateUserRequest
+import com.hoppingmall.user.support.InMemoryUserSessions
 import com.hoppingmall.user.support.fixture.fixture
 import com.hoppingmall.user.support.withId
 import org.assertj.core.api.Assertions.assertThat
@@ -28,14 +30,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.whenever
-import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.data.redis.core.ValueOperations
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.util.Optional
-import java.util.concurrent.TimeUnit
 
 @ExtendWith(MockitoExtension::class)
 @DisplayName("비밀번호 변경 뒤 기존 refresh token 무효화")
@@ -43,10 +40,7 @@ import java.util.concurrent.TimeUnit
 class PasswordChangeRefreshTokenRevocationTest {
 
     @Mock
-    private lateinit var stringRedisTemplate: RedisTemplate<String, String>
-
-    @Mock
-    private lateinit var valueOperations: ValueOperations<String, String>
+    private lateinit var legacyRefreshTokenRepository: RefreshTokenRepository
 
     @Mock
     private lateinit var userRepository: UserRepository
@@ -69,7 +63,7 @@ class PasswordChangeRefreshTokenRevocationTest {
     @Mock
     private lateinit var passwordPolicy: PasswordPolicy
 
-    private val redisStore = mutableMapOf<String, String>()
+    private val sessions = InMemoryUserSessions()
 
     private lateinit var user: User
 
@@ -84,12 +78,19 @@ class PasswordChangeRefreshTokenRevocationTest {
             accessExpirationMs = 3600000
             refreshExpirationMs = 86400000
         }
-        val refreshTokenService = RefreshTokenServiceImpl(RefreshTokenRepository(stringRedisTemplate))
+        val tokenProvider = TokenProviderImpl(jwtProperties)
+        val refreshTokenService = RefreshTokenServiceImpl(
+            userSessionRepository = sessions.repository,
+            userRepository = userRepository,
+            legacyRefreshTokenRepository = legacyRefreshTokenRepository,
+            tokenProvider = tokenProvider,
+            jwtProperties = jwtProperties,
+            sessionProperties = SessionProperties()
+        )
         authService = AuthServiceImpl(
             userQueryService = userQueryService,
-            tokenProvider = TokenProviderImpl(jwtProperties),
+            tokenProvider = tokenProvider,
             refreshTokenService = refreshTokenService,
-            jwtProperties = jwtProperties,
             userRepository = userRepository,
             accessTokenBlacklistRepository = accessTokenBlacklistRepository,
             loginAttemptLimiter = NoOpLoginAttemptLimiter()
@@ -104,12 +105,8 @@ class PasswordChangeRefreshTokenRevocationTest {
         )
         user = User.fixture().withId(1L)
 
-        whenever(stringRedisTemplate.opsForValue()).thenReturn(valueOperations)
-        doAnswer { redisStore[it.getArgument(0)] = it.getArgument(1) }
-            .whenever(valueOperations).set(any(), any(), any<Long>(), any<TimeUnit>())
-        whenever(valueOperations.get(any())).thenAnswer { redisStore[it.getArgument(0)] }
-        whenever(stringRedisTemplate.delete(any<String>())).thenAnswer { redisStore.remove(it.getArgument<String>(0)) != null }
         whenever(userRepository.findNullableById(1L)).thenReturn(user)
+        whenever(userRepository.findForUpdateById(1L)).thenReturn(user)
         lenient().`when`(userRepository.findById(1L)).thenReturn(Optional.of(user))
     }
 

@@ -6,13 +6,13 @@ import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProviderImpl
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.service.AuthServiceImpl
-import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.vo.PasswordVerifier
 import com.hoppingmall.user.controller.UserController
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.service.UserCommandService
 import com.hoppingmall.user.service.UserQueryServiceImpl
 import com.hoppingmall.user.support.InMemoryRateLimitBuckets
+import com.hoppingmall.user.support.issuingRefreshTokenService
 import io.github.bucket4j.distributed.proxy.ProxyManager
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -61,8 +61,7 @@ class LoginAttemptLimitStoreFailureTest {
         val authService = AuthServiceImpl(
             userQueryService = UserQueryServiceImpl(userRepository, PasswordVerifier(BCryptPasswordEncoder(4))),
             tokenProvider = TokenProviderImpl(jwtProperties),
-            refreshTokenService = mock<RefreshTokenService>(),
-            jwtProperties = jwtProperties,
+            refreshTokenService = issuingRefreshTokenService(),
             userRepository = userRepository,
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
             loginAttemptLimiter = loginAttemptLimiter

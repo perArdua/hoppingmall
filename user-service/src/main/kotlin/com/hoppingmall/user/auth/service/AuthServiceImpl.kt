@@ -1,7 +1,6 @@
 package com.hoppingmall.user.auth.service
 
 import org.springframework.data.repository.findByIdOrNull
-import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
@@ -15,15 +14,12 @@ import com.hoppingmall.user.exception.user.UserNotFoundException
 import com.hoppingmall.user.service.UserQueryService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
-@Transactional(readOnly = true)
 class AuthServiceImpl(
     private val userQueryService: UserQueryService,
     private val tokenProvider: TokenProvider,
     private val refreshTokenService: RefreshTokenService,
-    private val jwtProperties: JwtProperties,
     private val userRepository: UserRepository,
     private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository,
     private val loginAttemptLimiter: LoginAttemptLimiter
@@ -44,48 +40,30 @@ class AuthServiceImpl(
         }
         loginAttemptLimiter.reset(request.email, clientIp)
         val userId = user.id!!
-        log.info("로그인 성공: userId={}, role={}", userId, user.getRole())
 
-        val accessToken = tokenProvider.generateAccessToken(userId, user.getRole())
-        val refreshToken = tokenProvider.generateRefreshToken(userId)
+        val issued = refreshTokenService.issue(userId)
+        val accessToken = tokenProvider.generateAccessToken(userId, user.getRole(), issued.sessionId)
+        log.info("로그인 성공: userId={}, role={}, sessionId={}", userId, user.getRole(), issued.sessionId)
 
-        refreshTokenService.rotateRefreshToken(
-            userId = userId,
-            newToken = refreshToken,
-            ttl = jwtProperties.refreshExpirationMs
-        )
-
-        return SignInResponse(accessToken, refreshToken)
+        return SignInResponse(accessToken, issued.token)
     }
 
     override fun refreshAccessToken(refreshToken: String): TokenRefreshResponse {
-        val userId = tokenProvider.parseRefreshToken(refreshToken)
-
-        refreshTokenService.validate(userId, refreshToken)
-
-        val user = userRepository.findByIdOrNull(userId) ?: throw UserNotFoundException()
-        val uid = user.id!!
-
-        val newAccessToken = tokenProvider.generateAccessToken(uid, user.getRole())
-        val newRefreshToken = tokenProvider.generateRefreshToken(uid)
-
-        refreshTokenService.rotateRefreshToken(
-            userId = uid,
-            newToken = newRefreshToken,
-            ttl = jwtProperties.refreshExpirationMs
-        )
+        val issued = refreshTokenService.rotate(refreshToken)
+        val user = userRepository.findByIdOrNull(issued.userId) ?: throw UserNotFoundException()
 
         return TokenRefreshResponse(
-            accessToken = newAccessToken,
-            refreshToken = newRefreshToken
+            accessToken = tokenProvider.generateAccessToken(user.id!!, user.getRole(), issued.sessionId),
+            refreshToken = issued.token
         )
     }
 
     override fun logout(accessToken: String) {
         val userId = tokenProvider.parseAccessToken(accessToken)
+        val sessionId = tokenProvider.getSessionId(accessToken)
         val remainingMs = tokenProvider.getRemainingExpirationMs(accessToken)
         accessTokenBlacklistRepository.add(accessToken, remainingMs)
-        refreshTokenService.delete(userId)
-        log.info("로그아웃: userId={}", userId)
+        refreshTokenService.revokeSession(userId, sessionId)
+        log.info("로그아웃: userId={}, sessionId={}", userId, sessionId)
     }
 }

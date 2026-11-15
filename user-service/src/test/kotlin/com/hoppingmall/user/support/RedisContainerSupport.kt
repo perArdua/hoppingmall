@@ -15,10 +15,16 @@ object RedisContainerSupport {
             .also { it.start() }
     }
 
+    val host: String get() = container.host
+
+    val port: Int get() = container.getMappedPort(REDIS_PORT)
+
+    fun address(): String = "redis://$host:$port"
+
     fun createClient(): RedissonClient {
         val config = Config()
         config.useSingleServer()
-            .setAddress("redis://${container.host}:${container.getMappedPort(REDIS_PORT)}")
+            .setAddress(address())
         return Redisson.create(config)
     }
 }

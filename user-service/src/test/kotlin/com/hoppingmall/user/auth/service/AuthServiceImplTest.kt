@@ -1,6 +1,5 @@
 package com.hoppingmall.user.auth.service
 
-import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
@@ -54,11 +53,6 @@ class AuthServiceImplTest {
             userQueryService = userQueryService,
             tokenProvider = tokenProvider,
             refreshTokenService = refreshTokenService,
-            jwtProperties = JwtProperties().apply {
-                secret = "test-secret-key-for-testing-purposes-only-32chars!"
-                accessExpirationMs = 3600000
-                refreshExpirationMs = 86400000
-            },
             userRepository = userRepository,
             accessTokenBlacklistRepository = accessTokenBlacklistRepository,
             loginAttemptLimiter = NoOpLoginAttemptLimiter()
@@ -66,39 +60,35 @@ class AuthServiceImplTest {
     }
 
     @Test
-    fun 로그인_성공_시_토큰을_발급하고_리프레시_토큰을_회전한다() {
+    fun 로그인_성공_시_새_세션의_리프레시_토큰과_그_세션의_액세스_토큰을_발급한다() {
         val request = SignInRequest(email = "seller@example.com", password = "Password1234")
         val user = com.hoppingmall.user.domain.User.fixture(role = Role.SELLER).withId(1L)
         whenever(userQueryService.authenticate(request)).thenReturn(user)
-        whenever(tokenProvider.generateAccessToken(1L, Role.SELLER)).thenReturn("access-token")
-        whenever(tokenProvider.generateRefreshToken(1L)).thenReturn("refresh-token")
+        whenever(refreshTokenService.issue(1L)).thenReturn(IssuedRefreshToken(1L, "session-1", "refresh-token"))
+        whenever(tokenProvider.generateAccessToken(1L, Role.SELLER, "session-1")).thenReturn("access-token")
 
         val response = authService.login(request, "10.0.0.1")
 
         assertThat(response.accessToken).isEqualTo("access-token")
         assertThat(response.refreshToken).isEqualTo("refresh-token")
-        verify(refreshTokenService).rotateRefreshToken(1L, "refresh-token", 86400000)
     }
 
     @Test
-    fun 리프레시_토큰_재발급_시_새로운_토큰을_반환한다() {
+    fun 리프레시_토큰_재발급_시_세션을_회전하고_새로운_토큰을_반환한다() {
         val user = com.hoppingmall.user.domain.User.fixture(role = Role.BUYER).withId(10L)
-        whenever(tokenProvider.parseRefreshToken("refresh-token")).thenReturn(10L)
+        whenever(refreshTokenService.rotate("refresh-token")).thenReturn(IssuedRefreshToken(10L, "session-10", "new-refresh-token"))
         whenever(userRepository.findById(10L)).thenReturn(Optional.of(user))
-        whenever(tokenProvider.generateAccessToken(10L, Role.BUYER)).thenReturn("new-access-token")
-        whenever(tokenProvider.generateRefreshToken(10L)).thenReturn("new-refresh-token")
+        whenever(tokenProvider.generateAccessToken(10L, Role.BUYER, "session-10")).thenReturn("new-access-token")
 
         val response: TokenRefreshResponse = authService.refreshAccessToken("refresh-token")
 
         assertThat(response.accessToken).isEqualTo("new-access-token")
         assertThat(response.refreshToken).isEqualTo("new-refresh-token")
-        verify(refreshTokenService).validate(10L, "refresh-token")
-        verify(refreshTokenService).rotateRefreshToken(10L, "new-refresh-token", 86400000)
     }
 
     @Test
     fun 리프레시_토큰에_해당하는_사용자가_없으면_예외가_발생한다() {
-        whenever(tokenProvider.parseRefreshToken("missing-user-token")).thenReturn(999L)
+        whenever(refreshTokenService.rotate("missing-user-token")).thenReturn(IssuedRefreshToken(999L, "session-999", "next"))
         whenever(userRepository.findById(999L)).thenReturn(Optional.empty())
 
         assertThatThrownBy { authService.refreshAccessToken("missing-user-token") }
@@ -106,13 +96,14 @@ class AuthServiceImplTest {
     }
 
     @Test
-    fun 로그아웃_시_블랙리스트_등록_및_리프레시_토큰_삭제() {
+    fun 로그아웃_시_블랙리스트_등록_및_그_세션만_끊는다() {
         whenever(tokenProvider.parseAccessToken("access-token")).thenReturn(7L)
+        whenever(tokenProvider.getSessionId("access-token")).thenReturn("session-7")
         whenever(tokenProvider.getRemainingExpirationMs("access-token")).thenReturn(1000L)
 
         authService.logout("access-token")
 
         verify(accessTokenBlacklistRepository).add("access-token", 1000L)
-        verify(refreshTokenService).delete(7L)
+        verify(refreshTokenService).revokeSession(7L, "session-7")
     }
 }
