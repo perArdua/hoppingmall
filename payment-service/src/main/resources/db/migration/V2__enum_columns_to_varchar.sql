@@ -1,0 +1,9 @@
+ALTER TABLE `payments` MODIFY `method` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `payments` MODIFY `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `point_histories` MODIFY `type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `coupons` MODIFY `discount_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `coupons` MODIFY `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `user_coupons` MODIFY `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `compensation_event_logs` MODIFY `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `outbox_events` MODIFY `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE `dlq_messages` MODIFY `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL;
