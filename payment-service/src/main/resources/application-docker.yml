@@ -51,6 +51,12 @@ services:
   product-service:
     url: http://product-service:8083
 
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
+
 internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN}

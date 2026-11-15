@@ -47,6 +47,12 @@ services:
   order-service:
     url: http://order-service.hoppingmall.svc.cluster.local:8084
 
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
+
 internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN}

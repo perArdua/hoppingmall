@@ -49,6 +49,12 @@ services:
   order-service:
     url: http://order-service:8084
 
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
+
 internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN}
