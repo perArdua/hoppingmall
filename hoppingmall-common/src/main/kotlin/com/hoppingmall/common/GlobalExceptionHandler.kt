@@ -1,5 +1,6 @@
 package com.hoppingmall.common
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.data.mapping.PropertyReferenceException
 import org.springframework.http.HttpStatus
@@ -18,7 +19,9 @@ import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
-class GlobalExceptionHandler {
+class GlobalExceptionHandler(
+    private val objectMapper: ObjectMapper? = null
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
