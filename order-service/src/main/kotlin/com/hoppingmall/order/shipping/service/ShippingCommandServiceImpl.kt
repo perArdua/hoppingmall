@@ -16,6 +16,7 @@ import com.hoppingmall.order.shipping.dto.request.ShippingCreateRequest
 import com.hoppingmall.order.shipping.dto.request.ShippingStatusUpdateRequest
 import com.hoppingmall.order.shipping.dto.response.ShippingResponse
 import com.hoppingmall.order.shipping.enum.ShippingStatus
+import com.hoppingmall.order.shipping.exception.ShippingAccessDeniedException
 import com.hoppingmall.order.shipping.exception.ShippingAlreadyExistsException
 import com.hoppingmall.order.shipping.exception.ShippingNotFoundException
 import org.springframework.stereotype.Service
@@ -31,8 +32,16 @@ class ShippingCommandServiceImpl(
     private val objectMapper: ObjectMapper
 ) : ShippingCommandService {
 
-    override fun createShipping(sellerId: Long, request: ShippingCreateRequest): ShippingResponse {
-        val order = orderRepository.findByIdOrNull(request.orderId) ?: throw OrderNotFoundException() 
+    override fun createShipping(sellerId: Long, request: ShippingCreateRequest, isAdmin: Boolean): ShippingResponse {
+        val order = orderRepository.findByIdOrNull(request.orderId) ?: throw OrderNotFoundException()
+
+        val orderItems = orderItemRepository.findByOrderId(request.orderId)
+        if (orderItems.isEmpty()) {
+            throw OrderNotFoundException()
+        }
+        if (!isAdmin && orderItems.none { it.sellerId == sellerId }) {
+            throw ShippingAccessDeniedException()
+        }
 
         if (order.status != OrderStatus.PAID) {
             throw OrderInvalidStatusException()
@@ -40,11 +49,6 @@ class ShippingCommandServiceImpl(
 
         if (shippingRepository.findByOrderId(request.orderId) != null) {
             throw ShippingAlreadyExistsException()
-        }
-
-        val orderItems = orderItemRepository.findByOrderId(request.orderId)
-        if (orderItems.isEmpty()) {
-            throw OrderNotFoundException()
         }
 
         val shipping = Shipping.create(
@@ -64,14 +68,19 @@ class ShippingCommandServiceImpl(
     override fun updateShippingStatus(
         sellerId: Long,
         shippingId: Long,
-        request: ShippingStatusUpdateRequest
+        request: ShippingStatusUpdateRequest,
+        isAdmin: Boolean
     ): ShippingResponse {
         shippingRepository.lockOrderIdById(shippingId)?.let { orderRepository.lockById(it) }
-        val shipping = shippingRepository.findByIdOrNull(shippingId) ?: throw ShippingNotFoundException() 
+        val shipping = shippingRepository.findByIdOrNull(shippingId) ?: throw ShippingNotFoundException()
+
+        val order = orderRepository.findByIdOrNull(shipping.orderId) ?: throw OrderNotFoundException()
+
+        if (!isAdmin && !orderItemRepository.existsByOrderIdAndSellerId(shipping.orderId, sellerId)) {
+            throw ShippingAccessDeniedException()
+        }
 
         shipping.updateStatus(request.status)
-
-        val order = orderRepository.findByIdOrNull(shipping.orderId) ?: throw OrderNotFoundException() 
 
         when (request.status) {
             ShippingStatus.IN_TRANSIT -> {

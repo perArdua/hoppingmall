@@ -1,5 +1,6 @@
 package com.hoppingmall.order.shipping.service
 
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.exception.ShippingNotFoundException
@@ -25,6 +26,9 @@ class ShippingQueryServiceImplTest {
     @Mock
     private lateinit var shippingRepository: ShippingRepository
 
+    @Mock
+    private lateinit var orderItemRepository: OrderItemRepository
+
     @InjectMocks
     private lateinit var service: ShippingQueryServiceImpl
 
@@ -44,7 +48,7 @@ class ShippingQueryServiceImplTest {
 
         whenever(shippingRepository.findByOrderId(10L)).thenReturn(shipping)
 
-        val result = service.getShippingByOrderId(10L)
+        val result = service.getShippingByOrderId(10L, 1L, false)
 
         assertThat(result.orderId).isEqualTo(10L)
         assertThat(result.carrierName).isEqualTo("CJ대한통운")
@@ -54,7 +58,7 @@ class ShippingQueryServiceImplTest {
     fun 주문ID로_배송이_없으면_예외가_발생한다() {
         whenever(shippingRepository.findByOrderId(999L)).thenReturn(null)
 
-        assertThatThrownBy { service.getShippingByOrderId(999L) }
+        assertThatThrownBy { service.getShippingByOrderId(999L, 1L, false) }
             .isInstanceOf(ShippingNotFoundException::class.java)
     }
 
@@ -64,7 +68,7 @@ class ShippingQueryServiceImplTest {
 
         whenever(shippingRepository.findById(1L)).thenReturn(Optional.of(shipping))
 
-        val result = service.getShipping(1L)
+        val result = service.getShipping(1L, 1L, false)
 
         assertThat(result.id).isEqualTo(1L)
     }
@@ -73,7 +77,7 @@ class ShippingQueryServiceImplTest {
     fun 배송ID로_배송이_없으면_예외가_발생한다() {
         whenever(shippingRepository.findById(999L)).thenReturn(Optional.empty())
 
-        assertThatThrownBy { service.getShipping(999L) }
+        assertThatThrownBy { service.getShipping(999L, 1L, false) }
             .isInstanceOf(ShippingNotFoundException::class.java)
     }
 }

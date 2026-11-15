@@ -261,7 +261,7 @@ class OrderCommandServiceImpl(
         orderRepository.lockById(orderId)
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
-        if (!isAdmin) {
+        if (!isAdmin && !orderItemRepository.existsByOrderIdAndSellerId(orderId, userId)) {
             throw OrderAccessDeniedException()
         }
 
