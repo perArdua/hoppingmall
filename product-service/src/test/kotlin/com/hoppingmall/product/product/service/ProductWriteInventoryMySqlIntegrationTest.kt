@@ -5,6 +5,7 @@ import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.product.category.dto.request.CategoryCreateRequest
 import com.hoppingmall.product.category.service.CategoryCommandService
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.inventory.dto.request.InventoryAdjustRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.exception.InventoryNotFoundException
 import com.hoppingmall.product.inventory.service.InventoryCommandService
@@ -85,6 +86,21 @@ abstract class ProductWriteInventoryScenarios : MySqlIntegrationTestSupport() {
             inventoryCommandService.updateStock(product.id, InventoryUpdateRequest(stockQuantity = 9))
         }.isInstanceOf(InventoryNotFoundException::class.java)
         assertThat(deletedAtOfInventory(product.id)).isNotNull()
+    }
+
+    @Test
+    fun 삭제하면_재고_증감도_재고_없음이고_재고는_그대로다() {
+        val product = productCommandService.createProduct(createRequest(stockQuantity = 5))
+
+        productCommandService.deleteProduct(product.id)
+
+        assertThatThrownBy {
+            inventoryCommandService.adjustStock(product.id, InventoryAdjustRequest(delta = 3))
+        }.isInstanceOf(InventoryNotFoundException::class.java)
+        assertThatThrownBy {
+            inventoryCommandService.adjustStock(product.id, InventoryAdjustRequest(delta = -2))
+        }.isInstanceOf(InventoryNotFoundException::class.java)
+        assertThat(committedStock(product.id)).isEqualTo(5)
     }
 
     @Test

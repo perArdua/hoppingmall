@@ -107,6 +107,7 @@ class InventoryCommandServiceImpl(
         val delta = requireNotNull(request.delta)
         if (delta == 0) throw InventoryInvalidStockAdjustmentException()
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+            ?.takeIf { it.deletedAt == null }
             ?: throw InventoryNotFoundException()
 
         if (bucketStockService.enabled) {
