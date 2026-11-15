@@ -6,6 +6,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.response.OrderResponse
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Service
@@ -18,6 +19,9 @@ class OrderQueryServiceImpl(
     private val orderItemRepository: OrderItemRepository
 ) : OrderQueryService {
 
+    @Value("\${order.timeout.paying-minutes:15}")
+    private var payingTimeoutMinutes: Long = 15
+
     override fun getOrder(orderId: Long, userId: Long, isAdmin: Boolean): OrderResponse {
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
@@ -26,7 +30,7 @@ class OrderQueryServiceImpl(
             throw OrderAccessDeniedException()
         }
 
-        return OrderResponse.from(order, orderItems)
+        return OrderResponse.from(order, orderItems, payingTimeoutMinutes)
     }
 
     override fun getMyOrders(buyerId: Long, pageable: Pageable): Slice<OrderResponse> {
@@ -36,7 +40,7 @@ class OrderQueryServiceImpl(
             .groupBy { it.orderId }
 
         return orderSlice.map { order ->
-            OrderResponse.from(order, orderItemMap[order.id] ?: emptyList())
+            OrderResponse.from(order, orderItemMap[order.id] ?: emptyList(), payingTimeoutMinutes)
         }
     }
 }

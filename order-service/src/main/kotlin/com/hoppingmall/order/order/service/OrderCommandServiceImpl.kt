@@ -38,6 +38,7 @@ import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.client.HttpClientErrorException
@@ -63,6 +64,9 @@ class OrderCommandServiceImpl(
 
     @Autowired(required = false)
     var reservationFence: ReservationFence? = null
+
+    @Value("\${order.timeout.paying-minutes:15}")
+    private var payingTimeoutMinutes: Long = 15
 
     override fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse {
         val cartItems = cartItemRepository.findAllById(request.cartItemIds)
@@ -149,7 +153,7 @@ class OrderCommandServiceImpl(
             cartItemRepository.deleteAllById(request.cartItemIds)
 
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
-            OrderResponse.from(order, savedOrderItems)
+            OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
         }!!
 
     private fun priceChanges(
