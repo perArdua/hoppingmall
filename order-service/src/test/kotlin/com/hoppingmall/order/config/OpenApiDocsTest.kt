@@ -42,12 +42,25 @@ class OpenApiDocsTest {
     @Test
     fun 명세의_요청_필드_이름으로_보낸_본문을_읽는다() {
         val docs = apiDocs()
-        val field = propertyNames(schema(docs, requestSchemaRef(docs, "/api/v1/orders", "post"))).single()
+        val requestSchema = schema(docs, requestSchemaRef(docs, "/api/v1/orders", "post"))
+        val addressSchema = schema(docs, requestSchema.path("properties").path("shipping_address").path("\$ref").asText())
+
+        assertThat(propertyNames(requestSchema)).containsExactlyInAnyOrder("cart_item_ids", "shipping_address")
+        assertThat(requestSchema.path("required").map { it.asText() }).containsExactlyInAnyOrder("cart_item_ids", "shipping_address")
+        assertThat(propertyNames(addressSchema)).containsExactlyInAnyOrderElementsOf(SHIPPING_ADDRESS_VALUES.keys)
+        assertThat(addressSchema.path("required").map { it.asText() })
+            .containsExactlyInAnyOrder("recipient_name", "recipient_phone", "zip_code", "address")
+
+        val address = objectMapper.createObjectNode()
+        propertyNames(addressSchema).forEach { address.put(it, SHIPPING_ADDRESS_VALUES.getValue(it)) }
+        val body = objectMapper.createObjectNode()
+        body.putArray("cart_item_ids").add(999999999L)
+        body.set<JsonNode>("shipping_address", address)
 
         val response = send(
             request("/api/v1/orders").buyer()
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                .POST(HttpRequest.BodyPublishers.ofString("{\"$field\":[999999999]}"))
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
         )
 
         assertThat(response.statusCode()).isEqualTo(400)
@@ -132,6 +145,14 @@ class OpenApiDocsTest {
         private val httpClient: HttpClient = HttpClient.newHttpClient()
         private lateinit var context: ConfigurableApplicationContext
         private var port: Int = 0
+        private val SHIPPING_ADDRESS_VALUES = mapOf(
+            "recipient_name" to "홍길동",
+            "recipient_phone" to "010-1234-5678",
+            "zip_code" to "06236",
+            "address" to "서울특별시 강남구 테헤란로 1",
+            "address_detail" to "101호",
+            "delivery_memo" to "문 앞에 놓아 주세요"
+        )
 
         @JvmStatic
         @BeforeAll
