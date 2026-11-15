@@ -2,6 +2,7 @@ package com.hoppingmall.order.refund.controller
 
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
+import com.hoppingmall.common.page.PageRequestLimits
 import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
@@ -51,6 +52,7 @@ class RefundController(
         @RequestParam(defaultValue = "10") size: Int
     ): ApiResponse<Slice<RefundResponse>> {
         val buyerId = principal.getUserId()
+        PageRequestLimits.requireValid(page, size)
         val pageable = PageRequest.of(page, size)
         return ApiResponse.success(refundQueryService.getMyRefunds(buyerId, pageable))
     }
@@ -70,6 +72,7 @@ class RefundController(
         @RequestParam(defaultValue = "10") size: Int
     ): ApiResponse<Slice<RefundResponse>> {
         val sellerId = principal.getUserId()
+        PageRequestLimits.requireValid(page, size)
         val pageable = PageRequest.of(page, size)
         return ApiResponse.success(refundQueryService.getSellerRefunds(sellerId, pageable))
     }

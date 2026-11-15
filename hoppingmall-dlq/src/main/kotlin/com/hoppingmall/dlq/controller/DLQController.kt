@@ -1,6 +1,7 @@
 package com.hoppingmall.dlq.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.page.PageRequestLimits
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
 import com.hoppingmall.dlq.dto.DLQRetryResultResponse
@@ -56,6 +57,7 @@ class DLQController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
     ): ApiResponse<Page<DLQMessage>> {
+        PageRequestLimits.requireValid(page, size)
         val messages = dlqQueryService.getDLQMessages(topic, page, size)
         return ApiResponse.success(messages)
     }
@@ -66,6 +68,7 @@ class DLQController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
     ): ApiResponse<Page<DLQMessage>> {
+        PageRequestLimits.requireValid(page, size)
         val messages = dlqQueryService.getDLQMessagesByStatus(status, page, size)
         return ApiResponse.success(messages)
     }

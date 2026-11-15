@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.exc.InvalidFormatException
 import com.fasterxml.jackson.databind.exc.InvalidNullException
 import com.fasterxml.jackson.databind.exc.MismatchedInputException
+import com.hoppingmall.common.page.RequestRangeException
 import org.hibernate.exception.ConstraintViolationException
 import org.slf4j.LoggerFactory
 import org.springframework.core.MethodParameter
@@ -85,6 +86,12 @@ class GlobalExceptionHandler(
         val errors = if (field.isEmpty()) emptyList() else listOf(FieldErrorDetail(field, unreadableReason(mapping)))
         log.warn("UnreadableBody: type={}, fields={}", (mapping ?: ex.cause ?: ex).javaClass.simpleName, errors.map { it.field })
         return invalidInput(errors)
+    }
+
+    @ExceptionHandler(RequestRangeException::class)
+    fun handleRequestRange(ex: RequestRangeException): ResponseEntity<ApiResponse<Unit>> {
+        log.warn("RequestRange: {}", ex.errors.map { it.field })
+        return invalidInput(ex.errors)
     }
 
     @ExceptionHandler(MissingServletRequestParameterException::class)
