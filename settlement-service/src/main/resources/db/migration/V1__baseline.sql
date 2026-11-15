@@ -13,12 +13,12 @@ CREATE TABLE `settlement_items` (
   UNIQUE KEY `uk_settlement_items_order_item_id` (`order_item_id`),
   KEY `idx_settlement_items_settlement_id` (`settlement_id`),
   KEY `idx_settlement_items_order_id` (`order_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `settlement_seller_locks` (
   `seller_id` bigint NOT NULL,
   PRIMARY KEY (`seller_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `settlement_summaries` (
   `commission_amount` decimal(12,2) NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE `settlement_summaries` (
   UNIQUE KEY `uk_settlement_summaries_settlement_id` (`settlement_id`),
   KEY `idx_settlement_summaries_seller_id` (`seller_id`),
   KEY `idx_settlement_summaries_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `settlements` (
   `commission_amount` decimal(12,2) NOT NULL,
@@ -64,4 +64,4 @@ CREATE TABLE `settlements` (
   UNIQUE KEY `uk_settlements_seller_period` (`seller_id`,`period_start`,`period_end`),
   KEY `idx_settlements_seller_id` (`seller_id`),
   KEY `idx_settlements_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

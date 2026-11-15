@@ -37,6 +37,20 @@ class FlywayMigrationMySqlTest {
     }
 
     @Test
+    fun 서버_기본_정렬_규칙으로_만든_DB에서도_표와_문자열_열은_utf8mb4_unicode_ci다() {
+        val database = "notification_flyway_server_default_${SEQUENCE.incrementAndGet()}"
+        jdbc(database).execute("SELECT 1")
+        assertThat(databaseCollation(database)).isNotEqualTo(COLLATION)
+
+        runner(database, "docker").run { context ->
+            assertThat(context).hasNotFailed()
+        }
+
+        assertThat(tableCollations(database)).containsOnly(COLLATION)
+        assertThat(columnCollations(database)).containsOnly(COLLATION)
+    }
+
+    @Test
     fun ddl_auto가_만든_기존_DB에_붙이면_기준선으로_표시하고_데이터를_그대로_둔다() {
         val database = freshDatabase("existing")
         legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
@@ -134,7 +148,7 @@ class FlywayMigrationMySqlTest {
 
     private fun freshDatabase(label: String): String {
         val database = "notification_flyway_${label}_${SEQUENCE.incrementAndGet()}"
-        jdbc(database).execute("SELECT 1")
+        jdbc("mysql").execute("CREATE DATABASE $database CHARACTER SET utf8mb4 COLLATE $COLLATION")
         return database
     }
 
@@ -145,6 +159,28 @@ class FlywayMigrationMySqlTest {
         jdbc(database).queryForList(
             "SELECT CONCAT(version, ':', type, ':', IF(success, 'true', 'false')) FROM flyway_schema_history ORDER BY installed_rank",
             String::class.java
+        )
+
+    private fun databaseCollation(database: String): String? =
+        jdbc(database).queryForObject(
+            "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+            String::class.java,
+            database
+        )
+
+    private fun tableCollations(database: String): List<String> =
+        jdbc(database).queryForList(
+            "SELECT DISTINCT TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME <> 'flyway_schema_history'",
+            String::class.java,
+            database
+        )
+
+    private fun columnCollations(database: String): List<String> =
+        jdbc(database).queryForList(
+            "SELECT DISTINCT COLLATION_NAME FROM information_schema.COLUMNS " +
+                "WHERE TABLE_SCHEMA = ? AND TABLE_NAME <> 'flyway_schema_history' AND COLLATION_NAME IS NOT NULL",
+            String::class.java,
+            database
         )
 
     private fun columnType(database: String, table: String, column: String): String? =
@@ -166,7 +202,8 @@ class FlywayMigrationMySqlTest {
 
     private fun columns(database: String): List<String> =
         jdbc(database).queryForList(
-            "SELECT CONCAT_WS('|', TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, IFNULL(COLUMN_DEFAULT, 'NULL'), EXTRA) " +
+            "SELECT CONCAT_WS('|', TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, IFNULL(COLUMN_DEFAULT, 'NULL'), EXTRA, " +
+                "IFNULL(COLLATION_NAME, 'NULL')) " +
                 "FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME <> 'flyway_schema_history' " +
                 "ORDER BY TABLE_NAME, COLUMN_NAME",
             String::class.java,
@@ -200,6 +237,7 @@ class FlywayMigrationMySqlTest {
         ).sorted()
 
     companion object {
+        private const val COLLATION = "utf8mb4_unicode_ci"
         private val SEQUENCE = AtomicInteger()
     }
 }

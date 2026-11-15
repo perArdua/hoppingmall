@@ -17,7 +17,7 @@ CREATE TABLE `settlement_refunds` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_settlement_refunds_refund_id` (`refund_id`),
   KEY `idx_settlement_refunds_settlement_id` (`settlement_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `settlement_carry_overs` (
   `amount` decimal(12,2) NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE `settlement_carry_overs` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_settlement_carry_overs_source_settlement_id` (`source_settlement_id`),
   KEY `idx_settlement_carry_overs_seller_applied` (`seller_id`,`applied_settlement_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `settlement_carry_overs` (`amount`, `created_at`, `seller_id`, `source_settlement_id`)
 SELECT -`settlement_amount`, NOW(6), `seller_id`, `id`
