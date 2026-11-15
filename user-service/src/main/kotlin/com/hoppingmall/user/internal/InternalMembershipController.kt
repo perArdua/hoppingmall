@@ -15,6 +15,12 @@ class InternalMembershipController(
     private val membershipRepository: MembershipRepository
 ) {
 
+    @GetMapping("/memberships/by-user/{userId}")
+    fun getMembershipDiscount(@PathVariable userId: Long): ResponseEntity<InternalMembershipDiscountResponse> {
+        val grade = membershipRepository.findByUserId(userId)?.grade ?: MembershipGrade.BRONZE
+        return ResponseEntity.ok(InternalMembershipDiscountResponse.of(grade))
+    }
+
     @GetMapping("/memberships/by-user/{userId}/earning-rate")
     fun getEarningRate(@PathVariable userId: Long): ResponseEntity<BigDecimal> {
         val membership = membershipRepository.findByUserId(userId)
