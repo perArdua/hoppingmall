@@ -4,6 +4,7 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.payment.point.domain.PointPolicy
 import com.hoppingmall.payment.point.domain.PointPolicyRepository
 import com.hoppingmall.payment.point.dto.request.PointPolicyRequest
+import com.hoppingmall.payment.point.exception.PointPolicyConcurrentChangeException
 import com.hoppingmall.payment.point.exception.PointPolicyInvalidException
 import com.hoppingmall.payment.point.exception.PointPolicyNameDuplicatedException
 import com.hoppingmall.payment.point.exception.PointPolicyNotFoundException
@@ -20,7 +21,11 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.inOrder
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.dao.CannotAcquireLockException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
 import java.math.BigDecimal
@@ -52,6 +57,14 @@ class PointPolicyServiceImplTest {
         }.whenever(pointPolicyRepository).save(any())
     }
 
+    private fun mockSaveAndFlushWithIdInjection() {
+        doAnswer {
+            val p = it.arguments[0] as PointPolicy
+            setBaseEntityFields(p)
+            p
+        }.whenever(pointPolicyRepository).saveAndFlush(any<PointPolicy>())
+    }
+
     private fun createRequest(): PointPolicyRequest {
         return PointPolicyRequest(
             policyName = "기본 정책",
@@ -78,12 +91,14 @@ class PointPolicyServiceImplTest {
     @Test
     fun 정책을_생성한다() {
         whenever(pointPolicyRepository.existsByPolicyName("기본 정책")).thenReturn(false)
-        whenever(pointPolicyRepository.findByIsActiveTrue()).thenReturn(null)
-        mockSaveWithIdInjection()
+        mockSaveAndFlushWithIdInjection()
 
         val result = pointPolicyService.createPolicy(createRequest())
 
         assertThat(result).isNotNull
+        val order = inOrder(pointPolicyRepository)
+        order.verify(pointPolicyRepository).deactivateAll()
+        order.verify(pointPolicyRepository).saveAndFlush(any<PointPolicy>())
     }
 
     @Test
@@ -110,12 +125,47 @@ class PointPolicyServiceImplTest {
     fun 정책을_활성화한다() {
         val policy = createPolicy()
         whenever(pointPolicyRepository.findById(1L)).thenReturn(Optional.of(policy))
-        whenever(pointPolicyRepository.findByIsActiveTrue()).thenReturn(null)
-        mockSaveWithIdInjection()
+        mockSaveAndFlushWithIdInjection()
 
         val result = pointPolicyService.activatePolicy(1L)
 
         assertThat(result).isNotNull
+        assertThat(result.isActive).isTrue()
+        verify(pointPolicyRepository).deactivateAllExcept(1L)
+    }
+
+    @Test
+    fun 활성_정책_유일_제약에_걸리면_동시_변경_예외가_발생한다() {
+        whenever(pointPolicyRepository.existsByPolicyName("기본 정책")).thenReturn(false)
+        whenever(pointPolicyRepository.saveAndFlush(any<PointPolicy>())).thenThrow(
+            DataIntegrityViolationException(
+                "insert",
+                RuntimeException("Duplicate entry '1' for key 'point_policies.${PointPolicy.ACTIVE_KEY_CONSTRAINT}'")
+            )
+        )
+
+        assertThatThrownBy { pointPolicyService.createPolicy(createRequest()) }
+            .isInstanceOf(PointPolicyConcurrentChangeException::class.java)
+    }
+
+    @Test
+    fun 다른_유일_제약_위반은_그대로_던진다() {
+        whenever(pointPolicyRepository.existsByPolicyName("기본 정책")).thenReturn(false)
+        whenever(pointPolicyRepository.saveAndFlush(any<PointPolicy>())).thenThrow(
+            DataIntegrityViolationException("insert", RuntimeException("Duplicate entry for key 'point_policies.UK_policy_name'"))
+        )
+
+        assertThatThrownBy { pointPolicyService.createPolicy(createRequest()) }
+            .isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun 다른_정책을_끄다_교착으로_지면_동시_변경_예외가_발생한다() {
+        whenever(pointPolicyRepository.findById(1L)).thenReturn(Optional.of(createPolicy()))
+        whenever(pointPolicyRepository.deactivateAllExcept(1L)).thenThrow(CannotAcquireLockException("deadlock"))
+
+        assertThatThrownBy { pointPolicyService.activatePolicy(1L) }
+            .isInstanceOf(PointPolicyConcurrentChangeException::class.java)
     }
 
     @Test
