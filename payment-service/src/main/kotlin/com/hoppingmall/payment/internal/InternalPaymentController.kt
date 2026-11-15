@@ -17,7 +17,8 @@ class InternalPaymentController(
 
     @GetMapping("/by-order/{orderId}")
     fun getPaymentByOrderId(@PathVariable orderId: Long): ResponseEntity<PaymentInfoResponse> {
-        val payment = paymentRepository.findByOrderId(orderId)
+        val payment = paymentRepository.findByActiveOrderId(orderId)
+            ?: paymentRepository.findFirstByOrderIdOrderByIdDesc(orderId)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(toResponse(payment))
     }
@@ -31,7 +32,7 @@ class InternalPaymentController(
 
     @PostMapping("/by-order/{orderId}/cancel")
     fun cancelPaymentByOrderId(@PathVariable orderId: Long): ResponseEntity<PaymentResponse> {
-        val payment = paymentRepository.findByOrderId(orderId)
+        val payment = paymentRepository.findByActiveOrderId(orderId)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(paymentCommandService.cancelPaymentInternal(payment.id!!))
     }

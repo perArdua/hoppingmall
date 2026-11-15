@@ -24,6 +24,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.math.BigDecimal
@@ -41,6 +42,9 @@ class ReviewCommandServiceImplTest {
 
     @Mock
     private lateinit var productStatisticsRepository: ProductStatisticsRepository
+
+    @Mock
+    private lateinit var productReviewSummaryService: ProductReviewSummaryService
 
     @InjectMocks
     private lateinit var service: ReviewCommandServiceImpl
@@ -202,5 +206,38 @@ class ReviewCommandServiceImplTest {
 
         assertThat(stats.averageRating).isEqualByComparingTo(BigDecimal("4.50"))
         assertThat(stats.reviewCount).isEqualTo(10)
+    }
+
+    @Test
+    fun 리뷰를_생성하면_상품의_리뷰_집계를_다시_센다() {
+        val request = ReviewCreateRequest(orderItemId = 100L, rating = 5, content = "좋아요")
+        val review = Review.create(
+            buyerId = 1L, orderItemId = 100L, productId = 1L,
+            rating = 5, content = "좋아요"
+        ).withId(1L)
+
+        whenever(orderQueryPort.findOrderItemById(100L)).thenReturn(orderItemInfo)
+        whenever(orderQueryPort.isDelivered(10L, 1L)).thenReturn(true)
+        whenever(reviewRepository.existsByOrderItemId(100L)).thenReturn(false)
+        whenever(reviewRepository.save(any<Review>())).thenReturn(review)
+
+        service.createReview(1L, request)
+
+        verify(productReviewSummaryService).refresh(1L)
+    }
+
+    @Test
+    fun 리뷰를_수정하거나_지우면_상품의_리뷰_집계를_다시_센다() {
+        val review = Review.create(
+            buyerId = 1L, orderItemId = 100L, productId = 7L,
+            rating = 5, content = "좋아요"
+        ).withId(1L)
+
+        whenever(reviewRepository.findNullableById(1L)).thenReturn(review)
+
+        service.updateReview(1L, 1L, ReviewUpdateRequest(rating = 2, content = "바뀐 리뷰 내용입니다"))
+        service.deleteReview(1L, 1L)
+
+        verify(productReviewSummaryService, times(2)).refresh(7L)
     }
 }

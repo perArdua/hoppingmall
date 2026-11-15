@@ -24,7 +24,8 @@ import java.math.RoundingMode
 class ReviewCommandServiceImpl(
     private val reviewRepository: ReviewRepository,
     private val orderQueryPort: OrderQueryPort,
-    private val productStatisticsRepository: ProductStatisticsRepository
+    private val productStatisticsRepository: ProductStatisticsRepository,
+    private val productReviewSummaryService: ProductReviewSummaryService
 ) : ReviewCommandService {
 
     override fun createReview(buyerId: Long, request: ReviewCreateRequest): ReviewResponse {
@@ -92,6 +93,11 @@ class ReviewCommandServiceImpl(
     }
 
     private fun updateProductReviewStats(productId: Long) {
+        updateStatisticsReviewStats(productId)
+        productReviewSummaryService.refresh(productId)
+    }
+
+    private fun updateStatisticsReviewStats(productId: Long) {
         val stats = productStatisticsRepository.findByProductIdForUpdate(productId) ?: return
 
         val avgRating = reviewRepository.averageRatingByProductId(productId)

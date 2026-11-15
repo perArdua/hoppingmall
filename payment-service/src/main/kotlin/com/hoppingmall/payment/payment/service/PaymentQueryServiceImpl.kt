@@ -30,15 +30,11 @@ class PaymentQueryServiceImpl(
     }
 
     override fun getPaymentsByOrderId(orderId: Long, userId: Long): List<PaymentResponse> {
-        val payment = paymentRepository.findByOrderId(orderId)
-        return if (payment != null) {
-            if (payment.userId != userId) {
-                throw PaymentAccessDeniedException()
-            }
-            listOf(PaymentResponse.from(payment))
-        } else {
-            emptyList()
+        val payments = paymentRepository.findAllByOrderIdOrderByIdDesc(orderId)
+        if (payments.any { it.userId != userId }) {
+            throw PaymentAccessDeniedException()
         }
+        return payments.map { PaymentResponse.from(it) }
     }
 
     override fun getPaymentByTransactionId(transactionId: String): PaymentResponse? {

@@ -12,7 +12,11 @@ import java.time.LocalDateTime
 interface OrderItemRepository : JpaRepository<OrderItem, Long> {
     fun findByOrderId(orderId: Long): List<OrderItem>
 
+    fun existsByOrderIdAndSellerId(orderId: Long, sellerId: Long): Boolean
+
     fun findByOrderIdIn(orderIds: List<Long>): List<OrderItem>
+
+    fun findByReservationIdIn(reservationIds: Collection<String>): List<OrderItem>
 
     @Query(
         value = """

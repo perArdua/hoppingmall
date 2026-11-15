@@ -9,7 +9,8 @@ import jakarta.persistence.*
 @Entity
 @Table(
     name = "sellers",
-    uniqueConstraints = [UniqueConstraint(name = Seller.USER_ID_UNIQUE_CONSTRAINT, columnNames = ["user_id"])]
+    uniqueConstraints = [UniqueConstraint(name = Seller.USER_ID_UNIQUE_CONSTRAINT, columnNames = ["user_id"])],
+    indexes = [Index(name = "idx_sellers_approval_status", columnList = "approval_status")]
 )
 class Seller private constructor(
     @Column(name = "user_id", nullable = false)
@@ -27,14 +28,19 @@ class Seller private constructor(
     var businessNumber: String = businessNumber
         private set
 
+    @Column(name = "rejection_reason", length = REJECTION_REASON_MAX_LENGTH)
+    var rejectionReason: String? = null
+        private set
+
     fun approve() {
         validatePendingStatus()
         this.approvalStatus = ApprovalStatus.APPROVED
     }
 
-    fun reject() {
+    fun reject(reason: String? = null) {
         validatePendingStatus()
         this.approvalStatus = ApprovalStatus.REJECTED
+        this.rejectionReason = reason
     }
 
     fun reapply(businessNumber: String) {
@@ -43,6 +49,7 @@ class Seller private constructor(
         }
         this.businessNumber = businessNumber
         this.approvalStatus = ApprovalStatus.PENDING
+        this.rejectionReason = null
     }
 
     private fun validatePendingStatus() {
@@ -55,6 +62,7 @@ class Seller private constructor(
 
     companion object {
         const val USER_ID_UNIQUE_CONSTRAINT = "uk_sellers_user_id"
+        const val REJECTION_REASON_MAX_LENGTH = 500
 
         fun create(user: User, businessNumber: String): Seller =
             Seller(user.id!!, businessNumber, ApprovalStatus.PENDING)

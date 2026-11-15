@@ -92,7 +92,7 @@ class PaymentQueryServiceImplTest {
     @Test
     fun getPaymentsByOrderId_결제가_있고_userId가_일치하면_리스트를_반환한다() {
         val payment = createPayment(id = 1L, userId = 10L)
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment)
+        whenever(paymentRepository.findAllByOrderIdOrderByIdDesc(100L)).thenReturn(listOf(payment))
 
         val result = service.getPaymentsByOrderId(100L, 10L)
 
@@ -102,7 +102,7 @@ class PaymentQueryServiceImplTest {
 
     @Test
     fun getPaymentsByOrderId_결제가_없으면_빈_리스트를_반환한다() {
-        whenever(paymentRepository.findByOrderId(999L)).thenReturn(null)
+        whenever(paymentRepository.findAllByOrderIdOrderByIdDesc(999L)).thenReturn(emptyList())
 
         val result = service.getPaymentsByOrderId(999L, 10L)
 
@@ -112,7 +112,7 @@ class PaymentQueryServiceImplTest {
     @Test
     fun getPaymentsByOrderId_userId가_일치하지_않으면_PaymentAccessDeniedException을_던진다() {
         val payment = createPayment(id = 1L, userId = 10L)
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment)
+        whenever(paymentRepository.findAllByOrderIdOrderByIdDesc(100L)).thenReturn(listOf(payment))
 
         assertThatThrownBy { service.getPaymentsByOrderId(100L, 999L) }
             .isInstanceOf(PaymentAccessDeniedException::class.java)

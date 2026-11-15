@@ -216,7 +216,7 @@ class PaymentCancelRequestRepeatAndPendingTest {
 
     private fun stored(payment: Payment): Payment {
         Mockito.lenient().`when`(paymentRepository.findByIdForUpdate(payment.id!!)).thenReturn(payment)
-        Mockito.lenient().`when`(paymentRepository.findByOrderId(payment.orderId)).thenReturn(payment)
+        Mockito.lenient().`when`(paymentRepository.findByActiveOrderId(payment.orderId)).thenReturn(payment)
         return payment
     }
 

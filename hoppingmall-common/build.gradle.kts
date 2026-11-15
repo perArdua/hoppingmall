@@ -50,6 +50,8 @@ dependencies {
 	testImplementation("org.springframework.kafka:spring-kafka")
 	testImplementation("net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE")
 	testImplementation("org.springframework.boot:spring-boot-starter-actuator")
+	testImplementation("org.springframework.boot:spring-boot-starter-validation")
+	testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	testRuntimeOnly("com.h2database:h2")
 	testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -89,9 +89,9 @@ class ShippingControllerTest {
     fun 주문ID로_배송을_조회한다() {
         val response = createShippingResponse()
 
-        whenever(shippingQueryService.getShippingByOrderId(10L)).thenReturn(response)
+        whenever(shippingQueryService.getShippingByOrderId(10L, 5L, false)).thenReturn(response)
 
-        val result = controller.getShippingByOrderId(10L)
+        val result = controller.getShippingByOrderId(sellerPrincipal, 10L)
 
         assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
         assertThat(result.body!!.data!!.orderId).isEqualTo(10L)
@@ -101,9 +101,9 @@ class ShippingControllerTest {
     fun 배송ID로_배송을_조회한다() {
         val response = createShippingResponse()
 
-        whenever(shippingQueryService.getShipping(1L)).thenReturn(response)
+        whenever(shippingQueryService.getShipping(1L, 5L, false)).thenReturn(response)
 
-        val result = controller.getShipping(1L)
+        val result = controller.getShipping(sellerPrincipal, 1L)
 
         assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
         assertThat(result.body!!.data!!.id).isEqualTo(1L)

@@ -68,7 +68,7 @@ abstract class MySqlJpaTestSupport {
     companion object {
         private const val LOCK_WAIT_LIMIT_MS = 15_000L
         private const val DATABASE = "user_mysql_test"
-        private val CLEANED_TABLES = listOf("sellers", "users")
+        private val CLEANED_TABLES = listOf("user_sessions", "sellers", "users")
 
         @JvmStatic
         @DynamicPropertySource

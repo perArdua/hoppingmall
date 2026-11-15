@@ -1,5 +1,6 @@
 package com.hoppingmall.user.common.vo
 
+import com.hoppingmall.user.exception.user.InvalidEmailException
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
 
@@ -9,10 +10,15 @@ data class Email(
     val value: String
 ) {
     init {
-        require(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$").matches(value)) {
-            "유효하지 않은 이메일 형식입니다: $value"
+        if (!FORMAT_REGEX.matches(value)) {
+            throw InvalidEmailException()
         }
     }
 
     override fun toString(): String = value
+
+    companion object {
+        const val FORMAT = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"
+        private val FORMAT_REGEX = Regex(FORMAT)
+    }
 }

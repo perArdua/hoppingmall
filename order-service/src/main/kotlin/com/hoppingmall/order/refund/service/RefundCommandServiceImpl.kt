@@ -25,11 +25,13 @@ import com.hoppingmall.order.refund.exception.RefundPaymentNotFoundException
 import com.hoppingmall.order.refund.exception.code.RefundErrorCode
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.LocalDateTime
 
 @Service
 class RefundCommandServiceImpl(
@@ -44,6 +46,9 @@ class RefundCommandServiceImpl(
 ) : RefundCommandService {
 
     private val refundableOrderStatuses = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
+
+    @Value("\${order.refund.window-days:30}")
+    private var refundWindowDays: Long = 30
 
     override fun requestRefund(buyerId: Long, request: RefundCreateRequest): RefundResponse {
         if (request.items.distinctBy { it.orderItemId }.size != request.items.size) {
@@ -66,6 +71,10 @@ class RefundCommandServiceImpl(
 
             if (order.status !in refundableOrderStatuses) {
                 throw RefundException(RefundErrorCode.REFUND_INVALID_ORDER_STATUS)
+            }
+
+            if (order.isRefundWindowClosed(LocalDateTime.now().minusDays(refundWindowDays))) {
+                throw RefundException(RefundErrorCode.REFUND_WINDOW_EXPIRED)
             }
 
             val orderItems = orderItemRepository.findByOrderId(request.orderId)

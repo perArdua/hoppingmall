@@ -6,6 +6,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import jakarta.persistence.*
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @Entity
 @Table(
@@ -30,6 +31,14 @@ class Order private constructor(
     @Column(nullable = false)
     var cancelRetryCount: Int = 0
 
+    @Column
+    var deliveredAt: LocalDateTime? = null
+        private set
+
+    @Embedded
+    var shippingAddress: OrderShippingAddress? = null
+        private set
+
     companion object {
         val MAX_TOTAL_AMOUNT: BigDecimal = BigDecimal("99999999.99")
 
@@ -47,14 +56,18 @@ class Order private constructor(
 
         private val refundableStatuses: Set<OrderStatus> = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
 
+        val TERMINAL_STATUSES: Set<OrderStatus> =
+            allowedTransitions.filterValues { it.isEmpty() }.keys - refundableStatuses
+
         fun create(
             buyerId: Long,
-            totalAmount: BigDecimal
+            totalAmount: BigDecimal,
+            shippingAddress: OrderShippingAddress? = null
         ): Order =
             Order(
                 buyerId = buyerId,
                 totalAmount = totalAmount
-            )
+            ).also { it.shippingAddress = shippingAddress }
     }
 
     fun updateStatus(newStatus: OrderStatus) {
@@ -63,7 +76,13 @@ class Order private constructor(
             throw OrderInvalidStatusException()
         }
         this.status = newStatus
+        if (newStatus == OrderStatus.DELIVERED) {
+            deliveredAt = LocalDateTime.now()
+        }
     }
+
+    fun isRefundWindowClosed(deliveredBefore: LocalDateTime): Boolean =
+        deliveredAt?.isBefore(deliveredBefore) == true
 
     fun requestCancellation() {
         updateStatus(OrderStatus.CANCEL_REQUESTED)
@@ -90,6 +109,10 @@ class Order private constructor(
     }
 
     fun isRefundable(): Boolean = status in refundableStatuses
+
+    fun isTerminalBefore(updatedBefore: LocalDateTime, deliveredBefore: LocalDateTime): Boolean =
+        (status in TERMINAL_STATUSES && updatedAt?.isBefore(updatedBefore) == true) ||
+            (status == OrderStatus.DELIVERED && isRefundWindowClosed(deliveredBefore))
 
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
 

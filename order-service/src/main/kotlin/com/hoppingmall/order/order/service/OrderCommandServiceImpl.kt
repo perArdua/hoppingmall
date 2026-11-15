@@ -114,7 +114,13 @@ class OrderCommandServiceImpl(
             if (fence != null && fence.link(reservationMap.values).isNotEmpty()) {
                 throw OrderReservationFencedException()
             }
-            val order = orderRepository.save(Order.create(buyerId = buyerId, totalAmount = totalAmount))
+            val order = orderRepository.save(
+                Order.create(
+                    buyerId = buyerId,
+                    totalAmount = totalAmount,
+                    shippingAddress = request.shippingAddress?.toShippingAddress()
+                )
+            )
 
             val orderItems = cartItems.map { cartItem ->
                 OrderItem.create(
@@ -261,7 +267,7 @@ class OrderCommandServiceImpl(
         orderRepository.lockById(orderId)
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
-        if (!isAdmin) {
+        if (!isAdmin && !orderItemRepository.existsByOrderIdAndSellerId(orderId, userId)) {
             throw OrderAccessDeniedException()
         }
 

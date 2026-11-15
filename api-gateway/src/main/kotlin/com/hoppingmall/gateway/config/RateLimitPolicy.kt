@@ -3,7 +3,7 @@ package com.hoppingmall.gateway.config
 import java.time.Duration
 
 enum class RateLimitKeyType {
-    IP, USER_ID
+    IP, USER_ID, REFRESH_TOKEN
 }
 
 data class RateLimitPolicy(

@@ -144,7 +144,7 @@ class PaymentCancelTransactionIdTest {
                 orderId = 100L
             )
         )
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(100L)).thenReturn(payment)
         whenever(paymentRepository.findByIdForUpdate(1L)).thenReturn(payment)
         whenever(paymentRepository.save(any<Payment>())).thenAnswer { it.arguments[0] }
 

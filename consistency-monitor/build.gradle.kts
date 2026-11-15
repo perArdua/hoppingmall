@@ -25,6 +25,8 @@ repositories {
 	mavenCentral()
 }
 
+extra["testcontainers.version"] = "1.21.4"
+
 val invariantsSql = file(
 	listOf("../scripts/invariants/invariants.sql", "/scripts/invariants/invariants.sql")
 		.first { file(it).exists() }
@@ -39,6 +41,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-jdbc")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 	implementation("io.micrometer:micrometer-registry-prometheus")
 
 	implementation("io.jsonwebtoken:jjwt-api:0.11.5")
@@ -50,6 +53,8 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+	testImplementation("org.testcontainers:testcontainers:1.21.4")
+	testImplementation("org.testcontainers:mysql:1.21.4")
 	testRuntimeOnly("com.h2database:h2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

@@ -90,12 +90,12 @@ class FileUploadControllerSecurityTest {
         }
 
         @Test
-        fun 인증되지_않은_요청_시_403_응답() {
+        fun 인증되지_않은_요청_시_401_응답() {
             mockMvc.multipart("/api/v1/files/upload") {
                 file(mockFile)
                 param("domain", "product")
             }.andExpect {
-                status { isForbidden() }
+                status { isUnauthorized() }
             }
         }
     }
@@ -146,11 +146,11 @@ class FileUploadControllerSecurityTest {
         }
 
         @Test
-        fun 인증되지_않은_상품_이미지_업로드_요청_시_403_응답() {
+        fun 인증되지_않은_상품_이미지_업로드_요청_시_401_응답() {
             mockMvc.multipart("/api/v1/products/images/upload") {
                 file(MockMultipartFile("image", "test.jpg", "image/jpeg", "content".toByteArray()))
             }.andExpect {
-                status { isForbidden() }
+                status { isUnauthorized() }
             }
         }
     }

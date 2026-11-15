@@ -16,10 +16,13 @@ data class ProductResponse(
     val status: ProductStatus,
     val imageUrls: List<String>,
     val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime?
+    val updatedAt: LocalDateTime?,
+    val categoryName: String? = null,
+    val averageRating: BigDecimal = BigDecimal.ZERO,
+    val reviewCount: Long = 0
 ) {
     companion object {
-        fun from(product: Product, images: List<ProductImage>): ProductResponse {
+        fun from(product: Product, images: List<ProductImage>, categoryName: String?): ProductResponse {
             return ProductResponse(
                 id = product.id!!,
                 sellerId = product.sellerId,
@@ -30,7 +33,10 @@ data class ProductResponse(
                 status = product.status,
                 imageUrls = images.sortedBy { it.sortOrder }.map { it.imageUrl },
                 createdAt = product.createdAt,
-                updatedAt = product.updatedAt
+                updatedAt = product.updatedAt,
+                categoryName = categoryName,
+                averageRating = product.averageRating,
+                reviewCount = product.reviewCount
             )
         }
     }

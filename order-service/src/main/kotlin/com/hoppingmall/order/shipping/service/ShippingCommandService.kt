@@ -5,6 +5,11 @@ import com.hoppingmall.order.shipping.dto.request.ShippingStatusUpdateRequest
 import com.hoppingmall.order.shipping.dto.response.ShippingResponse
 
 interface ShippingCommandService {
-    fun createShipping(sellerId: Long, request: ShippingCreateRequest): ShippingResponse
-    fun updateShippingStatus(sellerId: Long, shippingId: Long, request: ShippingStatusUpdateRequest): ShippingResponse
+    fun createShipping(sellerId: Long, request: ShippingCreateRequest, isAdmin: Boolean = false): ShippingResponse
+    fun updateShippingStatus(
+        sellerId: Long,
+        shippingId: Long,
+        request: ShippingStatusUpdateRequest,
+        isAdmin: Boolean = false
+    ): ShippingResponse
 }

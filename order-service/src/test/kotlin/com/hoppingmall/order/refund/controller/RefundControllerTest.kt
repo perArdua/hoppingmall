@@ -77,7 +77,7 @@ class RefundControllerTest {
 
         whenever(refundCommandService.requestRefund(1L, request)).thenReturn(response)
 
-        val result = controller.requestRefund(request, buyerPrincipal)
+        val result = controller.requestRefund(request, buyerPrincipal).body!!
 
         assertThat(result.data!!.id).isEqualTo(1L)
     }
@@ -125,7 +125,7 @@ class RefundControllerTest {
 
         whenever(refundCommandService.approveRefund(1L, 5L)).thenReturn(response)
 
-        val result = controller.approveRefund(1L, sellerPrincipal)
+        val result = controller.approveRefund(1L, sellerPrincipal).body!!
 
         assertThat(result.data!!.status).isEqualTo(RefundStatus.COMPLETED)
     }
@@ -137,7 +137,7 @@ class RefundControllerTest {
 
         whenever(refundCommandService.rejectRefund(1L, 5L, request)).thenReturn(response)
 
-        val result = controller.rejectRefund(1L, request, sellerPrincipal)
+        val result = controller.rejectRefund(1L, request, sellerPrincipal).body!!
 
         assertThat(result.data!!.status).isEqualTo(RefundStatus.REJECTED)
     }

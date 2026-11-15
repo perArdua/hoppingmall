@@ -2,6 +2,7 @@ package com.hoppingmall.product.wishlist.service
 
 import com.hoppingmall.product.wishlist.domain.Wishlist
 import com.hoppingmall.product.wishlist.domain.repository.WishlistRepository
+import com.hoppingmall.product.wishlist.dto.response.WishlistCheckResponse
 import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -20,6 +21,6 @@ class WishlistQueryServiceImpl(
         return wishlistRepository.findByBuyerIdWithProduct(buyerId, pageable)
     }
 
-    override fun isWishlisted(buyerId: Long, productId: Long): Boolean =
-        wishlistRepository.existsByBuyerIdAndProductId(buyerId, productId)
+    override fun checkWishlist(buyerId: Long, productId: Long): WishlistCheckResponse =
+        WishlistCheckResponse.of(wishlistRepository.findIdByBuyerIdAndProductId(buyerId, productId))
 }

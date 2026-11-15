@@ -11,3 +11,9 @@ CREATE TABLE IF NOT EXISTS invariant_violations (
     resolution_note VARCHAR(500) NULL,
     snapshot_json TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS monitor_leases (
+    name VARCHAR(64) NOT NULL PRIMARY KEY,
+    owner VARCHAR(191) NOT NULL,
+    lease_until DATETIME(6) NOT NULL
+);

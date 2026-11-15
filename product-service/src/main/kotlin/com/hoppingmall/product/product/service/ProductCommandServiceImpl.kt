@@ -27,9 +27,7 @@ class ProductCommandServiceImpl(
 
     override fun createProduct(request: ProductCreateRequest): ProductResponse {
         val categoryId = requireNotNull(request.categoryId)
-        if (categoryRepository.findNullableById(categoryId) == null) {
-            throw CategoryNotFoundException()
-        }
+        val category = categoryRepository.findNullableById(categoryId) ?: throw CategoryNotFoundException()
 
         val product = Product.create(
             sellerId = requireNotNull(request.sellerId),
@@ -51,15 +49,13 @@ class ProductCommandServiceImpl(
         }
         val savedImages = productImageRepository.saveAll(productImages)
 
-        return ProductResponse.from(savedProduct, savedImages)
+        return ProductResponse.from(savedProduct, savedImages, category.name)
     }
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")
     override fun updateProduct(productId: Long, request: ProductUpdateRequest): ProductResponse {
-        val categoryId = request.categoryId
-        if (categoryId == null || categoryRepository.findNullableById(categoryId) == null) {
-            throw CategoryNotFoundException()
-        }
+        val categoryId = request.categoryId ?: throw CategoryNotFoundException()
+        val category = categoryRepository.findNullableById(categoryId) ?: throw CategoryNotFoundException()
 
         val product = productRepository.findByIdOrNull(productId) ?: throw ProductNotFoundException() 
 
@@ -86,7 +82,7 @@ class ProductCommandServiceImpl(
         }
         val savedImages = productImageRepository.saveAll(newImages)
 
-        return ProductResponse.from(updatedProduct, savedImages)
+        return ProductResponse.from(updatedProduct, savedImages, category.name)
     }
 
     @CacheEvict(cacheNames = ["product"], key = "#productId")

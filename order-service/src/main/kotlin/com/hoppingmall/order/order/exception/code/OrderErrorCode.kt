@@ -19,4 +19,5 @@ enum class OrderErrorCode(
     ORDER_PRODUCT_UNAVAILABLE("ORD010", "상품 정보를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE),
     ORDER_TOTAL_AMOUNT_EXCEEDED("ORD011", "주문 합계는 99,999,999.99원을 넘을 수 없습니다.", HttpStatus.BAD_REQUEST),
     ORDER_PARTIALLY_REFUNDED("ORD012", "부분 환불된 주문은 취소할 수 없습니다. 남은 수량은 환불을 요청해주세요.", HttpStatus.BAD_REQUEST),
+    ORDER_SHIPPING_ADDRESS_REQUIRED("ORD013", "배송지가 없는 주문의 배송 등록에는 받는 사람 이름·전화번호·주소가 필요합니다.", HttpStatus.BAD_REQUEST),
 }

@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.payment.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.payment.payment.dto.request.PaymentRequest
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.service.PaymentCommandService
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Slice
 import com.hoppingmall.common.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -22,13 +24,14 @@ class PaymentController(
 ) {
 
     @PostMapping
+    @Idempotent(ttlHours = 24)
     fun processPayment(
         @Valid @RequestBody paymentRequest: PaymentRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<PaymentResponse> {
+    ): ResponseEntity<ApiResponse<PaymentResponse>> {
         val userId = principal.getUserId()
         val paymentResponse = paymentCommandService.processPayment(paymentRequest, userId)
-        return ApiResponse.success(paymentResponse)
+        return ResponseEntity.ok(ApiResponse.success(paymentResponse))
     }
 
     @GetMapping("/{paymentId}")

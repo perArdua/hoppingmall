@@ -2,6 +2,8 @@ package com.hoppingmall.user.domain.repository
 
 import com.hoppingmall.user.domain.Seller
 import jakarta.persistence.LockModeType
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import java.util.Optional
@@ -14,4 +16,6 @@ interface SellerRepository : JpaRepository<Seller, Long> {
     fun findNullableByUserId(userId: Long): Seller?
 
     fun existsByBusinessNumber(businessNumber: String): Boolean
+
+    fun findAllByApprovalStatus(approvalStatus: Seller.ApprovalStatus, pageable: Pageable): Page<Seller>
 }

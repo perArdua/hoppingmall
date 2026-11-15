@@ -74,11 +74,11 @@ class CategoryControllerSecurityTest {
         }
 
         @Test
-        fun 인증되지_않은_카테고리_생성_요청_시_403_응답() {
+        fun 인증되지_않은_카테고리_생성_요청_시_401_응답() {
             mockMvc.post("/api/v1/categories") {
                 contentType = MediaType.APPLICATION_JSON
                 content = categoryJson
-            }.andExpect { status { isForbidden() } }
+            }.andExpect { status { isUnauthorized() } }
         }
     }
 

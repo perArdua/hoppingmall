@@ -13,9 +13,10 @@ import java.time.LocalDateTime
 @Table(
     name = "payments",
     indexes = [
-        Index(name = "idx_payments_user_id", columnList = "userId")
+        Index(name = "idx_payments_user_id", columnList = "userId"),
+        Index(name = "idx_payments_order_id", columnList = "orderId")
     ],
-    uniqueConstraints = [UniqueConstraint(name = "uk_payments_order_id", columnNames = ["order_id"])]
+    uniqueConstraints = [UniqueConstraint(name = "uk_payments_active_order_id", columnNames = ["active_order_id"])]
 )
 class Payment private constructor(
     @Column(nullable = false)
@@ -53,6 +54,10 @@ class Payment private constructor(
     @Column(precision = 10, scale = 2)
     val couponDiscountAmount: BigDecimal = BigDecimal.ZERO
 ) : BaseEntity() {
+
+    @Column(name = "active_order_id")
+    var activeOrderId: Long? = orderId
+        private set
 
     @Column(name = "refunded_amount", precision = 10, scale = 2, insertable = false, updatable = false)
     val refundedAmount: BigDecimal? = null
@@ -103,6 +108,7 @@ class Payment private constructor(
             this.transactionId = this@Payment.transactionId
             this.errorMessage = this@Payment.errorMessage
             this.completedAt = this@Payment.completedAt
+            this.activeOrderId = this@Payment.activeOrderId
         }
     }
 
@@ -117,6 +123,9 @@ class Payment private constructor(
         this.transactionId = transactionId
         this.completedAt = completedAt
         this.errorMessage = errorMessage
+        if (newStatus == PaymentStatus.FAILED) {
+            this.activeOrderId = null
+        }
     }
 
     private fun validateTransition(newStatus: PaymentStatus) {
@@ -135,6 +144,8 @@ class Payment private constructor(
     fun isSuccess(): Boolean = status == PaymentStatus.SUCCESS
 
     fun isFailed(): Boolean = status == PaymentStatus.FAILED
+
+    fun isZeroAmount(): Boolean = amount.signum() == 0
 }
 
 class PaymentMethodConverter : EnumNameConverter<PaymentMethod>(PaymentMethod::class.java)

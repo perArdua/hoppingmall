@@ -124,6 +124,7 @@ class ShippingCommandServiceImplTest {
         ReflectionTestUtils.setField(order, "id", 10L)
 
         whenever(orderRepository.findById(10L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.findByOrderId(10L)).thenReturn(listOf(createOrderItem()))
 
         assertThatThrownBy { service.createShipping(5L, shippingRequest) }
             .isInstanceOf(OrderInvalidStatusException::class.java)
@@ -135,6 +136,7 @@ class ShippingCommandServiceImplTest {
         val existingShipping = createShipping()
 
         whenever(orderRepository.findById(10L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.findByOrderId(10L)).thenReturn(listOf(createOrderItem()))
         whenever(shippingRepository.findByOrderId(10L)).thenReturn(existingShipping)
 
         assertThatThrownBy { service.createShipping(5L, shippingRequest) }
@@ -149,6 +151,7 @@ class ShippingCommandServiceImplTest {
 
         whenever(shippingRepository.findById(1L)).thenReturn(Optional.of(shipping))
         whenever(orderRepository.findById(10L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.existsByOrderIdAndSellerId(10L, 5L)).thenReturn(true)
         whenever(objectMapper.writeValueAsString(any())).thenReturn("{}")
 
         val result = service.updateShippingStatus(5L, 1L, request)
@@ -174,6 +177,7 @@ class ShippingCommandServiceImplTest {
 
         whenever(shippingRepository.findById(1L)).thenReturn(Optional.of(shipping))
         whenever(orderRepository.findById(10L)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.existsByOrderIdAndSellerId(10L, 5L)).thenReturn(true)
         whenever(objectMapper.writeValueAsString(any())).thenReturn("{}")
 
         val result = service.updateShippingStatus(5L, 1L, request)

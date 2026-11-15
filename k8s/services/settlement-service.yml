@@ -46,6 +46,12 @@ spec:
                 secretKeyRef:
                   name: hoppingmall-secret
                   key: GATEWAY_IDENTITY_SECRET
+            - name: GATEWAY_IDENTITY_PREVIOUS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hoppingmall-secret
+                  key: GATEWAY_IDENTITY_PREVIOUS_SECRET
+                  optional: true
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC"
             - name: INTERNAL_SERVICE_TOKEN

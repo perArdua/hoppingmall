@@ -44,7 +44,7 @@ class OrderController(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable orderId: Long
     ): ResponseEntity<ApiResponse<OrderResponse>> {
-        val order = orderQueryService.getOrder(orderId, userPrincipal.getUserId())
+        val order = orderQueryService.getOrder(orderId, userPrincipal.getUserId(), userPrincipal.getRole() == "ADMIN")
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 
@@ -77,13 +77,13 @@ class OrderController(
         if (request.status !in SHIPPING_STATUSES) {
             throw OrderInvalidStatusException()
         }
-        val canChangeAnyOrder = userPrincipal.getRole() in SHIPPING_MANAGER_ROLES
-        val order = orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), canChangeAnyOrder)
+        val isAdmin = userPrincipal.getRole() == ADMIN_ROLE
+        val order = orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), isAdmin)
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 
     companion object {
         private val SHIPPING_STATUSES = setOf(OrderStatus.SHIPPED, OrderStatus.DELIVERED)
-        private val SHIPPING_MANAGER_ROLES = setOf("SELLER", "ADMIN")
+        private const val ADMIN_ROLE = "ADMIN"
     }
 }

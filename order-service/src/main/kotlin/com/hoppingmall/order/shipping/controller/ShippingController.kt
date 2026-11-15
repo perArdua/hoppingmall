@@ -29,7 +29,7 @@ class ShippingController(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: ShippingCreateRequest
     ): ResponseEntity<ApiResponse<ShippingResponse>> {
-        val shipping = shippingCommandService.createShipping(userPrincipal.getUserId(), request)
+        val shipping = shippingCommandService.createShipping(userPrincipal.getUserId(), request, userPrincipal.isAdmin())
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(shipping))
     }
@@ -41,23 +41,33 @@ class ShippingController(
         @PathVariable shippingId: Long,
         @Valid @RequestBody request: ShippingStatusUpdateRequest
     ): ResponseEntity<ApiResponse<ShippingResponse>> {
-        val shipping = shippingCommandService.updateShippingStatus(userPrincipal.getUserId(), shippingId, request)
+        val shipping = shippingCommandService.updateShippingStatus(
+            userPrincipal.getUserId(), shippingId, request, userPrincipal.isAdmin()
+        )
         return ResponseEntity.ok(ApiResponse.success(shipping))
     }
 
     @GetMapping("/order/{orderId}")
     fun getShippingByOrderId(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable orderId: Long
     ): ResponseEntity<ApiResponse<ShippingResponse>> {
-        val shipping = shippingQueryService.getShippingByOrderId(orderId)
+        val shipping = shippingQueryService.getShippingByOrderId(orderId, userPrincipal.getUserId(), userPrincipal.isAdmin())
         return ResponseEntity.ok(ApiResponse.success(shipping))
     }
 
     @GetMapping("/{shippingId}")
     fun getShipping(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable shippingId: Long
     ): ResponseEntity<ApiResponse<ShippingResponse>> {
-        val shipping = shippingQueryService.getShipping(shippingId)
+        val shipping = shippingQueryService.getShipping(shippingId, userPrincipal.getUserId(), userPrincipal.isAdmin())
         return ResponseEntity.ok(ApiResponse.success(shipping))
+    }
+
+    private fun UserPrincipal.isAdmin(): Boolean = getRole() == ADMIN_ROLE
+
+    companion object {
+        private const val ADMIN_ROLE = "ADMIN"
     }
 }

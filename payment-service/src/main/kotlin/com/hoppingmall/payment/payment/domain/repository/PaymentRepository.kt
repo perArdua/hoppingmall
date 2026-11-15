@@ -15,7 +15,11 @@ import java.math.BigDecimal
 @Repository
 interface PaymentRepository : JpaRepository<Payment, Long> {
 
-    fun findByOrderId(orderId: Long): Payment?
+    fun findByActiveOrderId(orderId: Long): Payment?
+
+    fun findFirstByOrderIdOrderByIdDesc(orderId: Long): Payment?
+
+    fun findAllByOrderIdOrderByIdDesc(orderId: Long): List<Payment>
 
     @Query("SELECT p FROM Payment p WHERE p.id = :id")
     @Lock(LockModeType.PESSIMISTIC_WRITE)

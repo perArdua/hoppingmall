@@ -4,6 +4,7 @@ import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
+import com.hoppingmall.product.wishlist.dto.response.WishlistCheckResponse
 import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
 import com.hoppingmall.product.wishlist.service.WishlistQueryService
@@ -46,6 +47,16 @@ class WishlistController(
         return ResponseEntity.ok(ApiResponse.success(Unit))
     }
 
+    @Idempotent(ttlHours = 24)
+    @DeleteMapping("/product/{productId}")
+    fun removeWishlistByProduct(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PathVariable productId: Long
+    ): ResponseEntity<ApiResponse<Unit>> {
+        wishlistCommandService.removeWishlistByProductId(userPrincipal.getUserId(), productId)
+        return ResponseEntity.ok(ApiResponse.success(Unit))
+    }
+
     @GetMapping
     fun getWishlists(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
@@ -59,8 +70,8 @@ class WishlistController(
     fun isWishlisted(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable productId: Long
-    ): ResponseEntity<ApiResponse<Boolean>> {
-        val wishlisted = wishlistQueryService.isWishlisted(userPrincipal.getUserId(), productId)
-        return ResponseEntity.ok(ApiResponse.success(wishlisted))
+    ): ResponseEntity<ApiResponse<WishlistCheckResponse>> {
+        val response = wishlistQueryService.checkWishlist(userPrincipal.getUserId(), productId)
+        return ResponseEntity.ok(ApiResponse.success(response))
     }
 }

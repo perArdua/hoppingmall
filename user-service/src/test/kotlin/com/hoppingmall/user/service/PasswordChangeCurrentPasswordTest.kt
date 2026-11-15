@@ -1,6 +1,7 @@
 package com.hoppingmall.user.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.user.auth.domain.SessionRevokeReason
 import com.hoppingmall.user.auth.service.RefreshTokenService
 import com.hoppingmall.user.common.vo.CurrentPasswordNotMatchedException
 import com.hoppingmall.user.common.vo.DefaultPasswordPolicy
@@ -79,7 +80,7 @@ class PasswordChangeCurrentPasswordTest {
         }.isInstanceOf(CurrentPasswordNotMatchedException::class.java)
 
         assertThat(user.getPassword()).isEqualTo(originalPassword)
-        verify(refreshTokenService, never()).delete(any())
+        verify(refreshTokenService, never()).revokeAll(any(), any())
     }
 
     @Test
@@ -89,7 +90,7 @@ class PasswordChangeCurrentPasswordTest {
         }.isInstanceOf(CurrentPasswordNotMatchedException::class.java)
 
         assertThat(user.getPassword()).isEqualTo(originalPassword)
-        verify(refreshTokenService, never()).delete(any())
+        verify(refreshTokenService, never()).revokeAll(any(), any())
     }
 
     @Test
@@ -98,7 +99,7 @@ class PasswordChangeCurrentPasswordTest {
 
         assertThat(passwordEncoder.matches("NewPassword1234", user.getPassword().value)).isTrue()
         assertThat(user.getName()).isEqualTo("새이름")
-        verify(refreshTokenService).delete(1L)
+        verify(refreshTokenService).revokeAll(1L, SessionRevokeReason.PASSWORD_CHANGED)
     }
 
     @Test
@@ -107,7 +108,7 @@ class PasswordChangeCurrentPasswordTest {
 
         assertThat(user.getName()).isEqualTo("새이름")
         assertThat(user.getPassword()).isEqualTo(originalPassword)
-        verify(refreshTokenService, never()).delete(any())
+        verify(refreshTokenService, never()).revokeAll(any(), any())
     }
 
     private fun updateWithBody(body: String) {
