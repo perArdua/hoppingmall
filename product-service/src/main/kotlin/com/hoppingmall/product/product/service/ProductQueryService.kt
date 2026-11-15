@@ -12,6 +12,8 @@ interface ProductQueryService {
 
     fun getProductsBySellerId(sellerId: Long, pageable: Pageable): Slice<ProductResponse>
 
+    fun getProductsBySellerIdWithStock(sellerId: Long, pageable: Pageable): Slice<ProductResponse>
+
     fun getProductsByCategoryId(categoryId: Long, pageable: Pageable): Slice<ProductResponse>
 
     fun searchProducts(condition: ProductSearchCondition, pageable: Pageable): Slice<ProductResponse>
