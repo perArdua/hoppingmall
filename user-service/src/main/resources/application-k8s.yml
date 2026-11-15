@@ -21,7 +21,9 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+  flyway:
+    enabled: true
   data:
     redis:
       host: redis.hoppingmall.svc.cluster.local
