@@ -18,14 +18,14 @@ class OrderQueryServiceImpl(
     private val orderItemRepository: OrderItemRepository
 ) : OrderQueryService {
 
-    override fun getOrder(orderId: Long, buyerId: Long): OrderResponse {
+    override fun getOrder(orderId: Long, userId: Long, isAdmin: Boolean): OrderResponse {
         val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
 
-        if (order.buyerId != buyerId) {
+        val orderItems = orderItemRepository.findByOrderId(orderId)
+        if (order.buyerId != userId && !isAdmin && orderItems.none { it.sellerId == userId }) {
             throw OrderAccessDeniedException()
         }
 
-        val orderItems = orderItemRepository.findByOrderId(orderId)
         return OrderResponse.from(order, orderItems)
     }
 
