@@ -2,6 +2,7 @@ package com.hoppingmall.user.config
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.CommonErrorCode
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.MediaType
@@ -23,7 +24,7 @@ class JwtAuthenticationEntryPoint(
         response.characterEncoding = "UTF-8"
         response.writer.write(
             objectMapper.writeValueAsString(
-                ApiResponse.failure<Unit>("인증이 필요합니다.")
+                ApiResponse.failure<Unit>(CommonErrorCode.UNAUTHORIZED)
             )
         )
     }

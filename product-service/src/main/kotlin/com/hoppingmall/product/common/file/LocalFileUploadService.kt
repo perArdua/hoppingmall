@@ -21,10 +21,11 @@ class LocalFileUploadService(
             ?: throw InvalidFileNameException()
         if (originalFilename.isBlank()) throw InvalidFileNameException()
 
-        val extension = originalFilename.substringAfterLast(".", "")
+        val extension = originalFilename.substringAfterLast(".", "").lowercase()
+        val allowedExtensions = fileUploadConfig.allowedExtensions.map { it.lowercase() }
 
-        if (extension !in fileUploadConfig.allowedExtensions) {
-            throw UnsupportedFileTypeException(fileUploadConfig.allowedExtensions.toList())
+        if (extension !in allowedExtensions) {
+            throw UnsupportedFileTypeException(allowedExtensions)
         }
         if (request.file.size > fileUploadConfig.maxFileSize) {
             throw FileSizeExceededException()
@@ -32,6 +33,7 @@ class LocalFileUploadService(
         if (request.domain !in fileUploadConfig.allowedDomains) {
             throw UnsupportedDomainException(fileUploadConfig.allowedDomains.toList())
         }
+        checkContent(request, extension)
 
         val fileName = "${UUID.randomUUID()}.$extension"
         val uploadDir = Paths.get(fileUploadConfig.baseUploadDir, request.domain, fileUploadConfig.subDirectory)
@@ -55,5 +57,16 @@ class LocalFileUploadService(
             fileSize = request.file.size,
             domain = request.domain
         )
+    }
+
+    private fun checkContent(request: FileUploadRequest, extension: String) {
+        val detected = try {
+            request.file.inputStream.use { ImageType.detect(it) }
+        } catch (e: IOException) {
+            throw FileUploadException(e.message ?: "")
+        }
+        if (detected == null || extension !in detected.extensions) {
+            throw FileContentMismatchException()
+        }
     }
 }
