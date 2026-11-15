@@ -8,6 +8,7 @@ import com.hoppingmall.payment.coupon.service.CouponCommandService
 import com.hoppingmall.payment.coupon.service.CouponQueryService
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.idempotency.Idempotent
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -57,6 +58,7 @@ class CouponController(
     }
 
     @PostMapping("/coupons/{couponId}/issue")
+    @Idempotent(ttlHours = 24)
     fun issueCoupon(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable couponId: Long
