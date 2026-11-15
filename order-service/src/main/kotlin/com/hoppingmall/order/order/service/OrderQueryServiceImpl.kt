@@ -8,7 +8,6 @@ import com.hoppingmall.order.order.dto.response.SellerOrderResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
-import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.domain.SliceImpl
@@ -45,7 +44,7 @@ class OrderQueryServiceImpl(
     }
 
     override fun getSellerOrders(sellerId: Long, status: OrderStatus?, pageable: Pageable): Slice<SellerOrderResponse> {
-        val page = PageRequest.of(pageable.pageNumber, pageable.pageSize)
+        val page = Pageable.ofSize(pageable.pageSize).withPage(pageable.pageNumber)
         val orderSlice = when {
             status == null -> orderRepository.findSellerOrders(sellerId, SELLER_HIDDEN_STATUSES, page)
             status in SELLER_HIDDEN_STATUSES -> return SliceImpl(emptyList(), page, false)
