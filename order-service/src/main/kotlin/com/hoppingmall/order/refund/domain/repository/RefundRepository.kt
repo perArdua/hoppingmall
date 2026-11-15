@@ -15,6 +15,7 @@ interface RefundRepository : JpaRepository<Refund, Long> {
     fun existsByOrderIdAndStatusAndIsFullRefundTrueAndDeletedAtIsNull(orderId: Long, status: RefundStatus): Boolean
     fun findByBuyerId(buyerId: Long, pageable: Pageable): Slice<Refund>
     fun findBySellerId(sellerId: Long, pageable: Pageable): Slice<Refund>
+    fun findByOrderIdOrderByIdAsc(orderId: Long): List<Refund>
     fun findBySellerIdAndStatusAndCompletedAtBetween(
         sellerId: Long, status: RefundStatus, startDate: LocalDateTime, endDate: LocalDateTime
     ): List<Refund>
