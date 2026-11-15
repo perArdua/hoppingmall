@@ -42,7 +42,7 @@ class ViolationApiAuthTest {
 
     private fun resolveWith(authorization: String?) = mockMvc.post("/api/v1/violations/5/resolve") {
         contentType = MediaType.APPLICATION_JSON
-        content = """{"ackedBy":"kim","resolutionNote":"환불 확인"}"""
+        content = """{"acked_by":"kim","resolution_note":"환불 확인"}"""
         authorization?.let { header(HttpHeaders.AUTHORIZATION, it) }
     }
 
@@ -108,7 +108,7 @@ class ViolationApiAuthTest {
 
         resolveWith(TestTokens.bearer(TestTokens.admin(7L))).andExpect {
             status { isOk() }
-            jsonPath("$.ackedBy") { value("7") }
+            jsonPath("$.acked_by") { value("7") }
         }
         verify(repository).resolve(5L, t0.plusMinutes(1), "7", "환불 확인")
     }
