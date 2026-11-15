@@ -173,8 +173,8 @@ class OrderItemWithdrawalRestrictionTest {
         out.writeString(3, "20000")
         out.writeInt64(4, SELLER_ID)
         if (restricted) {
-            out.writeBool(6, true)
-            out.writeString(7, "CUSTOM_MADE")
+            out.writeBool(8, true)
+            out.writeString(9, "CUSTOM_MADE")
         }
         out.flush()
         return ProductResponse.parseFrom(ByteString.copyFrom(bytes.toByteArray()))
