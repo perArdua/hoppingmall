@@ -210,7 +210,7 @@ class IdempotencyAspectTest {
                 responseBody = objectMapper.writeValueAsString(responseBody),
                 expiresAt = LocalDateTime.now().plusHours(24)
             )
-            whenever(idempotencyService.save(any(), any(), any(), any(), any(), any()))
+            whenever(idempotencyService.save(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(savedRecord)
 
             val result = aspect.handleIdempotency(joinPoint, idempotent)
@@ -222,6 +222,7 @@ class IdempotencyAspectTest {
                 endpoint = eq("/api/v1/orders"),
                 responseStatus = eq(201),
                 responseBody = any(),
+                requestFingerprint = any(),
                 ttlHours = eq(24L)
             )
             verify(lock).unlock()
@@ -242,7 +243,7 @@ class IdempotencyAspectTest {
             val result = aspect.handleIdempotency(joinPoint, idempotent)
 
             assertThat(result).isEqualTo(response)
-            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any())
+            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any(), any())
             verify(lock).unlock()
         }
 
@@ -260,7 +261,7 @@ class IdempotencyAspectTest {
             val result = aspect.handleIdempotency(joinPoint, idempotent)
 
             assertThat(result).isEqualTo("plain string")
-            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any())
+            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any(), any())
             verify(lock).unlock()
         }
 

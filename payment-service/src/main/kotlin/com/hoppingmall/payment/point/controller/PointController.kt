@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.point.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.payment.point.dto.request.PointUseRequest
 import com.hoppingmall.payment.point.dto.response.PointBalanceResponse
 import com.hoppingmall.payment.point.dto.response.PointHistoryResponse
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Slice
 import com.hoppingmall.common.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -47,13 +49,14 @@ class PointController(
     }
 
     @PostMapping("/use")
+    @Idempotent(ttlHours = 24)
     fun usePoint(
         @Valid @RequestBody request: PointUseRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<PointUseResponse> {
+    ): ResponseEntity<ApiResponse<PointUseResponse>> {
         val userId = principal.getUserId()
         val result = pointCommandService.usePoint(userId, request)
-        return ApiResponse.success(result)
+        return ResponseEntity.ok(ApiResponse.success(result))
     }
 
     companion object {

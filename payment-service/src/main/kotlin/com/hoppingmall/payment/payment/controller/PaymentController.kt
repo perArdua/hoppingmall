@@ -69,13 +69,14 @@ class PaymentController(
     }
 
     @PostMapping("/{paymentId}/cancel")
+    @Idempotent(ttlHours = 24)
     fun cancelPayment(
         @PathVariable paymentId: Long,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<PaymentResponse> {
+    ): ResponseEntity<ApiResponse<PaymentResponse>> {
         val userId = principal.getUserId()
         val paymentResponse = paymentCommandService.cancelPayment(paymentId, userId)
-        return ApiResponse.success(paymentResponse)
+        return ResponseEntity.ok(ApiResponse.success(paymentResponse))
     }
 
     companion object {

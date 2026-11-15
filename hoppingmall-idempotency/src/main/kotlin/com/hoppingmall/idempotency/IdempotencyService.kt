@@ -30,6 +30,7 @@ class IdempotencyService(
         endpoint: String,
         responseStatus: Int,
         responseBody: String,
+        requestFingerprint: String,
         ttlHours: Long
     ): IdempotencyRecord =
         idempotencyRecordRepository.save(
@@ -39,7 +40,8 @@ class IdempotencyService(
                 endpoint = endpoint,
                 responseStatus = responseStatus,
                 responseBody = responseBody,
-                expiresAt = LocalDateTime.now().plusHours(ttlHours)
+                expiresAt = LocalDateTime.now().plusHours(ttlHours),
+                requestFingerprint = requestFingerprint
             )
         )
 
