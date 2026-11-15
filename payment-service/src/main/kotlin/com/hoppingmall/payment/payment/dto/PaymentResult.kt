@@ -20,6 +20,9 @@ data class PaymentResult(
             )
         }
 
+        fun zeroAmount(payment: Payment): PaymentResult =
+            success(payment, "$ZERO_AMOUNT_TRANSACTION_PREFIX${payment.id}")
+
         fun failed(payment: Payment, errorMessage: String): PaymentResult {
             return PaymentResult(
                 payment = payment,
@@ -27,5 +30,7 @@ data class PaymentResult(
                 errorMessage = errorMessage
             )
         }
+
+        private const val ZERO_AMOUNT_TRANSACTION_PREFIX = "FREE_"
     }
 }

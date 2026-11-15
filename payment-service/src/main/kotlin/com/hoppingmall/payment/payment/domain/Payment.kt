@@ -135,6 +135,8 @@ class Payment private constructor(
     fun isSuccess(): Boolean = status == PaymentStatus.SUCCESS
 
     fun isFailed(): Boolean = status == PaymentStatus.FAILED
+
+    fun isZeroAmount(): Boolean = amount.signum() == 0
 }
 
 class PaymentMethodConverter : EnumNameConverter<PaymentMethod>(PaymentMethod::class.java)

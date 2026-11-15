@@ -86,7 +86,11 @@ class PaymentCommandServiceImpl(
             throw PaymentDuplicateException()
         }
 
-        val paymentResult = paymentService.processPayment(savedPayment)
+        val paymentResult = if (savedPayment.isZeroAmount()) {
+            PaymentResult.zeroAmount(savedPayment)
+        } else {
+            paymentService.processPayment(savedPayment)
+        }
 
         val earnRate = if (savedPayment.amount > BigDecimal.ZERO) {
             pointEarnRateStrategy.getEarnRate(savedPayment.userId)
