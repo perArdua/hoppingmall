@@ -15,11 +15,11 @@ import org.springframework.cloud.gateway.filter.GlobalFilter
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter
 import org.springframework.core.annotation.Order
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.util.AntPathMatcher
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
+import java.time.Clock
 import java.time.Duration
 import java.util.Optional
 
@@ -32,7 +32,8 @@ class RateLimitGlobalFilter(
     private val enabled: Boolean,
     private val meterRegistry: MeterRegistry = Metrics.globalRegistry,
     redisProperties: GatewayRedisProperties = GatewayRedisProperties(),
-    rateLimitProperties: GatewayRateLimitProperties = GatewayRateLimitProperties()
+    rateLimitProperties: GatewayRateLimitProperties = GatewayRateLimitProperties(),
+    private val clock: Clock = Clock.systemUTC()
 ) : GlobalFilter {
 
     private val pathMatcher = AntPathMatcher()
@@ -111,9 +112,11 @@ class RateLimitGlobalFilter(
         policy: RateLimitPolicy
     ): Mono<Void> {
         val key = resolveKey(exchange, policy.keyType)
-        val windowSeconds = policy.window.seconds
-        val window = System.currentTimeMillis() / (windowSeconds * 1000)
+        val windowMillis = policy.window.toMillis()
+        val now = clock.millis()
+        val window = now / windowMillis
         val redisKey = "rl:${policy.id}:$key:$window"
+        val retryAfterSeconds = ((window + 1) * windowMillis - now + 999) / 1000
 
         return Mono.defer { redisTemplate.opsForValue().increment(redisKey) }
             .subscribeOn(GatewayRedisScheduler.instance)
@@ -132,7 +135,7 @@ class RateLimitGlobalFilter(
             }
             .flatMap { count ->
                 if (count.isPresent) {
-                    applyLimit(exchange, chain, policy, count.get())
+                    applyLimit(exchange, chain, policy, count.get(), retryAfterSeconds)
                 } else {
                     chain.filter(exchange)
                 }
@@ -159,7 +162,8 @@ class RateLimitGlobalFilter(
         exchange: ServerWebExchange,
         chain: GatewayFilterChain,
         policy: RateLimitPolicy,
-        count: Long
+        count: Long,
+        retryAfterSeconds: Long
     ): Mono<Void> {
         val remaining = (policy.maxRequests - count).coerceAtLeast(0)
         exchange.response.headers.set("X-RateLimit-Limit", policy.maxRequests.toString())
@@ -168,9 +172,8 @@ class RateLimitGlobalFilter(
         if (count <= policy.maxRequests) {
             return chain.filter(exchange)
         }
-        exchange.response.statusCode = HttpStatus.TOO_MANY_REQUESTS
-        exchange.response.headers.set("Retry-After", policy.window.seconds.toString())
-        return exchange.response.setComplete()
+        exchange.response.headers.set("Retry-After", retryAfterSeconds.toString())
+        return GatewayErrorResponse.TOO_MANY_REQUESTS.write(exchange)
     }
 
     private fun recordRedisFailure(policy: RateLimitPolicy, operation: String, e: Throwable) {

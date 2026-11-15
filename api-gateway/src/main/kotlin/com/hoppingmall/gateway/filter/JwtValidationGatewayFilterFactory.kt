@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.cloud.gateway.filter.GatewayFilter
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate
-import org.springframework.http.HttpStatus
 import org.springframework.http.server.reactive.ServerHttpRequest
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ServerWebExchange
@@ -110,15 +109,11 @@ class JwtValidationGatewayFilterFactory(
         return request.headers.getFirst("x-user-role") == requiredRole
     }
 
-    private fun onUnauthorized(exchange: ServerWebExchange): Mono<Void> {
-        exchange.response.statusCode = HttpStatus.UNAUTHORIZED
-        return exchange.response.setComplete()
-    }
+    private fun onUnauthorized(exchange: ServerWebExchange): Mono<Void> =
+        GatewayErrorResponse.UNAUTHORIZED.write(exchange)
 
-    private fun onForbidden(exchange: ServerWebExchange): Mono<Void> {
-        exchange.response.statusCode = HttpStatus.FORBIDDEN
-        return exchange.response.setComplete()
-    }
+    private fun onForbidden(exchange: ServerWebExchange): Mono<Void> =
+        GatewayErrorResponse.FORBIDDEN.write(exchange)
 
     companion object {
         private val log = LoggerFactory.getLogger(JwtValidationGatewayFilterFactory::class.java)
