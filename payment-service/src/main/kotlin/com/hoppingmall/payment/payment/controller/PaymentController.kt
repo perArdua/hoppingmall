@@ -7,6 +7,8 @@ import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.service.PaymentCommandService
 import com.hoppingmall.payment.payment.service.PaymentQueryService
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Slice
 import com.hoppingmall.common.UserPrincipal
@@ -47,8 +49,8 @@ class PaymentController(
     @GetMapping
     fun getMyPayments(
         @AuthenticationPrincipal principal: UserPrincipal,
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "10") size: Int
+        @RequestParam(defaultValue = "0") @Min(0) page: Int,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_PAGE_SIZE) size: Int
     ): ApiResponse<Slice<PaymentResponse>> {
         val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
@@ -74,5 +76,9 @@ class PaymentController(
         val userId = principal.getUserId()
         val paymentResponse = paymentCommandService.cancelPayment(paymentId, userId)
         return ApiResponse.success(paymentResponse)
+    }
+
+    companion object {
+        const val MAX_PAGE_SIZE = 100L
     }
 }
