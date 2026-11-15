@@ -150,7 +150,8 @@ class PaymentCancelAfterRefundMembershipRevertMySqlIntegrationTest : MySqlJpaTes
         mock(),
         mock(),
         FakeOrderSummaryQueryPort(),
-        transactionManager
+        transactionManager,
+        mock()
     )
 
     private fun cancel(payment: Payment) {
