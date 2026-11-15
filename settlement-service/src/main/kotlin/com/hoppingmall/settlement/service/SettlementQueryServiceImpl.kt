@@ -3,6 +3,7 @@ package com.hoppingmall.settlement.service
 import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.settlement.domain.SettlementSummary
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
+import com.hoppingmall.settlement.domain.repository.SettlementRefundRepository
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.domain.repository.SettlementSummaryRepository
 import com.hoppingmall.settlement.dto.response.SettlementDetailResponse
@@ -20,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional
 class SettlementQueryServiceImpl(
     private val settlementRepository: SettlementRepository,
     private val settlementItemRepository: SettlementItemRepository,
-    private val settlementSummaryRepository: SettlementSummaryRepository
+    private val settlementSummaryRepository: SettlementSummaryRepository,
+    private val settlementRefundRepository: SettlementRefundRepository
 ) : SettlementQueryService {
 
     override fun getSettlements(
@@ -43,7 +45,8 @@ class SettlementQueryServiceImpl(
         }
 
         val items = settlementItemRepository.findBySettlementId(settlementId)
-        return SettlementDetailResponse.from(settlement, items)
+        val refunds = settlementRefundRepository.findBySettlementId(settlementId)
+        return SettlementDetailResponse.from(settlement, items, refunds)
     }
 
     private fun findSummaries(
@@ -95,7 +98,9 @@ class SettlementQueryServiceImpl(
             status = this.status,
             confirmedAt = this.confirmedAt,
             paidAt = this.paidAt,
-            createdAt = this.createdAt
+            createdAt = this.createdAt,
+            carriedInAmount = this.carriedInAmount,
+            carryOverAmount = this.carryOverAmount
         )
     }
 }

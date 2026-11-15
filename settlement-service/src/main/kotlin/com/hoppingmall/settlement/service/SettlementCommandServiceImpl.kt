@@ -1,8 +1,12 @@
 package com.hoppingmall.settlement.service
 
 import com.hoppingmall.settlement.domain.Settlement
+import com.hoppingmall.settlement.domain.SettlementCarryOver
 import com.hoppingmall.settlement.domain.SettlementItem
+import com.hoppingmall.settlement.domain.SettlementRefund
+import com.hoppingmall.settlement.domain.repository.SettlementCarryOverRepository
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
+import com.hoppingmall.settlement.domain.repository.SettlementRefundRepository
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.dto.request.CreateSettlementRequest
 import com.hoppingmall.settlement.dto.response.SettlementResponse
@@ -11,14 +15,15 @@ import com.hoppingmall.settlement.exception.SettlementInvalidPeriodException
 import com.hoppingmall.settlement.exception.SettlementItemAlreadySettledException
 import com.hoppingmall.settlement.exception.SettlementNoSalesDataException
 import com.hoppingmall.settlement.exception.SettlementNotFoundException
+import com.hoppingmall.settlement.exception.SettlementRefundAlreadyDeductedException
 import com.hoppingmall.settlement.port.OrderItemQueryPort
+import com.hoppingmall.settlement.port.RefundInfo
 import com.hoppingmall.settlement.port.RefundQueryPort
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
-import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -29,6 +34,8 @@ class SettlementCommandServiceImpl(
     private val orderItemQueryPort: OrderItemQueryPort,
     private val refundQueryPort: RefundQueryPort,
     transactionManager: PlatformTransactionManager,
+    private val settlementRefundRepository: SettlementRefundRepository,
+    private val settlementCarryOverRepository: SettlementCarryOverRepository,
     private val settlementSummarySynchronizer: SettlementSummarySynchronizer? = null,
     private val settlementSellerLocker: SettlementSellerLocker? = null
 ) : SettlementCommandService {
@@ -39,8 +46,12 @@ class SettlementCommandServiceImpl(
         try {
             return doCreateSettlement(request)
         } catch (e: DataIntegrityViolationException) {
-            if (e.mostSpecificCause.message?.contains(SettlementItem.ORDER_ITEM_UNIQUE_CONSTRAINT, ignoreCase = true) == true) {
+            val cause = e.mostSpecificCause.message
+            if (cause?.contains(SettlementItem.ORDER_ITEM_UNIQUE_CONSTRAINT, ignoreCase = true) == true) {
                 throw SettlementItemAlreadySettledException()
+            }
+            if (cause?.contains(SettlementRefund.REFUND_UNIQUE_CONSTRAINT, ignoreCase = true) == true) {
+                throw SettlementRefundAlreadyDeductedException()
             }
             throw e
         }
@@ -57,21 +68,13 @@ class SettlementCommandServiceImpl(
         val orderItems = orderItemQueryPort.findDeliveredItemsBySellerAndPeriod(
             request.sellerId, startDateTime, endDateTime
         )
-
-        if (orderItems.isEmpty()) {
-            throw SettlementNoSalesDataException()
-        }
-
-        val totalSalesAmount = orderItems.sumOf { it.totalPrice }
-
         val refunds = refundQueryPort.findCompletedBySellerAndPeriod(
             request.sellerId, startDateTime, endDateTime
-        )
-        val totalRefundAmount = refunds.sumOf { it.refundAmount }
+        ).distinctBy { it.id }
 
-        val commissionAmount = totalSalesAmount.multiply(request.commissionRate)
-            .setScale(2, RoundingMode.HALF_UP)
-        val settlementAmount = totalSalesAmount.subtract(totalRefundAmount).subtract(commissionAmount)
+        if (orderItems.isEmpty() && refunds.isEmpty()) {
+            throw SettlementNoSalesDataException()
+        }
 
         return transactionTemplate.execute {
             settlementSellerLocker?.lock(request.sellerId)
@@ -85,22 +88,39 @@ class SettlementCommandServiceImpl(
                 throw SettlementAlreadyExistsException()
             }
 
+            val newRefunds = excludeDeductedRefunds(refunds)
+            if (orderItems.isEmpty() && newRefunds.isEmpty()) {
+                throw SettlementNoSalesDataException()
+            }
+            val pendingCarryOvers = settlementCarryOverRepository
+                .findBySellerIdAndAppliedSettlementIdIsNullOrderByIdAsc(request.sellerId)
+
+            val amounts = SettlementAmounts.calculate(
+                totalSalesAmount = orderItems.sumOf { it.totalPrice },
+                totalRefundAmount = newRefunds.sumOf { it.refundAmount },
+                commissionRate = request.commissionRate,
+                carriedInAmount = pendingCarryOvers.sumOf { it.amount }
+            )
+
             val settlement = settlementRepository.save(
                 Settlement.create(
                     sellerId = request.sellerId,
                     periodStart = request.periodStart,
                     periodEnd = request.periodEnd,
-                    totalSalesAmount = totalSalesAmount,
-                    totalRefundAmount = totalRefundAmount,
+                    totalSalesAmount = amounts.totalSalesAmount,
+                    totalRefundAmount = amounts.totalRefundAmount,
                     commissionRate = request.commissionRate,
-                    commissionAmount = commissionAmount,
-                    settlementAmount = settlementAmount
+                    commissionAmount = amounts.commissionAmount,
+                    settlementAmount = amounts.settlementAmount,
+                    carriedInAmount = amounts.carriedInAmount,
+                    carryOverAmount = amounts.carryOverAmount
                 )
             )
+            val settlementId = settlement.id!!
 
             val settlementItems = orderItems.map { orderItem ->
                 SettlementItem.create(
-                    settlementId = settlement.id!!,
+                    settlementId = settlementId,
                     orderId = orderItem.orderId,
                     orderItemId = orderItem.id,
                     productName = orderItem.productName,
@@ -109,10 +129,25 @@ class SettlementCommandServiceImpl(
                 )
             }
             settlementItemRepository.saveAll(settlementItems)
+            settlementRefundRepository.saveAll(
+                newRefunds.map { SettlementRefund.create(settlementId, it.id, it.refundAmount) }
+            )
+            pendingCarryOvers.forEach { it.applyTo(settlementId) }
+            if (amounts.carryOverAmount.signum() > 0) {
+                settlementCarryOverRepository.save(
+                    SettlementCarryOver.create(request.sellerId, settlementId, amounts.carryOverAmount)
+                )
+            }
             settlementSummarySynchronizer?.sync(settlement)
 
             SettlementResponse.from(settlement)
         }!!
+    }
+
+    private fun excludeDeductedRefunds(refunds: List<RefundInfo>): List<RefundInfo> {
+        if (refunds.isEmpty()) return refunds
+        val deducted = settlementRefundRepository.findRefundIdsIn(refunds.map { it.id }).toSet()
+        return refunds.filterNot { it.id in deducted }
     }
 
     private fun startOfSettlementDay(date: LocalDate): LocalDateTime =

@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
+import com.hoppingmall.order.shipping.service.ShippingCommandServiceImpl
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -37,7 +39,7 @@ import java.util.Optional
 @DisplayName("공개 주문 상태 변경 API로 REFUNDED 요청")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
 @WebMvcTest(controllers = [OrderController::class])
-@Import(SecurityConfig::class, OrderCommandServiceImpl::class)
+@Import(SecurityConfig::class, OrderCommandServiceImpl::class, ShippingCommandServiceImpl::class)
 class OrderRefundedStatusRequestTest {
 
     @Autowired
@@ -78,6 +80,9 @@ class OrderRefundedStatusRequestTest {
 
     @MockitoBean
     private lateinit var tracer: Tracer
+
+    @MockitoBean
+    private lateinit var shippingRepository: ShippingRepository
 
     @Test
     fun 구매자가_자기_PAID_주문을_REFUNDED로_바꾸려_하면_403이고_주문은_PAID에_남는다() {

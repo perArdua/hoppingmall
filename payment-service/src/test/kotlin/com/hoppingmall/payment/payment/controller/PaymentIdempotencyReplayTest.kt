@@ -67,14 +67,15 @@ class PaymentIdempotencyReplayTest {
         whenever(lock.tryLock(any(), any(), any())).thenReturn(true)
         whenever(lock.isHeldByCurrentThread).thenReturn(true)
         whenever(idempotencyService.findByKey(any())).thenAnswer { records[it.getArgument<String>(0)] }
-        whenever(idempotencyService.save(any(), any(), any(), any(), any(), any())).thenAnswer {
+        whenever(idempotencyService.save(any(), any(), any(), any(), any(), any(), any())).thenAnswer {
             val record = IdempotencyRecord(
                 idempotencyKey = it.getArgument(0),
                 httpMethod = it.getArgument(1),
                 endpoint = it.getArgument(2),
                 responseStatus = it.getArgument(3),
                 responseBody = it.getArgument(4),
-                expiresAt = LocalDateTime.now().plusHours(it.getArgument<Long>(5))
+                expiresAt = LocalDateTime.now().plusHours(it.getArgument<Long>(6)),
+                requestFingerprint = it.getArgument(5)
             )
             records[record.idempotencyKey] = record
             record

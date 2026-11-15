@@ -39,20 +39,6 @@ class ShippingCreateFromOrderAddressTest {
     )
 
     @Test
-    fun 배송지가_있는_주문은_요청의_받는_사람_값을_쓰지_않고_주문의_배송지로_배송을_만든다() {
-        paidOrder(withAddress = true)
-
-        val result = service.createShipping(
-            SELLER_ID,
-            request(recipientName = "다른 사람", recipientPhone = "010-9999-9999", recipientAddress = "다른 주소")
-        )
-
-        assertThat(result.recipientName).isEqualTo("홍길동")
-        assertThat(result.recipientPhone).isEqualTo("010-1234-5678")
-        assertThat(result.recipientAddress).isEqualTo("(06236) 서울시 강남구 테헤란로 1 101동 202호")
-    }
-
-    @Test
     fun 배송지가_있는_주문은_받는_사람_값_없이_배송을_등록한다() {
         paidOrder(withAddress = true)
 

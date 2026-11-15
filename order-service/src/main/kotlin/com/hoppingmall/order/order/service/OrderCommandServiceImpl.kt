@@ -8,7 +8,6 @@ import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
-import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.dto.response.OrderResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
@@ -37,7 +36,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.client.HttpClientErrorException
 import java.math.BigDecimal
@@ -200,6 +198,7 @@ class OrderCommandServiceImpl(
                         throw OrderPartiallyRefundedException()
                     }
                     target.requestCancellation()
+                    orderRepository.cancelPreparingShipping(orderId)
                     transactionalEventPublisher.publishEvent(
                         aggregateType = "Order",
                         aggregateId = orderId.toString(),
@@ -260,26 +259,6 @@ class OrderCommandServiceImpl(
                 inventoryCommandPort.increaseStock(orderItem.productId, orderItem.quantity)
             }
         }
-    }
-
-    @Transactional
-    override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
-        orderRepository.lockById(orderId)
-        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
-
-        if (!isAdmin && !orderItemRepository.existsByOrderIdAndSellerId(orderId, userId)) {
-            throw OrderAccessDeniedException()
-        }
-
-        if (request.status == OrderStatus.SHIPPED && orderRepository.isHeldBySagaTimeout(orderId)) {
-            throw OrderInvalidStatusException()
-        }
-
-        order.updateStatus(request.status)
-        log.info("주문 상태 변경: orderId={}, userId={}, status={}", orderId, userId, request.status)
-
-        val orderItems = orderItemRepository.findByOrderId(orderId)
-        return OrderResponse.from(order, orderItems)
     }
 
     companion object {

@@ -32,5 +32,8 @@ class IdempotencyRecord(
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(nullable = false)
-    val expiresAt: LocalDateTime
+    val expiresAt: LocalDateTime,
+
+    @Column(length = 64)
+    val requestFingerprint: String? = null
 )

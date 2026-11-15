@@ -2,7 +2,9 @@ package com.hoppingmall.settlement.service
 
 import com.hoppingmall.settlement.domain.Settlement
 import com.hoppingmall.settlement.domain.SettlementItem
+import com.hoppingmall.settlement.domain.repository.SettlementCarryOverRepository
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
+import com.hoppingmall.settlement.domain.repository.SettlementRefundRepository
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.dto.request.CreateSettlementRequest
 import com.hoppingmall.settlement.exception.SettlementNoSalesDataException
@@ -55,6 +57,12 @@ class SettlementKstDayBoundaryTest {
 
     @Mock
     private lateinit var transactionManager: PlatformTransactionManager
+
+    @Mock
+    private lateinit var settlementRefundRepository: SettlementRefundRepository
+
+    @Mock
+    private lateinit var settlementCarryOverRepository: SettlementCarryOverRepository
 
     private val kst = ZoneId.of("Asia/Seoul")
 
@@ -142,7 +150,9 @@ class SettlementKstDayBoundaryTest {
         settlementItemRepository,
         orderItemQueryPort,
         refundQueryPort,
-        transactionManager
+        transactionManager,
+        settlementRefundRepository,
+        settlementCarryOverRepository
     )
 
     private fun deliveredAt(deliveredAt: ZonedDateTime) {

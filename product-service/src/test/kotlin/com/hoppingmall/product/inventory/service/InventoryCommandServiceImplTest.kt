@@ -124,7 +124,7 @@ class InventoryCommandServiceImplTest {
     @Test
     fun 재고를_수정한다() {
         val inventory = Inventory.create(productId = 1L, stockQuantity = 100).withId(1L)
-        val request = com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest(stockQuantity = 200)
+        val request = com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest(stockQuantity = 200, expectedStockQuantity = 100)
 
         whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(inventory)
 
@@ -135,7 +135,7 @@ class InventoryCommandServiceImplTest {
 
     @Test
     fun 존재하지_않는_재고_수정_시_예외를_발생시킨다() {
-        val request = com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest(stockQuantity = 200)
+        val request = com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest(stockQuantity = 200, expectedStockQuantity = 100)
 
         whenever(inventoryRepository.findByProductIdForUpdate(999L)).thenReturn(null)
 

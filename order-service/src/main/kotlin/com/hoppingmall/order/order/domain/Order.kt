@@ -47,7 +47,7 @@ class Order private constructor(
             OrderStatus.PAYING to setOf(OrderStatus.PAID, OrderStatus.CANCELLED),
             OrderStatus.PAID to setOf(OrderStatus.SHIPPED, OrderStatus.CANCEL_REQUESTED),
             OrderStatus.CANCEL_REQUESTED to setOf(OrderStatus.CANCELLED, OrderStatus.CANCEL_FAILED),
-            OrderStatus.SHIPPED to setOf(OrderStatus.DELIVERED),
+            OrderStatus.SHIPPED to setOf(OrderStatus.DELIVERED, OrderStatus.PAID),
             OrderStatus.DELIVERED to emptySet(),
             OrderStatus.CANCELLED to emptySet(),
             OrderStatus.CANCEL_FAILED to setOf(OrderStatus.CANCEL_REQUESTED),

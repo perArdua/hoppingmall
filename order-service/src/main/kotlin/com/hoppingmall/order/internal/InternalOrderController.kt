@@ -6,12 +6,19 @@ import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.refund.config.RefundPolicyProperties
+import com.hoppingmall.order.refund.domain.RefundDeadline
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
+import com.hoppingmall.order.refund.enum.RefundStatus
+import com.hoppingmall.order.refund.exception.RefundException
+import com.hoppingmall.order.refund.exception.code.RefundErrorCode
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.format.annotation.DateTimeFormat
@@ -28,14 +35,15 @@ class InternalOrderController(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val shippingRepository: ShippingRepository,
-    private val refundItemRepository: RefundItemRepository
+    private val refundItemRepository: RefundItemRepository,
+    private val refundRepository: RefundRepository
 ) {
 
     @Value("\${order.terminal.retention-days:30}")
     private var terminalRetentionDays: Long = 30
 
-    @Value("\${order.refund.window-days:30}")
-    private var refundWindowDays: Long = 30
+    @Autowired(required = false)
+    private var refundPolicy: RefundPolicyProperties = RefundPolicyProperties()
 
     @GetMapping("/orders/{orderId}")
     fun getOrder(@PathVariable orderId: Long): ResponseEntity<ApiResponse<OrderSummaryResponse>> {
@@ -90,11 +98,15 @@ class InternalOrderController(
             return ResponseEntity.ok().build()
         }
         if (order.isRefundable()) {
+            if (!refundRepository.existsByOrderIdAndStatusAndIsFullRefundTrueAndDeletedAtIsNull(orderId, RefundStatus.COMPLETED)) {
+                throw RefundException(RefundErrorCode.REFUND_NOT_COMPLETED)
+            }
             order.completeRefund()
         } else {
             order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.CANCELLED)
         }
         orderRepository.save(order)
+        orderRepository.cancelPreparingShipping(orderId)
         return ResponseEntity.ok().build()
     }
 
@@ -169,7 +181,7 @@ class InternalOrderController(
         val orders = orderRepository.findAllById(items.map { it.orderId }.distinct()).associateBy { it.id!! }
         val now = LocalDateTime.now()
         val updatedBefore = now.minusDays(terminalRetentionDays)
-        val deliveredBefore = now.minusDays(refundWindowDays + terminalRetentionDays)
+        val deliveredBefore = RefundDeadline(refundPolicy).allWindowsClosedBefore(now.toLocalDate(), terminalRetentionDays)
         val terminalReservationIds = items
             .groupBy { it.reservationId!! }
             .filterValues { held ->

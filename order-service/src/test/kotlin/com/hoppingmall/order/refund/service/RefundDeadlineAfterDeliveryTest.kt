@@ -9,6 +9,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.port.PaymentInfo
 import com.hoppingmall.order.port.PaymentQueryPort
+import com.hoppingmall.order.refund.config.RefundPolicyProperties
 import com.hoppingmall.order.refund.domain.Refund
 import com.hoppingmall.order.refund.domain.RefundItem
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
@@ -124,8 +125,8 @@ class RefundDeadlineAfterDeliveryTest {
     }
 
     @Test
-    fun 배송_완료_뒤_30일_안이면_환불_요청을_받는다() {
-        givenOrder(deliveredOrder(deliveredDaysAgo = 29))
+    fun 배송_완료_뒤_단순_변심_기한_안이면_환불_요청을_받는다() {
+        givenOrder(deliveredOrder(deliveredDaysAgo = 6))
 
         val response = service.requestRefund(BUYER_ID, refundRequest())
 
@@ -146,8 +147,8 @@ class RefundDeadlineAfterDeliveryTest {
 
     @Test
     fun 기한_일수는_프로퍼티로_바꾼다() {
-        ReflectionTestUtils.setField(service, "refundWindowDays", 7L)
-        givenOrder(deliveredOrder(deliveredDaysAgo = 8))
+        ReflectionTestUtils.setField(service, "refundPolicy", RefundPolicyProperties(changeOfMindWindowDays = 3))
+        givenOrder(deliveredOrder(deliveredDaysAgo = 4))
 
         assertThatThrownBy { service.requestRefund(BUYER_ID, refundRequest()) }
             .isInstanceOfSatisfying(BusinessException::class.java) {

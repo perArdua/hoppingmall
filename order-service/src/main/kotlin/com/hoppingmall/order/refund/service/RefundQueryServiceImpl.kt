@@ -1,9 +1,15 @@
 package com.hoppingmall.order.refund.service
 
 import org.springframework.data.repository.findByIdOrNull
+import com.hoppingmall.order.order.domain.repository.OrderItemRepository
+import com.hoppingmall.order.order.domain.repository.OrderRepository
+import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
+import com.hoppingmall.order.refund.dto.response.OrderItemRefundResponse
+import com.hoppingmall.order.refund.dto.response.OrderRefundsResponse
 import com.hoppingmall.order.refund.dto.response.RefundResponse
+import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.order.refund.exception.RefundAccessDeniedException
 import com.hoppingmall.order.refund.exception.RefundNotFoundException
 import org.springframework.data.domain.Pageable
@@ -15,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class RefundQueryServiceImpl(
     private val refundRepository: RefundRepository,
-    private val refundItemRepository: RefundItemRepository
+    private val refundItemRepository: RefundItemRepository,
+    private val orderRepository: OrderRepository,
+    private val orderItemRepository: OrderItemRepository
 ) : RefundQueryService {
 
     override fun getRefund(refundId: Long, userId: Long): RefundResponse {
@@ -47,5 +55,49 @@ class RefundQueryServiceImpl(
         return refundPage.map { refund ->
             RefundResponse.from(refund, itemsByRefundId[refund.id] ?: emptyList())
         }
+    }
+
+    override fun getOrderRefunds(orderId: Long, buyerId: Long): OrderRefundsResponse {
+        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException()
+        if (order.buyerId != buyerId) {
+            throw RefundAccessDeniedException()
+        }
+
+        val quantities = refundItemRepository.findRefundQuantitiesByStatus(orderId)
+        val refundedByItem = quantities.filter { it.status == RefundStatus.COMPLETED.name }
+            .groupBy { it.orderItemId }
+            .mapValues { (_, rows) -> rows.sumOf { it.quantity }.toInt() }
+        val inProgressByItem = quantities.filter { it.status in IN_PROGRESS_STATUSES }
+            .groupBy { it.orderItemId }
+            .mapValues { (_, rows) -> rows.sumOf { it.quantity }.toInt() }
+
+        val items = orderItemRepository.findByOrderId(orderId).sortedBy { it.id }.map { item ->
+            val refunded = refundedByItem[item.id] ?: 0
+            val inProgress = inProgressByItem[item.id] ?: 0
+            OrderItemRefundResponse(
+                orderItemId = item.id!!,
+                productId = item.productId,
+                productName = item.productName,
+                quantity = item.quantity,
+                refundedQuantity = refunded,
+                inProgressQuantity = inProgress,
+                refundableQuantity = (item.quantity - refunded - inProgress).coerceAtLeast(0)
+            )
+        }
+
+        val refunds = refundRepository.findByOrderIdOrderByIdAsc(orderId)
+        val itemsByRefundId = if (refunds.isNotEmpty()) {
+            refundItemRepository.findByRefundIdIn(refunds.mapNotNull { it.id }).groupBy { it.refundId }
+        } else emptyMap()
+
+        return OrderRefundsResponse(
+            orderId = orderId,
+            items = items,
+            refunds = refunds.map { RefundResponse.from(it, itemsByRefundId[it.id] ?: emptyList()) }
+        )
+    }
+
+    companion object {
+        private val IN_PROGRESS_STATUSES = setOf(RefundStatus.REQUESTED.name, RefundStatus.APPROVED.name)
     }
 }

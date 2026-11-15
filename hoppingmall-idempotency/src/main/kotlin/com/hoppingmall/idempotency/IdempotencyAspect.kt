@@ -1,6 +1,7 @@
 package com.hoppingmall.idempotency
 
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.ObjectReader
 import com.hoppingmall.common.config.GatewayHeaderAuthenticationFilter
@@ -8,17 +9,20 @@ import jakarta.servlet.http.HttpServletRequest
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect
+import org.aspectj.lang.reflect.MethodSignature
 import org.redisson.api.RedissonClient
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.context.request.RequestContextHolder
 import org.springframework.web.context.request.ServletRequestAttributes
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.HexFormat
+import java.util.TreeMap
 import java.util.concurrent.TimeUnit
 
 @Aspect
@@ -47,11 +51,12 @@ class IdempotencyAspect(
         val key = request.getHeader(IDEMPOTENCY_KEY_HEADER)
             ?: throw IdempotencyKeyMissingException()
         val scopedKey = scopedKey(request, key)
+        val fingerprint = requestFingerprint(joinPoint, request)
 
         val existing = idempotencyService.findByKey(scopedKey)
         if (existing != null) {
             log.info("멱등성 캐시 히트: key={}, endpoint={}", key, existing.endpoint)
-            return buildCachedResponse(existing)
+            return buildCachedResponse(existing, fingerprint)
         }
 
         val lockKey = "idempotency:$scopedKey"
@@ -65,7 +70,7 @@ class IdempotencyAspect(
             val existingAfterLock = idempotencyService.findByKey(scopedKey)
             if (existingAfterLock != null) {
                 log.info("멱등성 캐시 히트 (락 후): key={}", key)
-                return buildCachedResponse(existingAfterLock)
+                return buildCachedResponse(existingAfterLock, fingerprint)
             }
 
             val result = joinPoint.proceed()
@@ -77,6 +82,7 @@ class IdempotencyAspect(
                     endpoint = request.requestURI,
                     responseStatus = result.statusCode.value(),
                     responseBody = objectMapper.writeValueAsString(result.body),
+                    requestFingerprint = fingerprint,
                     ttlHours = idempotent.ttlHours
                 )
                 log.info("멱등성 레코드 저장: key={}, endpoint={}", key, request.requestURI)
@@ -96,12 +102,40 @@ class IdempotencyAspect(
             ?.toLongOrNull()
             ?.toString()
             ?: ANONYMOUS_REQUESTER
-        val scope = listOf(requester, request.method, request.requestURI, key).joinToString(SCOPE_DELIMITER)
-        val digest = MessageDigest.getInstance(SCOPE_HASH_ALGORITHM).digest(scope.toByteArray(StandardCharsets.UTF_8))
-        return HexFormat.of().formatHex(digest)
+        return sha256(listOf(requester, request.method, request.requestURI, key).joinToString(SCOPE_DELIMITER))
     }
 
-    private fun buildCachedResponse(record: IdempotencyRecord): ResponseEntity<Any> {
+    private fun requestFingerprint(joinPoint: ProceedingJoinPoint, request: HttpServletRequest): String {
+        val method = (joinPoint.signature as? MethodSignature)?.method
+        val args = joinPoint.args.orEmpty()
+        val bodies = method?.parameters.orEmpty()
+            .mapIndexedNotNull { index, parameter ->
+                if (parameter.isAnnotationPresent(RequestBody::class.java)) canonical(objectMapper.valueToTree(args.getOrNull(index))) else null
+            }
+        val query = TreeMap(request.parameterMap.orEmpty().mapValues { it.value.toList() })
+        val payload = objectMapper.createObjectNode()
+        payload.set<JsonNode>("body", objectMapper.valueToTree(bodies))
+        payload.set<JsonNode>("query", objectMapper.valueToTree(query))
+        return sha256(objectMapper.writeValueAsString(payload))
+    }
+
+    private fun canonical(node: JsonNode?): JsonNode? = when {
+        node == null -> null
+        node.isObject -> objectMapper.createObjectNode().also { sorted ->
+            node.fieldNames().asSequence().sorted().forEach { name -> sorted.set<JsonNode>(name, canonical(node.get(name))) }
+        }
+        node.isArray -> objectMapper.createArrayNode().also { array -> node.forEach { array.add(canonical(it)) } }
+        else -> node
+    }
+
+    private fun sha256(value: String): String =
+        HexFormat.of().formatHex(MessageDigest.getInstance(SCOPE_HASH_ALGORITHM).digest(value.toByteArray(StandardCharsets.UTF_8)))
+
+    private fun buildCachedResponse(record: IdempotencyRecord, fingerprint: String): ResponseEntity<Any> {
+        if (record.requestFingerprint != null && record.requestFingerprint != fingerprint) {
+            log.warn("멱등성 키 재사용 거절: endpoint={}", record.endpoint)
+            throw IdempotencyKeyReusedException()
+        }
         val body = replayReader.readValue<Any>(record.responseBody)
         return ResponseEntity.status(record.responseStatus).body(body)
     }

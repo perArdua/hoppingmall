@@ -22,4 +22,12 @@ interface UserCouponRepository : JpaRepository<UserCoupon, Long> {
 
     @Query("SELECT uc.userId FROM UserCoupon uc WHERE uc.couponId = :couponId")
     fun findUserIdsByCouponId(@Param("couponId") couponId: Long): List<Long>
+
+    fun existsByUserIdAndCouponId(userId: Long, couponId: Long): Boolean
+
+    @Query("SELECT uc.couponId FROM UserCoupon uc WHERE uc.userId = :userId AND uc.couponId IN :couponIds")
+    fun findCouponIdsByUserIdAndCouponIdIn(
+        @Param("userId") userId: Long,
+        @Param("couponIds") couponIds: Collection<Long>
+    ): List<Long>
 }

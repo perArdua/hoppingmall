@@ -7,6 +7,7 @@ import org.springframework.data.domain.Slice
 
 interface CouponQueryService {
     fun getAvailableCoupons(): List<CouponResponse>
+    fun getIssuedCouponIds(userId: Long, couponIds: Collection<Long>): Set<Long>
     fun getAllCoupons(): List<CouponResponse>
     fun getMyCoupons(userId: Long, pageable: Pageable): Slice<UserCouponResponse>
 }

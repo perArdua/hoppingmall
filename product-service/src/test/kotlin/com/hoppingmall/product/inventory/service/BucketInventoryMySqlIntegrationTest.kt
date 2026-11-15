@@ -319,7 +319,7 @@ class BucketInventoryMySqlIntegrationTest : MySqlIntegrationTestSupport() {
         assertThat(bucketStocks(productId)).containsExactly(13, 10, 10, 10, 10, 10, 10, 10)
         assertThat(inventoryRowStock(productId)).isEqualTo(83)
 
-        commandService.updateStock(productId, InventoryUpdateRequest(stockQuantity = 40))
+        commandService.updateStock(productId, InventoryUpdateRequest(stockQuantity = 40, expectedStockQuantity = 83))
 
         assertThat(bucketStocks(productId)).containsOnly(5)
         assertThat(inventoryRowStock(productId)).isEqualTo(40)

@@ -162,6 +162,16 @@ class OrderSagaConfirmFailureCompensationTest {
     }
 
     @Test
+    fun 확정_실패로_결제_완료_주문을_취소하면_준비_중인_배송도_함께_취소한다() {
+        whenever(inventoryCommandPort.confirmReservations(listOf("rsv-1"))).thenReturn(false)
+
+        consumer.handlePaymentCompleted("{}")
+
+        assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
+        verify(orderRepository).cancelPreparingShipping(1L)
+    }
+
+    @Test
     fun 확정이_409로_거절되면_예약을_취소해_재고를_바로_돌려준다() {
         whenever(inventoryCommandPort.confirmReservations(listOf("rsv-1")))
             .thenThrow(HttpClientErrorException.create(HttpStatus.CONFLICT, "INV004", HttpHeaders.EMPTY, ByteArray(0), null))
