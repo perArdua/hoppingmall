@@ -52,7 +52,7 @@ class PointPolicy private constructor(
         updatable = false,
         columnDefinition = "TINYINT GENERATED ALWAYS AS (CASE WHEN is_active THEN 1 END)"
     )
-    private val activeKey: Int? = null
+    private val activeKey: Byte? = null
 
     init {
         validatePolicy()
