@@ -13,6 +13,7 @@ import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.product.service.ProductImageService
 import com.hoppingmall.product.product.service.ProductOwnershipPolicy
 import com.hoppingmall.product.product.service.ProductQueryService
+import com.hoppingmall.product.product.service.ProductStockReader
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -30,7 +31,8 @@ class ProductController(
     private val productQueryService: ProductQueryService,
     private val productCommandService: ProductCommandService,
     private val productImageService: ProductImageService,
-    private val productOwnershipPolicy: ProductOwnershipPolicy
+    private val productOwnershipPolicy: ProductOwnershipPolicy,
+    private val productStockReader: ProductStockReader
 ) {
 
     @GetMapping
@@ -43,15 +45,20 @@ class ProductController(
     fun getProduct(@PathVariable productId: Long): ApiResponse<ProductResponse> {
         val productResponse = productQueryService.getProductById(productId)
             ?: throw ProductNotFoundException()
-        return ApiResponse.success(productResponse)
+        return ApiResponse.success(productStockReader.withInStock(productResponse))
     }
 
     @GetMapping("/seller/{sellerId}")
     fun getProductsBySeller(
         @PathVariable sellerId: Long,
-        @SortDefault("id") pageable: Pageable
+        @SortDefault("id") pageable: Pageable,
+        @AuthenticationPrincipal userPrincipal: UserPrincipal?
     ): ApiResponse<Slice<ProductResponse>> {
-        val products = productQueryService.getProductsBySellerId(sellerId, pageable)
+        val products = if (userPrincipal.canSeeStockOf(sellerId)) {
+            productQueryService.getProductsBySellerIdWithStock(sellerId, pageable)
+        } else {
+            productQueryService.getProductsBySellerId(sellerId, pageable)
+        }
         return ApiResponse.success(products)
     }
 
@@ -110,4 +117,11 @@ class ProductController(
         val productImageResponse = productImageService.uploadProductImage(imageFile)
         return ApiResponse.success(productImageResponse)
     }
-} 
+
+    private fun UserPrincipal?.canSeeStockOf(sellerId: Long): Boolean =
+        this != null && (getRole() == ADMIN_ROLE || getUserId() == sellerId)
+
+    companion object {
+        private const val ADMIN_ROLE = "ADMIN"
+    }
+}
