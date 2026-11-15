@@ -164,20 +164,6 @@ class PaymentCompensationEventReadTest {
         verify(refundPointsService, never()).refundPoints(any(), any())
     }
 
-    @Test
-    fun 실제_발행_코드가_만든_결제_실패_이벤트를_읽으면_메시지의_eventId_orderId_paymentId로_기록한다() {
-        val payment = Payment.create(orderId = 6L, userId = 6L, amount = BigDecimal("3000.00"), method = PaymentMethod.CREDIT_CARD)
-        payment.updateStatus(newStatus = PaymentStatus.FAILED, errorMessage = "잔액 부족")
-        assignId(payment, 5L)
-        paymentEventService().publishPaymentFailedEvent(payment)
-
-        consumer.handleCompensationEvent(consumedMessage(savedOutboxEvents.single()))
-
-        assertThat(compensationLogs.values)
-            .extracting("eventId", "compensationType", "paymentId", "orderId", "status")
-            .containsExactly(tuple("payment-failed-5", "PAYMENT_FAILED", 5L, 6L, CompensationEventLogStatus.COMPLETED))
-    }
-
     private fun paymentEventService() = PaymentEventService(
         KafkaPaymentEventPublisher(TransactionalEventPublisherImpl(OutboxEventWriter(outboxEventRepository, productionObjectMapper)))
     )

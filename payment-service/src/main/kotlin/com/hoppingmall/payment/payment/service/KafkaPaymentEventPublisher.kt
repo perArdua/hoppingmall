@@ -5,7 +5,6 @@ import com.hoppingmall.payment.payment.dto.event.MembershipRevertRequestEvent
 import com.hoppingmall.payment.payment.dto.event.MembershipUpdateRequestEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
-import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.springframework.stereotype.Service
@@ -87,24 +86,6 @@ class KafkaPaymentEventPublisher(
             ),
             topic = KafkaTopics.MEMBERSHIP_UPDATE_REQUEST,
             partitionKey = event.userId.toString()
-        )
-    }
-
-    override fun publishPaymentFailedEvent(event: PaymentFailedEvent) {
-        transactionalEventPublisher.publishEvent(
-            aggregateType = "Payment",
-            aggregateId = event.paymentId.toString(),
-            eventType = "PaymentFailed",
-            eventData = mapOf(
-                "eventId" to event.eventId,
-                "paymentId" to event.paymentId,
-                "orderId" to event.orderId,
-                "userId" to event.userId,
-                "amount" to event.amount,
-                "reason" to event.reason
-            ),
-            topic = KafkaTopics.PAYMENT_COMPENSATION,
-            partitionKey = event.orderId.toString()
         )
     }
 

@@ -79,7 +79,7 @@ class PaymentCancellationRetriesExhaustedTest {
     @Test
     fun 취소가_커밋된_뒤_완료_이벤트_쓰기가_재시도_내내_실패하면_재시도_소진_처리에서_완료_이벤트를_내고_실패_이벤트는_내지_않는다() {
         val payment = payment(orderId = 100L, id = 1L)
-        whenever(paymentRepository.findByOrderId(100L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(100L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(1L)).thenAnswer {
             if (payment.status != PaymentStatus.CANCELLED) {
                 payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
@@ -113,7 +113,7 @@ class PaymentCancellationRetriesExhaustedTest {
     @Test
     fun 결제가_취소되지_않은_채_재시도가_소진되면_실패_이벤트를_낸다() {
         val payment = payment(orderId = 200L, id = 2L)
-        whenever(paymentRepository.findByOrderId(200L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(200L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(2L))
             .thenThrow(DataAccessResourceFailureException("결제 DB 쓰기 실패"))
 
@@ -134,7 +134,7 @@ class PaymentCancellationRetriesExhaustedTest {
 
     @Test
     fun 결제가_없는_채_재시도가_소진되면_실패_이벤트를_낸다() {
-        Mockito.lenient().`when`(paymentRepository.findByOrderId(300L)).thenReturn(null)
+        Mockito.lenient().`when`(paymentRepository.findByActiveOrderId(300L)).thenReturn(null)
 
         handler.onRetriesExhausted(request("cancel-300-1", 300L))
 
@@ -150,7 +150,7 @@ class PaymentCancellationRetriesExhaustedTest {
     @Test
     fun 이미_처리_완료된_요청은_재시도_소진_처리에서_아무_이벤트도_내지_않는다() {
         val payment = payment(orderId = 400L, id = 4L)
-        whenever(paymentRepository.findByOrderId(400L)).thenReturn(payment)
+        whenever(paymentRepository.findByActiveOrderId(400L)).thenReturn(payment)
         whenever(paymentCommandService.cancelPaymentInternal(4L)).thenAnswer {
             payment.updateStatus(PaymentStatus.CANCELLED, transactionId = payment.transactionId)
             mock<PaymentResponse>()
