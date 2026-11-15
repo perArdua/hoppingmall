@@ -5,6 +5,7 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import org.hibernate.annotations.ColumnDefault
 import java.math.BigDecimal
 
 @Entity
@@ -43,6 +44,15 @@ class OrderItem private constructor(
     val reservationId: String? = null
 ) : BaseEntity() {
 
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    var withdrawalRestricted: Boolean = false
+        private set
+
+    @Column(length = 32)
+    var withdrawalRestrictionReason: String? = null
+        private set
+
     companion object {
         fun create(
             orderId: Long,
@@ -51,7 +61,9 @@ class OrderItem private constructor(
             productName: String,
             productPrice: BigDecimal,
             quantity: Int,
-            reservationId: String? = null
+            reservationId: String? = null,
+            withdrawalRestricted: Boolean = false,
+            withdrawalRestrictionReason: String? = null
         ): OrderItem {
             return OrderItem(
                 orderId = orderId,
@@ -62,7 +74,10 @@ class OrderItem private constructor(
                 quantity = quantity,
                 totalPrice = productPrice.multiply(BigDecimal(quantity)),
                 reservationId = reservationId
-            )
+            ).also {
+                it.withdrawalRestricted = withdrawalRestricted
+                it.withdrawalRestrictionReason = withdrawalRestrictionReason?.takeIf { withdrawalRestricted }
+            }
         }
     }
 }

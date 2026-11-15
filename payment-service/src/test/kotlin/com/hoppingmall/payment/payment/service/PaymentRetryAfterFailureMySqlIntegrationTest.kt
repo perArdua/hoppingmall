@@ -75,7 +75,8 @@ class PaymentRetryAfterFailureMySqlIntegrationTest : MySqlJpaTestSupport() {
             PaymentMetrics(SimpleMeterRegistry()),
             pointEarnRateStrategy,
             orderSummaryQueryPort,
-            transactionManager
+            transactionManager,
+            mock()
         )
     }
 

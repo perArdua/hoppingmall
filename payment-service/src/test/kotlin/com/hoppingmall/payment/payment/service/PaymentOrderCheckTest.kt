@@ -1,5 +1,6 @@
 package com.hoppingmall.payment.payment.service
 
+import com.hoppingmall.common.BusinessException
 import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.payment.config.PaymentMetrics
 import com.hoppingmall.payment.coupon.service.CouponCommandService
@@ -16,7 +17,7 @@ import com.hoppingmall.payment.payment.exception.PaymentInvalidAmountException
 import com.hoppingmall.payment.payment.exception.PaymentOrderNotFoundException
 import com.hoppingmall.payment.payment.exception.PaymentOrderNotPayableException
 import com.hoppingmall.payment.payment.exception.PaymentOrderUnavailableException
-import com.hoppingmall.payment.payment.exception.PaymentPointUseNotAllowedException
+import com.hoppingmall.payment.point.exception.PointUseExceedsPayableException
 import com.hoppingmall.payment.point.service.strategy.PointEarnRateStrategy
 import com.hoppingmall.payment.support.FakeOrderSummaryQueryPort
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
@@ -101,7 +103,8 @@ class PaymentOrderCheckTest {
         PaymentMetrics(SimpleMeterRegistry()),
         pointEarnRateStrategy,
         orderSummaryQueryPort,
-        transactionManager
+        transactionManager,
+        mock()
     )
 
     private fun request(
@@ -187,12 +190,14 @@ class PaymentOrderCheckTest {
     }
 
     @Test
-    fun 포인트_사용액이_있는_결제는_400으로_거절하고_결제를_만들지_않는다() {
+    fun 포인트_사용액이_결제할_금액을_넘으면_400으로_거절하고_결제를_만들지_않는다() {
         orderSummaryQueryPort.put(ORDER_ID, BUYER_ID, ORDER_TOTAL)
 
-        assertRejected(HttpStatus.BAD_REQUEST, PaymentPointUseNotAllowedException::class.java) {
-            service().processPayment(request(pointAmount = BigDecimal("1000")), BUYER_ID)
-        }
+        assertThatThrownBy { service().processPayment(request(pointAmount = ORDER_TOTAL.add(BigDecimal.ONE)), BUYER_ID) }
+            .isInstanceOf(PointUseExceedsPayableException::class.java)
+            .satisfies({ assertThat((it as BusinessException).errorCode.status).isEqualTo(HttpStatus.BAD_REQUEST) })
+        verify(paymentRepository, never()).save(any<Payment>())
+        verify(paymentService, never()).processPayment(any())
     }
 
     @Test

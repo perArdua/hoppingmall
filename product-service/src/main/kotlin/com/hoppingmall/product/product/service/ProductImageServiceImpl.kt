@@ -11,10 +11,10 @@ class ProductImageServiceImpl(
     private val fileUploadService: FileUploadService
 ) : ProductImageService {
 
-    override fun uploadProductImage(imageFile: MultipartFile): ProductImageResponse {
-        val request = FileUploadRequest(imageFile, "product")
+    override fun uploadProductImage(imageFile: MultipartFile, uploaderId: Long, uploaderRole: String): ProductImageResponse {
+        val request = FileUploadRequest(imageFile, "product", uploaderId, uploaderRole)
         val fileUploadResponse = fileUploadService.uploadFile(request)
-        
+
         return ProductImageResponse(
             imageUrl = fileUploadResponse.fileUrl,
             fileName = fileUploadResponse.fileName,

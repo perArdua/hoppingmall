@@ -6,7 +6,6 @@ import com.hoppingmall.payment.payment.controller.PaymentController
 import com.hoppingmall.payment.payment.service.PaymentCommandService
 import com.hoppingmall.payment.payment.service.PaymentQueryService
 import com.hoppingmall.payment.point.controller.PointController
-import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.point.service.PointQueryService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -40,7 +39,7 @@ class ListPageRangeTest {
     private val mockMvc: MockMvc = MockMvcBuilders
         .standaloneSetup(
             PaymentController(mock<PaymentCommandService>(), paymentQueryService),
-            PointController(pointQueryService, mock<PointCommandService>())
+            PointController(pointQueryService)
         )
         .setControllerAdvice(GlobalExceptionHandler())
         .setCustomArgumentResolvers(AuthenticationPrincipalArgumentResolver())

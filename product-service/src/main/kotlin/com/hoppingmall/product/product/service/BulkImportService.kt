@@ -3,8 +3,8 @@ package com.hoppingmall.product.product.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
+import com.hoppingmall.product.common.file.exception.UnregisteredImageException
 import com.hoppingmall.product.common.enums.ProductStatus
-import com.hoppingmall.product.common.file.FileUploadConfig
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.service.InventoryCommandService
 import com.hoppingmall.product.product.domain.BulkImportJob
@@ -42,7 +42,7 @@ class BulkImportService(
     private val inventoryCommandService: InventoryCommandService,
     private val objectMapper: ObjectMapper,
     private val cacheManager: CacheManager,
-    private val fileUploadConfig: FileUploadConfig,
+    private val productImageLinker: ProductImageLinker,
     @Qualifier("bulkImportExecutor") private val bulkImportExecutor: Executor,
     transactionManager: PlatformTransactionManager
 ) {
@@ -148,6 +148,7 @@ class BulkImportService(
                     continue
                 }
 
+                val imageUrls = productImageLinker.link(sellerId, row.imageUrls)
                 val product = productRepository.save(
                     Product.create(
                         sellerId = sellerId,
@@ -159,7 +160,6 @@ class BulkImportService(
                     )
                 )
 
-                val imageUrls = row.imageUrls.ifEmpty { listOf(fileUploadConfig.defaultImagePath) }
                 val productImages = imageUrls.mapIndexed { index, url ->
                     ProductImage.create(productId = product.id!!, imageUrl = url, sortOrder = index)
                 }
@@ -170,6 +170,9 @@ class BulkImportService(
                 )
 
                 job.recordSuccess()
+            } catch (e: UnregisteredImageException) {
+                allErrors.add(BulkRowError(row.rowNumber, "imageUrls", e.errorCode.message))
+                job.recordFailure()
             } catch (e: Exception) {
                 log.warn("대량 등록 행 {} 실패: {}", row.rowNumber, e.message)
                 allErrors.add(BulkRowError(row.rowNumber, "system", e.message ?: "알 수 없는 오류"))

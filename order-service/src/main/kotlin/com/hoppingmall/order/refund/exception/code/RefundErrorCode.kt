@@ -23,4 +23,5 @@ enum class RefundErrorCode(
     REFUND_REASON_NOT_ACCEPTED("RFD013", "새 환불 요청에 쓸 수 없는 사유입니다.", HttpStatus.BAD_REQUEST),
     REFUND_NOT_COMPLETED("RFD014", "완료된 전체 환불이 없는 주문은 환불 완료로 바꿀 수 없습니다.", HttpStatus.CONFLICT),
     REFUND_RETURN_SHIPPING_FEE_EXCEEDED("RFD015", "반품 배송비가 환불할 상품 금액보다 큽니다.", HttpStatus.BAD_REQUEST),
+    REFUND_WITHDRAWAL_RESTRICTED("RFD016", "청약철회가 제한된 상품은 단순 변심으로 환불할 수 없습니다.", HttpStatus.BAD_REQUEST),
 }

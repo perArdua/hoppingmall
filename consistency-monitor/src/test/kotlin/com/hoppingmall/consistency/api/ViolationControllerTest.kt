@@ -47,7 +47,7 @@ class ViolationControllerTest {
             header(HttpHeaders.AUTHORIZATION, adminAuthorization)
         }.andExpect {
             status { isOk() }
-            jsonPath("$[0].invId") { value("INV-1") }
+            jsonPath("$[0].inv_id") { value("INV-1") }
         }
     }
 
@@ -59,10 +59,10 @@ class ViolationControllerTest {
         mockMvc.post("/api/v1/violations/5/resolve") {
             header(HttpHeaders.AUTHORIZATION, adminAuthorization)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"resolutionNote":"환불 확인"}"""
+            content = """{"resolution_note":"환불 확인"}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.resolutionNote") { value("환불 확인") }
+            jsonPath("$.resolution_note") { value("환불 확인") }
         }
         verify(repository).resolve(5L, t0.plusMinutes(1), "7", "환불 확인")
     }
@@ -72,7 +72,7 @@ class ViolationControllerTest {
         mockMvc.post("/api/v1/violations/5/resolve") {
             header(HttpHeaders.AUTHORIZATION, adminAuthorization)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"resolutionNote":" "}"""
+            content = """{"resolution_note":" "}"""
         }.andExpect { status { isBadRequest() } }
         verify(repository, never()).resolve(any(), any(), any(), any())
     }
@@ -84,7 +84,7 @@ class ViolationControllerTest {
         mockMvc.post("/api/v1/violations/9/resolve") {
             header(HttpHeaders.AUTHORIZATION, adminAuthorization)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"resolutionNote":"x"}"""
+            content = """{"resolution_note":"x"}"""
         }.andExpect { status { isNotFound() } }
     }
 
@@ -95,7 +95,7 @@ class ViolationControllerTest {
         mockMvc.post("/api/v1/violations/5/resolve") {
             header(HttpHeaders.AUTHORIZATION, adminAuthorization)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"resolutionNote":"x"}"""
+            content = """{"resolution_note":"x"}"""
         }.andExpect { status { isConflict() } }
     }
 }

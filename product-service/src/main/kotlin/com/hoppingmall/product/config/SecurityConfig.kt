@@ -16,7 +16,8 @@ import org.springframework.security.web.SecurityFilterChain
 class SecurityConfig(
     gatewayHeaderAuthenticationFilter: GatewayHeaderAuthenticationFilter,
     internalTokenFilter: InternalTokenFilter,
-    private val unauthorizedEntryPoint: UnauthorizedEntryPoint
+    private val unauthorizedEntryPoint: UnauthorizedEntryPoint,
+    private val forbiddenAccessDeniedHandler: ForbiddenAccessDeniedHandler
 ) : BaseSecurityConfig(gatewayHeaderAuthenticationFilter, internalTokenFilter) {
 
     override fun configureServiceEndpoints(
@@ -44,7 +45,10 @@ class SecurityConfig(
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         return configureBase(http)
-            .exceptionHandling { it.authenticationEntryPoint(unauthorizedEntryPoint) }
+            .exceptionHandling {
+                it.authenticationEntryPoint(unauthorizedEntryPoint)
+                    .accessDeniedHandler(forbiddenAccessDeniedHandler)
+            }
             .build()
     }
 

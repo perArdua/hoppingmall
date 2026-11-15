@@ -118,11 +118,16 @@ export function lifecycle(data) {
   const cartReq = nextRequest(clientId);
   const cart = http.post(`${BASE}/api/v1/cart-items`, body({ product_id: productId, quantity: 1 }, cartReq),
     { headers: headers(token, cartReq), tags: { name: 'cart' } });
-  const cartItemId = is2xx(cart) ? (cart.json('data') || {}).id : null;
+  const cartItem = is2xx(cart) ? (cart.json('data') || {}) : {};
+  const cartItemId = cartItem.id;
   if (!cartItemId) return;
 
   const orderReq = nextRequest(clientId);
-  const orderPayload = body({ cart_item_ids: [cartItemId], shipping_address: SHIPPING_ADDRESS }, orderReq);
+  const orderPayload = body({
+    cart_item_ids: [cartItemId],
+    shipping_address: SHIPPING_ADDRESS,
+    expected_prices: [{ cart_item_id: cartItemId, product_price: cartItem.product_price }],
+  }, orderReq);
   const orderParams = { headers: headers(token, orderReq), tags: { name: 'order' } };
   const order = http.post(`${BASE}/api/v1/orders`, orderPayload, orderParams);
   if (Math.random() < DUP_PROB) {

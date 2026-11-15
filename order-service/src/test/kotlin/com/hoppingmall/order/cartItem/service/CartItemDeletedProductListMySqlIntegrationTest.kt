@@ -1,10 +1,10 @@
 package com.hoppingmall.order.cartItem.service
 
 import com.hoppingmall.order.cartItem.dto.request.CartItemCreateRequest
+import com.hoppingmall.order.cartItem.enum.CartProductStatus
 import com.hoppingmall.order.port.ProductInfo
-import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.port.ProductQueryUnavailableException
-import com.hoppingmall.order.support.MySqlJpaTestSupport
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import org.assertj.core.api.Assertions.assertThat
@@ -16,25 +16,19 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
 
 @DisplayName("삭제된 상품을 담은 장바구니 행의 목록 조회 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(CartItemCommandServiceImpl::class, CartItemQueryServiceImpl::class)
-class CartItemDeletedProductListMySqlIntegrationTest : MySqlJpaTestSupport() {
+class CartItemDeletedProductListMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var cartItemCommandService: CartItemCommandServiceImpl
 
     @Autowired
     private lateinit var cartItemQueryService: CartItemQueryServiceImpl
-
-    @MockitoBean
-    private lateinit var productQueryPort: ProductQueryPort
 
     @BeforeEach
     fun setUp() {
@@ -43,27 +37,27 @@ class CartItemDeletedProductListMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
-    fun 삭제된_상품을_담은_장바구니_행은_목록에_나오지_않는다() {
+    fun 삭제된_상품을_담은_장바구니_행은_목록에_남고_DELETED로_표시된다() {
         val deletedId = add(DELETED_PRODUCT_ID)
         val keptId = add(KEPT_PRODUCT_ID)
         productsAliveAre(KEPT_PRODUCT_ID)
 
-        val listed = cartItemQueryService.getCartItems(BUYER_ID, PageRequest.of(0, 10)).content.map { it.id }
+        val listed = cartItemQueryService.getCartItems(BUYER_ID, PageRequest.of(0, 10, Sort.by("id"))).content
 
-        assertThat(listed).containsExactly(keptId)
-        assertThat(listed).doesNotContain(deletedId)
+        assertThat(listed.map { it.id }).containsExactly(deletedId, keptId)
+        assertThat(listed.map { it.productStatus }).containsExactly(CartProductStatus.DELETED, null)
     }
 
     @Test
-    fun 삭제된_상품을_빼도_다음_쪽이_있는지는_장바구니_행_기준으로_알려준다() {
-        add(DELETED_PRODUCT_ID)
+    fun 삭제된_상품이_있어도_쪽_크기와_다음_쪽_여부는_장바구니_행_기준이다() {
+        val deletedId = add(DELETED_PRODUCT_ID)
         val keptId = add(KEPT_PRODUCT_ID)
         add(OTHER_PRODUCT_ID)
         productsAliveAre(KEPT_PRODUCT_ID, OTHER_PRODUCT_ID)
 
         val page = cartItemQueryService.getCartItems(BUYER_ID, PageRequest.of(0, 2, Sort.by("id")))
 
-        assertThat(page.content.map { it.id }).containsExactly(keptId)
+        assertThat(page.content.map { it.id }).containsExactly(deletedId, keptId)
         assertThat(page.hasNext()).isTrue()
     }
 

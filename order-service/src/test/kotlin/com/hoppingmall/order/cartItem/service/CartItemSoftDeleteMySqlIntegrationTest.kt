@@ -4,19 +4,11 @@ import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.cartItem.dto.request.CartItemCreateRequest
 import com.hoppingmall.order.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.order.cartItem.exception.CartItemNotFoundException
-import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.service.OrderCommandServiceImpl
-import com.hoppingmall.order.order.service.ReservationFence
-import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
-import com.hoppingmall.order.port.ProductQueryPort
-import com.hoppingmall.order.support.MySqlJpaTestSupport
-import com.hoppingmall.outbox.service.TransactionalEventPublisher
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -27,26 +19,12 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.transaction.PlatformTransactionManager
-import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 
 @DisplayName("삭제한 장바구니 행 조회 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(
-    CartItemCommandServiceImpl::class,
-    CartItemQueryServiceImpl::class,
-    OrderCommandServiceImpl::class,
-    ReservationFence::class,
-    OrderMetrics::class,
-    CartItemSoftDeleteMySqlIntegrationTest.TestConfig::class
-)
-class CartItemSoftDeleteMySqlIntegrationTest : MySqlJpaTestSupport() {
+class CartItemSoftDeleteMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var cartItemCommandService: CartItemCommandServiceImpl
@@ -59,18 +37,6 @@ class CartItemSoftDeleteMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     @Autowired
     private lateinit var cartItemRepository: CartItemRepository
-
-    @MockitoBean
-    private lateinit var productQueryPort: ProductQueryPort
-
-    @MockitoBean
-    private lateinit var inventoryCommandPort: InventoryCommandPort
-
-    @MockitoBean
-    private lateinit var paymentCommandPort: PaymentCommandPort
-
-    @MockitoBean
-    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @BeforeEach
     fun setUp() {
@@ -158,16 +124,6 @@ class CartItemSoftDeleteMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     private fun orderedProductIds(): List<Long> =
         jdbcTemplate.queryForList("SELECT product_id FROM order_items ORDER BY id", Long::class.java)
-
-    @TestConfiguration(proxyBeanMethods = false)
-    class TestConfig {
-        @Bean
-        fun transactionTemplate(transactionManager: PlatformTransactionManager): TransactionTemplate =
-            TransactionTemplate(transactionManager)
-
-        @Bean
-        fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
-    }
 
     companion object {
         private const val BUYER_ID = 10L

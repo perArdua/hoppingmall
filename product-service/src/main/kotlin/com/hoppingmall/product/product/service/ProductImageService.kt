@@ -4,5 +4,5 @@ import com.hoppingmall.product.product.dto.response.ProductImageResponse
 import org.springframework.web.multipart.MultipartFile
 
 interface ProductImageService {
-    fun uploadProductImage(imageFile: MultipartFile): ProductImageResponse
+    fun uploadProductImage(imageFile: MultipartFile, uploaderId: Long, uploaderRole: String): ProductImageResponse
 } 

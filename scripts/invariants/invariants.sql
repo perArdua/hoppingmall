@@ -53,7 +53,7 @@ WHERE uc.deleted_at IS NULL
   AND uc.status = 'USED'
   AND p.id IS NULL;
 
--- @INV INV-5 | 결제가 SUCCESS가 아닌데 적립(EARN) 포인트가 회수(RECLAIM, 이전 형식 REFUND)되지 않음
+-- @INV INV-5 | 결제가 SUCCESS가 아닌데 적립(EARN) 포인트가 회수(RECLAIM, 이전 형식 REFUND refund-{결제}·refund-{결제}-{환불})되지 않음
 SELECT h.id AS point_history_id, h.user_id, h.payment_id, h.amount, p.status AS payment_status
 FROM payment_db.point_histories h
 JOIN payment_db.payments p ON p.id = h.payment_id AND p.deleted_at IS NULL
@@ -62,8 +62,41 @@ WHERE h.deleted_at IS NULL
   AND p.status <> 'SUCCESS'
   AND NOT EXISTS (
     SELECT 1 FROM payment_db.point_histories r
-    WHERE r.payment_id = h.payment_id AND r.type IN ('RECLAIM', 'REFUND') AND r.deleted_at IS NULL
+    WHERE r.payment_id = h.payment_id AND r.deleted_at IS NULL
+      AND (r.type = 'RECLAIM'
+        OR (r.type = 'REFUND' AND (r.event_id = CONCAT('refund-', h.payment_id) OR r.event_id LIKE CONCAT('refund-', h.payment_id, '-%'))))
   );
+
+-- @INV INV-13 | 결제가 FAILED·CANCELLED·REFUNDED인데 결제에 쓴 포인트(USE)가 다 되돌려지지 않음(되돌림 = REFUND use-…·refund-point-…)
+SELECT p.id AS payment_id, p.user_id, p.status AS payment_status, u.used, COALESCE(r.restored, 0) AS restored
+FROM payment_db.payments p
+JOIN (
+  SELECT payment_id, SUM(-amount) AS used FROM payment_db.point_histories
+  WHERE type = 'USE' AND deleted_at IS NULL AND payment_id IS NOT NULL
+  GROUP BY payment_id
+) u ON u.payment_id = p.id
+LEFT JOIN (
+  SELECT payment_id, SUM(amount) AS restored FROM payment_db.point_histories
+  WHERE type = 'REFUND' AND deleted_at IS NULL AND (event_id LIKE 'use-%' OR event_id LIKE 'refund-point-%')
+  GROUP BY payment_id
+) r ON r.payment_id = p.id
+WHERE p.deleted_at IS NULL
+  AND p.status IN ('FAILED', 'CANCELLED', 'REFUNDED')
+  AND u.used > COALESCE(r.restored, 0);
+
+-- @INV INV-14 | 결제에 쓴 포인트(USE)보다 많은 포인트가 되돌려짐(되돌림 = REFUND use-…·refund-point-…)
+SELECT r.payment_id, r.restored, COALESCE(u.used, 0) AS used
+FROM (
+  SELECT payment_id, SUM(amount) AS restored FROM payment_db.point_histories
+  WHERE type = 'REFUND' AND deleted_at IS NULL AND payment_id IS NOT NULL AND (event_id LIKE 'use-%' OR event_id LIKE 'refund-point-%')
+  GROUP BY payment_id
+) r
+LEFT JOIN (
+  SELECT payment_id, SUM(-amount) AS used FROM payment_db.point_histories
+  WHERE type = 'USE' AND deleted_at IS NULL
+  GROUP BY payment_id
+) u ON u.payment_id = r.payment_id
+WHERE r.restored > COALESCE(u.used, 0);
 
 -- @INV INV-6 | 한 주문에 SUCCESS 결제가 2건 이상
 SELECT p.order_id, COUNT(*) AS success_payments, GROUP_CONCAT(p.id ORDER BY p.id) AS payment_ids

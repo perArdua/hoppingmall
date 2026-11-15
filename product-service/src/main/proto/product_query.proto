@@ -17,6 +17,10 @@ message ProductResponse {
   string price = 3;
   int64 seller_id = 4;
   string image_url = 5;
+  string status = 6;
+  int32 stock_quantity = 7;
+  bool withdrawal_restricted = 8;
+  string withdrawal_restriction_reason = 9;
 }
 message ProductListResponse { repeated ProductResponse products = 1; }
 message ImageUrlResponse {

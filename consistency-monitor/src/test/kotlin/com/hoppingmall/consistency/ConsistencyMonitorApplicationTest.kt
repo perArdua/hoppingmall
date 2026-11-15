@@ -33,7 +33,7 @@ class ConsistencyMonitorApplicationTest {
 
     @Test
     fun 모든_점검_항목에_정책이_선언되어_있다() {
-        assertThat(catalog.definitions).hasSize(14)
+        assertThat(catalog.definitions).hasSize(16)
         assertThat(properties.policies.keys).containsExactlyInAnyOrderElementsOf(catalog.definitions.map { it.id })
         assertThat(properties.policyOf("INV-1R").severity).isEqualTo(Severity.CRITICAL)
         assertThat(properties.policyOf("INV-2b").graceSeconds).isEqualTo(60)

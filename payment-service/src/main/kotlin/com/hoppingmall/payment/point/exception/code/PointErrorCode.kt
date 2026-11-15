@@ -9,23 +9,38 @@ enum class PointErrorCode(
     override val status: HttpStatus
 ) : ErrorCode {
     POINT_INSUFFICIENT_BALANCE(
-        code = "POINT_INSUFFICIENT_BALANCE",
+        code = "PNT001",
         message = "포인트 잔액이 부족합니다",
         status = HttpStatus.BAD_REQUEST
     ),
     POINT_POLICY_NOT_FOUND(
-        code = "POINT_POLICY_NOT_FOUND",
+        code = "PNT002",
         message = "포인트 정책을 찾을 수 없습니다",
         status = HttpStatus.NOT_FOUND
     ),
     POINT_POLICY_NAME_DUPLICATED(
-        code = "POINT_POLICY_NAME_DUPLICATED",
+        code = "PNT003",
         message = "이미 존재하는 정책 이름입니다",
         status = HttpStatus.CONFLICT
     ),
     POINT_POLICY_INVALID(
-        code = "POINT_POLICY_INVALID",
+        code = "PNT004",
         message = "적립률은 0보다 크고 최대 적립률 이하, 최소 사용 금액은 최대 사용 금액 이하여야 합니다",
+        status = HttpStatus.BAD_REQUEST
+    ),
+    POINT_POLICY_CONCURRENT_CHANGE(
+        code = "PNT005",
+        message = "다른 요청이 동시에 활성 정책을 바꿨습니다. 정책 목록을 다시 확인해 주세요",
+        status = HttpStatus.CONFLICT
+    ),
+    POINT_USE_UNIT_INVALID(
+        code = "PNT006",
+        message = "포인트는 1포인트 단위로 사용할 수 있습니다",
+        status = HttpStatus.BAD_REQUEST
+    ),
+    POINT_USE_EXCEEDS_PAYABLE(
+        code = "PNT007",
+        message = "포인트는 쿠폰 할인 뒤 결제할 금액까지만 사용할 수 있습니다",
         status = HttpStatus.BAD_REQUEST
     )
 }

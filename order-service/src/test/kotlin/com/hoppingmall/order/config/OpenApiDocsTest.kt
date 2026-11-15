@@ -45,8 +45,11 @@ class OpenApiDocsTest {
         val requestSchema = schema(docs, requestSchemaRef(docs, "/api/v1/orders", "post"))
         val addressSchema = schema(docs, requestSchema.path("properties").path("shipping_address").path("\$ref").asText())
 
-        assertThat(propertyNames(requestSchema)).containsExactlyInAnyOrder("cart_item_ids", "shipping_address")
-        assertThat(requestSchema.path("required").map { it.asText() }).containsExactlyInAnyOrder("cart_item_ids", "shipping_address")
+        val expectedPriceSchema = schema(docs, requestSchema.path("properties").path("expected_prices").path("items").path("\$ref").asText())
+
+        assertThat(propertyNames(requestSchema)).containsExactlyInAnyOrder("cart_item_ids", "shipping_address", "expected_prices")
+        assertThat(requestSchema.path("required").map { it.asText() }).containsExactlyInAnyOrder("cart_item_ids", "shipping_address", "expected_prices")
+        assertThat(propertyNames(expectedPriceSchema)).containsExactlyInAnyOrder("cart_item_id", "product_price")
         assertThat(propertyNames(addressSchema)).containsExactlyInAnyOrderElementsOf(SHIPPING_ADDRESS_VALUES.keys)
         assertThat(addressSchema.path("required").map { it.asText() })
             .containsExactlyInAnyOrder("recipient_name", "recipient_phone", "zip_code", "address")
@@ -56,6 +59,7 @@ class OpenApiDocsTest {
         val body = objectMapper.createObjectNode()
         body.putArray("cart_item_ids").add(999999999L)
         body.set<JsonNode>("shipping_address", address)
+        body.putArray("expected_prices").addObject().put("cart_item_id", 999999999L).put("product_price", 10000)
 
         val response = send(
             request("/api/v1/orders").buyer()
@@ -105,6 +109,20 @@ class OpenApiDocsTest {
         }
 
         assertThat(mediaTypes).isNotEmpty().doesNotContain("*/*")
+    }
+
+    @Test
+    fun 생성_입구의_명세_성공_응답은_실제와_같은_201이다() {
+        val docs = apiDocs()
+        listOf(
+            "/api/v1/cart-items" to "post",
+            "/api/v1/orders" to "post",
+            "/api/v1/shipping" to "post"
+        ).forEach { (path, method) ->
+            val responses = docs.path("paths").path(path).path(method).path("responses")
+            assertThat(responses.has("201")).describedAs("%s %s 201", method, path).isTrue()
+            assertThat(responses.has("200")).describedAs("%s %s 200", method, path).isFalse()
+        }
     }
 
     private fun apiDocs(): JsonNode = objectMapper.readTree(send(get("/v3/api-docs")).body())
