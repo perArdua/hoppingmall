@@ -8,7 +8,6 @@ import com.hoppingmall.order.order.domain.SagaEventLog
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.domain.repository.SagaEventLogRepository
-import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.port.InventoryCommandPort
@@ -17,7 +16,9 @@ import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.dto.request.ShippingStatusUpdateRequest
+import com.hoppingmall.order.shipping.dto.request.ShippingCreateRequest
 import com.hoppingmall.order.shipping.enum.ShippingStatus
+import com.hoppingmall.order.shipping.exception.ShippingInvalidStatusException
 import com.hoppingmall.order.shipping.service.ShippingCommandServiceImpl
 import com.hoppingmall.order.support.MySqlJpaTestSupport
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
@@ -97,12 +98,14 @@ class OrderShipmentSagaTimeoutClaimMySqlIntegrationTest : MySqlJpaTestSupport() 
     fun 시간_초과_보상이_선점한_주문은_관리자가_SHIPPED로_바꿀_수_없다() {
         val orderId = savePaidOrder()
         savePaymentCompletedSaga(orderId, claimed = true)
+        val shippingId = saveShipping(orderId)
 
         assertThatThrownBy {
-            orderCommandService.updateOrderStatus(orderId, OrderStatusUpdateRequest(OrderStatus.SHIPPED), ADMIN_ID, true)
+            shippingCommandService.updateStatusByOrder(ADMIN_ID, orderId, OrderStatus.SHIPPED, true)
         }.isInstanceOf(OrderInvalidStatusException::class.java)
 
         assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.PAID.name)
+        assertThat(shippingStatus(shippingId)).isEqualTo(ShippingStatus.PREPARING.name)
     }
 
     @Test
@@ -123,8 +126,9 @@ class OrderShipmentSagaTimeoutClaimMySqlIntegrationTest : MySqlJpaTestSupport() 
     fun 선점하지_않은_결제_완료_saga가_있는_주문은_SHIPPED로_바꾼다() {
         val orderId = savePaidOrder()
         savePaymentCompletedSaga(orderId, claimed = false)
+        saveShipping(orderId)
 
-        orderCommandService.updateOrderStatus(orderId, OrderStatusUpdateRequest(OrderStatus.SHIPPED), ADMIN_ID, true)
+        shippingCommandService.updateStatusByOrder(ADMIN_ID, orderId, OrderStatus.SHIPPED, true)
 
         assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.SHIPPED.name)
     }
@@ -164,6 +168,105 @@ class OrderShipmentSagaTimeoutClaimMySqlIntegrationTest : MySqlJpaTestSupport() 
             .hasCauseInstanceOf(OrderInvalidStatusException::class.java)
         assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.PAID.name)
         assertThat(shippingStatus(shippingId)).isEqualTo(ShippingStatus.PREPARING.name)
+    }
+
+    @Test
+    fun 배송_등록_뒤_결제_완료_주문을_취소하면_배송도_CANCELLED가_되고_그_배송은_더_진행되지_않는다() {
+        val orderId = savePaidOrder()
+        val shippingId = saveShipping(orderId)
+
+        orderCommandService.cancelOrder(BUYER_ID, orderId)
+
+        assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.CANCEL_REQUESTED.name)
+        assertThat(shippingStatus(shippingId)).isEqualTo(ShippingStatus.CANCELLED.name)
+        assertThatThrownBy {
+            shippingCommandService.updateShippingStatus(SELLER_ID, shippingId, ShippingStatusUpdateRequest(ShippingStatus.IN_TRANSIT))
+        }.isInstanceOf(ShippingInvalidStatusException::class.java)
+        assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.CANCEL_REQUESTED.name)
+        assertThat(shippingStatus(shippingId)).isEqualTo(ShippingStatus.CANCELLED.name)
+    }
+
+    @Test
+    fun 배송에_실패한_주문에_배송을_다시_등록하면_행은_하나로_남고_새_운송장으로_다시_준비한다() {
+        val orderId = savePaidOrder()
+        val shippingId = saveShipping(orderId)
+        shippingCommandService.updateShippingStatus(SELLER_ID, shippingId, ShippingStatusUpdateRequest(ShippingStatus.IN_TRANSIT))
+        shippingCommandService.updateShippingStatus(SELLER_ID, shippingId, ShippingStatusUpdateRequest(ShippingStatus.FAILED))
+        assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.PAID.name)
+
+        val restarted = shippingCommandService.createShipping(
+            SELLER_ID,
+            ShippingCreateRequest(
+                orderId = orderId, carrierName = "한진택배", trackingNumber = "TRK-RETRY-$orderId",
+                recipientName = "홍길동", recipientPhone = "010-1234-5678", recipientAddress = "서울시 강남구"
+            )
+        )
+
+        assertThat(restarted.id).isEqualTo(shippingId)
+        assertThat(
+            jdbcTemplate.queryForList(
+                "SELECT status, tracking_number, attempt FROM shippings WHERE order_id = ?", orderId
+            ).map { listOf(it["status"], it["tracking_number"], (it["attempt"] as Number).toInt()) }
+        ).containsExactly(listOf(ShippingStatus.PREPARING.name, "TRK-RETRY-$orderId", 2))
+        assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.PAID.name)
+    }
+
+    @Test
+    fun 시도_번호_없이_들어간_옛_배송_행은_첫_시도로_읽힌다() {
+        val orderId = savePaidOrder()
+        jdbcTemplate.update(
+            """
+            INSERT INTO shippings (order_id, buyer_id, status, carrier_name, tracking_number,
+                recipient_name, recipient_phone, recipient_address, created_at, updated_at)
+            VALUES (?, ?, 'PREPARING', 'CJ대한통운', 'TRK-OLD', '홍길동', '010-1234-5678', '서울시 강남구', NOW(6), NOW(6))
+            """.trimIndent(),
+            orderId, BUYER_ID
+        )
+
+        assertThat(shippingRepository.findByOrderId(orderId)!!.attempt).isEqualTo(1)
+    }
+
+    @Test
+    fun 주문_취소와_배송_시작이_겹치면_둘_다_주문_잠금에서_차례를_기다려_교착_없이_취소가_이긴다() {
+        val orderId = savePaidOrder()
+        val shippingId = saveShipping(orderId)
+        val holderLocked = CountDownLatch(1)
+        val releaseHolder = CountDownLatch(1)
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        val holder = executor.submit {
+            transactionTemplate.executeWithoutResult {
+                orderRepository.lockById(orderId)
+                holderLocked.countDown()
+                releaseHolder.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            }
+        }
+        assertThat(holderLocked.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue()
+
+        val enteredAt = AtomicLong()
+        val cancel = executor.submit {
+            enteredAt.set(System.currentTimeMillis())
+            orderCommandService.cancelOrder(BUYER_ID, orderId)
+        }
+        awaitLockWait(cancel, enteredAt, "주문 취소", "orders")
+        val shipment = executor.submit {
+            shippingCommandService.updateShippingStatus(SELLER_ID, shippingId, ShippingStatusUpdateRequest(ShippingStatus.IN_TRANSIT))
+        }
+        val startedAt = System.currentTimeMillis()
+        while (lockWaitCount("orders") < 2) {
+            if (shipment.isDone || System.currentTimeMillis() - startedAt > LATCH_TIMEOUT_SECONDS * 1000) {
+                throw AssertionError("배송 시작이 orders 잠금을 기다리지 않았다\n" + lockDiagnostics(shipment, enteredAt, startedAt))
+            }
+            Thread.onSpinWait()
+        }
+        releaseHolder.countDown()
+        holder.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+
+        cancel.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        assertThatThrownBy { shipment.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+            .isInstanceOf(ExecutionException::class.java)
+            .hasCauseInstanceOf(ShippingInvalidStatusException::class.java)
+        assertThat(orderStatus(orderId)).isEqualTo(OrderStatus.CANCEL_REQUESTED.name)
+        assertThat(shippingStatus(shippingId)).isEqualTo(ShippingStatus.CANCELLED.name)
     }
 
     private fun savePaidOrder(): Long {

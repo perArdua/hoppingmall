@@ -8,8 +8,6 @@ import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
-import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
-import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
@@ -165,19 +163,6 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
-    fun 관리자도_공개_상태_변경으로_PAID_주문을_REFUNDED로_보낼_수_없다() {
-        val orderId = saveOrder("PAID")
-
-        assertThatThrownBy {
-            orderCommandService.updateOrderStatus(
-                orderId, OrderStatusUpdateRequest(OrderStatus.valueOf("REFUNDED")), ADMIN_ID, true
-            )
-        }.isInstanceOf(OrderInvalidStatusException::class.java)
-
-        assertThat(orderStatus(orderId)).isEqualTo("PAID")
-    }
-
-    @Test
     fun REFUNDED_주문은_사용자가_취소할_수_없다() {
         val orderId = saveOrder("PAID")
         internalCancel(orderId).andExpect { status { isOk() } }
@@ -228,6 +213,5 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     companion object {
         private const val BUYER_ID = 10L
         private const val SELLER_ID = 5L
-        private const val ADMIN_ID = 99L
     }
 }

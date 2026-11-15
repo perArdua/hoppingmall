@@ -11,6 +11,9 @@ interface ShippingRepository : JpaRepository<Shipping, Long> {
     fun findByOrderId(orderId: Long): Shipping?
     fun findByTrackingNumber(trackingNumber: String): Shipping?
 
+    @Query("SELECT s.orderId FROM Shipping s WHERE s.id = :id")
+    fun findOrderIdById(@Param("id") id: Long): Long?
+
     @Query(value = "SELECT order_id FROM shippings WHERE id = :id FOR UPDATE", nativeQuery = true)
     fun lockOrderIdById(@Param("id") id: Long): Long?
 }

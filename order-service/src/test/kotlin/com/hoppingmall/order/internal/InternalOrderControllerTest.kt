@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.http.HttpStatus
 import org.springframework.test.util.ReflectionTestUtils
@@ -97,6 +98,22 @@ class InternalOrderControllerTest {
         val response = controller.cancelOrder(10L)
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
+    }
+
+    @Test
+    fun 내부_API로_결제_완료_주문을_취소하면_준비_중인_배송도_함께_취소한다() {
+        val order = com.hoppingmall.order.order.domain.Order.create(
+            buyerId = 10L, totalAmount = BigDecimal("50000")
+        )
+        order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.PAYING)
+        order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.PAID)
+        ReflectionTestUtils.setField(order, "id", 10L)
+        whenever(orderRepository.findById(10L)).thenReturn(java.util.Optional.of(order))
+        whenever(orderRepository.save(order)).thenReturn(order)
+
+        controller.cancelOrder(10L)
+
+        verify(orderRepository).cancelPreparingShipping(10L)
     }
 
     @Test

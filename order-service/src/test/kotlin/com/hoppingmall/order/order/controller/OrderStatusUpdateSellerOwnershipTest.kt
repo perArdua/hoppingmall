@@ -1,20 +1,18 @@
 package com.hoppingmall.order.order.controller
 
 import com.hoppingmall.common.UserPrincipal
-import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
-import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
-import com.hoppingmall.order.order.service.OrderCommandServiceImpl
+import com.hoppingmall.order.order.service.OrderCommandService
 import com.hoppingmall.order.order.service.OrderQueryService
-import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.PaymentCommandPort
-import com.hoppingmall.order.port.ProductQueryPort
-import com.hoppingmall.order.refund.domain.repository.RefundRepository
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.hoppingmall.order.shipping.domain.Shipping
+import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
+import com.hoppingmall.order.shipping.service.ShippingCommandServiceImpl
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -26,7 +24,6 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.http.HttpStatus
 import org.springframework.test.util.ReflectionTestUtils
-import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.util.Optional
 
@@ -36,23 +33,15 @@ class OrderStatusUpdateSellerOwnershipTest {
 
     private val orderRepository: OrderRepository = mock()
     private val orderItemRepository: OrderItemRepository = mock()
-    private val cartItemRepository: CartItemRepository = mock()
-    private val productQueryPort: ProductQueryPort = mock()
-    private val inventoryCommandPort: InventoryCommandPort = mock()
-    private val paymentCommandPort: PaymentCommandPort = mock()
+    private val shippingRepository: ShippingRepository = mock()
     private val transactionalEventPublisher: TransactionalEventPublisher = mock()
-    private val orderMetrics: OrderMetrics = mock()
-    private val transactionTemplate: TransactionTemplate = mock()
-    private val refundRepository: RefundRepository = mock()
-    private val orderQueryService: OrderQueryService = mock()
 
     private val controller = OrderController(
-        OrderCommandServiceImpl(
-            orderRepository, orderItemRepository, cartItemRepository,
-            productQueryPort, inventoryCommandPort, paymentCommandPort,
-            transactionalEventPublisher, orderMetrics, transactionTemplate, refundRepository
-        ),
-        orderQueryService
+        mock<OrderCommandService>(),
+        mock<OrderQueryService>(),
+        ShippingCommandServiceImpl(
+            shippingRepository, orderRepository, orderItemRepository, transactionalEventPublisher, ObjectMapper()
+        )
     )
 
     @Test
@@ -106,11 +95,20 @@ class OrderStatusUpdateSellerOwnershipTest {
         order.updateStatus(OrderStatus.PAYING)
         order.updateStatus(OrderStatus.PAID)
         whenever(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order))
+        val shipping = Shipping.create(
+            orderId = ORDER_ID, buyerId = BUYER_ID, carrierName = "CJ대한통운",
+            trackingNumber = "1234567890", recipientName = "홍길동",
+            recipientPhone = "010-1234-5678", recipientAddress = "서울시 강남구"
+        )
+        ReflectionTestUtils.setField(shipping, "id", SHIPPING_ID)
+        whenever(shippingRepository.findByOrderId(ORDER_ID)).thenReturn(shipping)
+        whenever(shippingRepository.findById(SHIPPING_ID)).thenReturn(Optional.of(shipping))
         return order
     }
 
     companion object {
         private const val ORDER_ID = 1L
+        private const val SHIPPING_ID = 3L
         private const val BUYER_ID = 10L
         private const val SELLER_ID = 20L
         private const val OTHER_SELLER_ID = 30L

@@ -95,6 +95,7 @@ class InternalOrderController(
             order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.CANCELLED)
         }
         orderRepository.save(order)
+        orderRepository.cancelPreparingShipping(orderId)
         return ResponseEntity.ok().build()
     }
 
