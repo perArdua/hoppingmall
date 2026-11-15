@@ -4,6 +4,7 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.product.common.enums.ProductStatus
 import jakarta.persistence.*
+import org.hibernate.annotations.ColumnDefault
 import org.hibernate.annotations.SQLRestriction
 import java.math.BigDecimal
 
@@ -38,6 +39,14 @@ class Product private constructor(
     var status: ProductStatus = ProductStatus.AVAILABLE
 
 ): BaseEntity() {
+
+    @ColumnDefault("0")
+    @Column(nullable = false, insertable = false, updatable = false)
+    var reviewCount: Long = 0
+
+    @ColumnDefault("0.00")
+    @Column(nullable = false, precision = 3, scale = 2, insertable = false, updatable = false)
+    var averageRating: BigDecimal = BigDecimal.ZERO
 
     fun update(name: String, description: String, price: BigDecimal, categoryId: Long, status: ProductStatus) {
         require(price > BigDecimal.ZERO) { "가격은 0보다 커야 합니다" }

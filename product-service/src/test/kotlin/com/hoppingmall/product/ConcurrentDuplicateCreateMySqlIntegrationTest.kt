@@ -11,6 +11,7 @@ import com.hoppingmall.product.review.domain.repository.ReviewRepository
 import com.hoppingmall.product.review.dto.request.ReviewCreateRequest
 import com.hoppingmall.product.review.port.OrderItemInfo
 import com.hoppingmall.product.review.port.OrderQueryPort
+import com.hoppingmall.product.review.service.ProductReviewSummaryService
 import com.hoppingmall.product.review.service.ReviewCommandServiceImpl
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
@@ -49,6 +50,9 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
 
     @Autowired
     private lateinit var productStatisticsRepository: ProductStatisticsRepository
+
+    @Autowired
+    private lateinit var productReviewSummaryService: ProductReviewSummaryService
 
     @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
@@ -91,7 +95,7 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
             OrderItemInfo(ORDER_ITEM_ID, ORDER_ID, SELLER_ID, PRODUCT_ID, "동시 리뷰 상품", BigDecimal("10000"), 1, BigDecimal("10000"))
         )
         whenever(orderQueryPort.isDelivered(any(), any())).thenReturn(true)
-        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository)
+        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService)
         val tx = TransactionTemplate(transactionManager)
 
         val result = runWhileHolding(

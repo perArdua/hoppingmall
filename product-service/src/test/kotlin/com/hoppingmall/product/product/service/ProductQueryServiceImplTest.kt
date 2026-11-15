@@ -1,5 +1,7 @@
 package com.hoppingmall.product.product.service
 
+import com.hoppingmall.product.category.domain.Category
+import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.common.enums.ProductStatus
 import com.hoppingmall.product.product.domain.Product
 import com.hoppingmall.product.product.domain.ProductImage
@@ -34,6 +36,9 @@ class ProductQueryServiceImplTest {
 
     @Mock
     private lateinit var productImageRepository: ProductImageRepository
+
+    @Mock
+    private lateinit var categoryRepository: CategoryRepository
 
     @InjectMocks
     private lateinit var service: ProductQueryServiceImpl
@@ -129,5 +134,30 @@ class ProductQueryServiceImplTest {
         val result = service.searchProducts(condition, pageable)
 
         assertThat(result.content).hasSize(1)
+    }
+
+    @Test
+    fun 상품_상세와_목록에_카테고리_이름을_넣는다() {
+        val pageable = PageRequest.of(0, 10)
+        val product = createProduct()
+        val category = Category.create(name = "신발", parentCategoryId = null, depth = 0).withId(1L)
+
+        whenever(productRepository.findNullableById(1L)).thenReturn(product)
+        whenever(productRepository.findBy(pageable)).thenReturn(SliceImpl(listOf(product), pageable, false))
+        whenever(categoryRepository.findNullableById(1L)).thenReturn(category)
+        whenever(categoryRepository.findAllById(listOf(1L))).thenReturn(listOf(category))
+
+        assertThat(service.getProductById(1L)!!.categoryName).isEqualTo("신발")
+        assertThat(service.getProducts(pageable).content[0].categoryName).isEqualTo("신발")
+    }
+
+    @Test
+    fun 카테고리가_없으면_카테고리_이름은_null이다() {
+        val product = createProduct()
+
+        whenever(productRepository.findNullableById(1L)).thenReturn(product)
+        whenever(categoryRepository.findNullableById(1L)).thenReturn(null)
+
+        assertThat(service.getProductById(1L)!!.categoryName).isNull()
     }
 }
