@@ -6,8 +6,11 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.exc.InvalidFormatException
 import com.fasterxml.jackson.databind.exc.InvalidNullException
 import com.fasterxml.jackson.databind.exc.MismatchedInputException
+import org.hibernate.exception.ConstraintViolationException
 import org.slf4j.LoggerFactory
 import org.springframework.core.MethodParameter
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.data.mapping.PropertyReferenceException
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -27,8 +30,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.multipart.MaxUploadSizeExceededException
+import org.springframework.web.multipart.support.MissingServletRequestPartException
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
+import java.sql.SQLException
 
 @RestControllerAdvice
 class GlobalExceptionHandler(
@@ -94,6 +99,35 @@ class GlobalExceptionHandler(
         return invalidInput(listOf(FieldErrorDetail(ex.name, INVALID_FORMAT)))
     }
 
+    @ExceptionHandler(MissingServletRequestPartException::class)
+    fun handleMissingPart(ex: MissingServletRequestPartException): ResponseEntity<ApiResponse<Unit>> {
+        log.warn("MissingRequestPart: {}", ex.requestPartName)
+        return invalidInput(listOf(FieldErrorDetail(ex.requestPartName, REQUIRED)))
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(ex: IllegalArgumentException): ResponseEntity<ApiResponse<Unit>> {
+        log.warn("IllegalArgument: {}", ex.message)
+        return ResponseEntity.badRequest().body(ApiResponse.failure(CommonErrorCode.INVALID_INPUT))
+    }
+
+    @ExceptionHandler(IllegalStateException::class)
+    fun handleIllegalState(ex: IllegalStateException): ResponseEntity<ApiResponse<Unit>> {
+        log.warn("IllegalState: {}", ex.message, ex)
+        return ResponseEntity.status(CommonErrorCode.INVALID_STATE.status)
+            .body(ApiResponse.failure(CommonErrorCode.INVALID_STATE))
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException::class)
+    fun handleDataIntegrityViolation(ex: DataIntegrityViolationException): ResponseEntity<ApiResponse<Unit>> {
+        if (!isUniqueViolation(ex)) {
+            return handleException(ex)
+        }
+        log.warn("DuplicateResource: constraint={}", constraintName(ex))
+        return ResponseEntity.status(CommonErrorCode.DUPLICATE_RESOURCE.status)
+            .body(ApiResponse.failure(CommonErrorCode.DUPLICATE_RESOURCE))
+    }
+
     @ExceptionHandler(MissingRequestHeaderException::class)
     fun handleBadRequest(ex: Exception): ResponseEntity<ApiResponse<Unit>> {
         log.warn("BadRequest: {}", ex.message)
@@ -154,6 +188,21 @@ class GlobalExceptionHandler(
         )
     }
 
+    private fun isUniqueViolation(ex: DataIntegrityViolationException): Boolean =
+        ex is DuplicateKeyException || causes(ex).any { cause ->
+            when (cause) {
+                is ConstraintViolationException -> cause.kind == ConstraintViolationException.ConstraintKind.UNIQUE
+                is SQLException -> cause.errorCode == MYSQL_DUPLICATE_ENTRY || cause.sqlState == SQL_STATE_UNIQUE_VIOLATION
+                else -> false
+            }
+        }
+
+    private fun constraintName(ex: DataIntegrityViolationException): String =
+        causes(ex).filterIsInstance<ConstraintViolationException>().firstNotNullOfOrNull { it.constraintName } ?: UNKNOWN
+
+    private fun causes(ex: Throwable): Sequence<Throwable> =
+        generateSequence(ex) { current -> current.cause?.takeIf { it !== current } }.take(MAX_CAUSE_DEPTH)
+
     private fun toDetail(error: FieldError, jsonBody: Boolean, prefix: String): FieldErrorDetail {
         val field = if (jsonBody) jsonName(error.field) else error.field
         val path = when {
@@ -204,5 +253,9 @@ class GlobalExceptionHandler(
         const val INVALID_FORMAT = "형식이 올바르지 않습니다."
         const val MISSING_OR_INVALID = "값이 없거나 형식이 올바르지 않습니다."
         const val INVALID_VALUE = "올바르지 않은 값입니다."
+        const val UNKNOWN = "unknown"
+        const val MYSQL_DUPLICATE_ENTRY = 1062
+        const val SQL_STATE_UNIQUE_VIOLATION = "23505"
+        const val MAX_CAUSE_DEPTH = 16
     }
 }
