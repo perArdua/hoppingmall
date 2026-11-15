@@ -366,7 +366,8 @@ class OrderSagaConsumer(
                 "userId" to buyerId,
                 "type" to "PAYMENT_CANCELLED",
                 "title" to "주문이 취소되었습니다",
-                "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다."
+                "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다.",
+                "metadata" to orderNotificationMetadata(orderId)
             ),
             topic = KafkaTopics.NOTIFICATION,
             partitionKey = orderId.toString()
