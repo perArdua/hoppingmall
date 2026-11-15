@@ -13,4 +13,5 @@ enum class ReviewErrorCode(
     REVIEW_ORDER_NOT_DELIVERED("REV003", "배송 완료된 주문에만 리뷰를 작성할 수 있습니다.", HttpStatus.BAD_REQUEST),
     REVIEW_ACCESS_DENIED("REV004", "리뷰에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
     REVIEW_INVALID_ORDER_ITEM("REV005", "유효하지 않은 주문 상품입니다.", HttpStatus.BAD_REQUEST),
+    ORDER_QUERY_UNAVAILABLE("REV006", "주문 정보를 지금 확인할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE),
 }
