@@ -12,6 +12,7 @@ class RateLimitConfig {
         RateLimitPolicy("login", "/api/v1/users/login", "POST", RateLimitKeyType.IP, 5, Duration.ofMinutes(1)),
         RateLimitPolicy("signup", "/api/v1/users/signup", "POST", RateLimitKeyType.IP, 3, Duration.ofMinutes(1)),
         RateLimitPolicy("refresh", "/api/v1/auth/refresh", "POST", RateLimitKeyType.REFRESH_TOKEN, 10, Duration.ofMinutes(1)),
+        RateLimitPolicy("logout", "/api/v1/auth/logout", "POST", RateLimitKeyType.REFRESH_TOKEN, 10, Duration.ofMinutes(1)),
         RateLimitPolicy("coupon-issue", "/api/v1/coupons/*/issue", "POST", RateLimitKeyType.USER_ID, 5, Duration.ofMinutes(1)),
         RateLimitPolicy("search", "/api/v1/products/search", "GET", RateLimitKeyType.USER_ID, 60, Duration.ofMinutes(1)),
         RateLimitPolicy("upload", "/api/v1/products/images/upload", "POST", RateLimitKeyType.USER_ID, 20, Duration.ofMinutes(1)),
