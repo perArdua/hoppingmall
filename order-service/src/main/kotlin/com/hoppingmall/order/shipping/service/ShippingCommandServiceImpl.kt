@@ -21,6 +21,9 @@ import com.hoppingmall.order.shipping.enum.ShippingStatus
 import com.hoppingmall.order.shipping.exception.ShippingAccessDeniedException
 import com.hoppingmall.order.shipping.exception.ShippingAlreadyExistsException
 import com.hoppingmall.order.shipping.exception.ShippingNotFoundException
+import com.hoppingmall.order.shipping.exception.ShippingRecipientNotAllowedException
+import com.hoppingmall.order.shipping.exception.ShippingSelfOrderException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -35,6 +38,7 @@ class ShippingCommandServiceImpl(
 ) : ShippingCommandService {
 
     override fun createShipping(sellerId: Long, request: ShippingCreateRequest, isAdmin: Boolean): ShippingResponse {
+        orderRepository.lockById(request.orderId)
         val order = orderRepository.findByIdOrNull(request.orderId) ?: throw OrderNotFoundException()
 
         val orderItems = orderItemRepository.findByOrderId(request.orderId)
@@ -43,6 +47,9 @@ class ShippingCommandServiceImpl(
         }
         if (!isAdmin && orderItems.none { it.sellerId == sellerId }) {
             throw ShippingAccessDeniedException()
+        }
+        if (!isAdmin && order.buyerId == sellerId) {
+            throw ShippingSelfOrderException()
         }
 
         if (order.status != OrderStatus.PAID) {
@@ -65,7 +72,11 @@ class ShippingCommandServiceImpl(
             recipientAddress = recipient.address
         )
 
-        val savedShipping = shippingRepository.save(shipping)
+        val savedShipping = try {
+            shippingRepository.save(shipping).also { shippingRepository.flush() }
+        } catch (e: DataIntegrityViolationException) {
+            throw ShippingAlreadyExistsException()
+        }
         return ShippingResponse.from(savedShipping)
     }
 
@@ -82,6 +93,9 @@ class ShippingCommandServiceImpl(
 
         if (!isAdmin && !orderItemRepository.existsByOrderIdAndSellerId(shipping.orderId, sellerId)) {
             throw ShippingAccessDeniedException()
+        }
+        if (!isAdmin && order.buyerId == sellerId) {
+            throw ShippingSelfOrderException()
         }
 
         shipping.updateStatus(request.status)
@@ -148,12 +162,15 @@ class ShippingCommandServiceImpl(
     }
 
     private fun recipientOf(order: Order, request: ShippingCreateRequest): Recipient {
-        order.shippingAddress?.let {
-            return Recipient(it.recipientName, it.recipientPhone, it.toRecipientAddress())
-        }
         val name = request.recipientName?.trim()?.takeIf { it.isNotEmpty() }
         val phone = request.recipientPhone?.trim()?.takeIf { it.isNotEmpty() }
         val address = request.recipientAddress?.trim()?.takeIf { it.isNotEmpty() }
+        order.shippingAddress?.let {
+            if (name != null || phone != null || address != null) {
+                throw ShippingRecipientNotAllowedException()
+            }
+            return Recipient(it.recipientName, it.recipientPhone, it.toRecipientAddress())
+        }
         if (name == null || phone == null || address == null) {
             throw OrderShippingAddressRequiredException()
         }

@@ -9,8 +9,10 @@ import jakarta.persistence.*
 @Entity
 @Table(
     name = "shippings",
+    uniqueConstraints = [
+        UniqueConstraint(name = "uk_shippings_order_id", columnNames = ["orderId"])
+    ],
     indexes = [
-        Index(name = "idx_shippings_order_id", columnList = "orderId"),
         Index(name = "idx_shippings_buyer_id", columnList = "buyerId"),
         Index(name = "idx_shippings_tracking_number", columnList = "trackingNumber")
     ]

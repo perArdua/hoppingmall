@@ -32,6 +32,7 @@ import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
+import com.hoppingmall.order.shipping.exception.ShippingSelfOrderException
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
@@ -269,6 +270,9 @@ class OrderCommandServiceImpl(
 
         if (!isAdmin && !orderItemRepository.existsByOrderIdAndSellerId(orderId, userId)) {
             throw OrderAccessDeniedException()
+        }
+        if (!isAdmin && order.buyerId == userId) {
+            throw ShippingSelfOrderException()
         }
 
         if (request.status == OrderStatus.SHIPPED && orderRepository.isHeldBySagaTimeout(orderId)) {
