@@ -35,6 +35,10 @@ class Order private constructor(
     var deliveredAt: LocalDateTime? = null
         private set
 
+    @Embedded
+    var shippingAddress: OrderShippingAddress? = null
+        private set
+
     companion object {
         val MAX_TOTAL_AMOUNT: BigDecimal = BigDecimal("99999999.99")
 
@@ -57,12 +61,13 @@ class Order private constructor(
 
         fun create(
             buyerId: Long,
-            totalAmount: BigDecimal
+            totalAmount: BigDecimal,
+            shippingAddress: OrderShippingAddress? = null
         ): Order =
             Order(
                 buyerId = buyerId,
                 totalAmount = totalAmount
-            )
+            ).also { it.shippingAddress = shippingAddress }
     }
 
     fun updateStatus(newStatus: OrderStatus) {

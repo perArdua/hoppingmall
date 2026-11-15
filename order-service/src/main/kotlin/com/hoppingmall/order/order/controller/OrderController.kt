@@ -44,7 +44,7 @@ class OrderController(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable orderId: Long
     ): ResponseEntity<ApiResponse<OrderResponse>> {
-        val order = orderQueryService.getOrder(orderId, userPrincipal.getUserId())
+        val order = orderQueryService.getOrder(orderId, userPrincipal.getUserId(), userPrincipal.getRole() == "ADMIN")
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 

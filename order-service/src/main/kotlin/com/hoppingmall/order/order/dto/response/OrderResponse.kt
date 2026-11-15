@@ -12,7 +12,8 @@ data class OrderResponse(
     val status: OrderStatus,
     val totalAmount: BigDecimal,
     val items: List<OrderItemResponse>,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val shippingAddress: OrderShippingAddressResponse? = null
 ) {
     companion object {
         fun from(order: Order, orderItems: List<OrderItem>): OrderResponse {
@@ -22,7 +23,8 @@ data class OrderResponse(
                 status = order.status,
                 totalAmount = order.totalAmount,
                 items = orderItems.map { OrderItemResponse.from(it) },
-                createdAt = order.createdAt
+                createdAt = order.createdAt,
+                shippingAddress = order.shippingAddress?.let { OrderShippingAddressResponse.from(it) }
             )
         }
     }

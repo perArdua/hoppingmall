@@ -4,11 +4,13 @@ import org.springframework.data.repository.findByIdOrNull
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.order.common.NotificationType
 import com.hoppingmall.common.KafkaTopics
+import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
+import com.hoppingmall.order.order.exception.OrderShippingAddressRequiredException
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
@@ -38,6 +40,8 @@ class ShippingCommandServiceImpl(
             throw OrderInvalidStatusException()
         }
 
+        val recipient = recipientOf(order, request)
+
         if (shippingRepository.findByOrderId(request.orderId) != null) {
             throw ShippingAlreadyExistsException()
         }
@@ -52,9 +56,9 @@ class ShippingCommandServiceImpl(
             buyerId = order.buyerId,
             carrierName = request.carrierName,
             trackingNumber = request.trackingNumber,
-            recipientName = request.recipientName,
-            recipientPhone = request.recipientPhone,
-            recipientAddress = request.recipientAddress
+            recipientName = recipient.name,
+            recipientPhone = recipient.phone,
+            recipientAddress = recipient.address
         )
 
         val savedShipping = shippingRepository.save(shipping)
@@ -133,4 +137,19 @@ class ShippingCommandServiceImpl(
             partitionKey = shipping.buyerId.toString()
         )
     }
+
+    private fun recipientOf(order: Order, request: ShippingCreateRequest): Recipient {
+        order.shippingAddress?.let {
+            return Recipient(it.recipientName, it.recipientPhone, it.toRecipientAddress())
+        }
+        val name = request.recipientName?.trim()?.takeIf { it.isNotEmpty() }
+        val phone = request.recipientPhone?.trim()?.takeIf { it.isNotEmpty() }
+        val address = request.recipientAddress?.trim()?.takeIf { it.isNotEmpty() }
+        if (name == null || phone == null || address == null) {
+            throw OrderShippingAddressRequiredException()
+        }
+        return Recipient(name, phone, address)
+    }
+
+    private class Recipient(val name: String, val phone: String, val address: String)
 }
