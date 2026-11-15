@@ -7,6 +7,7 @@ import com.hoppingmall.order.order.dto.response.OrderResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.service.OrderCommandService
 import com.hoppingmall.order.order.service.OrderQueryService
+import com.hoppingmall.order.shipping.service.ShippingCommandService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -33,6 +34,9 @@ class OrderControllerTest {
 
     @Mock
     private lateinit var orderQueryService: OrderQueryService
+
+    @Mock
+    private lateinit var shippingCommandService: ShippingCommandService
 
     @InjectMocks
     private lateinit var controller: OrderController
@@ -110,7 +114,7 @@ class OrderControllerTest {
         val request = OrderStatusUpdateRequest(status = OrderStatus.SHIPPED)
         val response = createOrderResponse(status = OrderStatus.SHIPPED)
 
-        whenever(orderCommandService.updateOrderStatus(1L, request, 99L, true)).thenReturn(response)
+        whenever(shippingCommandService.updateStatusByOrder(99L, 1L, OrderStatus.SHIPPED, true)).thenReturn(response)
 
         val result = controller.updateOrderStatus(adminPrincipal, 1L, request)
 

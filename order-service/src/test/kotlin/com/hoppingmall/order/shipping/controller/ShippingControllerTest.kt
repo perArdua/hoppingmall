@@ -45,6 +45,7 @@ class ShippingControllerTest {
             orderId = 10L,
             buyerId = 1L,
             status = status,
+            attempt = 1,
             carrierName = "CJ대한통운",
             trackingNumber = "1234567890",
             recipientName = "홍길동",
