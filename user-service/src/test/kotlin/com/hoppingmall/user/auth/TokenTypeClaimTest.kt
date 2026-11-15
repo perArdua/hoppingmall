@@ -2,8 +2,10 @@ package com.hoppingmall.user.auth
 
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.domain.repository.RefreshTokenRepository
+import com.hoppingmall.user.auth.exception.RefreshTokenNotFoundException
 import com.hoppingmall.user.auth.exception.InvalidTokenException
 import com.hoppingmall.user.auth.service.AuthServiceImpl
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.auth.service.RefreshTokenServiceImpl
 import com.hoppingmall.user.common.enums.Role
 import com.hoppingmall.user.config.ratelimit.NoOpLoginAttemptLimiter
@@ -11,6 +13,7 @@ import com.hoppingmall.user.domain.User
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
 import com.hoppingmall.user.service.UserQueryService
+import com.hoppingmall.user.support.InMemoryUserSessions
 import com.hoppingmall.user.support.fixture.fixture
 import com.hoppingmall.user.support.withId
 import io.jsonwebtoken.Jwts
@@ -28,15 +31,14 @@ import org.mockito.Mock
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
-import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.data.redis.core.ValueOperations
+import java.time.Duration
+import java.time.Instant
 import java.util.Date
 import java.util.Optional
-import java.util.concurrent.TimeUnit
 
 @ExtendWith(MockitoExtension::class)
 @DisplayName("토큰 종류 클레임으로 access와 refresh 구분")
@@ -44,10 +46,7 @@ import java.util.concurrent.TimeUnit
 class TokenTypeClaimTest {
 
     @Mock
-    private lateinit var stringRedisTemplate: RedisTemplate<String, String>
-
-    @Mock
-    private lateinit var valueOperations: ValueOperations<String, String>
+    private lateinit var legacyRefreshTokenRepository: RefreshTokenRepository
 
     @Mock
     private lateinit var userRepository: UserRepository
@@ -60,7 +59,7 @@ class TokenTypeClaimTest {
 
     private val secret = "test-secret-key-that-is-at-least-32-bytes-long-for-hs256"
 
-    private val redisStore = mutableMapOf<String, String>()
+    private val sessions = InMemoryUserSessions()
 
     private lateinit var tokenProvider: TokenProviderImpl
 
@@ -79,27 +78,29 @@ class TokenTypeClaimTest {
         authService = AuthServiceImpl(
             userQueryService = userQueryService,
             tokenProvider = tokenProvider,
-            refreshTokenService = RefreshTokenServiceImpl(RefreshTokenRepository(stringRedisTemplate)),
-            jwtProperties = jwtProperties,
+            refreshTokenService = RefreshTokenServiceImpl(
+                userSessionRepository = sessions.repository,
+                userRepository = userRepository,
+                legacyRefreshTokenRepository = legacyRefreshTokenRepository,
+                tokenProvider = tokenProvider,
+                jwtProperties = jwtProperties,
+                sessionProperties = SessionProperties()
+            ),
             userRepository = userRepository,
             accessTokenBlacklistRepository = accessTokenBlacklistRepository,
-            loginAttemptLimiter = NoOpLoginAttemptLimiter()
+            loginAttemptLimiter = NoOpLoginAttemptLimiter(),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         user = User.fixture().withId(1L)
 
-        lenient().`when`(stringRedisTemplate.opsForValue()).thenReturn(valueOperations)
-        lenient().doAnswer { redisStore.put(it.getArgument(0), it.getArgument(1)) }
-            .`when`(valueOperations).set(any(), any(), any<Long>(), any<TimeUnit>())
-        lenient().`when`(valueOperations.get(any())).thenAnswer { redisStore[it.getArgument(0)] }
-        lenient().`when`(stringRedisTemplate.delete(any<String>()))
-            .thenAnswer { redisStore.remove(it.getArgument<String>(0)) != null }
         lenient().`when`(userRepository.findById(1L)).thenReturn(Optional.of(user))
+        lenient().`when`(userRepository.findForUpdateById(1L)).thenReturn(user)
     }
 
     @Test
     fun access_token에는_typ_access가_refresh_token에는_typ_refresh가_들어간다() {
-        val accessToken = tokenProvider.generateAccessToken(1L, Role.BUYER)
-        val refreshToken = tokenProvider.generateRefreshToken(1L)
+        val accessToken = tokenProvider.generateAccessToken(1L, Role.BUYER, SESSION_ID)
+        val refreshToken = tokenProvider.generateRefreshToken(1L, SESSION_ID, 1L, ISSUED_AT, EXPIRES_AT)
 
         assertThat(tokenProvider.parseClaims(accessToken)["typ"]).isEqualTo("access")
         assertThat(tokenProvider.parseClaims(refreshToken)["typ"]).isEqualTo("refresh")
@@ -107,15 +108,15 @@ class TokenTypeClaimTest {
 
     @Test
     fun access_token을_refresh_token으로_파싱하면_거절된다() {
-        val accessToken = tokenProvider.generateAccessToken(1L, Role.BUYER)
+        val accessToken = tokenProvider.generateAccessToken(1L, Role.BUYER, SESSION_ID)
 
-        assertThatThrownBy { tokenProvider.parseRefreshToken(accessToken) }
+        assertThatThrownBy { tokenProvider.parseRefreshClaims(accessToken) }
             .isInstanceOf(InvalidTokenException::class.java)
     }
 
     @Test
     fun refresh_token을_access_token으로_파싱하면_거절된다() {
-        val refreshToken = tokenProvider.generateRefreshToken(1L)
+        val refreshToken = tokenProvider.generateRefreshToken(1L, SESSION_ID, 1L, ISSUED_AT, EXPIRES_AT)
 
         assertThatThrownBy { tokenProvider.parseAccessToken(refreshToken) }
             .isInstanceOf(InvalidTokenException::class.java)
@@ -127,7 +128,7 @@ class TokenTypeClaimTest {
 
         assertThatThrownBy { tokenProvider.parseAccessToken(token) }
             .isInstanceOf(InvalidTokenException::class.java)
-        assertThatThrownBy { tokenProvider.parseRefreshToken(token) }
+        assertThatThrownBy { tokenProvider.parseRefreshClaims(token) }
             .isInstanceOf(InvalidTokenException::class.java)
     }
 
@@ -137,7 +138,8 @@ class TokenTypeClaimTest {
 
         assertThatThrownBy { authService.refreshAccessToken(signIn.accessToken) }
             .isInstanceOf(InvalidTokenException::class.java)
-        assertThat(redisStore.values).containsExactly(signIn.refreshToken)
+        assertThat(sessions.sessions.single().generation).isEqualTo(1L)
+        assertThat(authService.refreshAccessToken(signIn.refreshToken).refreshToken).isNotBlank()
     }
 
     @Test
@@ -148,7 +150,7 @@ class TokenTypeClaimTest {
 
         assertThat(tokenProvider.parseClaims(response.accessToken)["typ"]).isEqualTo("access")
         assertThat(tokenProvider.parseClaims(response.refreshToken)["typ"]).isEqualTo("refresh")
-        assertThat(redisStore.values).containsExactly(response.refreshToken)
+        assertThat(sessions.sessions.single().generation).isEqualTo(2L)
     }
 
     @Test
@@ -158,24 +160,25 @@ class TokenTypeClaimTest {
         assertThatThrownBy { authService.logout(signIn.refreshToken) }
             .isInstanceOf(InvalidTokenException::class.java)
         verify(accessTokenBlacklistRepository, never()).add(any(), any())
-        assertThat(redisStore.values).containsExactly(signIn.refreshToken)
+        assertThat(sessions.sessions.single().revokedAt).isNull()
     }
 
     @Test
-    fun access_token으로_로그아웃하면_블랙리스트에_올리고_refresh_token을_지운다() {
+    fun access_token으로_로그아웃하면_블랙리스트에_올리고_그_세션을_끊는다() {
         val signIn = login()
 
         authService.logout(signIn.accessToken)
 
         verify(accessTokenBlacklistRepository).add(any(), any())
-        assertThat(redisStore).isEmpty()
+        assertThatThrownBy { authService.refreshAccessToken(signIn.refreshToken) }
+            .isInstanceOf(RefreshTokenNotFoundException::class.java)
     }
 
     @Test
     fun typ이_없는_옛_refresh_token은_role이_없으므로_refresh로_받는다() {
         val legacyRefresh = signedToken(typ = null, role = null)
 
-        assertThat(tokenProvider.parseRefreshToken(legacyRefresh)).isEqualTo(1L)
+        assertThat(tokenProvider.parseRefreshClaims(legacyRefresh).userId).isEqualTo(1L)
         assertThatThrownBy { tokenProvider.parseAccessToken(legacyRefresh) }
             .isInstanceOf(InvalidTokenException::class.java)
     }
@@ -184,7 +187,7 @@ class TokenTypeClaimTest {
     fun typ이_없는_옛_access_token은_role이_있으므로_refresh로_받지_않는다() {
         val legacyAccess = signedToken(typ = null, role = Role.BUYER.name)
 
-        assertThatThrownBy { tokenProvider.parseRefreshToken(legacyAccess) }
+        assertThatThrownBy { tokenProvider.parseRefreshClaims(legacyAccess) }
             .isInstanceOf(InvalidTokenException::class.java)
         assertThat(tokenProvider.parseAccessToken(legacyAccess)).isEqualTo(1L)
     }
@@ -192,11 +195,12 @@ class TokenTypeClaimTest {
     @Test
     fun typ이_없는_옛_refresh_token으로도_재발급할_수_있다() {
         val legacyRefresh = signedToken(typ = null, role = null)
-        redisStore["refreshToken:1"] = legacyRefresh
+        whenever(legacyRefreshTokenRepository.findByUserId(1L)).thenReturn(legacyRefresh)
 
         val response = authService.refreshAccessToken(legacyRefresh)
 
         assertThat(tokenProvider.parseClaims(response.refreshToken)["typ"]).isEqualTo("refresh")
+        verify(legacyRefreshTokenRepository).deleteByUserId(1L)
     }
 
     private fun login() = SignInRequest(email = "user@example.com", password = "Password1234").let { request ->
@@ -215,5 +219,11 @@ class TokenTypeClaimTest {
         return builder
             .signWith(Keys.hmacShaKeyFor(secret.toByteArray()), SignatureAlgorithm.HS256)
             .compact()
+    }
+
+    companion object {
+        private const val SESSION_ID = "11111111-1111-1111-1111-111111111111"
+        private val ISSUED_AT: Instant = Instant.ofEpochSecond(Instant.now().epochSecond)
+        private val EXPIRES_AT: Instant = ISSUED_AT.plus(Duration.ofDays(1))
     }
 }

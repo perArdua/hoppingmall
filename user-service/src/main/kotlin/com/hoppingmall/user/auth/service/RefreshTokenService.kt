@@ -1,12 +1,14 @@
 package com.hoppingmall.user.auth.service
 
-import com.hoppingmall.user.auth.domain.RefreshToken
+import com.hoppingmall.user.auth.domain.SessionRevokeReason
 
 interface RefreshTokenService {
 
-    fun rotateRefreshToken(userId: Long, newToken: String, ttl: Long): RefreshToken
+    fun issue(userId: Long): IssuedRefreshToken
 
-    fun validate(userId: Long, presentedToken: String)
+    fun rotate(presentedToken: String): IssuedRefreshToken
 
-    fun delete(userId: Long)
+    fun revokeSession(userId: Long, sessionId: String?)
+
+    fun revokeAll(userId: Long, reason: SessionRevokeReason)
 }

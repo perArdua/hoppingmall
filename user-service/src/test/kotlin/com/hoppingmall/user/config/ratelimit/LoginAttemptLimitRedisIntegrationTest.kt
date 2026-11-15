@@ -6,7 +6,7 @@ import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProviderImpl
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.service.AuthServiceImpl
-import com.hoppingmall.user.auth.service.RefreshTokenService
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
 import com.hoppingmall.user.common.vo.PasswordVerifier
@@ -18,6 +18,7 @@ import com.hoppingmall.user.service.UserQueryServiceImpl
 import com.hoppingmall.user.support.InMemoryRateLimitBuckets
 import com.hoppingmall.user.support.RedisContainerSupport
 import com.hoppingmall.user.support.fixture.fixture
+import com.hoppingmall.user.support.issuingRefreshTokenService
 import com.hoppingmall.user.support.withId
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterAll
@@ -72,11 +73,11 @@ class LoginAttemptLimitRedisIntegrationTest {
         val authService = AuthServiceImpl(
             userQueryService = UserQueryServiceImpl(userRepository, PasswordVerifier(passwordEncoder)),
             tokenProvider = TokenProviderImpl(jwtProperties),
-            refreshTokenService = mock<RefreshTokenService>(),
-            jwtProperties = jwtProperties,
+            refreshTokenService = issuingRefreshTokenService(),
             userRepository = userRepository,
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
-            loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, clock)
+            loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, clock),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         val controller = UserController(mock<UserCommandService>(), mock(), authService, ClientIpResolver())
 

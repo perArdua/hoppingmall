@@ -9,5 +9,7 @@ interface AuthService {
 
     fun refreshAccessToken(refreshToken: String): TokenRefreshResponse
 
-    fun logout(accessToken: String)
+    fun logout(accessToken: String?, refreshToken: String? = null)
+
+    fun logoutAll(userId: Long, accessToken: String?)
 }

@@ -29,7 +29,7 @@ class SecurityConfig(
     ) {
         auth
             .requestMatchers("/api/v1/users/signup", "/api/v1/users/login").permitAll()
-            .requestMatchers("/api/v1/auth/refresh").permitAll()
+            .requestMatchers("/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
     }
 
