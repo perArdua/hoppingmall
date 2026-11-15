@@ -4,6 +4,7 @@ import com.hoppingmall.user.auth.exception.InvalidTokenException
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.user.common.enums.Role
 import io.jsonwebtoken.Claims
+import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
 import io.jsonwebtoken.security.Keys
@@ -52,8 +53,26 @@ class TokenProviderImpl(
     override fun parseAccessToken(token: String): Long =
         requireType(parseClaims(token), ACCESS_TYPE).subject.toLong()
 
-    override fun parseRefreshClaims(token: String): RefreshTokenClaims {
-        val claims = requireType(parseClaims(token), REFRESH_TYPE)
+    override fun parseRefreshClaims(token: String): RefreshTokenClaims =
+        refreshTokenClaims(parseClaims(token))
+
+    override fun parseRefreshClaimsAllowingExpired(token: String): RefreshTokenClaims {
+        val claims = try {
+            Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .body
+        } catch (ex: ExpiredJwtException) {
+            ex.claims
+        } catch (ex: Exception) {
+            throw InvalidTokenException()
+        }
+        return refreshTokenClaims(claims)
+    }
+
+    private fun refreshTokenClaims(claims: Claims): RefreshTokenClaims {
+        requireType(claims, REFRESH_TYPE)
         return RefreshTokenClaims(
             userId = claims.subject.toLong(),
             sessionId = claims[SESSION_CLAIM] as? String,

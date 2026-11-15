@@ -11,6 +11,7 @@ interface TokenProvider {
 
     fun parseAccessToken(token: String): Long
     fun parseRefreshClaims(token: String): RefreshTokenClaims
+    fun parseRefreshClaimsAllowingExpired(token: String): RefreshTokenClaims
 
     fun getSessionId(token: String): String?
 

@@ -4,6 +4,7 @@ import org.springframework.data.repository.findByIdOrNull
 import com.hoppingmall.user.auth.TokenProvider
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
+import com.hoppingmall.user.auth.exception.InvalidTokenException
 import com.hoppingmall.user.config.ratelimit.LoginAttemptLimiter
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SignInRequest
@@ -58,11 +59,18 @@ class AuthServiceImpl(
         )
     }
 
-    override fun logout(accessToken: String) {
-        val userId = tokenProvider.parseAccessToken(accessToken)
-        val sessionId = tokenProvider.getSessionId(accessToken)
-        val remainingMs = tokenProvider.getRemainingExpirationMs(accessToken)
-        accessTokenBlacklistRepository.add(accessToken, remainingMs)
+    override fun logout(accessToken: String?, refreshToken: String?) {
+        val validAccessToken = accessToken?.takeIf { runCatching { tokenProvider.parseAccessToken(it) }.isSuccess }
+        val refreshClaims = refreshToken?.let { tokenProvider.parseRefreshClaimsAllowingExpired(it) }
+
+        validAccessToken?.let {
+            accessTokenBlacklistRepository.add(it, tokenProvider.getRemainingExpirationMs(it))
+        }
+        val (userId, sessionId) = when {
+            refreshClaims != null -> refreshClaims.userId to refreshClaims.sessionId
+            validAccessToken != null -> tokenProvider.parseAccessToken(validAccessToken) to tokenProvider.getSessionId(validAccessToken)
+            else -> throw InvalidTokenException()
+        }
         refreshTokenService.revokeSession(userId, sessionId)
         log.info("로그아웃: userId={}, sessionId={}", userId, sessionId)
     }

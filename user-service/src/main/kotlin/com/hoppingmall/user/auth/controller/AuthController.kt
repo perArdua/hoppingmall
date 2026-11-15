@@ -1,10 +1,12 @@
 package com.hoppingmall.user.auth.controller
 
+import com.hoppingmall.user.auth.dto.LogoutRequest
 import com.hoppingmall.user.auth.dto.TokenRefreshRequest
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
 import com.hoppingmall.user.auth.service.AuthService
 import com.hoppingmall.common.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
@@ -26,10 +28,11 @@ class AuthController(
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun logout(
-        @RequestHeader("Authorization") bearer: String
+        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) bearer: String?,
+        @RequestBody(required = false) request: LogoutRequest?
     ): ApiResponse<Unit> {
-        val accessToken = bearer.removePrefix("Bearer ").trim()
-        authService.logout(accessToken)
+        val accessToken = bearer?.removePrefix("Bearer ")?.trim()?.takeIf { it.isNotEmpty() }
+        authService.logout(accessToken, request?.refreshToken)
         return ApiResponse.success(Unit)
     }
 }
