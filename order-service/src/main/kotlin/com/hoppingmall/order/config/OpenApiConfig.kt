@@ -17,11 +17,14 @@ import io.swagger.v3.oas.models.responses.ApiResponse
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springdoc.core.customizers.OperationCustomizer
 import org.springdoc.core.properties.SpringDocConfigProperties
+import org.springdoc.core.utils.Constants
 import org.springdoc.core.utils.SpringDocUtils
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
+@ConditionalOnProperty(name = [Constants.SPRINGDOC_ENABLED], matchIfMissing = true)
 class OpenApiConfig {
     init {
         SpringDocUtils.getConfig().addRequestWrapperToIgnore(UserPrincipal::class.java)
