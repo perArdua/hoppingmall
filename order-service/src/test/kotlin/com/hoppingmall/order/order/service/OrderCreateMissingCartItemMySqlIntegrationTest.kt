@@ -2,18 +2,11 @@ package com.hoppingmall.order.order.service
 
 import com.hoppingmall.order.cartItem.dto.request.CartItemCreateRequest
 import com.hoppingmall.order.cartItem.service.CartItemCommandServiceImpl
-import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
-import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
-import com.hoppingmall.order.port.ProductQueryPort
-import com.hoppingmall.order.support.MySqlJpaTestSupport
-import com.hoppingmall.outbox.service.TransactionalEventPublisher
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -26,43 +19,18 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.transaction.PlatformTransactionManager
-import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 
 @DisplayName("주문 생성의 찾을 수 없는 장바구니 id MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(
-    CartItemCommandServiceImpl::class,
-    OrderCommandServiceImpl::class,
-    ReservationFence::class,
-    OrderMetrics::class,
-    OrderCreateMissingCartItemMySqlIntegrationTest.TestConfig::class
-)
-class OrderCreateMissingCartItemMySqlIntegrationTest : MySqlJpaTestSupport() {
+class OrderCreateMissingCartItemMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var cartItemCommandService: CartItemCommandServiceImpl
 
     @Autowired
     private lateinit var orderCommandService: OrderCommandServiceImpl
-
-    @MockitoBean
-    private lateinit var productQueryPort: ProductQueryPort
-
-    @MockitoBean
-    private lateinit var inventoryCommandPort: InventoryCommandPort
-
-    @MockitoBean
-    private lateinit var paymentCommandPort: PaymentCommandPort
-
-    @MockitoBean
-    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
 
     @BeforeEach
     fun setUp() {
@@ -141,16 +109,6 @@ class OrderCreateMissingCartItemMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     private fun liveCartItemIds(): List<Long> =
         jdbcTemplate.queryForList("SELECT id FROM cart_items WHERE deleted_at IS NULL ORDER BY id", Long::class.java)
-
-    @TestConfiguration(proxyBeanMethods = false)
-    class TestConfig {
-        @Bean
-        fun transactionTemplate(transactionManager: PlatformTransactionManager): TransactionTemplate =
-            TransactionTemplate(transactionManager)
-
-        @Bean
-        fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
-    }
 
     companion object {
         private const val BUYER_ID = 10L

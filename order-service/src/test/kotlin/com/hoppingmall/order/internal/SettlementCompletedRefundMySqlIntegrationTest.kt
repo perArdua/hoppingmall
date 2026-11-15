@@ -11,7 +11,7 @@ import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
-import com.hoppingmall.order.support.MySqlJpaTestSupport
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -19,14 +19,12 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Import
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @DisplayName("정산용 완료 환불 조회 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(InternalOrderController::class)
-class SettlementCompletedRefundMySqlIntegrationTest : MySqlJpaTestSupport() {
+class SettlementCompletedRefundMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var internalOrderController: InternalOrderController

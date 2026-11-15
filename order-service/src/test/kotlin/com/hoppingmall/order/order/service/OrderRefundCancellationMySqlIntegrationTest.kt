@@ -2,21 +2,16 @@ package com.hoppingmall.order.order.service
 
 import com.hoppingmall.common.BusinessException
 import com.hoppingmall.common.GlobalExceptionHandler
-import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.internal.InternalOrderController
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
-import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.PaymentCommandPort
-import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.refund.domain.Refund
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundReason
-import com.hoppingmall.order.support.MySqlJpaTestSupport
-import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -29,9 +24,7 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -39,8 +32,7 @@ import java.math.BigDecimal
 
 @DisplayName("환불된 주문의 취소와 끝 상태 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(OrderCommandServiceImpl::class, InternalOrderController::class)
-class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
+class OrderRefundCancellationMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var orderCommandService: OrderCommandServiceImpl
@@ -56,21 +48,6 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     @Autowired
     private lateinit var refundRepository: RefundRepository
-
-    @MockitoBean
-    private lateinit var inventoryCommandPort: InventoryCommandPort
-
-    @MockitoBean
-    private lateinit var paymentCommandPort: PaymentCommandPort
-
-    @MockitoBean
-    private lateinit var productQueryPort: ProductQueryPort
-
-    @MockitoBean
-    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
-
-    @MockitoBean
-    private lateinit var orderMetrics: OrderMetrics
 
     private lateinit var mockMvc: MockMvc
 
