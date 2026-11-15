@@ -52,6 +52,9 @@ class RateLimitGlobalFilter(
         private const val REDIS_FAILURE_METRIC = "gateway.ratelimit.redis.failures"
         private const val X_FORWARDED_FOR = "X-Forwarded-For"
         private const val MAX_KEYED_BODY_BYTES = 8 * 1024
+        private const val TOKEN_TRANSPORT_HEADER = "X-Token-Transport"
+        private const val COOKIE_TRANSPORT = "cookie"
+        private const val REFRESH_TOKEN_COOKIE = "hm_rt"
 
         private val GLOBAL_FALLBACK = RateLimitPolicy(
             id = "global",
@@ -101,10 +104,16 @@ class RateLimitGlobalFilter(
                     return@flatMap GatewayErrorResponse.PAYLOAD_TOO_LARGE.write(exchange)
                 }
                 val bytes = body.get()
-                val userId = refreshTokenKeyResolver?.userId(bytes)
+                val userId = refreshTokenKeyResolver?.userId(bytes, cookieRefreshToken(exchange))
                 val key = if (userId != null) "user:$userId" else "ip:${resolveClientIp(exchange) ?: "anonymous"}"
                 checkLimit(exchange.mutate().request(withBody(exchange, bytes)).build(), chain, policy, key)
             }
+
+    private fun cookieRefreshToken(exchange: ServerWebExchange): String? {
+        val transport = exchange.request.headers.getFirst(TOKEN_TRANSPORT_HEADER)?.trim()
+        if (!transport.equals(COOKIE_TRANSPORT, ignoreCase = true)) return null
+        return exchange.request.cookies.getFirst(REFRESH_TOKEN_COOKIE)?.value
+    }
 
     private fun withBody(exchange: ServerWebExchange, bytes: ByteArray): ServerHttpRequest =
         object : ServerHttpRequestDecorator(exchange.request) {
