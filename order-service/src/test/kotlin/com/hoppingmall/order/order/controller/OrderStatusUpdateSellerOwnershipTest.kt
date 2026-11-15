@@ -12,6 +12,7 @@ import com.hoppingmall.order.order.service.OrderQueryService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.order.shipping.domain.Shipping
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
+import com.hoppingmall.order.shipping.exception.ShippingSelfOrderException
 import com.hoppingmall.order.shipping.service.ShippingCommandServiceImpl
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
@@ -84,6 +85,23 @@ class OrderStatusUpdateSellerOwnershipTest {
         changeStatus(ADMIN_ID, "ADMIN", OrderStatus.SHIPPED)
 
         assertThat(order.status).isEqualTo(OrderStatus.SHIPPED)
+    }
+
+    @Test
+    fun 자기_상품을_산_판매자가_자기_주문을_DELIVERED로_바꾸면_거절하고_주문이_그대로다() {
+        val order = Order.create(buyerId = SELLER_ID, totalAmount = BigDecimal("50000"))
+        ReflectionTestUtils.setField(order, "id", ORDER_ID)
+        order.updateStatus(OrderStatus.PAYING)
+        order.updateStatus(OrderStatus.PAID)
+        order.updateStatus(OrderStatus.SHIPPED)
+        whenever(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order))
+        whenever(orderItemRepository.existsByOrderIdAndSellerId(ORDER_ID, SELLER_ID)).thenReturn(true)
+
+        assertThatThrownBy { changeStatus(SELLER_ID, "SELLER", OrderStatus.DELIVERED) }
+            .isInstanceOf(ShippingSelfOrderException::class.java)
+
+        assertThat(order.status).isEqualTo(OrderStatus.SHIPPED)
+        assertThat(order.deliveredAt).isNull()
     }
 
     private fun changeStatus(userId: Long, role: String, target: OrderStatus) =

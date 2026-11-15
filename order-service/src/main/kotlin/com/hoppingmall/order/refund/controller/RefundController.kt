@@ -5,6 +5,7 @@ import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
+import com.hoppingmall.order.refund.dto.response.OrderRefundsResponse
 import com.hoppingmall.order.refund.dto.response.RefundResponse
 import com.hoppingmall.order.refund.service.RefundCommandService
 import com.hoppingmall.order.refund.service.RefundQueryService
@@ -52,6 +53,14 @@ class RefundController(
         val buyerId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
         return ApiResponse.success(refundQueryService.getMyRefunds(buyerId, pageable))
+    }
+
+    @GetMapping("/orders/{orderId}")
+    fun getOrderRefunds(
+        @PathVariable orderId: Long,
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ApiResponse<OrderRefundsResponse> {
+        return ApiResponse.success(refundQueryService.getOrderRefunds(orderId, principal.getUserId()))
     }
 
     @GetMapping("/seller")

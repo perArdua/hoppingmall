@@ -33,6 +33,23 @@ interface RefundItemRepository : JpaRepository<RefundItem, Long> {
 
     @Query(
         value = """
+            SELECT ri.order_item_id AS orderItemId,
+                   r.status AS status,
+                   COALESCE(SUM(ri.quantity), 0) AS quantity
+            FROM refund_items ri
+            JOIN refunds r ON ri.refund_id = r.id
+            WHERE r.order_id = :orderId
+              AND r.status <> 'REJECTED'
+              AND ri.deleted_at IS NULL
+              AND r.deleted_at IS NULL
+            GROUP BY ri.order_item_id, r.status
+        """,
+        nativeQuery = true
+    )
+    fun findRefundQuantitiesByStatus(@Param("orderId") orderId: Long): List<RefundStatusQuantityProjection>
+
+    @Query(
+        value = """
             SELECT ri.product_id AS productId,
                    SUM(ri.quantity) AS totalQuantity,
                    SUM(ri.refund_price) AS totalAmount
@@ -88,4 +105,10 @@ interface RefundedQuantityProjection {
     val orderItemId: Long
     val totalRefundedQuantity: Long
     val totalRefundedAmount: BigDecimal
+}
+
+interface RefundStatusQuantityProjection {
+    val orderItemId: Long
+    val status: String
+    val quantity: Long
 }
