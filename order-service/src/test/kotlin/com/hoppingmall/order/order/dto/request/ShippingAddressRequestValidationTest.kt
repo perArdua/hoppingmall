@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.math.BigDecimal
 
 @DisplayName("주문 생성 요청의 배송지 검증")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -18,14 +19,14 @@ class ShippingAddressRequestValidationTest {
 
     @Test
     fun 배송지가_없는_주문_생성_요청은_검증에_실패한다() {
-        val violations = validator.validate(OrderCreateRequest(cartItemIds = listOf(1L)))
+        val violations = validator.validate(OrderCreateRequest(cartItemIds = listOf(1L), expectedPrices = expectedPrices()))
 
         assertThat(violations.map { it.propertyPath.toString() }).containsExactly("shippingAddress")
     }
 
     @Test
     fun 상세_주소와_배송_메모_없이도_배송지가_있으면_통과한다() {
-        val violations = validator.validate(OrderCreateRequest(cartItemIds = listOf(1L), shippingAddress = address()))
+        val violations = validator.validate(OrderCreateRequest(cartItemIds = listOf(1L), shippingAddress = address(), expectedPrices = expectedPrices()))
 
         assertThat(violations).isEmpty()
     }
@@ -102,4 +103,6 @@ class ShippingAddressRequestValidationTest {
         recipientName = recipientName, recipientPhone = recipientPhone, zipCode = zipCode,
         address = address, addressDetail = addressDetail, deliveryMemo = deliveryMemo
     )
+
+    private fun expectedPrices() = listOf(OrderExpectedPriceRequest(cartItemId = 1L, productPrice = BigDecimal("10000")))
 }

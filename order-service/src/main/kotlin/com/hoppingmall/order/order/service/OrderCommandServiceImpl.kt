@@ -8,6 +8,7 @@ import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
+import com.hoppingmall.order.order.dto.response.OrderPriceChange
 import com.hoppingmall.order.order.dto.response.OrderResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
@@ -17,6 +18,7 @@ import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderPartiallyRefundedException
+import com.hoppingmall.order.order.exception.OrderPriceChangedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
@@ -36,6 +38,7 @@ import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.client.HttpClientErrorException
@@ -62,6 +65,9 @@ class OrderCommandServiceImpl(
     @Autowired(required = false)
     var reservationFence: ReservationFence? = null
 
+    @Value("\${order.timeout.paying-minutes:15}")
+    private var payingTimeoutMinutes: Long = 15
+
     override fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse {
         val cartItems = cartItemRepository.findAllById(request.cartItemIds)
 
@@ -83,7 +89,12 @@ class OrderCommandServiceImpl(
             throw OrderSelfPurchaseException()
         }
 
-        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
+        val priceChanges = priceChanges(cartItems, productMap, request)
+        if (priceChanges.isNotEmpty()) {
+            throw OrderPriceChangedException(priceChanges)
+        }
+
+        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(productMap.getValue(it.productId).price.multiply(BigDecimal(it.quantity))) }
         if (totalAmount > Order.MAX_TOTAL_AMOUNT) {
             throw OrderTotalAmountExceededException()
         }
@@ -125,12 +136,13 @@ class OrderCommandServiceImpl(
             )
 
             val orderItems = cartItems.map { cartItem ->
+                val product = productMap.getValue(cartItem.productId)
                 OrderItem.create(
                     orderId = order.id!!,
-                    sellerId = productMap[cartItem.productId]!!.sellerId,
+                    sellerId = product.sellerId,
                     productId = cartItem.productId,
-                    productName = cartItem.productName,
-                    productPrice = cartItem.productPrice,
+                    productName = product.name,
+                    productPrice = product.price,
                     quantity = cartItem.quantity,
                     reservationId = reservationMap[cartItem.productId]
                 )
@@ -141,8 +153,27 @@ class OrderCommandServiceImpl(
             cartItemRepository.deleteAllById(request.cartItemIds)
 
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
-            OrderResponse.from(order, savedOrderItems)
+            OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
         }!!
+
+    private fun priceChanges(
+        cartItems: List<CartItem>,
+        productMap: Map<Long, ProductInfo>,
+        request: OrderCreateRequest
+    ): List<OrderPriceChange> {
+        val expectedPrices = request.expectedPrices.associate { it.cartItemId to it.productPrice }
+        return cartItems.mapNotNull { cartItem ->
+            val expectedPrice = expectedPrices[cartItem.id] ?: return@mapNotNull null
+            val currentPrice = productMap.getValue(cartItem.productId).price
+            if (expectedPrice.compareTo(currentPrice) == 0) return@mapNotNull null
+            OrderPriceChange(
+                cartItemId = cartItem.id!!,
+                productId = cartItem.productId,
+                expectedPrice = expectedPrice,
+                currentPrice = currentPrice
+            )
+        }
+    }
 
     private fun findProducts(productIds: List<Long>): List<ProductInfo> =
         try {

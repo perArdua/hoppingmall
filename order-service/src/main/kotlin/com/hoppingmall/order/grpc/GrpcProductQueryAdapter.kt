@@ -35,7 +35,9 @@ class GrpcProductQueryAdapter(
             name = response.name,
             price = response.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
             sellerId = response.sellerId,
-            imageUrl = response.imageUrl.takeIf { it.isNotBlank() }
+            imageUrl = response.imageUrl.takeIf { it.isNotBlank() },
+            status = response.status.takeIf { it.isNotBlank() },
+            stockQuantity = response.stockQuantity.takeIf { response.status.isNotBlank() }
         )
     }
 
@@ -45,12 +47,14 @@ class GrpcProductQueryAdapter(
         val response = stub.findProductsByIds(
             ProductIdsRequest.newBuilder().addAllProductIds(productIds).build()
         )
-        return response.productsList.map {
+        return response.productsList.map { product ->
             ProductInfo(
-                id = it.id,
-                name = it.name,
-                price = it.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                sellerId = it.sellerId
+                id = product.id,
+                name = product.name,
+                price = product.price.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                sellerId = product.sellerId,
+                status = product.status.takeIf { it.isNotBlank() },
+                stockQuantity = product.stockQuantity.takeIf { product.status.isNotBlank() }
             )
         }
     }
