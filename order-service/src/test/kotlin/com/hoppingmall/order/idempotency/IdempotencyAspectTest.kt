@@ -108,7 +108,7 @@ class IdempotencyAspectTest {
                 responseBody = objectMapper.writeValueAsString(responseBody),
                 expiresAt = LocalDateTime.now().plusHours(24)
             )
-            whenever(idempotencyService.save(any(), any(), any(), any(), any(), any()))
+            whenever(idempotencyService.save(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(savedRecord)
 
             val result = aspect.handleIdempotency(joinPoint, idempotent)
@@ -117,7 +117,7 @@ class IdempotencyAspectTest {
             val response = result as ResponseEntity<*>
             assertEquals(200, response.statusCode.value())
             verify(joinPoint).proceed()
-            verify(idempotencyService).save(any(), eq("POST"), eq("/api/v1/payments"), eq(200), any(), eq(24))
+            verify(idempotencyService).save(any(), eq("POST"), eq("/api/v1/payments"), eq(200), any(), any(), eq(24))
             verify(lock).unlock()
         }
 
@@ -179,7 +179,7 @@ class IdempotencyAspectTest {
             assertThrows<RuntimeException> {
                 aspect.handleIdempotency(joinPoint, idempotent)
             }
-            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any())
+            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any(), any())
             verify(lock).unlock()
         }
     }

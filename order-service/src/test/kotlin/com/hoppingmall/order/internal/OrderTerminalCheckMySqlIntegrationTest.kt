@@ -95,7 +95,7 @@ class OrderTerminalCheckMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     private fun terminalCheck(reservationIds: List<String>): List<String> =
-        InternalOrderController(orderRepository, orderItemRepository, mock(), mock())
+        InternalOrderController(orderRepository, orderItemRepository, mock(), mock(), mock())
             .terminalCheck(InternalOrderController.TerminalCheckRequest(reservationIds))
             .body!!.data!!.terminalReservationIds
 

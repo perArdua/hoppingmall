@@ -5,6 +5,9 @@ import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import com.hoppingmall.product.common.enums.ProductStatus
 import com.hoppingmall.product.common.file.FileUploadConfig
+import com.hoppingmall.product.inventory.domain.Inventory
+import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
+import com.hoppingmall.product.inventory.service.InventoryCommandService
 import com.hoppingmall.product.product.domain.Product
 import com.hoppingmall.product.product.domain.ProductImage
 import com.hoppingmall.product.product.domain.repository.ProductImageRepository
@@ -44,6 +47,12 @@ class ProductCommandServiceImplTest {
 
     @Mock
     private lateinit var fileUploadConfig: FileUploadConfig
+
+    @Mock
+    private lateinit var inventoryCommandService: InventoryCommandService
+
+    @Mock
+    private lateinit var inventoryRepository: InventoryRepository
 
     @InjectMocks
     private lateinit var service: ProductCommandServiceImpl
@@ -123,12 +132,12 @@ class ProductCommandServiceImplTest {
         whenever(productRepository.findById(1L)).thenReturn(Optional.of(product))
         whenever(productRepository.save(any<Product>())).thenReturn(product)
         whenever(productImageRepository.findByProductIdOrderBySortOrder(1L)).thenReturn(listOf(image))
-        whenever(fileUploadConfig.defaultImagePath).thenReturn("/default.jpg")
-        whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenReturn(listOf(image))
 
         val result = service.updateProduct(1L, request)
 
         assertThat(result.name).isEqualTo("수정상품")
+        assertThat(result.imageUrls).containsExactly("/default.jpg")
+        assertThat(image.deletedAt).isNull()
     }
 
     @Test
@@ -168,12 +177,15 @@ class ProductCommandServiceImplTest {
         val image = ProductImage.create(productId = 1L, imageUrl = "/img.jpg", sortOrder = 0).withId(1L)
 
         whenever(productRepository.findById(1L)).thenReturn(Optional.of(product))
+        val inventory = Inventory.create(productId = 1L, stockQuantity = 3).withId(1L)
         whenever(productImageRepository.findByProductIdOrderBySortOrder(1L)).thenReturn(listOf(image))
+        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(inventory)
 
         service.deleteProduct(1L)
 
         assertThat(product.deletedAt).isNotNull()
         assertThat(image.deletedAt).isNotNull()
+        assertThat(inventory.deletedAt).isNotNull()
     }
 
     @Test

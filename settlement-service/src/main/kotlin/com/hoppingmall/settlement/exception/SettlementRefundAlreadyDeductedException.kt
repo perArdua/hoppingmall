@@ -1,0 +1,5 @@
+package com.hoppingmall.settlement.exception
+
+import com.hoppingmall.settlement.exception.code.SettlementErrorCode
+
+class SettlementRefundAlreadyDeductedException : SettlementException(SettlementErrorCode.SETTLEMENT_REFUND_ALREADY_DEDUCTED)

@@ -105,6 +105,7 @@ class IdempotencyServiceTest {
                 endpoint = "/api/v1/payments",
                 responseStatus = 201,
                 responseBody = """{"status":"ok"}""",
+                requestFingerprint = "fp",
                 ttlHours = 24
             )
 
@@ -132,6 +133,7 @@ class IdempotencyServiceTest {
                 endpoint = "/api/v1/items/1",
                 responseStatus = 200,
                 responseBody = """{}""",
+                requestFingerprint = "fp",
                 ttlHours = 12
             )
 
@@ -164,6 +166,7 @@ class IdempotencyServiceTest {
                 endpoint = "/api/test",
                 responseStatus = 200,
                 responseBody = """{}""",
+                requestFingerprint = "fp",
                 ttlHours = 0
             )
 

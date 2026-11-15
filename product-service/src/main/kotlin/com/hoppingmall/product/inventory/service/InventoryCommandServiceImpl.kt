@@ -4,6 +4,7 @@ import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.InventoryReservation
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
+import com.hoppingmall.product.inventory.dto.request.InventoryAdjustRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
@@ -11,8 +12,10 @@ import com.hoppingmall.product.inventory.enums.ReservationStatus
 import com.hoppingmall.product.inventory.exception.InvalidReservationRequestKeyException
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidQuantityException
+import com.hoppingmall.product.inventory.exception.InventoryInvalidStockAdjustmentException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidStockChangeQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryNotFoundException
+import com.hoppingmall.product.inventory.exception.InventoryStockChangedException
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.inventory.exception.ReservationRequestKeyConflictException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
@@ -83,13 +86,35 @@ class InventoryCommandServiceImpl(
     @CacheEvict(cacheNames = ["inventory"], key = "#productId")
     override fun updateStock(productId: Long, request: InventoryUpdateRequest): InventoryResponse {
         val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+            ?.takeIf { it.deletedAt == null }
             ?: throw InventoryNotFoundException()
 
         val stockQuantity = requireNotNull(request.stockQuantity)
-        inventory.stockQuantity = stockQuantity
+        val expectedStockQuantity = requireNotNull(request.expectedStockQuantity)
         if (bucketStockService.enabled) {
-            bucketStockService.redistribute(productId, stockQuantity)
+            if (!bucketStockService.replaceTotal(productId, expectedStockQuantity, stockQuantity)) {
+                throw InventoryStockChangedException()
+            }
+        } else if (inventory.stockQuantity != expectedStockQuantity) {
+            throw InventoryStockChangedException()
         }
+        inventory.stockQuantity = stockQuantity
+        return InventoryResponse.from(inventory)
+    }
+
+    @CacheEvict(cacheNames = ["inventory"], key = "#productId")
+    override fun adjustStock(productId: Long, request: InventoryAdjustRequest): InventoryResponse {
+        val delta = requireNotNull(request.delta)
+        if (delta == 0) throw InventoryInvalidStockAdjustmentException()
+        val inventory = inventoryRepository.findByProductIdForUpdate(productId)
+            ?.takeIf { it.deletedAt == null }
+            ?: throw InventoryNotFoundException()
+
+        if (bucketStockService.enabled) {
+            if (delta > 0) bucketStockService.restore(productId, delta) else bucketStockService.decrease(productId, -delta)
+            return InventoryResponse.from(inventory).copy(stockQuantity = bucketStockService.totalStock(productId))
+        }
+        if (delta > 0) inventory.increaseStock(delta) else inventory.decreaseStock(-delta)
         return InventoryResponse.from(inventory)
     }
 

@@ -10,6 +10,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.service.OrderCommandService
 import com.hoppingmall.order.order.service.OrderQueryService
+import com.hoppingmall.order.shipping.service.ShippingCommandService
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -25,7 +26,8 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "주문")
 class OrderController(
     private val orderCommandService: OrderCommandService,
-    private val orderQueryService: OrderQueryService
+    private val orderQueryService: OrderQueryService,
+    private val shippingCommandService: ShippingCommandService
 ) {
 
     @Idempotent(ttlHours = 24)
@@ -78,7 +80,7 @@ class OrderController(
             throw OrderInvalidStatusException()
         }
         val isAdmin = userPrincipal.getRole() == ADMIN_ROLE
-        val order = orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), isAdmin)
+        val order = shippingCommandService.updateStatusByOrder(userPrincipal.getUserId(), orderId, request.status, isAdmin)
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 

@@ -2,7 +2,9 @@ package com.hoppingmall.settlement.service
 
 import com.hoppingmall.settlement.domain.Settlement
 import com.hoppingmall.settlement.domain.SettlementItem
+import com.hoppingmall.settlement.domain.repository.SettlementCarryOverRepository
 import com.hoppingmall.settlement.domain.repository.SettlementItemRepository
+import com.hoppingmall.settlement.domain.repository.SettlementRefundRepository
 import com.hoppingmall.settlement.domain.repository.SettlementRepository
 import com.hoppingmall.settlement.dto.request.CreateSettlementRequest
 import com.hoppingmall.settlement.exception.SettlementNoSalesDataException
@@ -53,6 +55,12 @@ class SettlementKstWallClockPeriodTest {
 
     @Mock
     private lateinit var transactionManager: PlatformTransactionManager
+
+    @Mock
+    private lateinit var settlementRefundRepository: SettlementRefundRepository
+
+    @Mock
+    private lateinit var settlementCarryOverRepository: SettlementCarryOverRepository
 
     private val originalTimeZone: TimeZone = TimeZone.getDefault()
 
@@ -123,7 +131,9 @@ class SettlementKstWallClockPeriodTest {
             settlementItemRepository,
             orderItemQueryPort,
             refundQueryPort,
-            transactionManager
+            transactionManager,
+            settlementRefundRepository,
+            settlementCarryOverRepository
         )
         try {
             service.createSettlement(

@@ -103,11 +103,13 @@ class BucketStockService(
         inventoryBucketLocker.increase(productId, smallest.bucketNo, quantity)
     }
 
-    fun redistribute(productId: Long, total: Int) {
+    fun replaceTotal(productId: Long, expectedTotal: Int, total: Int): Boolean {
         val buckets = lockAll(productId)
+        if (buckets.sumOf { it.stockQuantity.toLong() } != expectedTotal.toLong()) return false
         buckets.forEach {
             inventoryBucketLocker.setStock(productId, it.bucketNo, InventoryBucket.shareOf(total, buckets.size, it.bucketNo))
         }
+        return true
     }
 
     fun totalStock(productId: Long): Int = inventoryBucketRepository.sumStock(productId).toInt()

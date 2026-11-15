@@ -117,6 +117,16 @@ class OrderSagaPaidOrderPaymentCancelledTest {
     }
 
     @Test
+    fun 결제_완료_주문에_결제_취소_보상이_오면_준비_중인_배송도_함께_취소한다() {
+        val order = orderOf(OrderStatus.PAYING, OrderStatus.PAID)
+
+        consumer.handlePaymentCompensation(PAYMENT_CANCELLED_MESSAGE)
+
+        assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
+        verify(orderRepository).cancelPreparingShipping(ORDER_ID)
+    }
+
+    @Test
     fun 취소_실패_주문에_결제_취소_보상이_오면_주문을_취소하고_확정_재고까지_돌린다() {
         val order = orderOf(OrderStatus.PAYING, OrderStatus.PAID, OrderStatus.CANCEL_REQUESTED, OrderStatus.CANCEL_FAILED)
 

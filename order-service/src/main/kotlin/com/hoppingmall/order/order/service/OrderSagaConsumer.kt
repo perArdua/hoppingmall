@@ -221,6 +221,7 @@ class OrderSagaConsumer(
             order.updateStatus(OrderStatus.CANCEL_REQUESTED)
             order.updateStatus(OrderStatus.CANCELLED)
             orderRepository.save(order)
+            orderRepository.cancelPreparingShipping(event.orderId)
 
             transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",
@@ -331,6 +332,7 @@ class OrderSagaConsumer(
                 order.updateStatus(OrderStatus.CANCEL_REQUESTED)
                 order.updateStatus(OrderStatus.CANCELLED)
                 orderRepository.save(order)
+                orderRepository.cancelPreparingShipping(orderId)
                 log.markStepCompleted(SagaEventLog.RESTORE_CONFIRMED)
                 sagaEventLogRepository.save(log)
                 publishCancellationNotification(eventId, orderId, order.buyerId)

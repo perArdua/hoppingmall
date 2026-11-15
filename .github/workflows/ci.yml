@@ -51,6 +51,7 @@ jobs:
             payment_service:
               - 'payment-service/**'
               - 'hoppingmall-common/**'
+              - 'hoppingmall-idempotency/**'
               - 'hoppingmall-dlq/**'
               - 'hoppingmall-outbox/**'
               - 'hoppingmall-cache/**'
