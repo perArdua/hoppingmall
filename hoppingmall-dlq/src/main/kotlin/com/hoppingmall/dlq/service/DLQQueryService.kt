@@ -3,6 +3,8 @@ package com.hoppingmall.dlq.service
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
 import com.hoppingmall.dlq.domain.repository.DLQMessageRepository
+import com.hoppingmall.dlq.dto.DLQStatsResponse
+import com.hoppingmall.dlq.dto.DLQTopicStatsResponse
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
@@ -24,7 +26,7 @@ class DLQQueryService(
         return dlqMessageRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
     }
 
-    fun getDLQStats(): Map<String, Any> {
+    fun getDLQStats(): DLQStatsResponse {
         val totalCount = dlqMessageRepository.count()
         val pendingCount = dlqMessageRepository.countByStatus(DLQStatus.PENDING)
         val processedCount = dlqMessageRepository.countByStatus(DLQStatus.PROCESSED)
@@ -32,21 +34,21 @@ class DLQQueryService(
 
         val topicStats = dlqMessageRepository.getDLQStatsByTopic()
 
-        return mapOf(
-            "totalMessages" to totalCount,
-            "pendingCount" to pendingCount,
-            "processedCount" to processedCount,
-            "failedCount" to failedCount,
-            "topicStats" to topicStats.map { stats ->
-                mapOf(
-                    "topic" to stats.topic,
-                    "total" to stats.totalCount,
-                    "pending" to stats.pendingCount,
-                    "processed" to stats.processedCount,
-                    "failed" to stats.failedCount
+        return DLQStatsResponse(
+            totalMessages = totalCount,
+            pendingCount = pendingCount,
+            processedCount = processedCount,
+            failedCount = failedCount,
+            topicStats = topicStats.map { stats ->
+                DLQTopicStatsResponse(
+                    topic = stats.topic,
+                    total = stats.totalCount,
+                    pending = stats.pendingCount,
+                    processed = stats.processedCount,
+                    failed = stats.failedCount
                 )
             },
-            "lastUpdated" to System.currentTimeMillis()
+            lastUpdated = System.currentTimeMillis()
         )
     }
 }

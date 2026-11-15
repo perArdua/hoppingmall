@@ -1,6 +1,7 @@
 package com.hoppingmall.notification.config
 
 import com.hoppingmall.dlq.controller.DLQController
+import com.hoppingmall.dlq.dto.DLQStatsResponse
 import com.hoppingmall.dlq.service.DLQCommandService
 import com.hoppingmall.dlq.service.DLQQueryService
 import com.hoppingmall.notification.controller.NotificationController
@@ -97,7 +98,7 @@ class AdminEndpointSecurityTest {
 
     @Test
     fun ADMIN은_DLQ_통계를_조회한다() {
-        whenever(dlqQueryService.getDLQStats()).thenReturn(mapOf("total" to 0))
+        whenever(dlqQueryService.getDLQStats()).thenReturn(DLQStatsResponse(0L, 0L, 0L, 0L, emptyList(), 0L))
 
         mockMvc.get("/api/v1/admin/dlq/stats") {
             header("X-User-Id", "1")

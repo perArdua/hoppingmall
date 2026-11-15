@@ -4,6 +4,8 @@ import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.page.PageRequestLimits
 import com.hoppingmall.dlq.domain.DLQMessage
 import com.hoppingmall.dlq.domain.DLQStatus
+import com.hoppingmall.dlq.dto.DLQRetryResultResponse
+import com.hoppingmall.dlq.dto.DLQStatsResponse
 import com.hoppingmall.dlq.service.DLQCommandService
 import com.hoppingmall.dlq.service.DLQQueryService
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -19,7 +21,7 @@ class DLQController(
 ) {
 
     @GetMapping("/stats")
-    fun getDLQStats(): ApiResponse<Map<String, Any>> {
+    fun getDLQStats(): ApiResponse<DLQStatsResponse> {
         val stats = dlqQueryService.getDLQStats()
         return ApiResponse.success(stats)
     }
@@ -28,7 +30,7 @@ class DLQController(
     fun retryDLQMessages(
         @PathVariable topic: String,
         @RequestParam(defaultValue = "50") maxCount: Int
-    ): ApiResponse<Map<String, Any>> {
+    ): ApiResponse<DLQRetryResultResponse> {
         val result = dlqCommandService.retryDLQMessagesByTopic(topic, maxCount)
         return ApiResponse.success(result)
     }

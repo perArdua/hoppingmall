@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.config
 
 import com.hoppingmall.dlq.controller.DLQController
+import com.hoppingmall.dlq.dto.DLQStatsResponse
 import com.hoppingmall.dlq.service.DLQCommandService
 import com.hoppingmall.dlq.service.DLQQueryService
 import com.hoppingmall.payment.coupon.controller.CouponController
@@ -208,7 +209,7 @@ class AdminEndpointSecurityTest {
 
         @Test
         fun ADMIN_역할로_DLQ_통계_조회_성공() {
-            whenever(dlqQueryService.getDLQStats()).thenReturn(emptyMap())
+            whenever(dlqQueryService.getDLQStats()).thenReturn(DLQStatsResponse(0L, 0L, 0L, 0L, emptyList(), 0L))
 
             mockMvc.get("/api/v1/admin/dlq/stats") {
                 header("X-User-Id", "1")

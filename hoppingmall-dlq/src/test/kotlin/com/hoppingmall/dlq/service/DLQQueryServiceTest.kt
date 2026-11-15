@@ -85,12 +85,12 @@ class DLQQueryServiceTest {
 
             val stats = dlqQueryService.getDLQStats()
 
-            assertEquals(10L, stats["totalMessages"])
-            assertEquals(5L, stats["pendingCount"])
-            assertEquals(3L, stats["processedCount"])
-            assertEquals(2L, stats["failedCount"])
-            assertNotNull(stats["lastUpdated"])
-            assertNotNull(stats["topicStats"])
+            assertEquals(10L, stats.totalMessages)
+            assertEquals(5L, stats.pendingCount)
+            assertEquals(3L, stats.processedCount)
+            assertEquals(2L, stats.failedCount)
+            assertNotNull(stats.lastUpdated)
+            assertNotNull(stats.topicStats)
         }
 
         @Test
@@ -120,13 +120,12 @@ class DLQQueryServiceTest {
 
             val stats = dlqQueryService.getDLQStats()
 
-            @Suppress("UNCHECKED_CAST")
-            val resultTopicStats = stats["topicStats"] as List<Map<String, Any>>
+            val resultTopicStats = stats.topicStats
             assertEquals(2, resultTopicStats.size)
-            assertEquals("payment", resultTopicStats[0]["topic"])
-            assertEquals(3L, resultTopicStats[0]["total"])
-            assertEquals("order", resultTopicStats[1]["topic"])
-            assertEquals(2L, resultTopicStats[1]["total"])
+            assertEquals("payment", resultTopicStats[0].topic)
+            assertEquals(3L, resultTopicStats[0].total)
+            assertEquals("order", resultTopicStats[1].topic)
+            assertEquals(2L, resultTopicStats[1].total)
         }
     }
 
