@@ -39,18 +39,19 @@ class PointPolicyTest {
     fun 정책을_활성화할_수_있다() {
         val policy = createPolicy()
 
-        val activated = policy.activate()
+        policy.activate()
 
-        assertThat(activated.isActive).isTrue()
+        assertThat(policy.isActive).isTrue()
     }
 
     @Test
     fun 정책을_비활성화할_수_있다() {
-        val policy = createPolicy().activate()
+        val policy = createPolicy()
+        policy.activate()
 
-        val deactivated = policy.deactivate()
+        policy.deactivate()
 
-        assertThat(deactivated.isActive).isFalse()
+        assertThat(policy.isActive).isFalse()
     }
 
     @Test
@@ -99,7 +100,7 @@ class PointPolicyTest {
     fun 정책을_업데이트할_수_있다() {
         val policy = createPolicy()
 
-        val updated = policy.update(
+        policy.update(
             policyName = "수정된 정책",
             earnRate = BigDecimal("0.02"),
             maxEarnRate = BigDecimal("0.10"),
@@ -108,7 +109,23 @@ class PointPolicyTest {
             description = "설명"
         )
 
-        assertThat(updated.policyName).isEqualTo("수정된 정책")
-        assertThat(updated.earnRate).isEqualByComparingTo(BigDecimal("0.02"))
+        assertThat(policy.policyName).isEqualTo("수정된 정책")
+        assertThat(policy.earnRate).isEqualByComparingTo(BigDecimal("0.02"))
+    }
+
+    @Test
+    fun 업데이트_값이_정책_규칙을_어기면_예외가_발생한다() {
+        val policy = createPolicy()
+
+        assertThatThrownBy {
+            policy.update(
+                policyName = "기본 정책",
+                earnRate = BigDecimal("0.10"),
+                maxEarnRate = BigDecimal("0.05"),
+                minUseAmount = BigDecimal("100"),
+                maxUseAmount = BigDecimal("10000"),
+                description = null
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 }
