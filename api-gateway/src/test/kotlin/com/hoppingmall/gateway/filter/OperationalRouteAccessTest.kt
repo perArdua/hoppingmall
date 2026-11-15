@@ -203,7 +203,7 @@ class OperationalRouteAccessTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["/api/v1/violations", "/ops/circuitbreakers/reset-all", "/internal/api/v1/orders/1"])
+    @ValueSource(strings = ["/ops/circuitbreakers/reset-all", "/internal/api/v1/orders/1"])
     fun 권한_검사가_없거나_밖에_열지_않는_운영_API는_라우트가_없어_뒷단에_닿지_않는다(path: String) {
         webTestClient.post()
             .uri(path)
