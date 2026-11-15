@@ -30,6 +30,12 @@ class JwtValidationGatewayFilterFactory(
     private val key = Keys.hmacShaKeyFor(secret.toByteArray())
     private val redisCommandTimeout = redisProperties.commandTimeout
 
+    private class AuthenticatedToken(
+        val request: ServerHttpRequest,
+        val userId: String,
+        val issuedAtMillis: Long?
+    )
+
     class Config {
         var requiredRole: String? = null
     }
@@ -54,28 +60,34 @@ class JwtValidationGatewayFilterFactory(
 
                 val userId = claims.subject
                 val role = accessTokenRole(claims)
-                    ?: return@fromCallable Optional.empty<ServerHttpRequest>()
+                    ?: return@fromCallable Optional.empty<AuthenticatedToken>()
                 Optional.of(
-                    request.mutate()
-                        .headers { it.remove("x-user-id"); it.remove("x-user-role") }
-                        .header("x-user-id", userId)
-                        .header("x-user-role", role)
-                        .build()
+                    AuthenticatedToken(
+                        request = request.mutate()
+                            .headers { it.remove("x-user-id"); it.remove("x-user-role") }
+                            .header("x-user-id", userId)
+                            .header("x-user-role", role)
+                            .build(),
+                        userId = userId,
+                        issuedAtMillis = issuedAtMillis(claims)
+                    )
                 )
             }
             .subscribeOn(Schedulers.boundedElastic())
             .onErrorReturn(Optional.empty())
-            .flatMap { authenticatedRequest ->
-                if (authenticatedRequest.isEmpty) {
+            .flatMap { authenticated ->
+                if (authenticated.isEmpty) {
                     return@flatMap onUnauthorized(exchange)
                 }
-                isLoggedOut(token).flatMap { loggedOut ->
-                    when {
-                        loggedOut -> onUnauthorized(exchange)
-                        !hasRequiredRole(authenticatedRequest.get(), config) -> onForbidden(exchange)
-                        else -> chain.filter(exchange.mutate().request(authenticatedRequest.get()).build())
+                val authenticatedToken = authenticated.get()
+                Mono.zip(isLoggedOut(token), isIssuedBeforeInvalidation(authenticatedToken))
+                    .flatMap { revoked ->
+                        when {
+                            revoked.t1 || revoked.t2 -> onUnauthorized(exchange)
+                            !hasRequiredRole(authenticatedToken.request, config) -> onForbidden(exchange)
+                            else -> chain.filter(exchange.mutate().request(authenticatedToken.request).build())
+                        }
                     }
-                }
             }
         }
     }
@@ -92,6 +104,32 @@ class JwtValidationGatewayFilterFactory(
                 Mono.just(false)
             }
     }
+
+    private fun isIssuedBeforeInvalidation(token: AuthenticatedToken): Mono<Boolean> {
+        val template = redisTemplate ?: return Mono.just(false)
+        return Mono.defer { template.opsForValue().get(INVALID_BEFORE_KEY_PREFIX + token.userId) }
+            .subscribeOn(GatewayRedisScheduler.instance)
+            .timeout(redisCommandTimeout)
+            .map { value ->
+                val invalidBefore = value.toLongOrNull()
+                when {
+                    invalidBefore == null -> {
+                        log.warn("이전 발급 토큰 무효 시각 값이 숫자가 아님, 요청은 통과시킴 [userId={}]", token.userId)
+                        false
+                    }
+                    else -> (token.issuedAtMillis ?: Long.MIN_VALUE) < invalidBefore
+                }
+            }
+            .defaultIfEmpty(false)
+            .onErrorResume { e ->
+                log.warn("이전 발급 토큰 무효 시각 Redis 조회 실패, 요청은 통과시킴: {}", e.message)
+                meterRegistry.counter(INVALID_BEFORE_REDIS_FAILURE_METRIC).increment()
+                Mono.just(false)
+            }
+    }
+
+    private fun issuedAtMillis(claims: Claims): Long? =
+        (claims[ISSUED_AT_MS_CLAIM] as? Number)?.toLong() ?: claims.issuedAt?.time
 
     private fun accessTokenRole(claims: Claims): String? {
         val type = claims[TOKEN_TYPE_CLAIM]
@@ -119,6 +157,9 @@ class JwtValidationGatewayFilterFactory(
         private val log = LoggerFactory.getLogger(JwtValidationGatewayFilterFactory::class.java)
         private const val BLACKLIST_KEY_PREFIX = "blacklist:"
         private const val BLACKLIST_REDIS_FAILURE_METRIC = "gateway.jwt.blacklist.redis.failures"
+        private const val INVALID_BEFORE_KEY_PREFIX = "token-invalid-before:"
+        private const val INVALID_BEFORE_REDIS_FAILURE_METRIC = "gateway.jwt.invalid-before.redis.failures"
+        private const val ISSUED_AT_MS_CLAIM = "iat_ms"
         private const val TOKEN_TYPE_CLAIM = "typ"
         private const val ACCESS_TOKEN_TYPE = "access"
         private const val ROLE_CLAIM = "role"
