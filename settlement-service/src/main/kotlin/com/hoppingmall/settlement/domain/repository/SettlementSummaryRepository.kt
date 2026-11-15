@@ -26,11 +26,12 @@ interface SettlementSummaryRepository : JpaRepository<SettlementSummary, Long> {
     @Query(
         value = """
             INSERT INTO settlement_summaries (settlement_id, seller_id, period_start, period_end, total_sales_amount,
-              total_refund_amount, commission_rate, commission_amount, settlement_amount, status, confirmed_at, paid_at,
-              created_at, updated_at)
+              total_refund_amount, commission_rate, commission_amount, settlement_amount, carried_in_amount,
+              carry_over_amount, status, confirmed_at, paid_at, created_at, updated_at)
             VALUES (:#{#summary.settlementId}, :#{#summary.sellerId}, :#{#summary.periodStart}, :#{#summary.periodEnd},
               :#{#summary.totalSalesAmount}, :#{#summary.totalRefundAmount}, :#{#summary.commissionRate},
-              :#{#summary.commissionAmount}, :#{#summary.settlementAmount}, :#{#summary.status.name()},
+              :#{#summary.commissionAmount}, :#{#summary.settlementAmount}, :#{#summary.carriedInAmount},
+              :#{#summary.carryOverAmount}, :#{#summary.status.name()},
               :#{#summary.confirmedAt}, :#{#summary.paidAt}, :#{#summary.createdAt}, :#{#summary.createdAt})
             ON DUPLICATE KEY UPDATE settlement_id = settlement_id
         """,
