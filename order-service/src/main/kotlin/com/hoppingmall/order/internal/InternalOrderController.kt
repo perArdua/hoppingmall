@@ -6,12 +6,15 @@ import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.exception.OrderNotFoundException
+import com.hoppingmall.order.refund.config.RefundPolicyProperties
+import com.hoppingmall.order.refund.domain.RefundDeadline
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.format.annotation.DateTimeFormat
@@ -34,8 +37,8 @@ class InternalOrderController(
     @Value("\${order.terminal.retention-days:30}")
     private var terminalRetentionDays: Long = 30
 
-    @Value("\${order.refund.window-days:30}")
-    private var refundWindowDays: Long = 30
+    @Autowired(required = false)
+    private var refundPolicy: RefundPolicyProperties = RefundPolicyProperties()
 
     @GetMapping("/orders/{orderId}")
     fun getOrder(@PathVariable orderId: Long): ResponseEntity<ApiResponse<OrderSummaryResponse>> {
@@ -169,7 +172,7 @@ class InternalOrderController(
         val orders = orderRepository.findAllById(items.map { it.orderId }.distinct()).associateBy { it.id!! }
         val now = LocalDateTime.now()
         val updatedBefore = now.minusDays(terminalRetentionDays)
-        val deliveredBefore = now.minusDays(refundWindowDays + terminalRetentionDays)
+        val deliveredBefore = RefundDeadline(refundPolicy).allWindowsClosedBefore(now.toLocalDate(), terminalRetentionDays)
         val terminalReservationIds = items
             .groupBy { it.reservationId!! }
             .filterValues { held ->
