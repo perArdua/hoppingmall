@@ -7,8 +7,12 @@ spring:
     username: root
     password: ${MYSQL_ROOT_PASSWORD}
 
+  flyway:
+    enabled: true
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: validate
 
   data:
     redis:
