@@ -18,7 +18,8 @@ import org.springframework.transaction.annotation.Transactional
 class ProductQueryServiceImpl(
     private val productRepository: ProductRepository,
     private val productImageRepository: ProductImageRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val productStockReader: ProductStockReader
 ) : ProductQueryService {
 
     override fun getProducts(pageable: Pageable): Slice<ProductResponse> {
@@ -45,7 +46,10 @@ class ProductQueryServiceImpl(
     override fun getProductsBySellerIdWithStock(
         sellerId: Long,
         pageable: Pageable
-    ): Slice<ProductResponse> = getProductsBySellerId(sellerId, pageable)
+    ): Slice<ProductResponse> {
+        val productSlice = productRepository.findBySellerId(sellerId, pageable)
+        return toProductResponseSlice(productSlice, pageable, includeStockQuantity = true)
+    }
 
     override fun getProductsByCategoryId(
         categoryId: Long,
@@ -72,7 +76,8 @@ class ProductQueryServiceImpl(
 
     private fun toProductResponseSlice(
         productSlice: Slice<Product>,
-        pageable: Pageable
+        pageable: Pageable,
+        includeStockQuantity: Boolean = false
     ): Slice<ProductResponse> {
         val productIds = productSlice.content.mapNotNull { it.id }
         val imageMap = productImageRepository.findByProductIdIn(productIds)
@@ -80,8 +85,12 @@ class ProductQueryServiceImpl(
         val categoryNames = categoryRepository.findAllById(productSlice.content.map { it.categoryId }.distinct())
             .associate { it.id!! to it.name }
 
+        val stocks = productStockReader.stocks(productIds)
+
         val productResponses = productSlice.content.map { product ->
+            val stock = stocks[product.id!!] ?: 0
             ProductResponse.from(product, imageMap[product.id!!] ?: emptyList(), categoryNames[product.categoryId])
+                .copy(inStock = stock > 0, stockQuantity = if (includeStockQuantity) stock else null)
         }
 
         return SliceImpl(productResponses, pageable, productSlice.hasNext())

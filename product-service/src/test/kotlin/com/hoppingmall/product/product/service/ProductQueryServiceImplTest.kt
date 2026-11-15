@@ -40,6 +40,9 @@ class ProductQueryServiceImplTest {
     @Mock
     private lateinit var categoryRepository: CategoryRepository
 
+    @Mock
+    private lateinit var productStockReader: ProductStockReader
+
     @InjectMocks
     private lateinit var service: ProductQueryServiceImpl
 
