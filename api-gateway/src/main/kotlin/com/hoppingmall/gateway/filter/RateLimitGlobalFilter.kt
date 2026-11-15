@@ -14,10 +14,16 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain
 import org.springframework.cloud.gateway.filter.GlobalFilter
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter
 import org.springframework.core.annotation.Order
+import org.springframework.core.io.buffer.DataBuffer
+import org.springframework.core.io.buffer.DataBufferLimitException
+import org.springframework.core.io.buffer.DataBufferUtils
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate
+import org.springframework.http.server.reactive.ServerHttpRequest
+import org.springframework.http.server.reactive.ServerHttpRequestDecorator
 import org.springframework.stereotype.Component
 import org.springframework.util.AntPathMatcher
 import org.springframework.web.server.ServerWebExchange
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import java.time.Clock
 import java.time.Duration
@@ -33,7 +39,8 @@ class RateLimitGlobalFilter(
     private val meterRegistry: MeterRegistry = Metrics.globalRegistry,
     redisProperties: GatewayRedisProperties = GatewayRedisProperties(),
     rateLimitProperties: GatewayRateLimitProperties = GatewayRateLimitProperties(),
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val refreshTokenKeyResolver: RefreshTokenRateLimitKeyResolver? = null
 ) : GlobalFilter {
 
     private val pathMatcher = AntPathMatcher()
@@ -44,6 +51,7 @@ class RateLimitGlobalFilter(
         private val log = LoggerFactory.getLogger(RateLimitGlobalFilter::class.java)
         private const val REDIS_FAILURE_METRIC = "gateway.ratelimit.redis.failures"
         private const val X_FORWARDED_FOR = "X-Forwarded-For"
+        private const val MAX_KEYED_BODY_BYTES = 8 * 1024
 
         private val GLOBAL_FALLBACK = RateLimitPolicy(
             id = "global",
@@ -68,8 +76,41 @@ class RateLimitGlobalFilter(
         val method = exchange.request.method.name()
         val policy = findPolicy(path, method) ?: GLOBAL_FALLBACK
 
-        return checkLimit(exchange, chain, policy)
+        if (policy.keyType == RateLimitKeyType.REFRESH_TOKEN) {
+            return checkRefreshTokenLimit(exchange, chain, policy)
+        }
+        return checkLimit(exchange, chain, policy, resolveKey(exchange, policy.keyType))
     }
+
+    private fun checkRefreshTokenLimit(
+        exchange: ServerWebExchange,
+        chain: GatewayFilterChain,
+        policy: RateLimitPolicy
+    ): Mono<Void> =
+        DataBufferUtils.join(exchange.request.body, MAX_KEYED_BODY_BYTES)
+            .map { buffer ->
+                val bytes = ByteArray(buffer.readableByteCount())
+                buffer.read(bytes)
+                DataBufferUtils.release(buffer)
+                Optional.of(bytes)
+            }
+            .defaultIfEmpty(Optional.of(ByteArray(0)))
+            .onErrorResume(DataBufferLimitException::class.java) { Mono.just(Optional.empty()) }
+            .flatMap { body ->
+                if (body.isEmpty) {
+                    return@flatMap GatewayErrorResponse.PAYLOAD_TOO_LARGE.write(exchange)
+                }
+                val bytes = body.get()
+                val userId = refreshTokenKeyResolver?.userId(bytes)
+                val key = if (userId != null) "user:$userId" else "ip:${resolveClientIp(exchange) ?: "anonymous"}"
+                checkLimit(exchange.mutate().request(withBody(exchange, bytes)).build(), chain, policy, key)
+            }
+
+    private fun withBody(exchange: ServerWebExchange, bytes: ByteArray): ServerHttpRequest =
+        object : ServerHttpRequestDecorator(exchange.request) {
+            override fun getBody(): Flux<DataBuffer> =
+                if (bytes.isEmpty()) Flux.empty() else Flux.defer { Flux.just(exchange.response.bufferFactory().wrap(bytes)) }
+        }
 
     private fun findPolicy(path: String, method: String?): RateLimitPolicy? {
         return policies.find { policy ->
@@ -85,7 +126,7 @@ class RateLimitGlobalFilter(
                     ?: resolveClientIp(exchange)
                     ?: "anonymous"
             }
-            RateLimitKeyType.IP -> {
+            RateLimitKeyType.IP, RateLimitKeyType.REFRESH_TOKEN -> {
                 resolveClientIp(exchange) ?: "anonymous"
             }
         }
@@ -109,9 +150,9 @@ class RateLimitGlobalFilter(
     private fun checkLimit(
         exchange: ServerWebExchange,
         chain: GatewayFilterChain,
-        policy: RateLimitPolicy
+        policy: RateLimitPolicy,
+        key: String
     ): Mono<Void> {
-        val key = resolveKey(exchange, policy.keyType)
         val windowMillis = policy.window.toMillis()
         val now = clock.millis()
         val window = now / windowMillis
