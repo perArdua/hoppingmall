@@ -149,6 +149,18 @@ class OpenApiDocsTest {
         return objectMapper.readTree(response.contentAsString).path("data").path("id").asLong()
     }
 
+    @Test
+    fun 생성_입구의_명세_성공_응답은_실제와_같은_201이다() {
+        val docs = apiDocs()
+        listOf(
+            "/api/v1/memberships" to "post"
+        ).forEach { (path, method) ->
+            val responses = docs.path("paths").path(path).path(method).path("responses")
+            assertThat(responses.has("201")).describedAs("%s %s 201", method, path).isTrue()
+            assertThat(responses.has("200")).describedAs("%s %s 200", method, path).isFalse()
+        }
+    }
+
     private fun apiDocs(): JsonNode =
         objectMapper.readTree(mockMvc.get("/v3/api-docs").andReturn().response.contentAsString)
 

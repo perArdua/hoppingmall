@@ -32,6 +32,7 @@ class OrderController(
 
     @Idempotent(ttlHours = 24)
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: OrderCreateRequest
