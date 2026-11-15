@@ -1,11 +1,14 @@
 package com.hoppingmall.user.dto.request
 
+import com.hoppingmall.user.common.vo.Email as EmailValue
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 
 data class SignUpRequest(
     @field:Email(message = "유효한 이메일 주소를 입력해주세요.")
+    @field:Pattern(regexp = EmailValue.FORMAT, message = "유효한 이메일 주소를 입력해주세요.")
     val email: String,
 
     @field:NotBlank(message = "비밀번호는 필수입니다.")
