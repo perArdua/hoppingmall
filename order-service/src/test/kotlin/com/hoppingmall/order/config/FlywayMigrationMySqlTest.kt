@@ -39,7 +39,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
     }
 
     @Test
@@ -66,7 +66,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
         assertThat(jdbc(database).queryForList("SELECT status FROM dlq_messages", String::class.java)).containsExactly("PENDING")
     }
 
@@ -81,12 +81,45 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
         LEGACY_ENUM_COLUMNS.forEach {
             assertThat(columnType(database, it.table, it.column)).isEqualTo("varchar(32)")
             assertThat(columnNullable(database, it.table, it.column)).isEqualTo(if (it.nullable) "YES" else "NO")
         }
         assertThat(jdbc(database).queryForList("SELECT status FROM dlq_messages", String::class.java)).containsExactly("FAILED")
+    }
+
+    @Test
+    fun 기준선_뒤에_더해진_열이_없는_기존_DB에는_열을_더하고_기존_행은_제한_없음과_포인트_0이_된다() {
+        val database = freshDatabase("before_v4")
+        val fromEntities = freshDatabase("entities_v4")
+        legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
+        entityCreateRunner(fromEntities).run { context -> assertThat(context).hasNotFailed() }
+        jdbc(database).execute("ALTER TABLE refunds DROP COLUMN point_refund_amount")
+        jdbc(database).execute("ALTER TABLE order_items DROP COLUMN withdrawal_restricted, DROP COLUMN withdrawal_restriction_reason")
+        jdbc(database).update(
+            "INSERT INTO refunds (order_id, payment_id, buyer_id, seller_id, status, reason, refund_amount, is_full_refund, " +
+                "return_shipping_fee, created_at) VALUES (1, 1, 9, 2, 'COMPLETED', 'CHANGE_OF_MIND', 10000.00, true, 0.00, NOW(6))"
+        )
+        jdbc(database).update(
+            "INSERT INTO order_items (order_id, product_id, seller_id, product_name, product_price, quantity, total_price, created_at) " +
+                "VALUES (1, 1, 2, 'item', 10000.00, 1, 10000.00, NOW(6))"
+        )
+
+        runner(database, "docker").run { context ->
+            assertThat(context).hasNotFailed()
+        }
+
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
+        assertThat(columns(database)).isEqualTo(columns(fromEntities))
+        assertThat(jdbc(database).queryForList("SELECT CAST(point_refund_amount AS CHAR) FROM refunds", String::class.java))
+            .containsExactly("0.00")
+        assertThat(
+            jdbc(database).queryForList(
+                "SELECT CONCAT_WS('|', withdrawal_restricted + 0, IFNULL(withdrawal_restriction_reason, 'NULL')) FROM order_items",
+                String::class.java
+            )
+        ).containsExactly("0|NULL")
     }
 
     @Test
@@ -136,7 +169,7 @@ class FlywayMigrationMySqlTest {
 
         runner(database, "docker").run { context -> assertThat(context).hasNotFailed() }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
         assertThat(
             jdbc(database).queryForList(
                 "SELECT CONCAT_WS('|', id, IFNULL(CAST(delivered_at AS CHAR), 'NULL'), CAST(updated_at AS CHAR)) FROM orders ORDER BY id",
