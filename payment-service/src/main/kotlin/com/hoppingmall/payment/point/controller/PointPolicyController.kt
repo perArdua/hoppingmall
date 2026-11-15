@@ -5,7 +5,11 @@ import com.hoppingmall.payment.point.dto.request.PointPolicyRequest
 import com.hoppingmall.payment.point.dto.response.PointPolicyResponse
 import com.hoppingmall.payment.point.service.PointPolicyService
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Slice
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -44,6 +48,14 @@ class PointPolicyController(
         return ApiResponse.success(pointPolicyService.deactivatePolicy(policyId))
     }
 
+    @GetMapping
+    fun getPolicies(
+        @RequestParam(defaultValue = "0") @Min(0) page: Int,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) size: Int
+    ): ApiResponse<Slice<PointPolicyResponse>> {
+        return ApiResponse.success(pointPolicyService.getPolicies(PageRequest.of(page, size)))
+    }
+
     @GetMapping("/current")
     fun getCurrentPolicy(): ApiResponse<PointPolicyResponse?> {
         return ApiResponse.success(pointPolicyService.getCurrentPolicy())
@@ -54,5 +66,9 @@ class PointPolicyController(
         @PathVariable policyId: Long
     ): ApiResponse<PointPolicyResponse> {
         return ApiResponse.success(pointPolicyService.getPolicyById(policyId))
+    }
+
+    companion object {
+        const val MAX_PAGE_SIZE = 100L
     }
 }

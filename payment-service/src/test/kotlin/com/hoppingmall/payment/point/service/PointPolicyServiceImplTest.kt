@@ -4,6 +4,8 @@ import com.hoppingmall.common.BaseEntity
 import com.hoppingmall.payment.point.domain.PointPolicy
 import com.hoppingmall.payment.point.domain.PointPolicyRepository
 import com.hoppingmall.payment.point.dto.request.PointPolicyRequest
+import com.hoppingmall.payment.point.exception.PointPolicyInvalidException
+import com.hoppingmall.payment.point.exception.PointPolicyNameDuplicatedException
 import com.hoppingmall.payment.point.exception.PointPolicyNotFoundException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -19,6 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.whenever
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.SliceImpl
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -85,9 +89,8 @@ class PointPolicyServiceImplTest {
     @Test
     fun 현재_활성_정책을_조회한다() {
         val policy = createPolicy()
-        val activated = policy.activate()
-        setBaseEntityFields(activated)
-        whenever(pointPolicyRepository.findByIsActiveTrue()).thenReturn(activated)
+        policy.activate()
+        whenever(pointPolicyRepository.findByIsActiveTrue()).thenReturn(policy)
 
         val result = pointPolicyService.getCurrentPolicy()
 
@@ -118,9 +121,8 @@ class PointPolicyServiceImplTest {
     @Test
     fun 정책을_비활성화한다() {
         val policy = createPolicy()
-        val activated = policy.activate()
-        setBaseEntityFields(activated)
-        whenever(pointPolicyRepository.findById(1L)).thenReturn(Optional.of(activated))
+        policy.activate()
+        whenever(pointPolicyRepository.findById(1L)).thenReturn(Optional.of(policy))
         mockSaveWithIdInjection()
 
         val result = pointPolicyService.deactivatePolicy(1L)
@@ -185,5 +187,53 @@ class PointPolicyServiceImplTest {
 
         assertThatThrownBy { pointPolicyService.deactivatePolicy(999L) }
             .isInstanceOf(PointPolicyNotFoundException::class.java)
+    }
+
+    @Test
+    fun 다른_정책과_같은_이름으로_업데이트하면_이름_중복_예외가_발생한다() {
+        whenever(pointPolicyRepository.findById(1L)).thenReturn(Optional.of(createPolicy()))
+        whenever(pointPolicyRepository.existsByPolicyName("행사 정책")).thenReturn(true)
+
+        assertThatThrownBy { pointPolicyService.updatePolicy(1L, createRequest().copy(policyName = "행사 정책")) }
+            .isInstanceOf(PointPolicyNameDuplicatedException::class.java)
+    }
+
+    @Test
+    fun 같은_이름으로_정책을_만들면_이름_중복_예외가_발생한다() {
+        whenever(pointPolicyRepository.existsByPolicyName("기본 정책")).thenReturn(true)
+
+        assertThatThrownBy { pointPolicyService.createPolicy(createRequest()) }
+            .isInstanceOf(PointPolicyNameDuplicatedException::class.java)
+    }
+
+    @Test
+    fun 적립률이_0이면_정책_규칙_예외가_발생한다() {
+        assertThatThrownBy { pointPolicyService.createPolicy(createRequest().copy(earnRate = BigDecimal.ZERO)) }
+            .isInstanceOf(PointPolicyInvalidException::class.java)
+    }
+
+    @Test
+    fun 적립률이_최대_적립률보다_크면_정책_규칙_예외가_발생한다() {
+        assertThatThrownBy { pointPolicyService.createPolicy(createRequest().copy(earnRate = BigDecimal("0.10"))) }
+            .isInstanceOf(PointPolicyInvalidException::class.java)
+    }
+
+    @Test
+    fun 최소_사용_금액이_최대_사용_금액보다_크면_정책_규칙_예외가_발생한다() {
+        assertThatThrownBy {
+            pointPolicyService.updatePolicy(1L, createRequest().copy(minUseAmount = BigDecimal("20000")))
+        }.isInstanceOf(PointPolicyInvalidException::class.java)
+    }
+
+    @Test
+    fun 정책_목록을_최신순으로_조회한다() {
+        val pageable = PageRequest.of(0, 20)
+        whenever(pointPolicyRepository.findAllByOrderByIdDesc(pageable))
+            .thenReturn(SliceImpl(listOf(createPolicy(2L), createPolicy(1L)), pageable, false))
+
+        val result = pointPolicyService.getPolicies(pageable)
+
+        assertThat(result.content.map { it.id }).containsExactly(2L, 1L)
+        assertThat(result.hasNext()).isFalse()
     }
 }
