@@ -74,7 +74,7 @@ class OrderTerminalCheckDeliveredMySqlIntegrationTest : MySqlJpaTestSupport() {
             .containsExactly("rsv-cancelled", "rsv-delivered")
     }
 
-    private fun controller() = InternalOrderController(orderRepository, orderItemRepository, mock(), mock())
+    private fun controller() = InternalOrderController(orderRepository, orderItemRepository, mock(), mock(), mock())
 
     private fun terminalCheck(controller: InternalOrderController, reservationIds: List<String>): List<String> =
         controller.terminalCheck(InternalOrderController.TerminalCheckRequest(reservationIds))

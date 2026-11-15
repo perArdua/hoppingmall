@@ -4,6 +4,7 @@ import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.domain.repository.SettlementRefundProjection
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -37,6 +38,9 @@ class InternalOrderControllerTest {
 
     @Mock
     private lateinit var refundItemRepository: RefundItemRepository
+
+    @Mock
+    private lateinit var refundRepository: RefundRepository
 
     @InjectMocks
     private lateinit var controller: InternalOrderController

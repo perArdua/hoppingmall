@@ -9,6 +9,10 @@ import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.refund.config.RefundPolicyProperties
 import com.hoppingmall.order.refund.domain.RefundDeadline
 import com.hoppingmall.order.refund.domain.repository.RefundItemRepository
+import com.hoppingmall.order.refund.domain.repository.RefundRepository
+import com.hoppingmall.order.refund.enum.RefundStatus
+import com.hoppingmall.order.refund.exception.RefundException
+import com.hoppingmall.order.refund.exception.code.RefundErrorCode
 import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
 import com.hoppingmall.order.shipping.enum.ShippingStatus
 import jakarta.validation.Valid
@@ -31,7 +35,8 @@ class InternalOrderController(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val shippingRepository: ShippingRepository,
-    private val refundItemRepository: RefundItemRepository
+    private val refundItemRepository: RefundItemRepository,
+    private val refundRepository: RefundRepository
 ) {
 
     @Value("\${order.terminal.retention-days:30}")
@@ -93,6 +98,9 @@ class InternalOrderController(
             return ResponseEntity.ok().build()
         }
         if (order.isRefundable()) {
+            if (!refundRepository.existsByOrderIdAndStatusAndIsFullRefundTrueAndDeletedAtIsNull(orderId, RefundStatus.COMPLETED)) {
+                throw RefundException(RefundErrorCode.REFUND_NOT_COMPLETED)
+            }
             order.completeRefund()
         } else {
             order.updateStatus(com.hoppingmall.order.order.enum.OrderStatus.CANCELLED)

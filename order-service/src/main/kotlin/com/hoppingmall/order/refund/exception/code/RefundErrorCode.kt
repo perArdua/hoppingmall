@@ -21,4 +21,5 @@ enum class RefundErrorCode(
     REFUND_WINDOW_EXPIRED("RFD011", "단순 변심 환불 요청 기한이 지났습니다.", HttpStatus.BAD_REQUEST),
     REFUND_SELLER_FAULT_WINDOW_EXPIRED("RFD012", "상품 하자·오배송·설명과 다른 상품의 환불 요청 기한이 지났습니다.", HttpStatus.BAD_REQUEST),
     REFUND_REASON_NOT_ACCEPTED("RFD013", "새 환불 요청에 쓸 수 없는 사유입니다.", HttpStatus.BAD_REQUEST),
+    REFUND_NOT_COMPLETED("RFD014", "완료된 전체 환불이 없는 주문은 환불 완료로 바꿀 수 없습니다.", HttpStatus.CONFLICT),
 }
