@@ -28,6 +28,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
+import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockMultipartFile
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -137,7 +138,8 @@ class ProductControllerTest {
 
         val result = controller.createProduct(request, seller)
 
-        assertThat(result.data!!.name).isEqualTo("테스트")
+        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
+        assertThat(result.body!!.data!!.name).isEqualTo("테스트")
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.hoppingmall.product.product.dto.request
 
 import com.hoppingmall.product.common.enums.ProductStatus
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
@@ -24,5 +25,8 @@ data class ProductCreateRequest(
     val imageUrls: List<String>? = null,
     
     @field:NotNull(message = "상품 상태는 필수입니다.")
-    val status: ProductStatus = ProductStatus.AVAILABLE
+    val status: ProductStatus = ProductStatus.AVAILABLE,
+
+    @field:Min(value = 0, message = "재고 수량은 0 이상이어야 합니다.")
+    val stockQuantity: Int? = null
 ) 
