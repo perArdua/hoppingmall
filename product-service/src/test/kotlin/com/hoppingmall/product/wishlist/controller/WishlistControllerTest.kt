@@ -2,6 +2,7 @@ package com.hoppingmall.product.wishlist.controller
 
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
+import com.hoppingmall.product.wishlist.dto.response.WishlistCheckResponse
 import com.hoppingmall.product.wishlist.dto.response.WishlistResponse
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
 import com.hoppingmall.product.wishlist.service.WishlistQueryService
@@ -67,6 +68,14 @@ class WishlistControllerTest {
     }
 
     @Test
+    fun 상품_id로_위시리스트에서_제거한다() {
+        val result = controller.removeWishlistByProduct(principal, 10L)
+
+        assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
+        verify(wishlistCommandService).removeWishlistByProductId(1L, 10L)
+    }
+
+    @Test
     fun 위시리스트_목록을_조회한다() {
         val pageable = PageRequest.of(0, 20)
 
@@ -80,11 +89,11 @@ class WishlistControllerTest {
 
     @Test
     fun 위시리스트_여부를_확인한다() {
-        whenever(wishlistQueryService.isWishlisted(1L, 10L)).thenReturn(true)
+        whenever(wishlistQueryService.checkWishlist(1L, 10L)).thenReturn(WishlistCheckResponse.of(5L))
 
         val result = controller.isWishlisted(principal, 10L)
 
         assertThat(result.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(result.body!!.data).isTrue()
+        assertThat(result.body!!.data).isEqualTo(WishlistCheckResponse(wishlisted = true, wishlistId = 5L))
     }
 }
