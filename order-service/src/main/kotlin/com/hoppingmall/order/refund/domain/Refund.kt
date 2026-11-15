@@ -53,6 +53,9 @@ class Refund private constructor(
     @Column(nullable = false, precision = 10, scale = 2)
     val returnShippingFee: BigDecimal = BigDecimal.ZERO,
 
+    @Column(nullable = false, precision = 10, scale = 2)
+    val pointRefundAmount: BigDecimal = BigDecimal.ZERO,
+
     @Column
     var rejectionReason: String? = null,
 
@@ -80,7 +83,8 @@ class Refund private constructor(
             reasonDetail: String?,
             refundAmount: BigDecimal,
             isFullRefund: Boolean,
-            returnShippingFee: BigDecimal = BigDecimal.ZERO
+            returnShippingFee: BigDecimal = BigDecimal.ZERO,
+            pointRefundAmount: BigDecimal = BigDecimal.ZERO
         ): Refund {
             return Refund(
                 orderId = orderId,
@@ -91,7 +95,8 @@ class Refund private constructor(
                 reasonDetail = reasonDetail,
                 refundAmount = refundAmount,
                 isFullRefund = isFullRefund,
-                returnShippingFee = returnShippingFee
+                returnShippingFee = returnShippingFee,
+                pointRefundAmount = pointRefundAmount
             )
         }
     }
