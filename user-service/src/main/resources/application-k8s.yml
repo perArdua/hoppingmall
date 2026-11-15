@@ -49,6 +49,12 @@ management:
     tracing:
       endpoint: http://zipkin.hoppingmall.svc.cluster.local:9411/api/v2/spans
 
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
+
 internal:
   service:
     token: ${INTERNAL_SERVICE_TOKEN}

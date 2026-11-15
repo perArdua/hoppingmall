@@ -166,6 +166,7 @@ resilience4j:
         baseConfig: default
 
 springdoc:
+  default-flat-param-object: true
   api-docs:
     path: /v3/api-docs
   swagger-ui:
