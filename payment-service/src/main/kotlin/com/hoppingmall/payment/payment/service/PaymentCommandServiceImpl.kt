@@ -108,7 +108,6 @@ class PaymentCommandServiceImpl(
                 if (couponId != null) {
                     couponCommandService.restoreCouponByPayment(couponId!!, userId)
                 }
-                paymentEventService.publishPaymentFailedEvent(saved)
                 paymentNotificationService.publishPaymentFailedNotification(saved)
             }
 
