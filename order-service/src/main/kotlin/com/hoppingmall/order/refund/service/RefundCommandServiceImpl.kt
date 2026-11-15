@@ -49,6 +49,8 @@ class RefundCommandServiceImpl(
 
     private val refundableOrderStatuses = setOf(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED)
 
+    private val shippedStatuses = setOf(ShippingStatus.IN_TRANSIT, ShippingStatus.DELIVERED)
+
     @Autowired(required = false)
     private var refundPolicy: RefundPolicyProperties = RefundPolicyProperties()
 
@@ -114,7 +116,16 @@ class RefundCommandServiceImpl(
                     alreadyRefundedAmount = refundedAmountMap[item.orderItemId] ?: BigDecimal.ZERO
                 )
             }
-            val refundAmount = refundPrices.fold(BigDecimal.ZERO, BigDecimal::add)
+            val productAmount = refundPrices.fold(BigDecimal.ZERO, BigDecimal::add)
+            val returnShippingFee = if (!request.reason.isSellerFault && shipping?.status in shippedStatuses) {
+                refundPolicy.returnShippingFee
+            } else {
+                BigDecimal.ZERO
+            }
+            if (returnShippingFee > productAmount) {
+                throw RefundException(RefundErrorCode.REFUND_RETURN_SHIPPING_FEE_EXCEEDED)
+            }
+            val refundAmount = productAmount.subtract(returnShippingFee)
 
             val requestItemMap = request.items.associate { it.orderItemId to it.quantity }
             val isFullRefund = orderItems.all { orderItem ->
@@ -134,7 +145,8 @@ class RefundCommandServiceImpl(
                 reason = request.reason,
                 reasonDetail = request.reasonDetail,
                 refundAmount = refundAmount,
-                isFullRefund = isFullRefund
+                isFullRefund = isFullRefund,
+                returnShippingFee = returnShippingFee
             )
             val savedRefund = refundRepository.save(refund)
 

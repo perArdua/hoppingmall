@@ -50,6 +50,9 @@ class Refund private constructor(
     @Column(nullable = false)
     val isFullRefund: Boolean,
 
+    @Column(nullable = false, precision = 10, scale = 2)
+    val returnShippingFee: BigDecimal = BigDecimal.ZERO,
+
     @Column
     var rejectionReason: String? = null,
 
@@ -76,7 +79,8 @@ class Refund private constructor(
             reason: RefundReason,
             reasonDetail: String?,
             refundAmount: BigDecimal,
-            isFullRefund: Boolean
+            isFullRefund: Boolean,
+            returnShippingFee: BigDecimal = BigDecimal.ZERO
         ): Refund {
             return Refund(
                 orderId = orderId,
@@ -86,10 +90,13 @@ class Refund private constructor(
                 reason = reason,
                 reasonDetail = reasonDetail,
                 refundAmount = refundAmount,
-                isFullRefund = isFullRefund
+                isFullRefund = isFullRefund,
+                returnShippingFee = returnShippingFee
             )
         }
     }
+
+    fun productAmount(): BigDecimal = refundAmount.add(returnShippingFee)
 
     fun approve(approvedBy: Long) {
         validateTransition(RefundStatus.APPROVED)
