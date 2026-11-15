@@ -60,3 +60,8 @@ grpc:
     payment-service:
       address: dns:///payment-service.hoppingmall.svc.cluster.local:9095
       negotiation-type: plaintext
+
+order:
+  reservation:
+    fence:
+      enabled: true
