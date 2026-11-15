@@ -1,14 +1,15 @@
 package com.hoppingmall.order.cartItem.service
 
+import com.hoppingmall.order.cartItem.domain.CartItem
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.cartItem.dto.response.CartItemResponse
+import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.port.ProductQueryUnavailableException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
-import org.springframework.data.domain.SliceImpl
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -24,29 +25,24 @@ class CartItemQueryServiceImpl(
     var productQueryPort: ProductQueryPort? = null
 
     override fun getCartItems(buyerId: Long, pageable: Pageable): Slice<CartItemResponse> {
-        var page = sellingCartItems(buyerId, pageable)
-        while (page.content.isEmpty() && page.hasNext()) {
-            page = sellingCartItems(buyerId, page.nextPageable())
-        }
-        return page
-    }
-
-    private fun sellingCartItems(buyerId: Long, pageable: Pageable): Slice<CartItemResponse> {
         val cartItems = cartItemRepository.findByBuyerId(buyerId, pageable)
-        val sellingProductIds = sellingProductIds(cartItems.content.map { it.productId }.distinct())
-        val responses = cartItems.content
-            .filter { sellingProductIds == null || it.productId in sellingProductIds }
-            .map { CartItemResponse.from(it) }
-        return SliceImpl(responses, cartItems.pageable, cartItems.hasNext())
+        val products = currentProducts(cartItems.content.map { it.productId }.distinct())
+        return cartItems.map { cartItem -> response(cartItem, products) }
     }
 
-    private fun sellingProductIds(productIds: List<Long>): Set<Long>? {
+    private fun response(cartItem: CartItem, products: Map<Long, ProductInfo>?): CartItemResponse {
+        if (products == null) return CartItemResponse.from(cartItem)
+        val product = products[cartItem.productId] ?: return CartItemResponse.deleted(cartItem)
+        return CartItemResponse.of(cartItem, product)
+    }
+
+    private fun currentProducts(productIds: List<Long>): Map<Long, ProductInfo>? {
         val port = productQueryPort ?: return null
-        if (productIds.isEmpty()) return emptySet()
+        if (productIds.isEmpty()) return emptyMap()
         return try {
-            port.findProductsByIds(productIds).map { it.id }.toSet()
+            port.findProductsByIds(productIds).associateBy { it.id }
         } catch (e: ProductQueryUnavailableException) {
-            log.warn("장바구니 목록의 상품 조회 실패, 삭제된 상품을 빼지 않고 돌려줌: productIds={}", productIds, e)
+            log.warn("장바구니 목록의 상품 조회 실패, 담을 때 값으로 돌려줌: productIds={}", productIds, e)
             null
         }
     }
