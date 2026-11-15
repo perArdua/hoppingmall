@@ -104,7 +104,8 @@ data class RedisSseNotification(
     val content: String,
     val metadata: String?,
     val isRead: Boolean,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val orderId: Long? = null
 ) {
     fun toResponse(): NotificationResponse = NotificationResponse(
         id = id,
@@ -113,7 +114,8 @@ data class RedisSseNotification(
         content = content,
         metadata = metadata,
         isRead = isRead,
-        createdAt = createdAt
+        createdAt = createdAt,
+        orderId = orderId
     )
 
     companion object {
@@ -124,7 +126,8 @@ data class RedisSseNotification(
             content = response.content,
             metadata = response.metadata,
             isRead = response.isRead,
-            createdAt = response.createdAt
+            createdAt = response.createdAt,
+            orderId = response.orderId
         )
     }
 }
