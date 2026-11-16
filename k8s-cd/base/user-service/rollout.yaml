@@ -75,6 +75,8 @@ spec:
                 secretKeyRef:
                   name: hoppingmall-secret
                   key: MYSQL_ROOT_PASSWORD
+            - name: USER_RATELIMIT_TRUSTEDPROXYCOUNT
+              value: "1"
           envFrom:
             - configMapRef:
                 name: hoppingmall-config

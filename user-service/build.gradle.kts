@@ -97,6 +97,9 @@ tasks.withType<Test> {
 }
 
 tasks.test {
+	inputs.files("../docker-compose.yml", "../k8s/services/user-service.yml", "../k8s-cd/base/user-service/rollout.yaml")
+		.withPropertyName("deploymentFiles")
+		.withPathSensitivity(PathSensitivity.RELATIVE)
 	useJUnitPlatform {
 		excludeTags("startup")
 	}
