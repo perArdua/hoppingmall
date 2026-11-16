@@ -14,6 +14,7 @@ import com.hoppingmall.order.cartItem.exception.CartItemOutOfStockException
 import com.hoppingmall.order.cartItem.exception.CartItemProductNotFoundException
 import com.hoppingmall.order.cartItem.exception.CartItemProductNotOnSaleException
 import com.hoppingmall.order.cartItem.exception.CartItemProductUnavailableException
+import com.hoppingmall.order.cartItem.exception.CartItemSelfPurchaseException
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.port.ProductQueryUnavailableException
@@ -31,6 +32,9 @@ class CartItemCommandServiceImpl(
 
     override fun addCartItem(buyerId: Long, request: CartItemCreateRequest): CartItemResponse {
         val product = findProduct(request.productId) ?: throw CartItemProductNotFoundException()
+        if (product.sellerId == buyerId) {
+            throw CartItemSelfPurchaseException()
+        }
         if (!product.isOnSale()) {
             throw CartItemProductNotOnSaleException()
         }

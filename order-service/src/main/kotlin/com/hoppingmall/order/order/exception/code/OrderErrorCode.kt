@@ -22,4 +22,5 @@ enum class OrderErrorCode(
     ORDER_SHIPPING_ADDRESS_REQUIRED("ORD013", "배송지가 없는 주문의 배송 등록에는 받는 사람 이름·전화번호·주소가 필요합니다.", HttpStatus.BAD_REQUEST),
     ORDER_PRICE_CHANGED("ORD014", "상품 가격이 바뀌었습니다. 바뀐 가격을 확인한 뒤 다시 주문해주세요.", HttpStatus.CONFLICT),
     ORDER_SELF_PURCHASE("ORD015", "자기 상품은 주문할 수 없습니다.", HttpStatus.FORBIDDEN),
+    ORDER_SELF_CART_ADD("ORD016", "자기 상품은 장바구니에 담을 수 없습니다.", HttpStatus.FORBIDDEN),
 }
