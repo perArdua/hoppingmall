@@ -97,9 +97,6 @@ class PointPolicy private constructor(
         return purchaseAmount * earnRate
     }
 
-    fun canUsePoints(useAmount: BigDecimal): Boolean =
-        useAmount >= minUseAmount && useAmount <= maxUseAmount
-
     companion object {
         const val ACTIVE_KEY_CONSTRAINT = "uk_point_policies_active_key"
 
