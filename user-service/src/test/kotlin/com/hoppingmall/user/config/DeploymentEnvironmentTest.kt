@@ -19,6 +19,12 @@ class DeploymentEnvironmentTest {
         assertThat(userServiceEnvironment(file)).containsEntry("USER_RATELIMIT_TRUSTEDPROXYCOUNT", "1")
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = [COMPOSE, K8S, K8S_CD])
+    fun 쿠키_방식_리프레시를_받을_프론트_출처를_준다(file: String) {
+        assertThat(userServiceEnvironment(file)["AUTH_REFRESHCOOKIE_ALLOWEDORIGINS"]).isNotBlank()
+    }
+
     private fun userServiceEnvironment(file: String): Map<String, String?> {
         val text = repositoryRoot().resolve(file).readText()
         return if (file == COMPOSE) composeEnvironment(text) else kubernetesEnvironment(text)
