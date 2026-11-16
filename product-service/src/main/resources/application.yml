@@ -96,6 +96,7 @@ file:
       - webp
     allowed-domains:
       - product
+      - review
     sub-directory: images
   storage:
     endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}

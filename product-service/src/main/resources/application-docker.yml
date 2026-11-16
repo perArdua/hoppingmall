@@ -55,7 +55,7 @@ services:
 
 file:
   storage:
-    endpoint: ${STORAGE_ENDPOINT:http://minio:9000}
+    endpoint: ${STORAGE_ENDPOINT:http://s3mock:9090}
 
 springdoc:
   api-docs:

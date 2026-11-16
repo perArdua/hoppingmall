@@ -1,6 +1,7 @@
 package com.hoppingmall.product.product.service
 
 import com.hoppingmall.product.common.file.FileStorageProperties
+import com.hoppingmall.product.common.file.UploadedImageLinker
 import com.hoppingmall.product.common.file.domain.UploadStatus
 import com.hoppingmall.product.common.file.domain.UploadedFile
 import com.hoppingmall.product.common.file.domain.repository.UploadedFileRepository
@@ -33,7 +34,7 @@ class ProductImageLinkerTest {
 
     @BeforeEach
     fun setUp() {
-        linker = ProductImageLinker(uploadedFileRepository, properties)
+        linker = ProductImageLinker(UploadedImageLinker(uploadedFileRepository, properties), properties)
     }
 
     @Test
