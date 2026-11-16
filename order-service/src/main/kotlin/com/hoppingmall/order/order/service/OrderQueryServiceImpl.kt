@@ -26,13 +26,12 @@ class OrderQueryServiceImpl(
     private var payingTimeoutMinutes: Long = 15
 
     override fun getOrder(orderId: Long, userId: Long, isAdmin: Boolean): OrderResponse {
-        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
-
-        val orderItems = orderItemRepository.findByOrderId(orderId)
-        if (order.buyerId != userId && !isAdmin && orderItems.none { it.sellerId == userId }) {
+        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException()
+        if (order.buyerId != userId && !isAdmin) {
             throw OrderAccessDeniedException()
         }
 
+        val orderItems = orderItemRepository.findByOrderId(orderId)
         return OrderResponse.from(order, orderItems, payingTimeoutMinutes)
     }
 

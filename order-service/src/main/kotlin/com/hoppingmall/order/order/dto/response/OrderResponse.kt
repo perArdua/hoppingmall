@@ -18,7 +18,8 @@ data class OrderResponse(
     val createdAt: LocalDateTime,
     val shippingAddress: OrderShippingAddressResponse? = null,
     val autoCancelAt: OffsetDateTime? = null,
-    val autoCancelInSeconds: Long? = null
+    val autoCancelInSeconds: Long? = null,
+    val deliveredAt: LocalDateTime? = null
 ) {
     companion object {
         fun from(order: Order, orderItems: List<OrderItem>, payingTimeoutMinutes: Long? = null): OrderResponse {
@@ -32,7 +33,8 @@ data class OrderResponse(
                 createdAt = order.createdAt,
                 shippingAddress = order.shippingAddress?.let { OrderShippingAddressResponse.from(it) },
                 autoCancelAt = autoCancelAt?.atZone(ZoneId.systemDefault())?.toOffsetDateTime(),
-                autoCancelInSeconds = autoCancelAt?.let { Duration.between(LocalDateTime.now(), it).seconds.coerceAtLeast(0) }
+                autoCancelInSeconds = autoCancelAt?.let { Duration.between(LocalDateTime.now(), it).seconds.coerceAtLeast(0) },
+                deliveredAt = order.deliveredAt
             )
         }
     }

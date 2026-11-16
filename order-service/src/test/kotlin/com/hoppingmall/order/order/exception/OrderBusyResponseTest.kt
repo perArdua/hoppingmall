@@ -24,10 +24,10 @@ class OrderBusyResponseTest {
     }
 
     @Test
-    fun 재고_부족_예외는_여전히_400과_ORD007로_응답한다() {
+    fun 재고_부족_예외는_장바구니와_같은_409와_ORD007로_응답한다() {
         val response = handler.handleBusinessException(OrderOutOfStockException())
 
-        assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
         assertThat(response.body?.code).isEqualTo("ORD007")
     }
 }
