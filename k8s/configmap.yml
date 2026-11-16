@@ -16,3 +16,8 @@ data:
   PAYMENT_SERVICE_URL: http://payment-service.hoppingmall.svc.cluster.local:8085
   SETTLEMENT_SERVICE_URL: http://settlement-service.hoppingmall.svc.cluster.local:8086
   NOTIFICATION_SERVICE_URL: http://notification-service.hoppingmall.svc.cluster.local:8081
+  STORAGE_ENDPOINT: ""
+  STORAGE_REGION: ap-northeast-2
+  STORAGE_BUCKET: hoppingmall-product
+  STORAGE_PATH_STYLE_ACCESS: "false"
+  STORAGE_PUBLIC_BASE_URL: https://images.example.com/hoppingmall-product

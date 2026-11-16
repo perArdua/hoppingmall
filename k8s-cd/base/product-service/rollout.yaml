@@ -75,6 +75,18 @@ spec:
                 secretKeyRef:
                   name: hoppingmall-secret
                   key: MYSQL_ROOT_PASSWORD
+            - name: STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hoppingmall-secret
+                  key: STORAGE_ACCESS_KEY
+                  optional: true
+            - name: STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hoppingmall-secret
+                  key: STORAGE_SECRET_KEY
+                  optional: true
           envFrom:
             - configMapRef:
                 name: hoppingmall-config
