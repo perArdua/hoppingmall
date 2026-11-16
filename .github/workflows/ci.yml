@@ -204,16 +204,8 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: 테스트
-        run: cd ${{ matrix.service }} && ./gradlew test --no-daemon --build-cache
-
-      - name: Jacoco 리포트 생성
-        if: success()
-        run: cd ${{ matrix.service }} && ./gradlew jacocoTestReport --no-daemon --build-cache
-
-      - name: Jacoco 커버리지 검증 (80%)
-        if: success()
-        run: cd ${{ matrix.service }} && ./gradlew jacocoTestVerification --no-daemon --build-cache
+      - name: 테스트·Jacoco 리포트·커버리지 검증 (80%)
+        run: cd ${{ matrix.service }} && ./gradlew test jacocoTestReport jacocoTestVerification --no-daemon --build-cache
 
       - name: Codecov 업로드
         if: success()
