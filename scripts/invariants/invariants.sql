@@ -84,12 +84,14 @@ WHERE p.deleted_at IS NULL
   AND p.status IN ('FAILED', 'CANCELLED', 'REFUNDED')
   AND u.used > COALESCE(r.restored, 0);
 
--- @INV INV-14 | 결제에 쓴 포인트(USE)보다 많은 포인트가 되돌려짐(되돌림 = REFUND use-…·refund-point-…)
+-- @INV INV-14 | 결제에 쓴 포인트(USE)보다 많은 포인트가 되돌려짐(되돌림 = REFUND use-…·refund-point-…, {{POINT_PAYMENT_SINCE}} 이후 결제만)
 SELECT r.payment_id, r.restored, COALESCE(u.used, 0) AS used
 FROM (
-  SELECT payment_id, SUM(amount) AS restored FROM payment_db.point_histories
-  WHERE type = 'REFUND' AND deleted_at IS NULL AND payment_id IS NOT NULL AND (event_id LIKE 'use-%' OR event_id LIKE 'refund-point-%')
-  GROUP BY payment_id
+  SELECT h.payment_id, SUM(h.amount) AS restored FROM payment_db.point_histories h
+  WHERE h.type = 'REFUND' AND h.deleted_at IS NULL AND h.payment_id IS NOT NULL AND (h.event_id LIKE 'use-%' OR h.event_id LIKE 'refund-point-%')
+    AND h.created_at >= '{{POINT_PAYMENT_SINCE}}'
+    AND NOT EXISTS (SELECT 1 FROM payment_db.payments p WHERE p.id = h.payment_id AND p.created_at < '{{POINT_PAYMENT_SINCE}}')
+  GROUP BY h.payment_id
 ) r
 LEFT JOIN (
   SELECT payment_id, SUM(-amount) AS used FROM payment_db.point_histories
