@@ -50,7 +50,10 @@ spring:
               - DELETE
               - OPTIONS
             allowedHeaders:
-              - "*"
+              - Authorization
+              - Content-Type
+              - Idempotency-Key
+              - X-Token-Transport
             allowCredentials: true
             maxAge: 3600
       routes:

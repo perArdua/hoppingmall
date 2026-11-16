@@ -73,6 +73,10 @@ spec:
                 secretKeyRef:
                   name: hoppingmall-secret
                   key: MYSQL_ROOT_PASSWORD
+            - name: USER_RATELIMIT_TRUSTEDPROXYCOUNT
+              value: "1"
+            - name: AUTH_REFRESHCOOKIE_ALLOWEDORIGINS
+              value: "http://localhost:3000"
           envFrom:
             - configMapRef:
                 name: hoppingmall-config

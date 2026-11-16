@@ -13,9 +13,6 @@ data class ApiResponse<T>(
         fun <T> success(data: T): ApiResponse<T> =
             ApiResponse(code = "SUCCESS", message = "성공", data = data)
 
-        fun <T> failure(message: String): ApiResponse<T> =
-            ApiResponse(code = "FAIL", message = message, data = null)
-
         fun <T> failure(errorCode: ErrorCode): ApiResponse<T> =
             ApiResponse(code = errorCode.code, message = errorCode.message, data = null)
     }
