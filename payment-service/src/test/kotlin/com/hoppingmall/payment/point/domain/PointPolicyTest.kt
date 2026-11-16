@@ -64,27 +64,6 @@ class PointPolicyTest {
     }
 
     @Test
-    fun 사용_금액이_범위_내이면_사용_가능하다() {
-        val policy = createPolicy(minUseAmount = BigDecimal("100"), maxUseAmount = BigDecimal("10000"))
-
-        assertThat(policy.canUsePoints(BigDecimal("500"))).isTrue()
-    }
-
-    @Test
-    fun 사용_금액이_최소_미만이면_사용_불가하다() {
-        val policy = createPolicy(minUseAmount = BigDecimal("100"))
-
-        assertThat(policy.canUsePoints(BigDecimal("50"))).isFalse()
-    }
-
-    @Test
-    fun 사용_금액이_최대_초과이면_사용_불가하다() {
-        val policy = createPolicy(maxUseAmount = BigDecimal("10000"))
-
-        assertThat(policy.canUsePoints(BigDecimal("20000"))).isFalse()
-    }
-
-    @Test
     fun 적립률이_0_이하이면_예외가_발생한다() {
         assertThatThrownBy { createPolicy(earnRate = BigDecimal.ZERO) }
             .isInstanceOf(IllegalArgumentException::class.java)

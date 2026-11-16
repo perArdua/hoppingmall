@@ -26,7 +26,8 @@ class PointUseInvariantMySqlTest {
             "PAYING_MAX_MINUTES" to "15",
             "ORPHAN_GRACE_MINUTES" to "1",
             "OUTBOX_MAX_SECONDS" to "60",
-            "DLQ_MAX_SECONDS" to "60"
+            "DLQ_MAX_SECONDS" to "60",
+            "POINT_PAYMENT_SINCE" to POINT_PAYMENT_SINCE
         )
     ).associateBy { it.id }
 
@@ -41,6 +42,7 @@ class PointUseInvariantMySqlTest {
                 order_id BIGINT NOT NULL,
                 user_id BIGINT NOT NULL,
                 status VARCHAR(32) NOT NULL,
+                created_at DATETIME(6) NOT NULL,
                 deleted_at DATETIME(6) NULL
             )
             """.trimIndent()
@@ -54,6 +56,7 @@ class PointUseInvariantMySqlTest {
                 type VARCHAR(32) NOT NULL,
                 amount DECIMAL(10, 2) NOT NULL,
                 event_id VARCHAR(255) NULL UNIQUE,
+                created_at DATETIME(6) NOT NULL,
                 deleted_at DATETIME(6) NULL
             )
             """.trimIndent()
@@ -91,6 +94,19 @@ class PointUseInvariantMySqlTest {
     }
 
     @Test
+    fun 기준_시각_전에_만든_결제의_옛_되돌림은_INV_14가_보지_않는다() {
+        payment(1L, "REFUNDED", BEFORE)
+        history(1L, "REFUND", "3000", "refund-point-1-101")
+        payment(2L, "REFUNDED", BEFORE)
+        history(2L, "REFUND", "2000", "refund-point-2-102", BEFORE)
+        history(9L, "REFUND", "500", "refund-point-9-109", BEFORE)
+        payment(3L, "REFUNDED")
+        history(3L, "REFUND", "1000", "refund-point-11")
+
+        assertThat(violatingPaymentIds("INV-14")).containsExactly(3L)
+    }
+
+    @Test
     fun 포인트_되돌림_이력은_적립_회수로_세지_않아_INV_5가_가려지지_않는다() {
         payment(1L, "CANCELLED")
         history(1L, "EARN", "270", "tx-1")
@@ -109,18 +125,24 @@ class PointUseInvariantMySqlTest {
     private fun violatingPaymentIds(invariantId: String): List<Long> =
         jdbcTemplate.queryForList(definitions.getValue(invariantId).sql).map { (it["payment_id"] as Number).toLong() }
 
-    private fun payment(id: Long, status: String) {
-        jdbcTemplate.update("INSERT INTO payments (id, order_id, user_id, status) VALUES (?, ?, ?, ?)", id, id + 100, USER_ID, status)
+    private fun payment(id: Long, status: String, createdAt: String = AFTER) {
+        jdbcTemplate.update(
+            "INSERT INTO payments (id, order_id, user_id, status, created_at) VALUES (?, ?, ?, ?, ?)",
+            id, id + 100, USER_ID, status, createdAt
+        )
     }
 
-    private fun history(paymentId: Long, type: String, amount: String, eventId: String) {
+    private fun history(paymentId: Long, type: String, amount: String, eventId: String, createdAt: String = AFTER) {
         jdbcTemplate.update(
-            "INSERT INTO point_histories (user_id, payment_id, type, amount, event_id) VALUES (?, ?, ?, ?, ?)",
-            USER_ID, paymentId, type, BigDecimal(amount), eventId
+            "INSERT INTO point_histories (user_id, payment_id, type, amount, event_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            USER_ID, paymentId, type, BigDecimal(amount), eventId, createdAt
         )
     }
 
     companion object {
         private const val USER_ID = 31L
+        private const val POINT_PAYMENT_SINCE = "2026-11-16 06:02:19"
+        private const val BEFORE = "2026-11-16 06:02:18"
+        private const val AFTER = "2026-11-16 06:02:19"
     }
 }
