@@ -50,7 +50,7 @@ data class CartItemResponse(
             productPrice = cartItem.productPrice,
             productImageUrl = cartItem.productImageUrl,
             quantity = cartItem.quantity,
-            totalPrice = cartItem.totalPrice,
+            totalPrice = currentPrice?.multiply(BigDecimal(cartItem.quantity)) ?: cartItem.totalPrice,
             currentPrice = currentPrice,
             priceChanged = currentPrice != null && currentPrice.compareTo(cartItem.productPrice) != 0,
             productStatus = productStatus,

@@ -38,8 +38,9 @@ class StorageFileUploadService(
         if (request.file.size > fileUploadConfig.maxFileSize) {
             throw FileSizeExceededException()
         }
-        if (request.domain !in fileUploadConfig.allowedDomains) {
-            throw UnsupportedDomainException(fileUploadConfig.allowedDomains.toList())
+        val allowedDomains = fileUploadConfig.domainsFor(request.uploaderRole)
+        if (request.domain !in allowedDomains) {
+            throw UnsupportedDomainException(allowedDomains.toList())
         }
         val imageType = checkContent(request, extension)
 

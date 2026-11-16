@@ -23,7 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils
 import java.math.BigDecimal
 import java.util.Optional
 
-@DisplayName("주문 상세의 배송지는 구매자·판매자·관리자만 본다")
+@DisplayName("구매자용 주문 상세는 구매자·관리자만 본다")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
 class OrderDetailShippingAddressAccessTest {
 
@@ -61,10 +61,9 @@ class OrderDetailShippingAddressAccessTest {
     }
 
     @Test
-    fun 주문_항목의_판매자는_주문_상세에서_배송지를_본다() {
-        val result = controller.getOrder(UserPrincipal.of(SELLER_ID, "SELLER"), ORDER_ID).body!!.data!!
-
-        assertThat(result.shippingAddress!!.address).isEqualTo("서울시 강남구 테헤란로 1")
+    fun 주문_항목의_판매자도_구매자용_주문_상세는_볼_수_없다() {
+        assertThatThrownBy { controller.getOrder(UserPrincipal.of(SELLER_ID, "SELLER"), ORDER_ID) }
+            .isInstanceOf(OrderAccessDeniedException::class.java)
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.hoppingmall.order.cartItem.dto.request.CartItemUpdateRequest
 import com.hoppingmall.order.cartItem.enum.CartProductStatus
 import com.hoppingmall.order.cartItem.exception.CartItemOutOfStockException
 import com.hoppingmall.order.cartItem.exception.CartItemProductNotOnSaleException
+import com.hoppingmall.order.cartItem.exception.CartItemSelfPurchaseException
 import com.hoppingmall.order.port.ProductInfo
 import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.port.ProductQueryUnavailableException
@@ -42,6 +43,20 @@ class CartItemAddProductStateTest {
 
     @InjectMocks
     private lateinit var service: CartItemCommandServiceImpl
+
+    @Test
+    fun 자기_상품은_담지_않고_403_ORD016으로_거절한다() {
+        whenever(productQueryPort.findProductById(PRODUCT_ID)).thenReturn(product(sellerId = BUYER_ID))
+
+        assertThatThrownBy { service.addCartItem(BUYER_ID, CartItemCreateRequest(PRODUCT_ID, 1)) }
+            .isInstanceOfSatisfying(CartItemSelfPurchaseException::class.java) {
+                assertThat(it.errorCode.code).isEqualTo("ORD016")
+                assertThat(it.errorCode.status).isEqualTo(HttpStatus.FORBIDDEN)
+            }
+
+        verify(cartItemRepository, never()).findByBuyerIdAndProductId(any(), any())
+        verify(cartItemRepository, never()).save(any<CartItem>())
+    }
 
     @Test
     fun 품절_상품은_담지_않고_409_CART007로_거절한다() {
@@ -158,9 +173,9 @@ class CartItemAddProductStateTest {
         assertThat(response.productChecked).isFalse()
     }
 
-    private fun product(price: String = "10000", status: String = "AVAILABLE", stock: Int = 100) =
+    private fun product(price: String = "10000", status: String = "AVAILABLE", stock: Int = 100, sellerId: Long = 5L) =
         ProductInfo(
-            id = PRODUCT_ID, name = "상품", price = BigDecimal(price), sellerId = 5L,
+            id = PRODUCT_ID, name = "상품", price = BigDecimal(price), sellerId = sellerId,
             imageUrl = "http://image", status = status, stockQuantity = stock
         )
 

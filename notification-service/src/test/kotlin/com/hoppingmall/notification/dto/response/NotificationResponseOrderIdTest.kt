@@ -13,7 +13,7 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
 
-@DisplayName("알림 응답의 주문 id")
+@DisplayName("알림 응답의 주문 id·환불 id")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class NotificationResponseOrderIdTest {
 
@@ -49,6 +49,23 @@ class NotificationResponseOrderIdTest {
             """{"orderId":{"id":1}}"""
         ).forEach { metadata ->
             val node = responseJson(metadata).path("orderId")
+            assertThat(node.isNull).describedAs("metadata=%s", metadata).isTrue()
+        }
+    }
+
+    @Test
+    fun 환불_완료_알림은_metadata의_refundId를_환불_id로_준다() {
+        val json = responseJson("""{"orderId":42,"paymentId":7,"refundId":9,"amount":"1000"}""")
+
+        assertThat(json.path("orderId").asLong()).isEqualTo(42L)
+        assertThat(json.path("refundId").isIntegralNumber).isTrue()
+        assertThat(json.path("refundId").asLong()).isEqualTo(9L)
+    }
+
+    @Test
+    fun 환불_id가_없거나_맞지_않으면_환불_id는_null이다() {
+        listOf(null, "not-json", """{"orderId":42}""", """{"refundId":0}""", """{"refundId":"abc"}""").forEach { metadata ->
+            val node = responseJson(metadata).path("refundId")
             assertThat(node.isNull).describedAs("metadata=%s", metadata).isTrue()
         }
     }
