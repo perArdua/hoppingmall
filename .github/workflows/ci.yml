@@ -202,10 +202,28 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
+
+      - name: Gradle 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ matrix.service }}-${{ github.sha }}
+          restore-keys: |
+            gradle-${{ matrix.service }}-
 
       - name: 테스트·Jacoco 리포트·커버리지 검증 (80%)
         run: cd ${{ matrix.service }} && ./gradlew test jacocoTestReport jacocoTestVerification --no-daemon --build-cache
+
+      - name: Gradle 캐시 저장
+        if: success() && github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ matrix.service }}-${{ github.sha }}
 
       - name: Codecov 업로드
         if: success()
@@ -243,7 +261,16 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
+
+      - name: Gradle 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ matrix.service }}-${{ github.sha }}
+          restore-keys: |
+            gradle-${{ matrix.service }}-
 
       - name: docker·k8s 프로필 기동 검사
         run: cd ${{ matrix.service }} && ./gradlew startupCheck --no-daemon --build-cache
@@ -320,7 +347,16 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
+
+      - name: Gradle 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-shared-modules-${{ github.sha }}
+          restore-keys: |
+            gradle-shared-modules-
 
       - name: 공유 모듈 테스트
         run: |
@@ -345,6 +381,15 @@ jobs:
             echo "::error::공유 모듈 테스트 실패: ${failed_modules[*]}"
             exit 1
           fi
+
+      - name: Gradle 캐시 저장
+        if: success() && github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-shared-modules-${{ github.sha }}
 
   final-check:
     name: CI 최종 검증
