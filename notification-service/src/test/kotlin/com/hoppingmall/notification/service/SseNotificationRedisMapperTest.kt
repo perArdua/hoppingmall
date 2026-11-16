@@ -39,7 +39,7 @@ class SseNotificationRedisMapperTest {
 
         assertThat(json.fieldNames().asSequence().toList()).containsExactlyInAnyOrder("userId", "notification")
         assertThat(json.path("notification").fieldNames().asSequence().toList())
-            .containsExactlyInAnyOrder("id", "type", "title", "content", "metadata", "isRead", "createdAt", "orderId")
+            .containsExactlyInAnyOrder("id", "type", "title", "content", "metadata", "isRead", "createdAt", "orderId", "refundId")
     }
 
     @Test
@@ -57,5 +57,14 @@ class SseNotificationRedisMapperTest {
         assertThat(snakeCaseMapper.readTree(body).path("notification").path("orderId").asLong()).isEqualTo(77L)
         assertThat(snakeCaseMapper.readValue(body, RedisSseNotificationMessage::class.java).toMessage().notification.orderId)
             .isEqualTo(77L)
+    }
+
+    @Test
+    fun 환불_id가_있는_알림은_Redis_메시지를_거쳐도_환불_id가_남는다() {
+        val withRefundId = message.copy(notification = message.notification.copy(orderId = 77L, refundId = 9L))
+        val body = snakeCaseMapper.writeValueAsString(withRefundId.toRedisMessage())
+
+        assertThat(snakeCaseMapper.readValue(body, RedisSseNotificationMessage::class.java).toMessage().notification.refundId)
+            .isEqualTo(9L)
     }
 }

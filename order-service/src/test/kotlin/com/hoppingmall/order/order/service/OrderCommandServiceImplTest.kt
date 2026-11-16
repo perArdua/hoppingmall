@@ -177,7 +177,7 @@ class OrderCommandServiceImplTest {
     }
 
     @Test
-    fun 재고_서비스가_재고_부족으로_400을_응답하면_ORD007_재고_부족_예외로_바꾼다() {
+    fun 재고_서비스가_재고_부족으로_400을_응답하면_409_ORD007_재고_부족_예외로_바꾼다() {
         stubReservableCart()
         whenever(inventoryCommandPort.batchReserveStock(any()))
             .thenThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "INV002", HttpHeaders.EMPTY, """{"code":"INV002"}""".toByteArray(), null))
@@ -187,7 +187,7 @@ class OrderCommandServiceImplTest {
             .extracting { (it as OrderOutOfStockException).errorCode }
             .satisfies({ errorCode ->
                 assertThat(errorCode.code).isEqualTo("ORD007")
-                assertThat(errorCode.status).isEqualTo(HttpStatus.BAD_REQUEST)
+                assertThat(errorCode.status).isEqualTo(HttpStatus.CONFLICT)
             })
         verify(orderRepository, never()).save(any<Order>())
         verify(cartItemRepository, never()).deleteAllById(any())

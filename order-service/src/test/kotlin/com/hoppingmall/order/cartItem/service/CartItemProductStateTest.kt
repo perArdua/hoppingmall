@@ -73,6 +73,28 @@ class CartItemProductStateTest {
     }
 
     @Test
+    fun 합계는_지금_가격에_수량을_곱한_값으로_준다() {
+        cart(cartItem(1L, 100L, price = "10000", quantity = 2), cartItem(2L, 200L, price = "5000", quantity = 3))
+        products(product(100L, price = "12000.00"), product(200L, price = "4000.00"))
+
+        val rows = service.getCartItems(BUYER_ID, pageable).content
+
+        assertThat(rows[0].totalPrice).isEqualByComparingTo("24000")
+        assertThat(rows[1].totalPrice).isEqualByComparingTo("12000")
+    }
+
+    @Test
+    fun 지금_가격을_모르면_합계는_담을_때_가격_기준으로_준다() {
+        cart(cartItem(1L, 100L, price = "10000", quantity = 2), cartItem(2L, 200L, price = "5000", quantity = 3))
+        products(product(200L, price = "4000.00"))
+
+        val rows = service.getCartItems(BUYER_ID, pageable).content
+
+        assertThat(rows[0].totalPrice).isEqualByComparingTo("20000")
+        assertThat(rows[1].totalPrice).isEqualByComparingTo("12000")
+    }
+
+    @Test
     fun 품절_상품_줄은_SOLD_OUT과_재고_없음으로_표시한다() {
         cart(cartItem(1L, 100L))
         products(product(100L, status = "SOLD_OUT", stock = 50))
@@ -116,6 +138,7 @@ class CartItemProductStateTest {
         val row = service.getCartItems(BUYER_ID, pageable).content.single()
 
         assertThat(row.productPrice).isEqualByComparingTo("10000")
+        assertThat(row.totalPrice).isEqualByComparingTo("10000")
         assertThat(row.productChecked).isFalse()
         assertThat(row.currentPrice).isNull()
         assertThat(row.priceChanged).isFalse()

@@ -14,11 +14,13 @@ data class NotificationResponse(
     val metadata: String?,
     val isRead: Boolean,
     val createdAt: LocalDateTime,
-    val orderId: Long? = null
+    val orderId: Long? = null,
+    val refundId: Long? = null
 ) {
     companion object {
         private val metadataReader = ObjectMapper()
         private val orderIdKeys = listOf("orderId", "order_id")
+        private val refundIdKeys = listOf("refundId", "refund_id")
 
         fun from(notification: Notification): NotificationResponse {
             return NotificationResponse(
@@ -29,15 +31,16 @@ data class NotificationResponse(
                 metadata = notification.metadata,
                 isRead = notification.isRead,
                 createdAt = notification.createdAt,
-                orderId = orderIdOf(notification.metadata)
+                orderId = idOf(notification.metadata, orderIdKeys),
+                refundId = idOf(notification.metadata, refundIdKeys)
             )
         }
 
-        private fun orderIdOf(metadata: String?): Long? {
+        private fun idOf(metadata: String?, keys: List<String>): Long? {
             if (metadata.isNullOrBlank()) return null
             val root = runCatching { metadataReader.readTree(metadata) }.getOrNull()
             if (root == null || !root.isObject) return null
-            return orderIdKeys.firstNotNullOfOrNull { root.get(it) }?.let(::positiveLong)
+            return keys.firstNotNullOfOrNull { root.get(it) }?.let(::positiveLong)
         }
 
         private fun positiveLong(node: JsonNode): Long? {
