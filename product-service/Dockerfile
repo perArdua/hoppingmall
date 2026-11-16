@@ -1,3 +1,5 @@
+ARG JAR_SOURCE=build
+
 FROM eclipse-temurin:21-jdk-alpine AS build
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
@@ -11,9 +13,17 @@ COPY hoppingmall-cache /hoppingmall-cache
 COPY hoppingmall-dlq /hoppingmall-dlq
 RUN sed -i "s/\r$//" gradlew && chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
+FROM scratch AS jar-build
+COPY --from=build /app/build/libs/*.jar /app.jar
+
+FROM scratch AS jar-prebuilt
+COPY product-service/build/libs/*.jar /app.jar
+
+FROM jar-${JAR_SOURCE} AS jar
+
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
+COPY --from=jar /app.jar app.jar
 ENV JAVA_OPTS="-Xms256m -Xmx512m"
 ENV SPRING_PROFILES_ACTIVE="docker"
 EXPOSE 8083
