@@ -409,6 +409,16 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-shared-modules-${{ github.sha }}
 
+  error-code-check:
+    name: 오류 코드 유일성 검사
+    runs-on: ubuntu-latest
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v3
+
+      - name: ErrorCode enum 코드 중복 검사
+        run: python3 scripts/ci/check-error-code-uniqueness.py
+
   final-check:
     name: CI 최종 검증
     runs-on: ubuntu-latest
@@ -419,6 +429,7 @@ jobs:
       - services-docker-build
       - k8s-validate
       - shared-modules-test
+      - error-code-check
     if: always()
     steps:
       - name: 모든 선행 job 결과 확인
@@ -440,3 +451,4 @@ jobs:
           check_result "services-docker-build" "${{ needs.services-docker-build.result }}"
           check_result "k8s-validate" "${{ needs.k8s-validate.result }}"
           check_result "shared-modules-test" "${{ needs.shared-modules-test.result }}"
+          check_result "error-code-check" "${{ needs.error-code-check.result }}"
