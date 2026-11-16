@@ -165,4 +165,16 @@ class RefreshRateLimitKeyTest {
         assertThat(status).isEqualTo(413)
         assertThat(backendBodies).isEmpty()
     }
+
+    @Test
+    fun 본문이_8KB를_넘으면_공통_코드_REQ004로_답한다() {
+        webTestClient.post().uri("/api/v1/auth/refresh")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(bodyWith("a".repeat(9_000)))
+            .exchange()
+            .expectStatus().isEqualTo(413)
+            .expectBody()
+            .jsonPath("$.code").isEqualTo("REQ004")
+            .jsonPath("$.message").isEqualTo("요청 본문이 너무 큽니다.")
+    }
 }
