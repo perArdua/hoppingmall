@@ -7,6 +7,7 @@ import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import com.hoppingmall.product.category.service.CategoryCommandService
 import com.hoppingmall.product.category.service.CategoryQueryService
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.common.file.UploadedImageLinker
 import com.hoppingmall.product.product.domain.ProductStatistics
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
@@ -69,6 +70,9 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
     @Autowired
     private lateinit var productReviewSummaryService: ProductReviewSummaryService
+
+    @Autowired
+    private lateinit var uploadedImageLinker: UploadedImageLinker
 
     @Autowired
     private lateinit var categoryCommandService: CategoryCommandService
@@ -223,7 +227,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
             OrderItemInfo(ORDER_ITEM_ID, ORDER_ID, SELLER_ID, PRODUCT_ID, "리뷰 상품", BigDecimal("10000"), 1, BigDecimal("10000"))
         )
         whenever(orderQueryPort.isDelivered(any(), any())).thenReturn(true)
-        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService)
+        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService, uploadedImageLinker)
         val tx = TransactionTemplate(transactionManager)
         val request = ReviewCreateRequest(orderItemId = ORDER_ITEM_ID, rating = 2, content = "처음 쓴 리뷰 내용입니다")
         val firstId = tx.execute { service.createReview(BUYER_ID, request) }!!.id

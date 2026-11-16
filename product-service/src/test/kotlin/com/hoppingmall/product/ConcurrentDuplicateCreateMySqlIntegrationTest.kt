@@ -4,6 +4,7 @@ import com.hoppingmall.common.BusinessException
 import com.hoppingmall.product.category.dto.request.CategoryCreateRequest
 import com.hoppingmall.product.category.service.CategoryCommandService
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.common.file.UploadedImageLinker
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.service.ProductCommandService
@@ -56,6 +57,9 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
     private lateinit var productReviewSummaryService: ProductReviewSummaryService
 
     @Autowired
+    private lateinit var uploadedImageLinker: UploadedImageLinker
+
+    @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
 
     @BeforeEach
@@ -96,7 +100,7 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
             OrderItemInfo(ORDER_ITEM_ID, ORDER_ID, SELLER_ID, PRODUCT_ID, "동시 리뷰 상품", BigDecimal("10000"), 1, BigDecimal("10000"))
         )
         whenever(orderQueryPort.isDelivered(any(), any())).thenReturn(true)
-        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService)
+        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService, uploadedImageLinker)
         val tx = TransactionTemplate(transactionManager)
 
         val result = runWhileHolding(
