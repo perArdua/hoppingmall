@@ -16,7 +16,8 @@ class InvariantSqlParserTest {
         "PAYING_MAX_MINUTES" to "15",
         "ORPHAN_GRACE_MINUTES" to "1",
         "OUTBOX_MAX_SECONDS" to "60",
-        "DLQ_MAX_SECONDS" to "60"
+        "DLQ_MAX_SECONDS" to "60",
+        "POINT_PAYMENT_SINCE" to "2026-11-16 06:02:19"
     )
 
     private fun bundledSql(): String =
@@ -34,6 +35,16 @@ class InvariantSqlParserTest {
             assertThat(it.sql).startsWith("SELECT").doesNotContain("{{").doesNotEndWith(";")
         }
         assertThat(definitions.first { it.id == "INV-2b" }.meaning).isEqualTo("주문이 15분 넘게 PAYING")
+    }
+
+    @Test
+    fun INV_14는_기준_시각_전에_만든_결제와_이력의_되돌림을_보지_않는다() {
+        val definition = InvariantSqlParser.parse(bundledSql(), params).first { it.id == "INV-14" }
+
+        assertThat(definition.sql)
+            .contains("h.created_at >= '2026-11-16 06:02:19'")
+            .contains("p.created_at < '2026-11-16 06:02:19'")
+        assertThat(definition.meaning).contains("2026-11-16 06:02:19 이후 결제만")
     }
 
     @Test

@@ -25,7 +25,7 @@ class SecurityConfig(
     ) {
         auth
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-            .requestMatchers("/api/v1/files/upload").hasAnyRole("SELLER", "ADMIN")
+            .requestMatchers("/api/v1/files/upload").hasAnyRole("BUYER", "SELLER", "ADMIN")
             .requestMatchers("/api/v1/products/images/upload").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.POST, "/api/v1/products").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.PUT, "/api/v1/products/{productId}").hasAnyRole("SELLER", "ADMIN")

@@ -1,5 +1,8 @@
 package com.hoppingmall.product.review.service
 
+import com.hoppingmall.product.common.file.UploadedImageLinker
+import com.hoppingmall.product.common.file.exception.FileException
+import com.hoppingmall.product.common.file.exception.UnregisteredImageException
 import com.hoppingmall.product.product.domain.ProductStatistics
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.product.review.domain.Review
@@ -24,8 +27,11 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import java.math.BigDecimal
 
@@ -45,6 +51,9 @@ class ReviewCommandServiceImplTest {
 
     @Mock
     private lateinit var productReviewSummaryService: ProductReviewSummaryService
+
+    @Mock
+    private lateinit var uploadedImageLinker: UploadedImageLinker
 
     @InjectMocks
     private lateinit var service: ReviewCommandServiceImpl
@@ -239,5 +248,86 @@ class ReviewCommandServiceImplTest {
         service.deleteReview(1L, 1L)
 
         verify(productReviewSummaryService, times(2)).refresh(7L)
+    }
+
+    @Test
+    fun 이미지_없이_리뷰를_쓰면_업로드_기록을_보지_않는다() {
+        val review = Review.create(
+            buyerId = 1L, orderItemId = 100L, productId = 1L,
+            rating = 5, content = "좋아요"
+        ).withId(1L)
+        whenever(orderQueryPort.findOrderItemById(100L)).thenReturn(orderItemInfo)
+        whenever(orderQueryPort.isDelivered(10L, 1L)).thenReturn(true)
+        whenever(reviewRepository.existsByOrderItemId(100L)).thenReturn(false)
+        whenever(reviewRepository.save(any<Review>())).thenReturn(review)
+
+        service.createReview(1L, ReviewCreateRequest(orderItemId = 100L, rating = 5, content = "좋아요"))
+
+        verifyNoInteractions(uploadedImageLinker)
+    }
+
+    @Test
+    fun 리뷰_이미지는_쓴_사람의_업로드로_연결한다() {
+        val review = Review.create(
+            buyerId = 1L, orderItemId = 100L, productId = 1L,
+            rating = 5, content = "좋아요", imageUrl = IMAGE_URL
+        ).withId(1L)
+        whenever(orderQueryPort.findOrderItemById(100L)).thenReturn(orderItemInfo)
+        whenever(orderQueryPort.isDelivered(10L, 1L)).thenReturn(true)
+        whenever(reviewRepository.existsByOrderItemId(100L)).thenReturn(false)
+        whenever(reviewRepository.save(any<Review>())).thenReturn(review)
+
+        service.createReview(1L, ReviewCreateRequest(orderItemId = 100L, rating = 5, content = "좋아요", imageUrl = IMAGE_URL))
+
+        verify(uploadedImageLinker).attach(1L, listOf(IMAGE_URL))
+    }
+
+    @Test
+    fun 연결할_수_없는_이미지_주소면_리뷰를_저장하지_않고_F009() {
+        whenever(orderQueryPort.findOrderItemById(100L)).thenReturn(orderItemInfo)
+        whenever(orderQueryPort.isDelivered(10L, 1L)).thenReturn(true)
+        whenever(reviewRepository.existsByOrderItemId(100L)).thenReturn(false)
+        doThrow(UnregisteredImageException()).whenever(uploadedImageLinker).attach(1L, listOf(EXTERNAL_URL))
+
+        assertThatThrownBy {
+            service.createReview(1L, ReviewCreateRequest(orderItemId = 100L, rating = 5, content = "좋아요", imageUrl = EXTERNAL_URL))
+        }.isInstanceOf(FileException::class.java)
+            .extracting("errorCode.code").isEqualTo("F009")
+        verify(reviewRepository, never()).save(any<Review>())
+    }
+
+    @Test
+    fun 수정에서_바뀐_이미지만_연결을_확인한다() {
+        val review = Review.create(
+            buyerId = 1L, orderItemId = 100L, productId = 1L,
+            rating = 5, content = "좋아요", imageUrl = EXTERNAL_URL
+        ).withId(1L)
+        whenever(reviewRepository.findNullableById(1L)).thenReturn(review)
+
+        service.updateReview(1L, 1L, ReviewUpdateRequest(rating = 4, content = "그대로 둔 이미지", imageUrl = EXTERNAL_URL))
+        verifyNoInteractions(uploadedImageLinker)
+
+        service.updateReview(1L, 1L, ReviewUpdateRequest(rating = 4, content = "새로 올린 이미지", imageUrl = IMAGE_URL))
+        verify(uploadedImageLinker).attach(1L, listOf(IMAGE_URL))
+        assertThat(review.imageUrl).isEqualTo(IMAGE_URL)
+    }
+
+    @Test
+    fun 남의_리뷰는_이미지를_확인하기_전에_막는다() {
+        val review = Review.create(
+            buyerId = 1L, orderItemId = 100L, productId = 1L,
+            rating = 5, content = "좋아요"
+        ).withId(1L)
+        whenever(reviewRepository.findNullableById(1L)).thenReturn(review)
+
+        assertThatThrownBy {
+            service.updateReview(1L, 999L, ReviewUpdateRequest(rating = 4, content = "남의 리뷰 수정", imageUrl = IMAGE_URL))
+        }.isInstanceOf(ReviewAccessDeniedException::class.java)
+        verifyNoInteractions(uploadedImageLinker)
+    }
+
+    companion object {
+        private const val IMAGE_URL = "http://localhost:9000/hoppingmall-product/review/images/a.jpg"
+        private const val EXTERNAL_URL = "https://tracker.example.com/pixel.gif"
     }
 }

@@ -362,50 +362,31 @@ services:
       retries: 10
       start_period: 60s
 
-  minio:
-    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
-    container_name: minio
+  s3mock:
+    image: adobe/s3mock:5.2.3
+    container_name: s3mock
     restart: unless-stopped
-    command: server /data
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hoppingmall-root}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?.env에 MINIO_ROOT_PASSWORD를 설정하세요}
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: hoppingmall-product
     ports:
-      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+      - "127.0.0.1:${S3MOCK_PORT:-9000}:9090"
 
-  minio-init:
-    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
-    container_name: minio-init
+  s3mock-init:
+    image: curlimages/curl:8.11.1
+    container_name: s3mock-init
     restart: "no"
     depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hoppingmall-root}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?.env에 MINIO_ROOT_PASSWORD를 설정하세요}
-      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-product-service}
-      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?.env에 STORAGE_SECRET_KEY를 설정하세요}
+      s3mock:
+        condition: service_started
     volumes:
-      - ./docker/minio:/init:ro
+      - ./docker/s3mock:/init:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -eu
-        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null
-        mc mb --ignore-existing local/hoppingmall-product
-        mc anonymous set-json /init/anonymous-read-policy.json local/hoppingmall-product
-        mc admin policy create local hoppingmall-product-rw /init/product-service-policy.json
-        mc admin user add local "$$STORAGE_ACCESS_KEY" "$$STORAGE_SECRET_KEY"
-        mc admin policy attach local hoppingmall-product-rw --user "$$STORAGE_ACCESS_KEY" >/dev/null 2>&1 || true
-        mc cp /init/default-product.jpg local/hoppingmall-product/product/images/default-product.jpg
+        i=0
+        until curl -fsS -o /dev/null http://s3mock:9090/hoppingmall-product; do i=$$((i + 1)); [ "$$i" -lt 60 ] || exit 1; sleep 2; done
+        curl -fsS -o /dev/null -X PUT -H "Content-Type: image/jpeg" --data-binary @/init/default-product.jpg http://s3mock:9090/hoppingmall-product/product/images/default-product.jpg
 
   product-service:
     stop_grace_period: 45s
@@ -665,7 +646,6 @@ services:
 
 volumes:
   mysql-data:
-  minio-data:
   prometheus-data:
   grafana-data:
   tempo-data:

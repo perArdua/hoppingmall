@@ -22,6 +22,7 @@ import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.mock.web.MockMultipartFile
 import software.amazon.awssdk.core.exception.SdkClientException
@@ -133,8 +134,27 @@ class StorageFileUploadServiceTest {
 
     @Test
     fun 허용되지_않은_도메인은_F005() {
-        val request = FileUploadRequest(MockMultipartFile("file", "a.jpg", null, JPEG), "review", 1L, "SELLER")
+        val request = FileUploadRequest(MockMultipartFile("file", "a.jpg", null, JPEG), "user", 1L, "SELLER")
         assertCode(request, "F005")
+    }
+
+    @Test
+    fun 구매자는_리뷰_이미지를_올린다() {
+        stubSave()
+
+        val response = service.uploadFile(FileUploadRequest(MockMultipartFile("file", "a.jpg", null, JPEG), "review", 5L, "BUYER"))
+
+        assertThat(response.fileUrl).startsWith("http://cdn.test/bucket/review/images/")
+        val captor = argumentCaptor<UploadedFile>()
+        verify(uploadedFileRepository).save(captor.capture())
+        assertThat(captor.firstValue.uploaderId).isEqualTo(5L)
+        assertThat(captor.firstValue.uploaderRole).isEqualTo("BUYER")
+    }
+
+    @Test
+    fun 구매자가_상품_도메인에_올리면_F005() {
+        assertCode(request("a.jpg", JPEG, uploaderId = 5L, role = "BUYER"), "F005")
+        verifyNoInteractions(uploadedFileRepository)
     }
 
     private fun assertCode(request: FileUploadRequest, code: String) {
