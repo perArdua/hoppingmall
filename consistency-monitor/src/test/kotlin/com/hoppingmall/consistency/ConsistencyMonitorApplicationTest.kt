@@ -12,12 +12,14 @@ import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.time.Duration
 
 @SpringBootTest(
     properties = [
         "spring.datasource.url=jdbc:h2:mem:monitor;MODE=MySQL;DB_CLOSE_DELAY=-1",
         "spring.datasource.hikari.connection-init-sql=SELECT 1",
         "consistency.initial-delay-ms=3600000",
+        "consistency.full-sweep.initial-delay-ms=3600000",
         "jwt.secret=${TestTokens.SECRET}"
     ]
 )
@@ -36,7 +38,11 @@ class ConsistencyMonitorApplicationTest {
         assertThat(catalog.definitions).hasSize(16)
         assertThat(properties.policies.keys).containsExactlyInAnyOrderElementsOf(catalog.definitions.map { it.id })
         assertThat(properties.policyOf("INV-1R").severity).isEqualTo(Severity.CRITICAL)
-        assertThat(properties.policyOf("INV-2b").graceSeconds).isEqualTo(60)
+        assertThat(properties.policyOf("INV-2b").graceSeconds).isEqualTo(Duration.ofSeconds(60))
+        assertThat(properties.policyOf("INV-1").graceSeconds).isEqualTo(Duration.ofSeconds(60))
         assertThat(properties.policyOf("INV-11").repairPolicy).isEqualTo(RepairPolicy.AUTO_RETRY)
+        assertThat(properties.sources.keys).containsExactlyInAnyOrder("order", "payment", "product", "user", "notification")
+        assertThat(properties.recentWindowMinutes).isEqualTo(10)
+        assertThat(properties.fullSweep.chunkSize).isEqualTo(5000)
     }
 }
