@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpStatus
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
+import java.sql.Connection
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -100,32 +101,8 @@ class CartItemAddMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Test
     fun 두_요청이_모두_빈_자리를_보고_넣으면_한_행만_남고_다른_요청은_다시_시도하라는_오류를_받는다() {
-        val enteredAt = AtomicLong()
-        val pending = dataSource.connection.use { holder ->
-            holder.autoCommit = false
-            holder.prepareStatement("SELECT id FROM cart_items WHERE buyer_id = ? AND product_id = ? FOR UPDATE").use {
-                it.setLong(1, BUYER_ID)
-                it.setLong(2, PRODUCT_ID)
-                it.executeQuery().close()
-            }
-            val requests = listOf(2, 3).map { quantity ->
-                executor.submit<CartItemResponse> {
-                    enteredAt.compareAndSet(0L, System.currentTimeMillis())
-                    add(quantity)
-                }
-            }
-            awaitAllWaitingOrDone(requests, enteredAt)
-            holder.rollback()
-            requests
-        }
+        val outcomes = addTogetherWhileGapLocked(BUYER_ID, PRODUCT_ID, { add(2) }, { add(3) })
 
-        val outcomes = pending.map { future ->
-            try {
-                Result.success(future.get(LIMIT_SECONDS, TimeUnit.SECONDS))
-            } catch (e: ExecutionException) {
-                Result.failure(e.cause!!)
-            }
-        }
         val succeeded = outcomes.filter { it.isSuccess }.map { it.getOrThrow() }
         val failed = outcomes.mapNotNull { it.exceptionOrNull() }
 
@@ -135,6 +112,43 @@ class CartItemAddMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
         assertThat(errorCode.status).isEqualTo(HttpStatus.CONFLICT)
         assertThat(errorCode.code).isEqualTo("CART004")
         assertThat(rows()).containsExactly(listOf(succeeded.single().quantity, true))
+    }
+
+    @Test
+    fun 같은_구매자가_서로_다른_상품을_동시에_처음_담으면_둘_다_담긴다() {
+        stubProduct(SAME_BUYER_FIRST_PRODUCT_ID)
+        stubProduct(SAME_BUYER_SECOND_PRODUCT_ID)
+
+        val outcomes = addTogetherWhileGapLocked(
+            SAME_BUYER_ID,
+            SAME_BUYER_FIRST_PRODUCT_ID,
+            { add(SAME_BUYER_ID, SAME_BUYER_FIRST_PRODUCT_ID, 1) },
+            { add(SAME_BUYER_ID, SAME_BUYER_SECOND_PRODUCT_ID, 1) }
+        )
+
+        assertThat(outcomes.mapNotNull { it.exceptionOrNull() }).isEmpty()
+        assertThat(activeKeys()).containsExactly(
+            listOf(SAME_BUYER_ID, SAME_BUYER_FIRST_PRODUCT_ID),
+            listOf(SAME_BUYER_ID, SAME_BUYER_SECOND_PRODUCT_ID)
+        )
+    }
+
+    @Test
+    fun 서로_다른_구매자가_동시에_처음_담으면_둘_다_담긴다() {
+        stubProduct(OTHER_BUYERS_PRODUCT_ID)
+
+        val outcomes = addTogetherWhileGapLocked(
+            FIRST_BUYER_ID,
+            OTHER_BUYERS_PRODUCT_ID,
+            { add(FIRST_BUYER_ID, OTHER_BUYERS_PRODUCT_ID, 1) },
+            { add(SECOND_BUYER_ID, OTHER_BUYERS_PRODUCT_ID, 1) }
+        )
+
+        assertThat(outcomes.mapNotNull { it.exceptionOrNull() }).isEmpty()
+        assertThat(activeKeys()).containsExactly(
+            listOf(FIRST_BUYER_ID, OTHER_BUYERS_PRODUCT_ID),
+            listOf(SECOND_BUYER_ID, OTHER_BUYERS_PRODUCT_ID)
+        )
     }
 
     @Test
@@ -148,8 +162,54 @@ class CartItemAddMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
         assertThat(activeQuantities()).containsExactly(1)
     }
 
-    private fun add(quantity: Int): CartItemResponse =
-        cartItemCommandService.addCartItem(BUYER_ID, CartItemCreateRequest(productId = PRODUCT_ID, quantity = quantity))
+    private fun add(quantity: Int): CartItemResponse = add(BUYER_ID, PRODUCT_ID, quantity)
+
+    private fun add(buyerId: Long, productId: Long, quantity: Int): CartItemResponse =
+        cartItemCommandService.addCartItem(buyerId, CartItemCreateRequest(productId = productId, quantity = quantity))
+
+    private fun stubProduct(productId: Long) {
+        whenever(productQueryPort.findProductById(productId))
+            .thenReturn(ProductInfo(id = productId, name = "상품 $productId", price = BigDecimal("1000"), sellerId = 5L))
+    }
+
+    private fun addTogetherWhileGapLocked(
+        lockedBuyerId: Long,
+        lockedProductId: Long,
+        vararg adds: () -> CartItemResponse
+    ): List<Result<CartItemResponse>> {
+        val enteredAt = AtomicLong()
+        val pending = dataSource.connection.use { holder ->
+            holder.autoCommit = false
+            holder.transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ
+            holder.prepareStatement("SELECT id FROM cart_items WHERE buyer_id = ? AND product_id = ? FOR UPDATE").use {
+                it.setLong(1, lockedBuyerId)
+                it.setLong(2, lockedProductId)
+                it.executeQuery().close()
+            }
+            val requests = adds.map { request ->
+                executor.submit<CartItemResponse> {
+                    enteredAt.compareAndSet(0L, System.currentTimeMillis())
+                    request()
+                }
+            }
+            awaitAllWaitingOrDone(requests, enteredAt)
+            holder.rollback()
+            requests
+        }
+        return pending.map { future ->
+            try {
+                Result.success(future.get(LIMIT_SECONDS, TimeUnit.SECONDS))
+            } catch (e: ExecutionException) {
+                Result.failure(e.cause!!)
+            }
+        }
+    }
+
+    private fun activeKeys(): List<List<Long>> =
+        jdbcTemplate.query(
+            "SELECT buyer_id, product_id FROM cart_items WHERE deleted_at IS NULL ORDER BY buyer_id, product_id",
+            { rs, _ -> listOf(rs.getLong("buyer_id"), rs.getLong("product_id")) }
+        )
 
     private fun rows(): List<List<Any>> =
         jdbcTemplate.query(
@@ -205,6 +265,12 @@ class CartItemAddMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
     companion object {
         private const val BUYER_ID = 10L
         private const val PRODUCT_ID = 100L
+        private const val SAME_BUYER_ID = 9_000_001L
+        private const val SAME_BUYER_FIRST_PRODUCT_ID = 9_000_001L
+        private const val SAME_BUYER_SECOND_PRODUCT_ID = 9_000_002L
+        private const val FIRST_BUYER_ID = 9_100_001L
+        private const val SECOND_BUYER_ID = 9_100_002L
+        private const val OTHER_BUYERS_PRODUCT_ID = 9_100_001L
         private const val TABLE = "cart_items"
         private const val LIMIT_SECONDS = 15L
     }
