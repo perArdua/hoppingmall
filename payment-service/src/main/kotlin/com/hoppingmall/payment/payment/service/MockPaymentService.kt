@@ -8,6 +8,7 @@ import com.hoppingmall.payment.payment.exception.code.PaymentErrorCode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
+import java.util.UUID
 import kotlin.random.Random
 
 @Service
@@ -48,7 +49,7 @@ class MockPaymentService : PaymentService {
     }
 
     private fun generateMockTransactionId(): String =
-        "MOCK_${System.currentTimeMillis()}_${Random.nextInt(1000, 9999)}"
+        "MOCK_${UUID.randomUUID()}"
 
     private fun getRandomErrorMessage(): String {
         val errors = listOf(

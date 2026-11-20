@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.scheduler.OutboxPublishWaker
 import com.hoppingmall.outbox.service.OutboxEventService
 import com.hoppingmall.outbox.service.OutboxEventWriter
 import org.assertj.core.api.Assertions.assertThat
@@ -30,6 +31,9 @@ class OutboxEventServiceTest {
 
     @Mock
     private lateinit var objectMapper: ObjectMapper
+
+    @Mock
+    private lateinit var outboxPublishWaker: OutboxPublishWaker
 
     @InjectMocks
     private lateinit var service: OutboxEventWriter

@@ -7,6 +7,8 @@ import com.hoppingmall.common.event.AvroEventConverter
 import com.hoppingmall.common.event.AvroJsonDeserializer
 import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.scheduler.OutboxEventPublisher
+import com.hoppingmall.outbox.scheduler.OutboxPublishWaker
 import com.hoppingmall.outbox.service.OutboxEventWriter
 import com.hoppingmall.payment.outbox.service.TransactionalEventPublisherImpl
 import com.hoppingmall.payment.payment.domain.CompensationEventLog
@@ -51,6 +53,9 @@ class PaymentCompensationEventReadTest {
 
     @Mock
     private lateinit var outboxEventRepository: OutboxEventRepository
+
+    @Mock
+    private lateinit var outboxEventPublisher: OutboxEventPublisher
 
     @Mock
     private lateinit var compensationEventLogService: CompensationEventLogService
@@ -144,7 +149,7 @@ class PaymentCompensationEventReadTest {
 
     @Test
     fun eventId가_빈_결제_취소_이벤트는_처리_완료로_기록하지_않고_실패한다() {
-        KafkaPaymentEventPublisher(TransactionalEventPublisherImpl(OutboxEventWriter(outboxEventRepository, productionObjectMapper)))
+        KafkaPaymentEventPublisher(TransactionalEventPublisherImpl(outboxEventWriter()))
             .publishPaymentCancelledEvent(
                 PaymentCancelledEvent(
                     eventId = "",
@@ -164,8 +169,11 @@ class PaymentCompensationEventReadTest {
         verify(refundPointsService, never()).refundPoints(any(), any())
     }
 
+    private fun outboxEventWriter() =
+        OutboxEventWriter(outboxEventRepository, productionObjectMapper, OutboxPublishWaker(outboxEventPublisher, false))
+
     private fun paymentEventService() = PaymentEventService(
-        KafkaPaymentEventPublisher(TransactionalEventPublisherImpl(OutboxEventWriter(outboxEventRepository, productionObjectMapper)))
+        KafkaPaymentEventPublisher(TransactionalEventPublisherImpl(outboxEventWriter()))
     )
 
     private fun successPayment(paymentId: Long, orderId: Long, userId: Long): Payment {

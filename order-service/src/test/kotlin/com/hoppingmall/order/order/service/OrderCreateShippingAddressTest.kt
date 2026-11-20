@@ -69,6 +69,7 @@ class OrderCreateShippingAddressTest {
         )
         ReflectionTestUtils.setField(cartItem, "id", 1L)
         whenever(cartItemRepository.findAllById(listOf(1L))).thenReturn(listOf(cartItem))
+        whenever(cartItemRepository.deleteUnchanged(1L, BUYER_ID, 1)).thenReturn(1)
         whenever(productQueryPort.findProductsByIds(listOf(100L)))
             .thenReturn(listOf(ProductInfo(id = 100L, name = "상품", price = BigDecimal("25000"), sellerId = 5L)))
         whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 1))).thenReturn(mapOf(100L to "rsv-1"))
