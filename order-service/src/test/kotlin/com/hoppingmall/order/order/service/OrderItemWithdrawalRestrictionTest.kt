@@ -120,6 +120,7 @@ class OrderItemWithdrawalRestrictionTest {
         whenever(cartItemRepository.findAllById(listOf(1L, 2L))).thenReturn(
             listOf(cartItem(1L, RESTRICTED_PRODUCT_ID), cartItem(2L, FREE_PRODUCT_ID))
         )
+        whenever(cartItemRepository.deleteUnchanged(any(), any(), any())).thenReturn(1)
         whenever(productQueryPort.findProductsByIds(listOf(RESTRICTED_PRODUCT_ID, FREE_PRODUCT_ID))).thenReturn(
             listOf(productFromHttp(RESTRICTED_PRODUCT_ID, restricted = true), productFromHttp(FREE_PRODUCT_ID, restricted = false))
         )
