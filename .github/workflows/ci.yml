@@ -72,6 +72,13 @@ jobs:
             consistency_monitor:
               - 'consistency-monitor/**'
               - 'scripts/invariants/**'
+              - 'user-service/src/main/resources/db/migration/**'
+              - 'product-service/src/main/resources/db/migration/**'
+              - 'order-service/src/main/resources/db/migration/**'
+              - 'payment-service/src/main/resources/db/migration/**'
+              - 'notification-service/src/main/resources/db/migration/**'
+              - 'settlement-service/src/main/resources/db/migration/**'
+              - 'docker/init-*'
               - '.github/workflows/**'
             user_service:
               - 'user-service/**'

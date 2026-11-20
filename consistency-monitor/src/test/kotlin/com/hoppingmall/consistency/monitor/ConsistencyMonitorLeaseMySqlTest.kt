@@ -2,9 +2,13 @@ package com.hoppingmall.consistency.monitor
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.hoppingmall.consistency.check.InvariantChecks
 import com.hoppingmall.consistency.config.ConsistencyProperties
+import com.hoppingmall.consistency.config.SourceProperties
 import com.hoppingmall.consistency.invariant.InvariantCatalog
 import com.hoppingmall.consistency.invariant.InvariantDefinition
+import com.hoppingmall.consistency.invariant.InvariantStatement
+import com.hoppingmall.consistency.source.SourceDatabases
 import com.hoppingmall.consistency.support.MySqlContainerSupport
 import com.hoppingmall.consistency.violation.ViolationRepository
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -36,23 +40,31 @@ class ConsistencyMonitorLeaseMySqlTest {
     )
     private val jdbcTemplate = JdbcTemplate(dataSource)
     private val executor = Executors.newFixedThreadPool(2)
-    private val properties = ConsistencyProperties()
+    private val properties = ConsistencyProperties(
+        sources = mapOf(
+            "lease" to SourceProperties(
+                MySqlContainerSupport.jdbcUrl("consistency_lease"),
+                MySqlContainerSupport.username,
+                MySqlContainerSupport.password
+            )
+        ),
+        dataTimeZone = "+00:00"
+    )
+    private val sources = SourceDatabases(properties)
     private val catalog: InvariantCatalog = mock()
 
     @BeforeEach
     fun setUp() {
         jdbcTemplate.execute("DROP TABLE IF EXISTS invariant_violations")
         jdbcTemplate.execute("DROP TABLE IF EXISTS monitor_leases")
-        jdbcTemplate.execute("DROP TABLE IF EXISTS lease_probe")
         ResourceDatabasePopulator(ClassPathResource("schema.sql")).execute(dataSource)
-        jdbcTemplate.execute("CREATE TABLE lease_probe (id BIGINT PRIMARY KEY)")
-        jdbcTemplate.update("INSERT INTO lease_probe (id) VALUES (1)")
         whenever(catalog.definitions).thenReturn(listOf(BLOCKING))
     }
 
     @AfterEach
     fun tearDown() {
         executor.shutdownNow()
+        sources.close()
     }
 
     private fun lease(owner: String) = MonitorLease(jdbcTemplate, LEASE_SECONDS, owner)
@@ -60,7 +72,7 @@ class ConsistencyMonitorLeaseMySqlTest {
     private fun monitor(owner: String) = ConsistencyMonitor(
         catalog,
         properties,
-        jdbcTemplate,
+        InvariantChecks(catalog, sources, properties),
         ViolationRepository(jdbcTemplate),
         InvariantMetrics(SimpleMeterRegistry(), catalog, properties),
         ObjectMapper().registerModule(JavaTimeModule()),
@@ -70,10 +82,10 @@ class ConsistencyMonitorLeaseMySqlTest {
     private fun lockWaitCount(): Long =
         jdbcTemplate.queryForObject(
             """
-            SELECT COUNT(*) FROM performance_schema.data_lock_waits w
-            JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
-            WHERE l.OBJECT_SCHEMA = DATABASE()
-            AND l.OBJECT_NAME = 'lease_probe'
+            SELECT COUNT(*) FROM performance_schema.metadata_locks
+            WHERE OBJECT_TYPE = 'USER LEVEL LOCK'
+            AND OBJECT_NAME = 'lease_probe'
+            AND LOCK_STATUS = 'PENDING'
             """.trimIndent(),
             Long::class.java
         )!!
@@ -112,17 +124,15 @@ class ConsistencyMonitorLeaseMySqlTest {
         val holder = dataSource.connection
         val secondSkipped: Boolean
         try {
-            holder.autoCommit = false
-            holder.createStatement().use { it.executeQuery("SELECT id FROM lease_probe WHERE id = 1 FOR UPDATE") }
+            holder.createStatement().use { it.executeQuery("SELECT GET_LOCK('lease_probe', 0)") }
             val firstCycle = executor.submit { first.runCycle() }
             awaitLockWaits(1, firstCycle)
             val secondCycle = executor.submit { second.runCycle() }
             secondSkipped = finishedWithoutWaiting(secondCycle)
-            holder.commit()
+            holder.createStatement().use { it.executeQuery("SELECT RELEASE_LOCK('lease_probe')") }
             firstCycle.get(WAIT_LIMIT_MS, TimeUnit.MILLISECONDS)
             secondCycle.get(WAIT_LIMIT_MS, TimeUnit.MILLISECONDS)
         } finally {
-            holder.rollback()
             holder.close()
         }
 
@@ -162,7 +172,7 @@ class ConsistencyMonitorLeaseMySqlTest {
         private val BLOCKING = InvariantDefinition(
             "INV-LEASE",
             "잠긴 행을 읽는 점검",
-            "SELECT id AS entity_key FROM lease_probe WHERE id = 1 FOR UPDATE"
+            listOf(InvariantStatement("check", "lease", "SELECT GET_LOCK('lease_probe', 15) AS entity_key"))
         )
         private const val LEASE_SECONDS = 300L
         private const val WAIT_LIMIT_MS = 15_000L

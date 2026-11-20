@@ -27,11 +27,6 @@ repositories {
 
 extra["testcontainers.version"] = "1.21.4"
 
-val invariantsSql = file(
-	listOf("../scripts/invariants/invariants.sql", "/scripts/invariants/invariants.sql")
-		.first { file(it).exists() }
-)
-
 dependencies {
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -55,16 +50,25 @@ dependencies {
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 	testImplementation("org.testcontainers:testcontainers:1.21.4")
 	testImplementation("org.testcontainers:mysql:1.21.4")
+	testImplementation("org.flywaydb:flyway-core")
+	testImplementation("org.flywaydb:flyway-mysql")
 	testRuntimeOnly("com.h2database:h2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.processResources {
-	from(invariantsSql)
+tasks.processTestResources {
+	from("../scripts/invariants/invariants.sql") {
+		rename { "legacy-invariants.sql" }
+	}
 }
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	inputs.files(
+		listOf("user-service", "product-service", "order-service", "payment-service", "notification-service", "settlement-service")
+			.map { fileTree("../$it/src/main/resources/db/migration") }
+	)
+	inputs.files("../docker/init-db.sql", "../docker/init-accounts.sh")
 }
 
 val jacocoExcludedDirs = listOf(
