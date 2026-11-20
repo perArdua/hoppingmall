@@ -40,12 +40,16 @@ import org.springframework.kafka.support.SendResult
 import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.SimpleTransactionStatus
+import java.sql.Connection
+import java.sql.DatabaseMetaData
+import java.sql.SQLException
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
+import javax.sql.DataSource
 
 @DisplayName("OutboxEventPublisher")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -785,6 +789,71 @@ class OutboxEventPublisherTest {
     }
 
     @Test
+    fun 기동_시_연결된_DB가_MySQL이면_일괄_선점을_그대로_쓴다() {
+        val publisher = publisherWith(dataSource(productName = "MySQL"))
+        whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(emptyList())
+
+        val logs = captureLogs(Level.INFO) { publisher.configureClaimMode() }
+        publisher.publishPendingEvents()
+
+        assertThat(ReflectionTestUtils.getField(publisher, "batchClaim")).isEqualTo(true)
+        assertThat(logs).noneMatch { it.contains("batch claim disabled") }
+        verify(outboxEventRepository, never()).findUnprocessedEvents(any(), any(), any(), any())
+    }
+
+    @Test
+    fun 기동_시_연결된_DB가_MySQL이_아니면_행_단위_선점으로_돌고_한_줄_남긴다() {
+        val publisher = publisherWith(dataSource(productName = "H2"))
+        ReflectionTestUtils.setField(publisher, "staleThresholdMs", 1_000L)
+        whenever(
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = 3,
+                limit = 100
+            )
+        ).thenReturn(emptyList())
+
+        val logs = captureLogs(Level.INFO) { publisher.configureClaimMode() }
+        publisher.publishPendingEvents()
+
+        assertThat(ReflectionTestUtils.getField(publisher, "batchClaim")).isEqualTo(false)
+        assertThat(publisher.staleClaimTimestamp()).isNull()
+        assertThat(logs).containsExactly(
+            "Outbox batch claim disabled: connected database is H2, not MySQL; publishing with per-row claims"
+        )
+        verify(outboxEventRepository, never()).lockUnprocessedEventIds(any(), any(), any(), any())
+        verify(kafkaTemplate, never()).producerFactory
+    }
+
+    @Test
+    fun 기동_시_DB_판별에_실패하면_행_단위_선점으로_돈다() {
+        val dataSource = mock<DataSource>()
+        whenever(dataSource.connection).thenThrow(SQLException("connection refused"))
+        val publisher = publisherWith(dataSource)
+
+        val logs = captureLogs(Level.INFO) { publisher.configureClaimMode() }
+
+        assertThat(ReflectionTestUtils.getField(publisher, "batchClaim")).isEqualTo(false)
+        assertThat(logs).containsExactly(
+            "Outbox could not read the connected database product name: connection refused",
+            "Outbox batch claim disabled: connected database is unknown, not MySQL; publishing with per-row claims"
+        )
+    }
+
+    @Test
+    fun 일괄_선점을_설정으로_끄면_기동_시_DB를_판별하지_않는다() {
+        val dataSource = mock<DataSource>()
+        val publisher = publisherWith(dataSource)
+        ReflectionTestUtils.setField(publisher, "batchClaim", false)
+
+        val logs = captureLogs(Level.INFO) { publisher.configureClaimMode() }
+
+        assertThat(logs).isEmpty()
+        verify(dataSource, never()).connection
+    }
+
+    @Test
     fun 일괄_선점_시각은_마이크로초로_잘라_선점과_완료_조건에_같은_값을_쓴다() {
         val clock = MutableClock(START.plusNanos(123_456_789))
         val publisher = batchClaimPublisher(clock)
@@ -1080,6 +1149,35 @@ class OutboxEventPublisherTest {
             val callback = invocation.arguments[0] as KafkaOperations.OperationsCallback<String, Any, Any>
             callback.doInOperations(kafkaTemplate)
         }
+    }
+
+    private fun publisherWith(dataSource: DataSource): OutboxEventPublisher =
+        OutboxEventPublisher(
+            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager,
+            Clock.systemDefaultZone(), dataSource
+        )
+
+    private fun dataSource(productName: String): DataSource {
+        val metaData = mock<DatabaseMetaData>()
+        whenever(metaData.databaseProductName).thenReturn(productName)
+        val connection = mock<Connection>()
+        whenever(connection.metaData).thenReturn(metaData)
+        val dataSource = mock<DataSource>()
+        whenever(dataSource.connection).thenReturn(connection)
+        return dataSource
+    }
+
+    private fun captureLogs(minimum: Level, action: () -> Unit): List<String> {
+        val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java) as Logger
+        val appender = ListAppender<ILoggingEvent>().apply { start() }
+        logger.addAppender(appender)
+        try {
+            action()
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
+        return appender.list.filter { it.level.isGreaterOrEqual(minimum) }.map { it.formattedMessage }
     }
 
     private fun captureWarnings(action: () -> Unit): List<String> {

@@ -48,6 +48,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import javax.sql.DataSource
 
 @DisplayName("아웃박스 일괄 선점의 MySQL 잠금 선점")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -65,6 +66,9 @@ class OutboxBatchClaimMySqlTest {
 
     @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
+
+    @Autowired
+    private lateinit var dataSource: DataSource
 
     private val sendCounts = ConcurrentHashMap<String, AtomicInteger>()
 
@@ -96,6 +100,38 @@ class OutboxBatchClaimMySqlTest {
         assertThat(sendCounts.values.map { it.get() }).allMatch { it == 1 }
         assertThat(countByStatus("PUBLISHED")).isEqualTo(1000L)
         assertThat(countByStatus("RETRYING") + countByStatus("PENDING")).isZero()
+    }
+
+    @Test
+    fun 연결된_DB가_MySQL이면_기동_판별_뒤에도_잠금_조회로_일괄_선점한다() {
+        insertPending(150)
+        startStatementHistory()
+        val kafka = countingKafka()
+        val converter = Mockito.mock(AvroEventConverter::class.java)
+        whenever(converter.convertJsonToAvro(any(), any())).thenReturn(Mockito.mock(GenericRecord::class.java))
+        val publisher = OutboxEventPublisher(
+            outboxEventRepository,
+            kafka.template,
+            Mockito.mock(OutboxMetrics::class.java),
+            converter,
+            transactionManager,
+            Clock.systemDefaultZone(),
+            dataSource
+        )
+
+        publisher.configureClaimMode()
+        publisher.publishPendingEvents()
+
+        assertThat(ReflectionTestUtils.getField(publisher, "batchClaim")).isEqualTo(true)
+        assertThat(countByStatus("PUBLISHED")).isEqualTo(150L)
+        assertThat(kafka.transactions.get()).isEqualTo(2)
+        val statements = jdbcTemplate.queryForList(
+            "SELECT SQL_TEXT FROM performance_schema.events_statements_history_long " +
+                "WHERE CURRENT_SCHEMA = DATABASE() AND SQL_TEXT LIKE '%outbox_events%' ORDER BY EVENT_ID",
+            String::class.java
+        )
+        assertThat(statements.filter { it.contains("SKIP LOCKED") }).hasSize(2)
+        assertThat(statements.filter { it.contains("FORCE INDEX (PRIMARY)") }).hasSize(4)
     }
 
     @Test

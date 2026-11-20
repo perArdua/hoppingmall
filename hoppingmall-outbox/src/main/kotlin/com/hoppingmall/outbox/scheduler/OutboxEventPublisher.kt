@@ -24,6 +24,7 @@ import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
+import javax.sql.DataSource
 import kotlin.concurrent.withLock
 
 @Service
@@ -33,7 +34,8 @@ class OutboxEventPublisher(
     private val outboxMetrics: OutboxMetrics,
     private val avroEventConverter: AvroEventConverter,
     transactionManager: PlatformTransactionManager,
-    private val clock: Clock = Clock.systemDefaultZone()
+    private val clock: Clock = Clock.systemDefaultZone(),
+    private val dataSource: DataSource? = null
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
@@ -58,6 +60,28 @@ class OutboxEventPublisher(
     private var brokerTxCleanupMs: Long = 10_000
 
     @PostConstruct
+    fun configureClaimMode() {
+        if (batchClaim) {
+            val databaseProduct = databaseProductName()
+            if (!MYSQL_PRODUCT_NAME.equals(databaseProduct, ignoreCase = true)) {
+                batchClaim = false
+                logger.info(
+                    "Outbox batch claim disabled: connected database is ${databaseProduct ?: "unknown"}, not MySQL; " +
+                        "publishing with per-row claims"
+                )
+            }
+        }
+        warnIfClaimAgeExceedsStaleWindow()
+    }
+
+    private fun databaseProductName(): String? =
+        try {
+            dataSource?.connection?.use { it.metaData.databaseProductName }
+        } catch (e: Exception) {
+            logger.warn("Outbox could not read the connected database product name: ${e.message}")
+            null
+        }
+
     fun warnIfClaimAgeExceedsStaleWindow() {
         if (!batchClaim) return
         val transactionTimeoutMs = producerTransactionTimeoutMs()
@@ -390,5 +414,6 @@ class OutboxEventPublisher(
 
     companion object {
         private const val BATCH_LIMIT = 100
+        private const val MYSQL_PRODUCT_NAME = "MySQL"
     }
 }

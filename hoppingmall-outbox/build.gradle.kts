@@ -47,6 +47,7 @@ dependencies {
     testImplementation("org.testcontainers:mysql:1.21.4")
     testImplementation("org.testcontainers:kafka:1.21.4")
     testRuntimeOnly("com.mysql:mysql-connector-j")
+    testRuntimeOnly("com.h2database:h2")
 }
 
 tasks.withType<Test> {
