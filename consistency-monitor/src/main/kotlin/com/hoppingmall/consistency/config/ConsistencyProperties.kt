@@ -1,6 +1,5 @@
 package com.hoppingmall.consistency.config
 
-import com.hoppingmall.consistency.enums.RepairPolicy
 import com.hoppingmall.consistency.enums.Severity
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.convert.DurationUnit
@@ -25,8 +24,7 @@ data class ConsistencyProperties(
 data class InvariantPolicy(
     val severity: Severity = Severity.WARN,
     @DurationUnit(ChronoUnit.SECONDS)
-    val graceSeconds: Duration = Duration.ZERO,
-    val repairPolicy: RepairPolicy = RepairPolicy.HUMAN
+    val graceSeconds: Duration = Duration.ZERO
 )
 
 data class SourceProperties(

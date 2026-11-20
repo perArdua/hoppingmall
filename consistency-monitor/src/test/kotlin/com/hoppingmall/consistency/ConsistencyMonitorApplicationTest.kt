@@ -2,7 +2,6 @@ package com.hoppingmall.consistency
 
 import com.hoppingmall.consistency.auth.TestTokens
 import com.hoppingmall.consistency.config.ConsistencyProperties
-import com.hoppingmall.consistency.enums.RepairPolicy
 import com.hoppingmall.consistency.enums.Severity
 import com.hoppingmall.consistency.invariant.InvariantCatalog
 import org.assertj.core.api.Assertions.assertThat
@@ -40,7 +39,6 @@ class ConsistencyMonitorApplicationTest {
         assertThat(properties.policyOf("INV-1R").severity).isEqualTo(Severity.CRITICAL)
         assertThat(properties.policyOf("INV-2b").graceSeconds).isEqualTo(Duration.ofSeconds(60))
         assertThat(properties.policyOf("INV-1").graceSeconds).isEqualTo(Duration.ofSeconds(60))
-        assertThat(properties.policyOf("INV-11").repairPolicy).isEqualTo(RepairPolicy.AUTO_RETRY)
         assertThat(properties.sources.keys).containsExactlyInAnyOrder("order", "payment", "product", "user", "notification")
         assertThat(properties.recentWindowMinutes).isEqualTo(10)
         assertThat(properties.fullSweep.chunkSize).isEqualTo(5000)
