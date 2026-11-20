@@ -16,11 +16,11 @@ import java.math.BigDecimal
 class PointUseInvariantMySqlTest {
 
     private val jdbcTemplate = JdbcTemplate(
-        DriverManagerDataSource(MySqlContainerSupport.jdbcUrl("payment_db"), MySqlContainerSupport.username, MySqlContainerSupport.password)
+        DriverManagerDataSource(MySqlContainerSupport.jdbcUrl("point_use_db"), MySqlContainerSupport.username, MySqlContainerSupport.password)
     )
 
     private val definitions = InvariantSqlParser.parse(
-        javaClass.classLoader.getResource("invariants.sql")!!.readText(Charsets.UTF_8),
+        javaClass.classLoader.getResource("invariant-queries.sql")!!.readText(Charsets.UTF_8),
         mapOf(
             "PENDING_MAX_MINUTES" to "10",
             "PAYING_MAX_MINUTES" to "15",
@@ -123,7 +123,7 @@ class PointUseInvariantMySqlTest {
     }
 
     private fun violatingPaymentIds(invariantId: String): List<Long> =
-        jdbcTemplate.queryForList(definitions.getValue(invariantId).sql).map { (it["payment_id"] as Number).toLong() }
+        jdbcTemplate.queryForList(definitions.getValue(invariantId).statement("check").sql).map { (it["payment_id"] as Number).toLong() }
 
     private fun payment(id: Long, status: String, createdAt: String = AFTER) {
         jdbcTemplate.update(

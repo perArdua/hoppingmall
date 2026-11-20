@@ -92,7 +92,7 @@ class MonitorLeaseRenewalMySqlTest {
 
         assertThat(properties.getProperty("consistency.lease.seconds")).isEqualTo("60")
         assertThat(properties.getProperty("consistency.lease.renew-ms")).isEqualTo("20000")
-        assertThat(properties.getProperty("spring.task.scheduling.pool.size")).isEqualTo("2")
+        assertThat(properties.getProperty("spring.task.scheduling.pool.size")).isEqualTo("3")
         assertThat(renew).isNotNull
         assertThat(renew.fixedDelayString).isEqualTo("\${consistency.lease.renew-ms:20000}")
     }

@@ -6,7 +6,6 @@ COPY consistency-monitor/gradlew ./
 COPY consistency-monitor/gradle ./gradle
 COPY consistency-monitor/build.gradle.kts consistency-monitor/settings.gradle.kts ./
 COPY consistency-monitor/src ./src
-COPY scripts/invariants /scripts/invariants
 RUN sed -i "s/\r$//" gradlew && chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
 FROM scratch AS jar-build
