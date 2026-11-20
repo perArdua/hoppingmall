@@ -32,6 +32,27 @@ class IdempotencyService(
         responseBody: String,
         requestFingerprint: String,
         ttlHours: Long
+    ): IdempotencyRecord = persist(key, httpMethod, endpoint, responseStatus, responseBody, requestFingerprint, ttlHours)
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun saveInCurrentTransaction(
+        key: String,
+        httpMethod: String,
+        endpoint: String,
+        responseStatus: Int,
+        responseBody: String,
+        requestFingerprint: String,
+        ttlHours: Long
+    ): IdempotencyRecord = persist(key, httpMethod, endpoint, responseStatus, responseBody, requestFingerprint, ttlHours)
+
+    private fun persist(
+        key: String,
+        httpMethod: String,
+        endpoint: String,
+        responseStatus: Int,
+        responseBody: String,
+        requestFingerprint: String,
+        ttlHours: Long
     ): IdempotencyRecord =
         idempotencyRecordRepository.save(
             IdempotencyRecord(

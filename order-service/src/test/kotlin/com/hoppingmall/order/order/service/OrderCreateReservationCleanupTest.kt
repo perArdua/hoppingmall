@@ -1,5 +1,6 @@
 package com.hoppingmall.order.order.service
 
+import com.hoppingmall.idempotency.IdempotencyTxRecorder
 import com.hoppingmall.order.cartItem.domain.CartItem
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.config.OrderMetrics
@@ -8,6 +9,7 @@ import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
+import com.hoppingmall.order.order.exception.OrderCartChangedException
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentCommandPort
 import com.hoppingmall.order.port.ProductInfo
@@ -139,6 +141,37 @@ class OrderCreateReservationCleanupTest {
 
         verify(inventoryCommandPort, never()).cancelReservations(any())
         verify(orderMetrics, times(1)).recordOrderCreated(BigDecimal("75000"))
+    }
+
+    @Test
+    fun 주문_저장이_성공하면_트랜잭션_안에서_멱등_기록기를_한_번_부른다() {
+        val recorder: IdempotencyTxRecorder = mock()
+        service.idempotencyTxRecorder = recorder
+        whenever(orderItemRepository.saveAll(any<List<OrderItem>>())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val items = it.arguments[0] as List<OrderItem>
+            items.forEachIndexed { index, item -> ReflectionTestUtils.setField(item, "id", (index + 1).toLong()) }
+            items
+        }
+        whenever(cartItemRepository.deleteUnchanged(any(), any(), any())).thenReturn(1)
+
+        service.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(1L, 2L)))
+
+        verify(recorder, times(1)).recordIfPending(any())
+    }
+
+    @Test
+    fun 장바구니_차지에_실패하면_멱등_기록기를_부르지_않고_그_주문의_예약을_취소한다() {
+        val recorder: IdempotencyTxRecorder = mock()
+        service.idempotencyTxRecorder = recorder
+        whenever(orderItemRepository.saveAll(any<List<OrderItem>>())).thenAnswer { it.arguments[0] }
+        whenever(cartItemRepository.deleteUnchanged(any(), any(), any())).thenReturn(0)
+
+        assertThatThrownBy { service.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
+            .isInstanceOf(OrderCartChangedException::class.java)
+
+        verify(recorder, never()).recordIfPending(any())
+        verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-1", "rsv-2"))
     }
 
     private fun cartItem(id: Long, productId: Long, quantity: Int): CartItem {

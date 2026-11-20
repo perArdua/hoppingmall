@@ -10,6 +10,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.dto.response.OrderPriceChange
 import com.hoppingmall.order.order.dto.response.OrderResponse
+import com.hoppingmall.order.order.dto.response.toCreatedResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderCartChangedException
@@ -36,6 +37,7 @@ import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.idempotency.IdempotencyTxRecorder
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -65,6 +67,9 @@ class OrderCommandServiceImpl(
 
     @Autowired(required = false)
     var reservationFence: ReservationFence? = null
+
+    @Autowired(required = false)
+    var idempotencyTxRecorder: IdempotencyTxRecorder? = null
 
     @Value("\${order.timeout.paying-minutes:15}")
     private var payingTimeoutMinutes: Long = 15
@@ -156,7 +161,9 @@ class OrderCommandServiceImpl(
             claimCartItems(buyerId, cartItems)
 
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
-            OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
+            val response = OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
+            idempotencyTxRecorder?.recordIfPending { response.toCreatedResponse() }
+            response
         }!!
 
     private fun claimCartItems(buyerId: Long, cartItems: List<CartItem>) {

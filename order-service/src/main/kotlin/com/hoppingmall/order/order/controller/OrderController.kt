@@ -7,6 +7,7 @@ import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.dto.response.OrderResponse
 import com.hoppingmall.order.order.dto.response.SellerOrderResponse
+import com.hoppingmall.order.order.dto.response.toCreatedResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.service.OrderCommandService
@@ -37,11 +38,8 @@ class OrderController(
     fun createOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: OrderCreateRequest
-    ): ResponseEntity<ApiResponse<OrderResponse>> {
-        val order = orderCommandService.createOrder(userPrincipal.getUserId(), request)
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success(order))
-    }
+    ): ResponseEntity<ApiResponse<OrderResponse>> =
+        orderCommandService.createOrder(userPrincipal.getUserId(), request).toCreatedResponse()
 
     @GetMapping("/{orderId}")
     fun getOrder(
