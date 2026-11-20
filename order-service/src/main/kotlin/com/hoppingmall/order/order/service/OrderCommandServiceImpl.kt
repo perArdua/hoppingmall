@@ -37,6 +37,8 @@ import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.idempotency.IdempotencyConflictException
+import com.hoppingmall.idempotency.IdempotencyRequestContext
 import com.hoppingmall.idempotency.IdempotencyTxRecorder
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
@@ -112,6 +114,10 @@ class OrderCommandServiceImpl(
         val response = try {
             createOrderInTransaction(buyerId, request, cartItems, productMap, reservationMap, totalAmount, fence)
         } catch (e: Exception) {
+            if (idempotencyTxRecorder?.claimedByCommittedRequest() == true) {
+                log.info("같은 멱등 키 주문이 먼저 커밋되어 공유 예약을 취소하지 않음: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName)
+                throw e
+            }
             runCatching { inventoryCommandPort.cancelReservations(reservationMap.values.distinct()) }
                 .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName, it) }
             throw e
@@ -207,6 +213,9 @@ class OrderCommandServiceImpl(
             throw e
         } catch (e: HttpClientErrorException.TooManyRequests) {
             throw OrderBusyException()
+        } catch (e: HttpClientErrorException.Conflict) {
+            if (IdempotencyRequestContext.claimKey() != null) throw IdempotencyConflictException()
+            throw e
         }
 
     private fun productErrorCode(e: HttpClientErrorException): String? =

@@ -144,6 +144,34 @@ class OrderCreateReservationCleanupTest {
     }
 
     @Test
+    fun 같은_멱등_키_주문이_먼저_커밋됐으면_공유된_예약을_취소하지_않고_원래_오류를_던진다() {
+        val recorder: IdempotencyTxRecorder = mock()
+        service.idempotencyTxRecorder = recorder
+        val failure = DataIntegrityViolationException("idempotency_records 중복")
+        whenever(orderItemRepository.saveAll(any<List<OrderItem>>())).thenThrow(failure)
+        whenever(recorder.claimedByCommittedRequest()).thenReturn(true)
+
+        assertThatThrownBy { service.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
+            .isSameAs(failure)
+
+        verify(inventoryCommandPort, never()).cancelReservations(any())
+    }
+
+    @Test
+    fun 먼저_커밋된_같은_키_주문이_없으면_예전처럼_예약을_취소한다() {
+        val recorder: IdempotencyTxRecorder = mock()
+        service.idempotencyTxRecorder = recorder
+        val failure = DataIntegrityViolationException("order_items 저장 실패")
+        whenever(orderItemRepository.saveAll(any<List<OrderItem>>())).thenThrow(failure)
+        whenever(recorder.claimedByCommittedRequest()).thenReturn(false)
+
+        assertThatThrownBy { service.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
+            .isSameAs(failure)
+
+        verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-1", "rsv-2"))
+    }
+
+    @Test
     fun 주문_저장이_성공하면_트랜잭션_안에서_멱등_기록기를_한_번_부른다() {
         val recorder: IdempotencyTxRecorder = mock()
         service.idempotencyTxRecorder = recorder
@@ -158,6 +186,7 @@ class OrderCreateReservationCleanupTest {
         service.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(1L, 2L)))
 
         verify(recorder, times(1)).recordIfPending(any())
+        verify(recorder, never()).claimedByCommittedRequest()
     }
 
     @Test

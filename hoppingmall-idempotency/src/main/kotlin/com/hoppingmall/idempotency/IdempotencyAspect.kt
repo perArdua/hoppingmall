@@ -45,6 +45,9 @@ class IdempotencyAspect(
     @Value("\${idempotency.save-in-tx:false}")
     private var saveInTx: Boolean = false
 
+    @Value("\${idempotency.claim-by-commit:false}")
+    private var claimByCommit: Boolean = false
+
     @Around("@annotation(idempotent)")
     fun handleIdempotency(joinPoint: ProceedingJoinPoint, idempotent: Idempotent): Any? {
         val requestAttributes = RequestContextHolder.getRequestAttributes() as? ServletRequestAttributes
@@ -60,6 +63,10 @@ class IdempotencyAspect(
         if (existing != null) {
             log.info("멱등성 캐시 히트: key={}, endpoint={}", key, existing.endpoint)
             return buildCachedResponse(existing, fingerprint)
+        }
+
+        if (claimByCommit && idempotent.claimByCommit) {
+            return proceedClaimingByCommit(joinPoint, idempotent, request, key, scopedKey, fingerprint)
         }
 
         val lockKey = "idempotency:$scopedKey"
@@ -100,6 +107,31 @@ class IdempotencyAspect(
                 lock.unlock()
             }
         }
+    }
+
+    private fun proceedClaimingByCommit(
+        joinPoint: ProceedingJoinPoint,
+        idempotent: Idempotent,
+        request: HttpServletRequest,
+        key: String,
+        scopedKey: String,
+        fingerprint: String
+    ): Any? {
+        val pending = PendingIdempotency(scopedKey, request.method, request.requestURI, fingerprint, idempotent.ttlHours, claimByCommit = true)
+        IdempotencyRequestContext.open(pending)
+        val result = try {
+            joinPoint.proceed()
+        } catch (e: RuntimeException) {
+            val winner = idempotencyService.findByKey(scopedKey) ?: throw e
+            log.info("멱등성 커밋 선점 경합, 먼저 커밋된 응답 반환: key={}, cause={}", key, e.javaClass.simpleName)
+            return buildCachedResponse(winner, fingerprint)
+        } finally {
+            IdempotencyRequestContext.clear()
+        }
+        if (!pending.savedInTransaction) {
+            saveIfSuccessful(result, request, key, scopedKey, fingerprint, idempotent)
+        }
+        return result
     }
 
     private fun saveIfSuccessful(

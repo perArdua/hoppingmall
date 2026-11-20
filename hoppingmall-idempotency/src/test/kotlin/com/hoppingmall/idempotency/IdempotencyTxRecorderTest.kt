@@ -15,8 +15,10 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import java.time.LocalDateTime
 
 @DisplayName("IdempotencyTxRecorder")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -73,5 +75,36 @@ class IdempotencyTxRecorderTest {
 
         verify(idempotencyService, never()).saveInCurrentTransaction(any(), any(), any(), any(), any(), any(), any())
         assertThat(pending.savedInTransaction).isFalse()
+    }
+
+    @Test
+    fun 커밋_선점_요청이_아니면_다른_요청이_커밋했는지_조회하지_않는다() {
+        IdempotencyRequestContext.open(PendingIdempotency("k3", "POST", "/api/v1/orders", "fp-3", 24L))
+
+        assertThat(recorder.claimedByCommittedRequest()).isFalse()
+        IdempotencyRequestContext.clear()
+        assertThat(recorder.claimedByCommittedRequest()).isFalse()
+        verify(idempotencyService, never()).findByKey(any())
+    }
+
+    @Test
+    fun 커밋_선점_요청이면_같은_키로_커밋된_기록이_있는지로_판단한다() {
+        IdempotencyRequestContext.open(PendingIdempotency("k4", "POST", "/api/v1/orders", "fp-4", 24L, claimByCommit = true))
+        whenever(idempotencyService.findByKey("k4"))
+            .thenReturn(null)
+            .thenReturn(
+                IdempotencyRecord(
+                    idempotencyKey = "k4",
+                    httpMethod = "POST",
+                    endpoint = "/api/v1/orders",
+                    responseStatus = 201,
+                    responseBody = "{}",
+                    expiresAt = LocalDateTime.now().plusHours(1)
+                )
+            )
+
+        assertThat(recorder.claimedByCommittedRequest()).isFalse()
+        assertThat(recorder.claimedByCommittedRequest()).isTrue()
+        assertThat(IdempotencyRequestContext.claimKey()).isEqualTo("k4")
     }
 }

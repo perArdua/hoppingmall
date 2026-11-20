@@ -32,7 +32,7 @@ class OrderController(
     private val shippingCommandService: ShippingCommandService
 ) {
 
-    @Idempotent(ttlHours = 24)
+    @Idempotent(ttlHours = 24, claimByCommit = true)
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun createOrder(

@@ -25,4 +25,9 @@ class IdempotencyTxRecorder(
         )
         pending.savedInTransaction = true
     }
+
+    fun claimedByCommittedRequest(): Boolean {
+        val key = IdempotencyRequestContext.claimKey() ?: return false
+        return idempotencyService.findByKey(key) != null
+    }
 }

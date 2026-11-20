@@ -1,5 +1,6 @@
 package com.hoppingmall.order.port
 
+import com.hoppingmall.idempotency.IdempotencyRequestContext
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
@@ -97,7 +98,7 @@ class HttpInventoryCommandAdapter(
     @CircuitBreaker(name = "inventory-command")
     override fun batchReserveStock(items: List<Pair<Long, Int>>): Map<Long, String> {
         val requestBody = items.map { BatchReserveRequest(it.first, it.second) }
-        val requestKey = UUID.randomUUID().toString()
+        val requestKey = IdempotencyRequestContext.claimKey() ?: UUID.randomUUID().toString()
         val request = org.springframework.http.HttpEntity(requestBody, reserveHeaders(requestKey))
         val response = try {
             exchangeBatchReserve(request)

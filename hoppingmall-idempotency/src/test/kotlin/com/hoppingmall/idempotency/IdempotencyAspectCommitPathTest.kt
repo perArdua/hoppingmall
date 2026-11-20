@@ -27,9 +27,10 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.web.context.request.RequestContextHolder
 import org.springframework.web.context.request.ServletRequestAttributes
+import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
-@DisplayName("IdempotencyAspect 트랜잭션 안 기록 경로")
+@DisplayName("IdempotencyAspect 트랜잭션 안 기록·커밋 선점 경로")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 @ExtendWith(MockitoExtension::class)
 class IdempotencyAspectCommitPathTest {
@@ -71,6 +72,15 @@ class IdempotencyAspectCommitPathTest {
         whenever(lock.tryLock(0L, 10L, TimeUnit.SECONDS)).thenReturn(true)
         whenever(lock.isHeldByCurrentThread).thenReturn(true)
     }
+
+    private fun record(key: String, body: String) = IdempotencyRecord(
+        idempotencyKey = key,
+        httpMethod = "POST",
+        endpoint = "/api/v1/orders",
+        responseStatus = 201,
+        responseBody = body,
+        expiresAt = LocalDateTime.now().plusHours(1)
+    )
 
     @Nested
     @DisplayName("플래그가 모두 꺼짐")
@@ -120,6 +130,7 @@ class IdempotencyAspectCommitPathTest {
             val result = aspect.handleIdempotency(joinPoint, idempotent)
 
             assertThat(result).isEqualTo(response)
+            assertThat(opened!!.claimByCommit).isFalse()
             assertThat(opened!!.ttlHours).isEqualTo(24L)
             assertThat(IdempotencyRequestContext.current()).isNull()
             verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any(), any())
@@ -150,6 +161,103 @@ class IdempotencyAspectCommitPathTest {
 
             assertThat(IdempotencyRequestContext.current()).isNull()
             verify(lock).unlock()
+        }
+    }
+
+    @Nested
+    @DisplayName("claim-by-commit 켬")
+    inner class ClaimByCommit {
+
+        @BeforeEach
+        fun enable() {
+            ReflectionTestUtils.setField(aspect, "claimByCommit", true)
+        }
+
+        @Test
+        fun 표시된_엔드포인트는_락_없이_진행하고_선점_보관함을_연다() {
+            whenever(idempotent.claimByCommit).thenReturn(true)
+            whenever(idempotent.ttlHours).thenReturn(24L)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            val response = ResponseEntity.status(HttpStatus.CREATED).body(mapOf("id" to 3))
+            var opened: PendingIdempotency? = null
+            whenever(joinPoint.proceed()).thenAnswer {
+                opened = IdempotencyRequestContext.current()
+                opened!!.savedInTransaction = true
+                response
+            }
+
+            val result = aspect.handleIdempotency(joinPoint, idempotent)
+
+            assertThat(result).isEqualTo(response)
+            assertThat(opened!!.claimByCommit).isTrue()
+            assertThat(opened!!.key).hasSize(64)
+            assertThat(IdempotencyRequestContext.current()).isNull()
+            verify(redissonClient, never()).getLock(any<String>())
+            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any(), any())
+        }
+
+        @Test
+        fun 진행_중_예외가_났는데_먼저_커밋된_기록이_있으면_그_응답을_돌려준다() {
+            whenever(idempotent.claimByCommit).thenReturn(true)
+            whenever(idempotent.ttlHours).thenReturn(24L)
+            var claimKey: String? = null
+            whenever(joinPoint.proceed()).thenAnswer {
+                claimKey = IdempotencyRequestContext.claimKey()
+                throw IllegalStateException("duplicate")
+            }
+            whenever(idempotencyService.findByKey(any()))
+                .thenReturn(null)
+                .thenAnswer { record(claimKey!!, """{"id":9}""") }
+
+            @Suppress("UNCHECKED_CAST")
+            val result = aspect.handleIdempotency(joinPoint, idempotent) as ResponseEntity<Any>
+
+            assertThat(result.statusCode).isEqualTo(HttpStatus.CREATED)
+            assertThat(result.body).isEqualTo(mapOf("id" to 9))
+            assertThat(IdempotencyRequestContext.current()).isNull()
+            verify(redissonClient, never()).getLock(any<String>())
+        }
+
+        @Test
+        fun 진행_중_예외가_났고_커밋된_기록이_없으면_예외를_그대로_던진다() {
+            whenever(idempotent.claimByCommit).thenReturn(true)
+            whenever(idempotent.ttlHours).thenReturn(24L)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(joinPoint.proceed()).thenThrow(IllegalStateException("out of stock"))
+
+            assertThatThrownBy { aspect.handleIdempotency(joinPoint, idempotent) }.hasMessage("out of stock")
+            assertThat(IdempotencyRequestContext.current()).isNull()
+        }
+
+        @Test
+        fun 진행_중_저장하지_않은_성공_응답은_별도_트랜잭션으로_저장한다() {
+            whenever(idempotent.claimByCommit).thenReturn(true)
+            whenever(idempotent.ttlHours).thenReturn(24L)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            whenever(joinPoint.proceed()).thenReturn(ResponseEntity.ok(mapOf("id" to 4)))
+
+            aspect.handleIdempotency(joinPoint, idempotent)
+
+            verify(idempotencyService).save(any(), eq("POST"), eq("/api/v1/orders"), eq(200), any(), any(), eq(24L))
+        }
+
+        @Test
+        fun 표시되지_않은_엔드포인트는_락_경로를_그대로_탄다() {
+            stubLock()
+            whenever(idempotent.claimByCommit).thenReturn(false)
+            whenever(idempotent.ttlHours).thenReturn(24L)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            var opened: PendingIdempotency? = null
+            whenever(joinPoint.proceed()).thenAnswer {
+                opened = IdempotencyRequestContext.current()
+                ResponseEntity.ok(mapOf("id" to 5))
+            }
+
+            aspect.handleIdempotency(joinPoint, idempotent)
+
+            assertThat(opened).isNull()
+            verify(lock).unlock()
+            verify(idempotencyService).save(any(), any(), any(), any(), any(), any(), any())
         }
     }
 }
