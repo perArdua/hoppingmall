@@ -23,4 +23,5 @@ enum class OrderErrorCode(
     ORDER_PRICE_CHANGED("ORD014", "상품 가격이 바뀌었습니다. 바뀐 가격을 확인한 뒤 다시 주문해주세요.", HttpStatus.CONFLICT),
     ORDER_SELF_PURCHASE("ORD015", "자기 상품은 주문할 수 없습니다.", HttpStatus.FORBIDDEN),
     ORDER_SELF_CART_ADD("ORD016", "자기 상품은 장바구니에 담을 수 없습니다.", HttpStatus.FORBIDDEN),
+    ORDER_CART_CHANGED("ORD017", "이미 주문되었거나 바뀐 장바구니입니다. 장바구니를 다시 확인한 뒤 주문해주세요.", HttpStatus.CONFLICT),
 }

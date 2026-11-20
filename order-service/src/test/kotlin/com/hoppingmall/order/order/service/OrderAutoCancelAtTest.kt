@@ -140,6 +140,7 @@ class OrderAutoCancelAtTest {
         ReflectionTestUtils.setField(cartItem, "id", CART_ITEM_ID)
         val savedAt = LocalDateTime.now()
         whenever(cartItemRepository.findAllById(listOf(CART_ITEM_ID))).thenReturn(listOf(cartItem))
+        whenever(cartItemRepository.deleteUnchanged(CART_ITEM_ID, BUYER_ID, 1)).thenReturn(1)
         whenever(productQueryPort.findProductsByIds(listOf(PRODUCT_ID)))
             .thenReturn(listOf(ProductInfo(id = PRODUCT_ID, name = "상품", price = BigDecimal("1000"), sellerId = SELLER_ID)))
         whenever(inventoryCommandPort.batchReserveStock(any())).thenReturn(mapOf(PRODUCT_ID to "rsv-1"))

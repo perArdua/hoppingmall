@@ -112,7 +112,7 @@ class OrderCreateSelfPurchaseTest {
 
         verify(inventoryCommandPort, never()).batchReserveStock(any())
         verify(orderRepository, never()).save(any<Order>())
-        verify(cartItemRepository, never()).deleteAllById(any())
+        verify(cartItemRepository, never()).deleteUnchanged(any(), any(), any())
     }
 
     private fun cartItem(id: Long, productId: Long): CartItem {

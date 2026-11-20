@@ -109,7 +109,7 @@ class OrderCreateReservationCleanupTest {
             .isSameAs(failure)
 
         verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-1", "rsv-2"))
-        verify(cartItemRepository, never()).deleteAllById(any())
+        verify(cartItemRepository, never()).deleteUnchanged(any(), any(), any())
         verify(orderMetrics, never()).recordOrderCreated(any())
     }
 
@@ -133,6 +133,7 @@ class OrderCreateReservationCleanupTest {
             items.forEachIndexed { index, item -> ReflectionTestUtils.setField(item, "id", (index + 1).toLong()) }
             items
         }
+        whenever(cartItemRepository.deleteUnchanged(any(), any(), any())).thenReturn(1)
 
         service.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(1L, 2L)))
 

@@ -75,7 +75,7 @@ class OrderCreateExpectedPriceMySqlIntegrationTest : OrderCreateFenceScenarios()
             }
 
         verify(inventoryCommandPort, never()).batchReserveStock(any())
-        verify(cartItemRepository, never()).deleteAllById(any())
+        verify(cartItemRepository, never()).deleteUnchanged(any(), any(), any())
         assertThat(orderCount()).isZero()
     }
 
