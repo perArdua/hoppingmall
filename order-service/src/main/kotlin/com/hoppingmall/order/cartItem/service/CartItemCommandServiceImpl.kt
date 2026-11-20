@@ -21,6 +21,7 @@ import com.hoppingmall.order.port.ProductQueryUnavailableException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -30,6 +31,7 @@ class CartItemCommandServiceImpl(
     private val productQueryPort: ProductQueryPort
 ) : CartItemCommandService {
 
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     override fun addCartItem(buyerId: Long, request: CartItemCreateRequest): CartItemResponse {
         val product = findProduct(request.productId) ?: throw CartItemProductNotFoundException()
         if (product.sellerId == buyerId) {

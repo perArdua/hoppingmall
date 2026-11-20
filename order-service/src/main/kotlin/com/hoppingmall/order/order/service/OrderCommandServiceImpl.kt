@@ -12,6 +12,7 @@ import com.hoppingmall.order.order.dto.response.OrderPriceChange
 import com.hoppingmall.order.order.dto.response.OrderResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
+import com.hoppingmall.order.order.exception.OrderCartChangedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
@@ -152,11 +153,18 @@ class OrderCommandServiceImpl(
             val savedOrderItems = orderItemRepository.saveAll(orderItems)
             order.updateStatus(OrderStatus.PAYING)
 
-            cartItemRepository.deleteAllById(request.cartItemIds)
+            claimCartItems(buyerId, cartItems)
 
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
             OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
         }!!
+
+    private fun claimCartItems(buyerId: Long, cartItems: List<CartItem>) {
+        val claimed = cartItems.sortedBy { it.id }.all { cartItemRepository.deleteUnchanged(it.id!!, buyerId, it.quantity) == 1 }
+        if (!claimed) {
+            throw OrderCartChangedException()
+        }
+    }
 
     private fun priceChanges(
         cartItems: List<CartItem>,

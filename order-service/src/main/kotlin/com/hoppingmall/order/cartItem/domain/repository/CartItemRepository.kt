@@ -27,6 +27,13 @@ interface CartItemRepository: JpaRepository<CartItem, Long> {
     )
     fun deleteSoftDeleted(@Param("buyerId") buyerId: Long, @Param("productId") productId: Long): Int
 
+    @Modifying
+    @Query(
+        value = "DELETE FROM cart_items WHERE id = :id AND buyer_id = :buyerId AND quantity = :quantity AND deleted_at IS NULL",
+        nativeQuery = true
+    )
+    fun deleteUnchanged(@Param("id") id: Long, @Param("buyerId") buyerId: Long, @Param("quantity") quantity: Int): Int
+
     @Query(
         value = """
             SELECT ci.product_id AS productId,
