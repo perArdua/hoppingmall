@@ -71,3 +71,8 @@ grpc:
     payment-service:
       address: dns:///payment-service:9095
       negotiation-type: plaintext
+
+order:
+  reservation:
+    fence:
+      enabled: true
