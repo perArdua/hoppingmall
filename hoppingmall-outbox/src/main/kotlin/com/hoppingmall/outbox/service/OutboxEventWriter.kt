@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.scheduler.OutboxPublishWaker
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -11,7 +12,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class OutboxEventWriter(
     private val outboxEventRepository: OutboxEventRepository,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val outboxPublishWaker: OutboxPublishWaker
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxEventWriter::class.java)
@@ -49,6 +51,7 @@ class OutboxEventWriter(
         )
 
         outboxEventRepository.save(outboxEvent)
+        outboxPublishWaker.requestAfterCommit()
         logger.debug("Outbox event saved: aggregateId=$aggregateId, eventType=$eventType")
     }
 }

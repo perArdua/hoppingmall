@@ -30,6 +30,24 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
     ): List<OutboxEvent>
 
     @Query(
+        value = """
+        SELECT id FROM outbox_events FORCE INDEX (idx_outbox_processed_created)
+        WHERE processed = false
+        AND (status = :status OR (status = :retryStatus AND retry_count < :maxRetries))
+        ORDER BY created_at ASC
+        LIMIT :limit
+        FOR UPDATE SKIP LOCKED
+    """,
+        nativeQuery = true
+    )
+    fun lockUnprocessedEventIds(
+        @Param("status") status: String,
+        @Param("retryStatus") retryStatus: String,
+        @Param("maxRetries") maxRetries: Int,
+        @Param("limit") limit: Int
+    ): List<Long>
+
+    @Query(
         """
         SELECT COUNT(o) > 0 FROM OutboxEvent o
         WHERE o.aggregateType = :aggregateType
@@ -95,6 +113,80 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         @Param("pendingStatus") pendingStatus: OutboxStatus,
         @Param("failedStatus") failedStatus: OutboxStatus,
         @Param("maxRetries") maxRetries: Int
+    ): Int
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+        UPDATE outbox_events FORCE INDEX (PRIMARY)
+        SET status = :nextStatus,
+            updated_at = :updatedAt
+        WHERE id IN (:ids)
+        AND processed = false
+        AND (
+            status = :pendingStatus
+            OR (status = :failedStatus AND retry_count < :maxRetries)
+        )
+    """,
+        nativeQuery = true
+    )
+    fun claimEventsForPublish(
+        @Param("ids") ids: List<Long>,
+        @Param("nextStatus") nextStatus: String,
+        @Param("updatedAt") updatedAt: LocalDateTime,
+        @Param("pendingStatus") pendingStatus: String,
+        @Param("failedStatus") failedStatus: String,
+        @Param("maxRetries") maxRetries: Int
+    ): Int
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = """
+        UPDATE outbox_events FORCE INDEX (PRIMARY)
+        SET processed = true,
+            status = :publishedStatus,
+            processed_at = :processedAt,
+            updated_at = :updatedAt
+        WHERE id IN (:ids)
+        AND status = :claimedStatus
+        AND updated_at = :claimedAt
+    """,
+        nativeQuery = true
+    )
+    fun markClaimedEventsProcessed(
+        @Param("ids") ids: List<Long>,
+        @Param("publishedStatus") publishedStatus: String,
+        @Param("processedAt") processedAt: LocalDateTime,
+        @Param("updatedAt") updatedAt: LocalDateTime,
+        @Param("claimedStatus") claimedStatus: String,
+        @Param("claimedAt") claimedAt: LocalDateTime
+    ): Int
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        """
+        UPDATE OutboxEvent o
+        SET o.status = :status,
+            o.errorMessage = :errorMessage,
+            o.retryCount = :retryCount,
+            o.processed = :processed,
+            o.processedAt = :processedAt,
+            o.updatedAt = :updatedAt
+        WHERE o.id = :id
+        AND o.status = :claimedStatus
+        AND o.updatedAt = :claimedAt
+    """
+    )
+    fun markClaimedEventFailed(
+        @Param("id") id: Long,
+        @Param("status") status: OutboxStatus,
+        @Param("errorMessage") errorMessage: String?,
+        @Param("retryCount") retryCount: Int,
+        @Param("processed") processed: Boolean,
+        @Param("processedAt") processedAt: LocalDateTime?,
+        @Param("updatedAt") updatedAt: LocalDateTime,
+        @Param("claimedStatus") claimedStatus: OutboxStatus,
+        @Param("claimedAt") claimedAt: LocalDateTime
     ): Int
 
     @Query(

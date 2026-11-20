@@ -3,6 +3,7 @@ package com.hoppingmall.outbox.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.scheduler.OutboxPublishWaker
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -28,6 +29,9 @@ class OutboxEventWriterTest {
     @Mock
     private lateinit var objectMapper: ObjectMapper
 
+    @Mock
+    private lateinit var outboxPublishWaker: OutboxPublishWaker
+
     @InjectMocks
     private lateinit var writer: OutboxEventWriter
 
@@ -48,6 +52,7 @@ class OutboxEventWriterTest {
         )
 
         verify(outboxEventRepository).save(any<OutboxEvent>())
+        verify(outboxPublishWaker).requestAfterCommit()
     }
 
     @Test
@@ -66,6 +71,7 @@ class OutboxEventWriterTest {
         )
 
         verify(outboxEventRepository, never()).save(any<OutboxEvent>())
+        verify(outboxPublishWaker, never()).requestAfterCommit()
     }
 
     @Test
