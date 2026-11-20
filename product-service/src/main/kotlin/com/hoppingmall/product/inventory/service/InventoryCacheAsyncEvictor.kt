@@ -17,7 +17,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 @Component
-@ConditionalOnProperty(name = ["inventory.cache.evict-async"], havingValue = "true")
+@ConditionalOnProperty(name = ["inventory.cache.evict-async"], havingValue = "true", matchIfMissing = true)
 class InventoryCacheAsyncEvictor(
     private val cacheManagerProvider: ObjectProvider<CacheManager>,
     meterRegistry: MeterRegistry,

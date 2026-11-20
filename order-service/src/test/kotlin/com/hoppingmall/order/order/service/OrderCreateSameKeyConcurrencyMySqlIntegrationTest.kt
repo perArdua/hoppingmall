@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -47,6 +48,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.ResponseEntity
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
@@ -57,6 +59,7 @@ import java.math.BigDecimal
 import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -83,6 +86,9 @@ abstract class OrderCreateSameKeyScenarios : MySqlJpaTestSupport() {
 
     @Autowired
     protected lateinit var objectMapper: ObjectMapper
+
+    @MockitoSpyBean
+    protected lateinit var idempotencyTxRecorder: IdempotencyTxRecorder
 
     @MockitoBean
     protected lateinit var productQueryPort: ProductQueryPort
@@ -247,7 +253,10 @@ class OrderCreateSameKeyRedisLockMySqlIntegrationTest : OrderCreateSameKeyScenar
 
     override fun redissonClient(): RedissonClient = redisson
 
-    override fun configure(aspect: IdempotencyAspect) = Unit
+    override fun configure(aspect: IdempotencyAspect) {
+        ReflectionTestUtils.setField(aspect, "saveInTx", false)
+        ReflectionTestUtils.setField(aspect, "claimByCommit", false)
+    }
 
     @Test
     fun 락을_못_잡은_요청은_IDEM002를_받고_주문과_예약은_하나만_남는다() {
@@ -262,17 +271,7 @@ class OrderCreateSameKeyRedisLockMySqlIntegrationTest : OrderCreateSameKeyScenar
     }
 
     companion object {
-        private val redisContainer: GenericContainer<*> by lazy {
-            val container = GenericContainer<Nothing>("redis:7.2-alpine")
-            container.withExposedPorts(6379)
-            container.also { it.start() }
-        }
-
-        private val redisson: RedissonClient by lazy {
-            Redisson.create(Config().apply {
-                useSingleServer().address = "redis://${redisContainer.host}:${redisContainer.getMappedPort(6379)}"
-            })
-        }
+        private val redisson: RedissonClient by lazy { SameKeyRedis.newClient() }
 
         @JvmStatic
         @AfterAll
@@ -280,4 +279,65 @@ class OrderCreateSameKeyRedisLockMySqlIntegrationTest : OrderCreateSameKeyScenar
             runCatching { redisson.shutdown() }
         }
     }
+}
+
+@DisplayName("같은 멱등 키 주문 동시 20건, 기본값 save-in-tx 켬·커밋 선점 끔 (MySQL·Redis 락)")
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
+class OrderCreateSameKeySaveInTxRedisLockMySqlIntegrationTest : OrderCreateSameKeyScenarios() {
+
+    private val savedInTransaction = CopyOnWriteArrayList<Boolean>()
+
+    override fun redissonClient(): RedissonClient = redisson
+
+    override fun configure(aspect: IdempotencyAspect) {
+        ReflectionTestUtils.setField(aspect, "saveInTx", true)
+        ReflectionTestUtils.setField(aspect, "claimByCommit", false)
+    }
+
+    @BeforeEach
+    fun recordInTransactionSaves() {
+        doAnswer { invocation ->
+            invocation.callRealMethod()
+            savedInTransaction.add(IdempotencyRequestContext.current()?.savedInTransaction == true)
+            null
+        }.whenever(idempotencyTxRecorder).recordIfPending(any())
+    }
+
+    @Test
+    fun 락을_못_잡은_요청은_IDEM002를_받고_멱등_기록은_주문_트랜잭션_안에서_한_번만_저장된다() {
+        val outcomes = sendSameKeyConcurrently(REQUESTS)
+
+        val orderId = orderIds().single()
+        assertThat(outcomes).hasSize(REQUESTS).containsOnly("201:$orderId", "409:IDEM002").contains("201:$orderId")
+        assertThat(count("orders")).isEqualTo(1)
+        assertThat(count("idempotency_records")).isEqualTo(1)
+        assertThat(savedInTransaction).containsExactly(true)
+        assertThat(createdReservations.get()).isEqualTo(1)
+        assertThat(orderItemReservationIds()).containsExactlyElementsOf(createdReservationIds())
+        assertThat(count("cart_items")).isZero()
+        verify(inventoryCommandPort, never()).cancelReservations(any())
+    }
+
+    companion object {
+        private val redisson: RedissonClient by lazy { SameKeyRedis.newClient() }
+
+        @JvmStatic
+        @AfterAll
+        fun shutdown() {
+            runCatching { redisson.shutdown() }
+        }
+    }
+}
+
+private object SameKeyRedis {
+    private val container: GenericContainer<*> by lazy {
+        val container = GenericContainer<Nothing>("redis:7.2-alpine")
+        container.withExposedPorts(6379)
+        container.also { it.start() }
+    }
+
+    fun newClient(): RedissonClient =
+        Redisson.create(Config().apply {
+            useSingleServer().address = "redis://${container.host}:${container.getMappedPort(6379)}"
+        })
 }

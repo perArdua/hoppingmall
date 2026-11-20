@@ -24,6 +24,7 @@ import java.util.Collections
 import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 
+@TestPropertySource(properties = ["inventory.cache.evict-async=false"])
 abstract class ReservationExpiryCacheSupport : MySqlIntegrationTestSupport() {
 
     @Autowired

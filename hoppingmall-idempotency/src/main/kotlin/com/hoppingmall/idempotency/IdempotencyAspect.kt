@@ -42,8 +42,8 @@ class IdempotencyAspect(
     @Value("\${idempotency.lock-timeout-seconds:0}")
     private var lockTimeoutOverrideSeconds: Long = 0
 
-    @Value("\${idempotency.save-in-tx:false}")
-    private var saveInTx: Boolean = false
+    @Value("\${idempotency.save-in-tx:true}")
+    private var saveInTx: Boolean = true
 
     @Value("\${idempotency.claim-by-commit:false}")
     private var claimByCommit: Boolean = false

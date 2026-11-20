@@ -11,16 +11,19 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import org.springframework.cache.support.SimpleCacheManager
+import org.springframework.test.context.TestPropertySource
 import java.util.Collections
 import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 
-@DisplayName("재고 예약 뒤 재고 캐시 MySQL 통합 테스트")
+@DisplayName("재고 예약 뒤 재고 캐시 MySQL 통합 테스트 (비동기 삭제 끔)")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
+@TestPropertySource(properties = ["inventory.cache.evict-async=false"])
 class InventoryReserveCacheMySqlIntegrationTest : MySqlIntegrationTestSupport() {
 
     @Autowired
@@ -34,6 +37,9 @@ class InventoryReserveCacheMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
     @Autowired
     private lateinit var cacheManager: CacheManager
+
+    @Autowired
+    private lateinit var asyncEvictorProvider: ObjectProvider<InventoryCacheAsyncEvictor>
 
     private var originalCaches: List<Cache>? = null
 
@@ -89,6 +95,11 @@ class InventoryReserveCacheMySqlIntegrationTest : MySqlIntegrationTestSupport() 
         inventoryCommandService.reserveStock(PRODUCT_A, 3)
 
         assertThat(inventoryQueryService.getStock(PRODUCT_A).stockQuantity).isEqualTo(7)
+    }
+
+    @Test
+    fun 비동기_삭제를_끄면_비동기_삭제기가_만들어지지_않는다() {
+        assertThat(asyncEvictorProvider.getIfAvailable()).isNull()
     }
 
     private fun seed(productId: Long, stockQuantity: Int) {

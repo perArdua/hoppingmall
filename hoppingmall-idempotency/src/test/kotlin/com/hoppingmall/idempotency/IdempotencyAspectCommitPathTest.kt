@@ -83,8 +83,42 @@ class IdempotencyAspectCommitPathTest {
     )
 
     @Nested
+    @DisplayName("기본값")
+    inner class Defaults {
+
+        @Test
+        fun 보관함을_열되_선점_보관함은_아니고_락을_잡는다() {
+            stubLock()
+            whenever(idempotent.ttlHours).thenReturn(24L)
+            whenever(idempotencyService.findByKey(any())).thenReturn(null)
+            var opened: PendingIdempotency? = null
+            var claimKey: String? = "unset"
+            whenever(joinPoint.proceed()).thenAnswer {
+                opened = IdempotencyRequestContext.current()
+                claimKey = IdempotencyRequestContext.claimKey()
+                ResponseEntity.status(HttpStatus.CREATED).body(mapOf("id" to 1))
+            }
+
+            aspect.handleIdempotency(joinPoint, idempotent)
+
+            assertThat(opened).isNotNull
+            assertThat(opened!!.claimByCommit).isFalse()
+            assertThat(claimKey).isNull()
+            assertThat(IdempotencyRequestContext.current()).isNull()
+            verify(lock).unlock()
+            verify(idempotencyService).save(any(), eq("POST"), eq("/api/v1/orders"), eq(201), any(), any(), eq(24L))
+        }
+    }
+
+    @Nested
     @DisplayName("플래그가 모두 꺼짐")
     inner class FlagsOff {
+
+        @BeforeEach
+        fun disable() {
+            ReflectionTestUtils.setField(aspect, "saveInTx", false)
+            ReflectionTestUtils.setField(aspect, "claimByCommit", false)
+        }
 
         @Test
         fun 표시된_엔드포인트도_보관함을_열지_않고_락을_잡은_뒤_별도_트랜잭션으로_저장한다() {
@@ -170,6 +204,7 @@ class IdempotencyAspectCommitPathTest {
 
         @BeforeEach
         fun enable() {
+            ReflectionTestUtils.setField(aspect, "saveInTx", false)
             ReflectionTestUtils.setField(aspect, "claimByCommit", true)
         }
 
