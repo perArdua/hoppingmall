@@ -21,6 +21,7 @@ import com.hoppingmall.product.inventory.exception.ReservationRequestKeyConflict
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.exception.ProductNotFoundException
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
@@ -48,6 +49,9 @@ class InventoryCommandServiceImpl(
 ) : InventoryCommandService {
 
     private val reserveTransaction = TransactionTemplate(transactionManager)
+
+    @Autowired(required = false)
+    var asyncCacheEvictor: InventoryCacheAsyncEvictor? = null
 
     @Value("\${inventory.reservation.ttl-seconds:600}")
     private var ttlSeconds: Long = 600
@@ -285,7 +289,7 @@ class InventoryCommandServiceImpl(
             throw e
         }
         ReserveDeadline.check()
-        evictInventoryCacheAfterCommit(reservationMap.keys)
+        evictInventoryCacheAfterCommit(reservationMap.keys, asyncCacheEvictor)
         return reservationMap
     }
 
@@ -339,7 +343,7 @@ class InventoryCommandServiceImpl(
         inventory.increaseStock(quantity)
     }
 
-    private fun evictInventoryCacheAfterCommit(productIds: Collection<Long>) {
+    private fun evictInventoryCacheAfterCommit(productIds: Collection<Long>, asyncEvictor: InventoryCacheAsyncEvictor? = null) {
         if (productIds.isEmpty()) return
         val cache = cacheManagerProvider.getIfAvailable()?.getCache(INVENTORY_CACHE) ?: return
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -348,7 +352,7 @@ class InventoryCommandServiceImpl(
         }
         TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
             override fun afterCommit() {
-                productIds.forEach { cache.evict(it) }
+                if (asyncEvictor != null) asyncEvictor.submit(productIds) else productIds.forEach { cache.evict(it) }
             }
         })
     }
