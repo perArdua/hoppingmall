@@ -210,6 +210,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 대기중인_이벤트가_없으면_아무것도_하지_않는다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         whenever(
             outboxEventRepository.findUnprocessedEvents(
                 status = OutboxStatus.PENDING,
@@ -226,6 +227,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun null_id를_가진_이벤트는_클레임하지_않는다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         val eventWithNullId = OutboxEvent(
             aggregateType = "Payment",
             aggregateId = "1",
@@ -252,6 +254,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 클레임_실패한_이벤트는_발행하지_않는다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         val event = createOutboxEvent(status = OutboxStatus.PENDING)
 
         whenever(
@@ -296,6 +299,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 대기중인_이벤트를_클레임_후_배치_발행한다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         val event = createOutboxEvent(status = OutboxStatus.PENDING)
         val avroRecord = mock<GenericRecord>()
         val sendResult = createSendResult("payment", "1", avroRecord)
@@ -342,6 +346,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 여러_이벤트를_단일_Kafka_트랜잭션으로_배치_발행한다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         val event1 = createOutboxEvent(id = 1L, status = OutboxStatus.PENDING)
         val event2 = createOutboxEvent(id = 2L, status = OutboxStatus.PENDING)
         val avroRecord = mock<GenericRecord>()
@@ -387,6 +392,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 배치_발행_실패_시_모든_이벤트를_실패_처리한다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         val event = createOutboxEvent(id = 1L, status = OutboxStatus.PENDING)
         val avroRecord = mock<GenericRecord>()
 
@@ -425,7 +431,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 일괄_선점_모드에서는_잠근_행을_한_번에_다시_읽어_생성_순서대로_발행한다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         val now = LocalDateTime.now()
         val later = createOutboxEvent(id = 1L, createdAt = now)
         val earlier = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(1))
@@ -475,7 +480,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 일괄_선점_모드에서_잠근_행이_없으면_선점과_재조회를_하지_않는다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(emptyList())
 
         outboxEventPublisher.publishPendingEvents()
@@ -486,7 +490,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 일괄_선점_갱신_수가_잠근_행_수와_달라도_잠근_행만_다시_읽는다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         val notRetrying = createOutboxEvent(id = 1L, status = OutboxStatus.PENDING)
 
         whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(listOf(1L))
@@ -691,7 +694,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 기동_시_한도와_트랜잭션_제한_시간의_합이_stale_기준_이상이면_경고만_남기고_발행은_계속한다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         ReflectionTestUtils.setField(outboxEventPublisher, "staleThresholdMs", 60_000L)
         whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(emptyList())
 
@@ -710,7 +712,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 기동_시_한도와_트랜잭션_제한_시간과_브로커_정리_주기의_합이_stale_기준과_같으면_경고한다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         ReflectionTestUtils.setField(outboxEventPublisher, "staleThresholdMs", 370_000L)
 
         val warnings = captureWarnings { outboxEventPublisher.warnIfClaimAgeExceedsStaleWindow() }
@@ -726,7 +727,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 기동_시_세_값의_합이_stale_기준보다_1_작으면_경고하지_않는다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         ReflectionTestUtils.setField(outboxEventPublisher, "staleThresholdMs", 370_001L)
 
         val warnings = captureWarnings { outboxEventPublisher.warnIfClaimAgeExceedsStaleWindow() }
@@ -736,7 +736,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 기동_시_브로커_정리_주기_설정을_바꾸면_그_값을_더해_부등식을_검사한다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         ReflectionTestUtils.setField(outboxEventPublisher, "brokerTxCleanupMs", 240_000L)
         val warned = captureWarnings { outboxEventPublisher.warnIfClaimAgeExceedsStaleWindow() }
 
@@ -750,7 +749,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 기동_시_프로듀서_설정의_transaction_timeout_ms를_읽어_부등식을_검사한다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         val producerFactory = mock<ProducerFactory<String, Any>>()
         whenever(producerFactory.configurationProperties)
             .thenReturn(mapOf<String, Any>(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG to "300000"))
@@ -766,7 +764,6 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 기동_시_기본값이면_부등식이_서서_경고를_남기지_않는다() {
-        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", true)
         whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(emptyList())
 
         val warnings = captureWarnings { outboxEventPublisher.warnIfClaimAgeExceedsStaleWindow() }
@@ -777,6 +774,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 일괄_선점이_꺼져_있으면_기동_시_부등식을_검사하지_않는다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         ReflectionTestUtils.setField(outboxEventPublisher, "staleThresholdMs", 1_000L)
 
         val warnings = captureWarnings { outboxEventPublisher.warnIfClaimAgeExceedsStaleWindow() }
@@ -874,6 +872,7 @@ class OutboxEventPublisherTest {
 
     @Test
     fun 일괄_선점이_꺼져_있으면_복구용_선점_시각을_주지_않는다() {
+        ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         assertThat(outboxEventPublisher.staleClaimTimestamp()).isNull()
     }
 
@@ -1052,7 +1051,6 @@ class OutboxEventPublisherTest {
         OutboxEventPublisher(
             outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager, clock
         ).also {
-            ReflectionTestUtils.setField(it, "batchClaim", true)
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", MAX_CLAIM_AGE_MS)
         }
 

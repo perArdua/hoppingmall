@@ -241,7 +241,7 @@ class OutboxBatchClaimMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             converter,
             transactionManager
-        ).also { ReflectionTestUtils.setField(it, "batchClaim", true) }
+        )
     }
 
     private class CountingKafka(
@@ -291,7 +291,6 @@ class OutboxBatchClaimMySqlTest {
             transactionManager,
             clock
         ).also {
-            ReflectionTestUtils.setField(it, "batchClaim", true)
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", maxClaimAgeMs)
         }
     }

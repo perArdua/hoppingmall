@@ -33,7 +33,6 @@ import org.springframework.kafka.support.SendResult
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -488,7 +487,7 @@ class OutboxBatchClaimSkewMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             converter,
             transactionManager
-        ).also { ReflectionTestUtils.setField(it, "batchClaim", true) }
+        )
     }
 
     private fun opList(track: Track, t0: Long): String =

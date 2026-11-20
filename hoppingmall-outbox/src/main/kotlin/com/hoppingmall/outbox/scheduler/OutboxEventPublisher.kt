@@ -45,8 +45,8 @@ class OutboxEventPublisher(
     private val batchLock = ReentrantLock()
     private val emptyClaim = ClaimedBatch(emptyList(), LocalDateTime.MIN)
 
-    @Value("\${outbox.publish.batch-claim:false}")
-    private var batchClaim: Boolean = false
+    @Value("\${outbox.publish.batch-claim:true}")
+    private var batchClaim: Boolean = true
 
     @Value("\${outbox.publish.max-claim-age-ms:300000}")
     private var maxClaimAgeMs: Long = 300_000

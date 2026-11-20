@@ -1,7 +1,6 @@
 package com.hoppingmall.outbox.scheduler
 
 import com.hoppingmall.common.event.AvroEventConverter
-import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.metrics.OutboxMetrics
 import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -93,14 +92,14 @@ class OutboxPublishWakerTest {
         val maxRunning = AtomicInteger(0)
         val batches = AtomicInteger(0)
         val firstBatchStarted = CountDownLatch(1)
-        whenever(repository.findUnprocessedEvents(any(), any(), any(), any())).thenAnswer {
+        whenever(repository.lockUnprocessedEventIds(any(), any(), any(), any())).thenAnswer {
             val now = running.incrementAndGet()
             maxRunning.accumulateAndGet(now) { a, b -> maxOf(a, b) }
             batches.incrementAndGet()
             firstBatchStarted.countDown()
             Thread.sleep(100)
             running.decrementAndGet()
-            emptyList<OutboxEvent>()
+            emptyList<Long>()
         }
         val publisher = OutboxEventPublisher(
             repository, mock<KafkaTemplate<String, Any>>(), mock<OutboxMetrics>(), mock<AvroEventConverter>(), transactionManager

@@ -428,7 +428,6 @@ class OutboxClaimedMarkMySqlTest {
             transactionManager,
             clock
         ).also {
-            ReflectionTestUtils.setField(it, "batchClaim", true)
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", 500L)
         }
 
@@ -443,7 +442,7 @@ class OutboxClaimedMarkMySqlTest {
             passingConverter(),
             transactionManager,
             clock
-        )
+        ).also { ReflectionTestUtils.setField(it, "batchClaim", false) }
 
     private fun scheduler(publisher: OutboxEventPublisher): OutboxMaintenanceScheduler =
         OutboxMaintenanceScheduler(outboxEventRepository, publisher, transactionManager)

@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Component
 class OutboxPublishWaker(
     private val outboxEventPublisher: OutboxEventPublisher,
-    @Value("\${outbox.publish.wake-on-commit:false}")
+    @Value("\${outbox.publish.wake-on-commit:true}")
     private val enabled: Boolean
 ) {
 
