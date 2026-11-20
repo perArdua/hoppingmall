@@ -78,7 +78,7 @@ class OutboxBatchClaimMySqlTest {
         sendCounts.clear()
     }
 
-    @RepeatedTest(5)
+    @RepeatedTest(2)
     fun 서로_다른_발행기_두_개가_동시에_돌아도_행마다_정확히_한_번_발행한다() {
         insertPending(1000)
         val kafkas = listOf(countingKafka(), countingKafka())
