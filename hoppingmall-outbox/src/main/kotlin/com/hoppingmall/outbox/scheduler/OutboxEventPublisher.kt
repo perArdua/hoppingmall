@@ -5,10 +5,13 @@ import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.metrics.OutboxMetrics
 import com.hoppingmall.outbox.repository.OutboxEventRepository
+import jakarta.annotation.PostConstruct
+import org.apache.kafka.clients.producer.ProducerConfig
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.kafka.core.ProducerFactory
 import org.springframework.kafka.support.SendResult
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -16,6 +19,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
+import java.time.Duration
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
@@ -43,6 +47,40 @@ class OutboxEventPublisher(
 
     @Value("\${outbox.publish.batch-claim:false}")
     private var batchClaim: Boolean = false
+
+    @Value("\${outbox.publish.max-claim-age-ms:300000}")
+    private var maxClaimAgeMs: Long = 300_000
+
+    @Value("\${outbox.maintenance.stale-threshold-ms:600000}")
+    private var staleThresholdMs: Long = 600_000
+
+    @Value("\${outbox.publish.broker-tx-cleanup-ms:10000}")
+    private var brokerTxCleanupMs: Long = 10_000
+
+    @PostConstruct
+    fun warnIfClaimAgeExceedsStaleWindow() {
+        if (!batchClaim) return
+        val transactionTimeoutMs = producerTransactionTimeoutMs()
+        if (maxClaimAgeMs + transactionTimeoutMs + brokerTxCleanupMs < staleThresholdMs) return
+        logger.warn(
+            "Outbox claim age guard cannot rule out duplicate publish: " +
+                "outbox.publish.max-claim-age-ms($maxClaimAgeMs) + transaction.timeout.ms($transactionTimeoutMs) " +
+                "+ outbox.publish.broker-tx-cleanup-ms($brokerTxCleanupMs) " +
+                "is not less than outbox.maintenance.stale-threshold-ms($staleThresholdMs)"
+        )
+    }
+
+    private fun producerTransactionTimeoutMs(): Long {
+        val producerFactory: ProducerFactory<String, Any>? = kafkaTemplate.producerFactory
+        return producerFactory?.configurationProperties
+            ?.get(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG)
+            ?.toString()
+            ?.toLongOrNull()
+            ?: ProducerConfig.configDef().defaultValues()
+                .getValue(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG)
+                .toString()
+                .toLong()
+    }
 
     @Scheduled(fixedDelayString = "\${outbox.publish.interval-ms:5000}")
     fun publishPendingEvents() = batchLock.withLock {
@@ -159,12 +197,15 @@ class OutboxEventPublisher(
 
         try {
             val results = kafkaTemplate.executeInTransaction { template ->
+                ensureClaimFresh(claimedAt)
                 val futures = preparedEvents.map { (event, avroRecord) ->
                     event to template.send(event.topic, event.partitionKey ?: "", avroRecord)
                 }
-                futures.map { (event, future) ->
+                val sent = futures.map { (event, future) ->
                     event to future.get(10, TimeUnit.SECONDS)
                 }
+                ensureClaimFresh(claimedAt)
+                sent
             } ?: return false
 
             transactionTemplate.executeWithoutResult {
@@ -175,8 +216,23 @@ class OutboxEventPublisher(
                 }
             }
             return true
+        } catch (e: ClaimExpiredException) {
+            logger.warn(
+                "Outbox batch claim expired after ${e.ageMs}ms (limit ${maxClaimAgeMs}ms); " +
+                    "aborted Kafka transaction and left ${preparedEvents.size} events RETRYING for stale recovery: " +
+                    "ids=${preparedEvents.map { it.first.id }}"
+            )
+            return false
         } catch (e: Exception) {
             logger.error("Batch publish failed for ${preparedEvents.size} events", e)
+            if (claimedAt != null && claimAgeMs(claimedAt) > maxClaimAgeMs) {
+                logger.warn(
+                    "Outbox batch claim expired before failure handling (limit ${maxClaimAgeMs}ms); " +
+                        "left ${preparedEvents.size} events RETRYING for stale recovery: " +
+                        "ids=${preparedEvents.map { it.first.id }}"
+                )
+                return false
+            }
             transactionTemplate.executeWithoutResult {
                 preparedEvents.forEach { (event, _) ->
                     if (!event.processed) recordFailure(event, e, claimedAt)
@@ -186,7 +242,9 @@ class OutboxEventPublisher(
         }
     }
 
-    fun publishEvent(eventId: Long) {
+    fun staleClaimTimestamp(): LocalDateTime? = if (batchClaim) claimTimestamp() else null
+
+    fun publishEvent(eventId: Long, claimedAt: LocalDateTime? = null) {
         val event = transactionTemplate.execute {
             outboxEventRepository.findByIdOrNull(eventId)
         } ?: return
@@ -199,21 +257,40 @@ class OutboxEventPublisher(
             val avroRecord = avroEventConverter.convertJsonToAvro(event.eventType, event.eventData)
 
             val result = kafkaTemplate.executeInTransaction { template ->
-                template.send(
+                ensureClaimFresh(claimedAt)
+                val sent = template.send(
                     event.topic,
                     event.partitionKey ?: "",
                     avroRecord
                 ).get(10, TimeUnit.SECONDS)
+                ensureClaimFresh(claimedAt)
+                sent
             }
 
             transactionTemplate.executeWithoutResult {
-                handlePublishSuccess(event, result)
+                if (claimedAt == null) {
+                    handlePublishSuccess(event, result)
+                } else {
+                    markClaimedPublished(listOf(event to result), claimedAt)
+                }
             }
 
+        } catch (e: ClaimExpiredException) {
+            logger.warn(
+                "Outbox stale claim expired after ${e.ageMs}ms (limit ${maxClaimAgeMs}ms); " +
+                    "aborted Kafka transaction and left event $eventId RETRYING for stale recovery"
+            )
         } catch (e: Exception) {
             logger.error("Failed to publish outbox event: ${event.id}", e)
+            if (claimedAt != null && claimAgeMs(claimedAt) > maxClaimAgeMs) {
+                logger.warn(
+                    "Outbox stale claim expired before failure handling (limit ${maxClaimAgeMs}ms); " +
+                        "left event $eventId RETRYING for stale recovery"
+                )
+                return
+            }
             transactionTemplate.executeWithoutResult {
-                handlePublishFailure(event, e)
+                recordFailure(event, e, claimedAt)
             }
         }
     }
@@ -295,6 +372,17 @@ class OutboxEventPublisher(
     }
 
     private fun claimTimestamp(): LocalDateTime = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS)
+
+    private fun ensureClaimFresh(claimedAt: LocalDateTime?) {
+        if (claimedAt == null) return
+        val ageMs = claimAgeMs(claimedAt)
+        if (ageMs > maxClaimAgeMs) throw ClaimExpiredException(ageMs)
+    }
+
+    private fun claimAgeMs(claimedAt: LocalDateTime): Long =
+        Duration.between(claimedAt, LocalDateTime.now(clock)).toMillis()
+
+    private class ClaimExpiredException(val ageMs: Long) : RuntimeException("Outbox claim expired after ${ageMs}ms")
 
     private data class ClaimedBatch(val ids: List<Long>, val claimedAt: LocalDateTime)
 

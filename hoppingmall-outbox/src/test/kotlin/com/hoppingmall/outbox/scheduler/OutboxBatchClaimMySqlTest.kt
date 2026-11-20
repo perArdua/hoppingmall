@@ -37,13 +37,17 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.testcontainers.containers.MySQLContainer
 import java.sql.Timestamp
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 @DisplayName("아웃박스 일괄 선점의 MySQL 잠금 선점")
 @DisplayNameGeneration(ReplaceUnderscores::class)
@@ -131,6 +135,87 @@ class OutboxBatchClaimMySqlTest {
         ).isEqualTo(100L)
     }
 
+    @Test
+    fun 선점_뒤_한도를_넘긴_배치는_Kafka에_한_건도_보내지_않고_행을_RETRYING으로_남긴다() {
+        insertPending(50)
+        val kafka = transactionalKafka()
+
+        guardedPublisher(kafka.template, TestClock(Instant.now(), stepMillis = 1_000), maxClaimAgeMs = 500)
+            .publishPendingEvents()
+
+        assertThat(kafka.transactions.get()).isEqualTo(1)
+        assertThat(kafka.aborted.get()).isEqualTo(1)
+        assertThat(kafka.attempted.get()).isZero()
+        assertThat(kafka.committed).isEmpty()
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outbox_events WHERE status = 'RETRYING' AND retry_count = 0 AND processed = false",
+                Long::class.java
+            )
+        ).isEqualTo(50L)
+    }
+
+    @Test
+    fun 선점_뒤_한도를_넘긴_배치_뒤에는_꽉_찬_배치여도_이어_돌지_않는다() {
+        insertPending(300)
+        val kafka = transactionalKafka()
+
+        guardedPublisher(kafka.template, TestClock(Instant.now(), stepMillis = 1_000), maxClaimAgeMs = 500)
+            .publishPendingEvents()
+
+        assertThat(kafka.transactions.get()).isEqualTo(1)
+        assertThat(kafka.committed).isEmpty()
+        assertThat(countByStatus("RETRYING")).isEqualTo(100L)
+        assertThat(countByStatus("PENDING")).isEqualTo(200L)
+    }
+
+    @Test
+    fun 전송_뒤_커밋_전에_한도를_넘기면_Kafka_트랜잭션을_버리고_행을_RETRYING으로_남긴다() {
+        insertPending(20)
+        val clock = TestClock(Instant.now())
+        val kafka = transactionalKafka(onSend = { clock.advanceMillis(1_000) })
+
+        guardedPublisher(kafka.template, clock, maxClaimAgeMs = 500).publishPendingEvents()
+
+        assertThat(kafka.attempted.get()).isEqualTo(20)
+        assertThat(kafka.aborted.get()).isEqualTo(1)
+        assertThat(kafka.committed).isEmpty()
+        assertThat(countByStatus("RETRYING")).isEqualTo(20L)
+        assertThat(countByStatus("PUBLISHED")).isZero()
+    }
+
+    @Test
+    fun 선점이_한도를_넘긴_뒤_Kafka_트랜잭션이_실패해도_행을_FAILED로_바꾸지_않는다() {
+        insertPending(30)
+        val clock = TestClock(Instant.now())
+        @Suppress("UNCHECKED_CAST")
+        val template = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, Any>
+        whenever(template.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>()))
+            .thenAnswer {
+                clock.advanceMillis(1_000)
+                throw RuntimeException("producer fenced")
+            }
+
+        guardedPublisher(template, clock, maxClaimAgeMs = 500).publishPendingEvents()
+
+        assertThat(countByStatus("RETRYING")).isEqualTo(30L)
+        assertThat(countByStatus("FAILED")).isZero()
+    }
+
+    @Test
+    fun 선점_뒤_한도_안이면_기존처럼_모두_한_번씩_발행한다() {
+        insertPending(150)
+        val kafka = transactionalKafka()
+
+        guardedPublisher(kafka.template, TestClock(Instant.now()), maxClaimAgeMs = 500).publishPendingEvents()
+
+        assertThat(kafka.transactions.get()).isEqualTo(2)
+        assertThat(kafka.aborted.get()).isZero()
+        assertThat(kafka.committed).hasSize(150)
+        assertThat(kafka.committed.values.map { it.get() }).allMatch { it == 1 }
+        assertThat(countByStatus("PUBLISHED")).isEqualTo(150L)
+    }
+
     private fun insertPending(count: Int) {
         val base = LocalDateTime.now().minusMinutes(1)
         jdbcTemplate.batchUpdate(
@@ -189,6 +274,84 @@ class OutboxBatchClaimMySqlTest {
                 (invocation.arguments[0] as KafkaOperations.OperationsCallback<String, Any, Any>).doInOperations(template)
             }
         return CountingKafka(template, transactions, sent)
+    }
+
+    private fun guardedPublisher(
+        kafkaTemplate: KafkaTemplate<String, Any>,
+        clock: Clock,
+        maxClaimAgeMs: Long
+    ): OutboxEventPublisher {
+        val converter = Mockito.mock(AvroEventConverter::class.java)
+        whenever(converter.convertJsonToAvro(any(), any())).thenReturn(Mockito.mock(GenericRecord::class.java))
+        return OutboxEventPublisher(
+            outboxEventRepository,
+            kafkaTemplate,
+            Mockito.mock(OutboxMetrics::class.java),
+            converter,
+            transactionManager,
+            clock
+        ).also {
+            ReflectionTestUtils.setField(it, "batchClaim", true)
+            ReflectionTestUtils.setField(it, "maxClaimAgeMs", maxClaimAgeMs)
+        }
+    }
+
+    private class TransactionalKafka(
+        val template: KafkaTemplate<String, Any>,
+        val transactions: AtomicInteger,
+        val aborted: AtomicInteger,
+        val attempted: AtomicInteger,
+        val committed: ConcurrentHashMap<String, AtomicInteger>
+    )
+
+    @Suppress("UNCHECKED_CAST")
+    private fun transactionalKafka(onSend: () -> Unit = {}): TransactionalKafka {
+        val template = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, Any>
+        val transactions = AtomicInteger()
+        val aborted = AtomicInteger()
+        val attempted = AtomicInteger()
+        val committed = ConcurrentHashMap<String, AtomicInteger>()
+        val inFlight = mutableListOf<String>()
+        whenever(template.send(any<String>(), any<String>(), any())).thenAnswer { invocation ->
+            val topic = invocation.arguments[0] as String
+            val key = invocation.arguments[1] as String
+            onSend()
+            attempted.incrementAndGet()
+            inFlight.add(key)
+            CompletableFuture.completedFuture(
+                SendResult<String, Any>(
+                    ProducerRecord(topic, key, invocation.arguments[2]),
+                    RecordMetadata(TopicPartition(topic, 0), 0L, 0, System.currentTimeMillis(), 0, 0)
+                )
+            )
+        }
+        whenever(template.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>()))
+            .thenAnswer { invocation ->
+                transactions.incrementAndGet()
+                inFlight.clear()
+                try {
+                    val result = (invocation.arguments[0] as KafkaOperations.OperationsCallback<String, Any, Any>)
+                        .doInOperations(template)
+                    inFlight.forEach { key -> committed.computeIfAbsent(key) { AtomicInteger() }.incrementAndGet() }
+                    result
+                } catch (e: Exception) {
+                    aborted.incrementAndGet()
+                    throw e
+                } finally {
+                    inFlight.clear()
+                }
+            }
+        return TransactionalKafka(template, transactions, aborted, attempted, committed)
+    }
+
+    private class TestClock(start: Instant, private val stepMillis: Long = 0) : Clock() {
+        private val now = AtomicReference(start)
+        override fun getZone(): ZoneId = ZoneId.systemDefault()
+        override fun withZone(zone: ZoneId): Clock = this
+        override fun instant(): Instant = now.getAndUpdate { it.plusMillis(stepMillis) }
+        fun advanceMillis(millis: Long) {
+            now.updateAndGet { it.plusMillis(millis) }
+        }
     }
 
     private fun startStatementHistory() {

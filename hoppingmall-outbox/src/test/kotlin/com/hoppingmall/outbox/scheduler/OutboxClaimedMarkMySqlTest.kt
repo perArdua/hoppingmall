@@ -201,6 +201,82 @@ class OutboxClaimedMarkMySqlTest {
     }
 
     @Test
+    fun 복구가_선점한_뒤_한도_안이면_보내고_완료로_표시한다() {
+        insertStale("s1")
+        val kafka = fakeKafka()
+        val publisher = batchPublisher(kafka.template)
+
+        scheduler(publisher).handleStaleEvents()
+
+        assertThat(kafka.committed.keys).containsExactly("s1")
+        assertThat(row("s1")["status"]).isEqualTo("PUBLISHED")
+        assertThat(row("s1")["processed"]).isEqualTo(true)
+    }
+
+    @Test
+    fun 복구가_선점한_뒤_한도를_넘기면_보내지_않고_행을_RETRYING으로_둔다() {
+        insertStale("s1")
+        val kafka = fakeKafka()
+        val clock = TestClock(Instant.now().plusNanos(789), stepMillis = 1_000)
+        val publisher = batchPublisher(kafka.template, clock = clock)
+
+        scheduler(publisher).handleStaleEvents()
+
+        assertThat(kafka.attempted.get()).isZero()
+        assertThat(kafka.committed).isEmpty()
+        val stale = row("s1")
+        assertThat(stale["status"]).isEqualTo("RETRYING")
+        assertThat(stale["retry_count"]).isEqualTo(0)
+        assertThat(stale["processed"]).isEqualTo(false)
+        assertThat(time(stale["updated_at"])).isAfter(LocalDateTime.now().minusMinutes(1))
+    }
+
+    @Test
+    fun 복구_선점_뒤_완료_표시_직전에_다른_쪽이_다시_선점하면_완료로_바꾸지_않는다() {
+        insertStale("s1")
+        val kafka = fakeKafka(beforeCommit = { reclaim("s1") })
+
+        scheduler(batchPublisher(kafka.template)).handleStaleEvents()
+
+        assertThat(kafka.committed.keys).containsExactly("s1")
+        val stolen = row("s1")
+        assertThat(stolen["status"]).isEqualTo("RETRYING")
+        assertThat(stolen["processed"]).isEqualTo(false)
+        assertThat(time(stolen["updated_at"])).isEqualTo(otherClaimAt)
+    }
+
+    @Test
+    fun 복구가_선점한_뒤_한도_안에서_Kafka가_실패하면_선점_시각_조건으로_실패를_표시한다() {
+        insertStale("s1")
+        val kafka = fakeKafka(failWith = "broker down")
+
+        scheduler(batchPublisher(kafka.template)).handleStaleEvents()
+
+        val failed = row("s1")
+        assertThat(failed["status"]).isEqualTo("FAILED")
+        assertThat(failed["retry_count"]).isEqualTo(1)
+        assertThat(failed["error_message"]).isEqualTo("broker down")
+    }
+
+    @Test
+    fun 일괄_선점이_꺼져_있으면_복구는_시계를_보지_않고_현재_시각으로_선점해_기존처럼_발행한다() {
+        insertStale("s1")
+        val kafka = fakeKafka()
+        val clock = TestClock(Instant.now().minus(Duration.ofDays(1)), stepMillis = 60_000)
+        val publisher = plainPublisher(kafka.template, clock = clock).also {
+            ReflectionTestUtils.setField(it, "maxClaimAgeMs", 1L)
+        }
+        val before = LocalDateTime.now().minusSeconds(1)
+
+        scheduler(publisher).handleStaleEvents()
+
+        assertThat(kafka.committed.keys).containsExactly("s1")
+        val published = row("s1")
+        assertThat(published["status"]).isEqualTo("PUBLISHED")
+        assertThat(time(published["updated_at"])).isAfter(before)
+    }
+
+    @Test
     fun 선점_UPDATE는_기존_JPQL과_같은_행을_같은_값으로_바꾸고_같은_수를_돌려준다() {
         val claimedAt = LocalDateTime.now().withNano(123_456_789).truncatedTo(ChronoUnit.MICROS)
 
@@ -285,6 +361,11 @@ class OutboxClaimedMarkMySqlTest {
         )
     }
 
+    private fun insertStale(key: String) {
+        val createdAt = LocalDateTime.now().minusMinutes(30)
+        insert(listOf(Seed(key, "RETRYING", 0, createdAt)), updatedAt = createdAt.plusSeconds(1))
+    }
+
     private fun reclaim(key: String) {
         jdbcTemplate.update(
             "UPDATE outbox_events SET status = 'RETRYING', updated_at = ? WHERE partition_key = ?",
@@ -348,6 +429,7 @@ class OutboxClaimedMarkMySqlTest {
             clock
         ).also {
             ReflectionTestUtils.setField(it, "batchClaim", true)
+            ReflectionTestUtils.setField(it, "maxClaimAgeMs", 500L)
         }
 
     private fun plainPublisher(
@@ -362,6 +444,9 @@ class OutboxClaimedMarkMySqlTest {
             transactionManager,
             clock
         )
+
+    private fun scheduler(publisher: OutboxEventPublisher): OutboxMaintenanceScheduler =
+        OutboxMaintenanceScheduler(outboxEventRepository, publisher, transactionManager)
 
     private fun passingConverter(): AvroEventConverter {
         val converter = Mockito.mock(AvroEventConverter::class.java)

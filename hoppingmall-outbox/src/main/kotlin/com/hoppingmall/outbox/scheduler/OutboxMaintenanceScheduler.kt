@@ -67,18 +67,19 @@ class OutboxMaintenanceScheduler(
                 }
                 return@forEach
             }
+            val guardedClaimAt = outboxEventPublisher.staleClaimTimestamp()
             val claimed = transactionTemplate.execute {
                 outboxEventRepository.claimStaleEvent(
                     id = eventId,
                     nextStatus = OutboxStatus.RETRYING,
-                    updatedAt = LocalDateTime.now(),
+                    updatedAt = guardedClaimAt ?: LocalDateTime.now(),
                     cutoffDate = cutoffDate,
                     maxRetries = maxRetries,
                     statuses = listOf(OutboxStatus.PENDING, OutboxStatus.FAILED, OutboxStatus.RETRYING)
                 )
             } ?: 0
             if (claimed > 0) {
-                outboxEventPublisher.publishEvent(eventId)
+                outboxEventPublisher.publishEvent(eventId, guardedClaimAt)
             }
         }
     }

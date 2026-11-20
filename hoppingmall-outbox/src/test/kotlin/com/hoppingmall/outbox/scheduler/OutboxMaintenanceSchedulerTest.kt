@@ -14,6 +14,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -124,6 +125,51 @@ class OutboxMaintenanceSchedulerTest {
     }
 
     @Test
+    fun 일괄_선점이_켜져_있으면_발행기가_준_선점_시각으로_선점하고_그_시각을_넘겨_발행한다() {
+        val staleEvent = createStaleEvent(id = 1L, retryCount = 0)
+        val claimedAt = LocalDateTime.of(2026, 11, 20, 0, 0, 0, 123_456_000)
+
+        whenever(outboxEventRepository.findStaleEvents(any<LocalDateTime>(), eq(50)))
+            .thenReturn(listOf(staleEvent))
+        whenever(outboxEventPublisher.staleClaimTimestamp()).thenReturn(claimedAt)
+        whenever(
+            outboxEventRepository.claimStaleEvent(
+                id = eq(1L),
+                nextStatus = eq(OutboxStatus.RETRYING),
+                updatedAt = eq(claimedAt),
+                cutoffDate = any(),
+                maxRetries = eq(3),
+                statuses = eq(listOf(OutboxStatus.PENDING, OutboxStatus.FAILED, OutboxStatus.RETRYING))
+            )
+        ).thenReturn(1)
+
+        outboxMaintenanceScheduler.handleStaleEvents()
+
+        verify(outboxEventPublisher).publishEvent(1L, claimedAt)
+    }
+
+    @Test
+    fun 일괄_선점이_꺼져_있으면_현재_시각으로_선점하고_선점_시각_없이_발행한다() {
+        val staleEvent = createStaleEvent(id = 1L, retryCount = 0)
+        val before = LocalDateTime.now()
+
+        whenever(outboxEventRepository.findStaleEvents(any<LocalDateTime>(), eq(50)))
+            .thenReturn(listOf(staleEvent))
+        whenever(outboxEventPublisher.staleClaimTimestamp()).thenReturn(null)
+        val claimTimes = mutableListOf<LocalDateTime>()
+        whenever(outboxEventRepository.claimStaleEvent(any(), any(), any(), any(), any(), any())).thenAnswer {
+            claimTimes.add(it.arguments[2] as LocalDateTime)
+            1
+        }
+
+        outboxMaintenanceScheduler.handleStaleEvents()
+
+        assertThat(claimTimes).hasSize(1)
+        assertThat(claimTimes[0]).isBetween(before, LocalDateTime.now())
+        verify(outboxEventPublisher).publishEvent(1L, null)
+    }
+
+    @Test
     fun 최대_재시도_초과된_지연_이벤트는_영구_실패_처리한다() {
         val staleEvent = createStaleEvent(id = 1L, retryCount = 3)
 
@@ -135,7 +181,7 @@ class OutboxMaintenanceSchedulerTest {
 
         assertThat(staleEvent.status).isEqualTo(OutboxStatus.FAILED)
         verify(outboxEventRepository).save(eq(staleEvent))
-        verify(outboxEventPublisher, never()).publishEvent(any())
+        verify(outboxEventPublisher, never()).publishEvent(any(), anyOrNull())
     }
 
     @Test
@@ -145,7 +191,7 @@ class OutboxMaintenanceSchedulerTest {
 
         outboxMaintenanceScheduler.handleStaleEvents()
 
-        verify(outboxEventPublisher, never()).publishEvent(any())
+        verify(outboxEventPublisher, never()).publishEvent(any(), anyOrNull())
         verify(outboxEventRepository, never()).save(any<OutboxEvent>())
     }
 
@@ -166,7 +212,7 @@ class OutboxMaintenanceSchedulerTest {
 
         outboxMaintenanceScheduler.handleStaleEvents()
 
-        verify(outboxEventPublisher, never()).publishEvent(any())
+        verify(outboxEventPublisher, never()).publishEvent(any(), anyOrNull())
         verify(outboxEventRepository, never()).claimStaleEvent(any(), any(), any(), any(), any(), any())
     }
 
@@ -189,6 +235,6 @@ class OutboxMaintenanceSchedulerTest {
 
         outboxMaintenanceScheduler.handleStaleEvents()
 
-        verify(outboxEventPublisher, never()).publishEvent(any())
+        verify(outboxEventPublisher, never()).publishEvent(any(), anyOrNull())
     }
 }
