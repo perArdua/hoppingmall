@@ -68,6 +68,7 @@ tasks.withType<Test> {
 		listOf("user-service", "product-service", "order-service", "payment-service", "notification-service", "settlement-service")
 			.map { fileTree("../$it/src/main/resources/db/migration") }
 	)
+	inputs.files("../docker/init-db.sql", "../docker/init-accounts.sh")
 }
 
 val jacocoExcludedDirs = listOf(

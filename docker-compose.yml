@@ -8,6 +8,13 @@ services:
       - "127.0.0.1:3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD:?.env에 USER_DB_PASSWORD를 설정하세요}
+      PRODUCT_DB_PASSWORD: ${PRODUCT_DB_PASSWORD:?.env에 PRODUCT_DB_PASSWORD를 설정하세요}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?.env에 ORDER_DB_PASSWORD를 설정하세요}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?.env에 PAYMENT_DB_PASSWORD를 설정하세요}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?.env에 NOTIFICATION_DB_PASSWORD를 설정하세요}
+      SETTLEMENT_DB_PASSWORD: ${SETTLEMENT_DB_PASSWORD:?.env에 SETTLEMENT_DB_PASSWORD를 설정하세요}
+      CONSISTENCY_MONITOR_DB_PASSWORD: ${CONSISTENCY_MONITOR_DB_PASSWORD:?.env에 CONSISTENCY_MONITOR_DB_PASSWORD를 설정하세요}
     command: >
       --max-connections=200
       --innodb-buffer-pool-size=1G
@@ -18,6 +25,7 @@ services:
       --long-query-time=1
     volumes:
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./docker/init-accounts.sh:/docker-entrypoint-initdb.d/init-accounts.sh:ro
       - mysql-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -321,7 +329,8 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       GATEWAY_IDENTITY_SECRET: ${GATEWAY_IDENTITY_SECRET:?.env에 GATEWAY_IDENTITY_SECRET을 설정하세요}
       GATEWAY_IDENTITY_PREVIOUS_SECRET: ${GATEWAY_IDENTITY_PREVIOUS_SECRET:-}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      SPRING_DATASOURCE_USERNAME: notification_app
+      SPRING_DATASOURCE_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?.env에 NOTIFICATION_DB_PASSWORD를 설정하세요}
     ports:
       - "127.0.0.1:8091:8081"
     healthcheck:
@@ -349,7 +358,8 @@ services:
       GATEWAY_IDENTITY_PREVIOUS_SECRET: ${GATEWAY_IDENTITY_PREVIOUS_SECRET:-}
       JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      SPRING_DATASOURCE_USERNAME: user_app
+      SPRING_DATASOURCE_PASSWORD: ${USER_DB_PASSWORD:?.env에 USER_DB_PASSWORD를 설정하세요}
       USER_RATELIMIT_TRUSTEDPROXYCOUNT: "1"
       AUTH_REFRESHCOOKIE_ALLOWEDORIGINS: ${AUTH_REFRESHCOOKIE_ALLOWEDORIGINS:-http://localhost:3000}
     ports:
@@ -407,7 +417,8 @@ services:
       JAVA_TOOL_OPTIONS: "-Dnetworkaddress.cache.ttl=5 -Dsun.net.inetaddr.ttl=5"
       JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      SPRING_DATASOURCE_USERNAME: product_app
+      SPRING_DATASOURCE_PASSWORD: ${PRODUCT_DB_PASSWORD:?.env에 PRODUCT_DB_PASSWORD를 설정하세요}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-product-service}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?.env에 STORAGE_SECRET_KEY를 설정하세요}
       STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/hoppingmall-product}
@@ -442,7 +453,8 @@ services:
       JAVA_TOOL_OPTIONS: "-Dnetworkaddress.cache.ttl=5 -Dsun.net.inetaddr.ttl=5"
       JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      SPRING_DATASOURCE_USERNAME: order_app
+      SPRING_DATASOURCE_PASSWORD: ${ORDER_DB_PASSWORD:?.env에 ORDER_DB_PASSWORD를 설정하세요}
     ports:
       - "127.0.0.1:8084:8084"
       - "127.0.0.1:9094:9094"
@@ -474,7 +486,8 @@ services:
       JAVA_TOOL_OPTIONS: "-Dnetworkaddress.cache.ttl=5 -Dsun.net.inetaddr.ttl=5"
       JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 설정하세요}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      SPRING_DATASOURCE_USERNAME: payment_app
+      SPRING_DATASOURCE_PASSWORD: ${PAYMENT_DB_PASSWORD:?.env에 PAYMENT_DB_PASSWORD를 설정하세요}
     ports:
       - "127.0.0.1:8085:8085"
       - "127.0.0.1:9095:9095"
@@ -500,7 +513,8 @@ services:
       GATEWAY_IDENTITY_SECRET: ${GATEWAY_IDENTITY_SECRET:?.env에 GATEWAY_IDENTITY_SECRET을 설정하세요}
       GATEWAY_IDENTITY_PREVIOUS_SECRET: ${GATEWAY_IDENTITY_PREVIOUS_SECRET:-}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?.env에 INTERNAL_SERVICE_TOKEN을 설정하세요}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      SPRING_DATASOURCE_USERNAME: settlement_app
+      SPRING_DATASOURCE_PASSWORD: ${SETTLEMENT_DB_PASSWORD:?.env에 SETTLEMENT_DB_PASSWORD를 설정하세요}
     ports:
       - "127.0.0.1:8086:8086"
     healthcheck:
@@ -524,8 +538,8 @@ services:
         condition: service_started
     environment:
       CONSISTENCY_DB_URL: jdbc:mysql://mysql:3306/consistency_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
-      CONSISTENCY_DB_USERNAME: root
-      CONSISTENCY_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 설정하세요}
+      CONSISTENCY_DB_USERNAME: consistency_monitor
+      CONSISTENCY_DB_PASSWORD: ${CONSISTENCY_MONITOR_DB_PASSWORD:?.env에 CONSISTENCY_MONITOR_DB_PASSWORD를 설정하세요}
       CONSISTENCY_ORDER_DB_URL: jdbc:mysql://mysql:3306/order_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
       CONSISTENCY_PAYMENT_DB_URL: jdbc:mysql://mysql:3306/payment_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
       CONSISTENCY_PRODUCT_DB_URL: jdbc:mysql://mysql:3306/product_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
