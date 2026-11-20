@@ -15,6 +15,8 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 @Service
 class OutboxEventPublisher(
@@ -28,9 +30,12 @@ class OutboxEventPublisher(
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
     private val maxRetries = 3
     private val transactionTemplate = TransactionTemplate(transactionManager)
+    private val batchLock = ReentrantLock()
 
     @Scheduled(fixedDelayString = "\${outbox.publish.interval-ms:5000}")
-    fun publishPendingEvents() {
+    fun publishPendingEvents() = batchLock.withLock { publishBatch() }
+
+    private fun publishBatch() {
         val pendingEvents = transactionTemplate.execute {
             outboxEventRepository.findUnprocessedEvents(
                 status = OutboxStatus.PENDING,
