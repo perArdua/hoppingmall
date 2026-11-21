@@ -147,6 +147,24 @@ class SplitServersMySqlTest {
         assertThat(sweepKeys("INV-10")).containsExactlyInAnyOrder("5:1>2", "5:1>3")
     }
 
+    @Test
+    fun 같은_토픽에서_같은_소비자_그룹이_처리하는_이벤트끼리_기록_순서가_바뀌면_그대로_INV_10이다() {
+        fixture.order(6, "CANCELLED")
+        fixture.payment(6, 6, "CANCELLED")
+        fixture.outboxEvent("payment", 1, "PaymentCompleted", "6", "payment", "PUBLISHED",
+            """{"paymentId":6,"orderId":6,"transactionId":"tx-6"}""", processedSecondsAgo = 200)
+        fixture.outboxEvent("payment", 2, "PaymentCancelled", "6", "payment-compensation", "PUBLISHED",
+            """{"eventId":"pc-6a","paymentId":6,"orderId":6}""", processedSecondsAgo = 190)
+        fixture.outboxEvent("payment", 3, "PaymentCancelled", "6", "payment-compensation", "PUBLISHED",
+            """{"eventId":"pc-6b","paymentId":6,"orderId":6}""", processedSecondsAgo = 189)
+        fixture.sagaLog(6, "payment-completed-tx-6", 180)
+        fixture.sagaLog(6, "pc-6b", 150)
+        fixture.sagaLog(6, "pc-6a", 140)
+
+        assertThat(recentKeys("INV-10")).containsExactly("6:2>3")
+        assertThat(sweepKeys("INV-10")).containsExactly("6:2>3")
+    }
+
     @ParameterizedTest
     @MethodSource("crossSourceIds")
     fun 표가_비어_있으면_전체_훑기는_아무것도_하지_않는다(id: String) {
