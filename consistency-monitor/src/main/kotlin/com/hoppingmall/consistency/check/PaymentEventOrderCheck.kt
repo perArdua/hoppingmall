@@ -31,7 +31,9 @@ class PaymentEventOrderCheck(
 
     private fun outOfOrderPairs(events: List<ProcessedEvent>): List<Map<String, Any?>> =
         events.flatMap { earlier ->
-            events.filter { later -> later.outboxId > earlier.outboxId && earlier.processedAt > later.processedAt }
+            events.filter { later ->
+                later.outboxId > earlier.outboxId && earlier.processedAt > later.processedAt && earlier.sharesOrderingWith(later)
+            }
                 .map { later ->
                     linkedMapOf(
                         "entity" to "${earlier.event["order_id"]}:${earlier.outboxId}>${later.outboxId}",
@@ -46,5 +48,14 @@ class PaymentEventOrderCheck(
 
     private class ProcessedEvent(val event: Map<String, Any?>, val processedAt: LocalDateTime) {
         val outboxId: Long = (event["outbox_id"] as Number).toLong()
+        private val topic: String = event["topic"].toString()
+        private val cancellationResult: Boolean = event["event_type"].toString().startsWith(CANCELLATION_RESULT_PREFIX)
+
+        fun sharesOrderingWith(other: ProcessedEvent): Boolean =
+            topic != other.topic || cancellationResult == other.cancellationResult
+    }
+
+    private companion object {
+        const val CANCELLATION_RESULT_PREFIX = "PaymentCancellation"
     }
 }
