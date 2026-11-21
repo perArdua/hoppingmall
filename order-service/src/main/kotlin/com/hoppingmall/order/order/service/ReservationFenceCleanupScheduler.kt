@@ -23,7 +23,7 @@ class ReservationFenceCleanupScheduler(
 
     fun cleanUp(): Int {
         if (!enabled) return 0
-        val deleted = jdbcTemplate.update(DELETE, retentionHours, batchSize)
+        val deleted = jdbcTemplate.update(DELETE, -retentionHours, batchSize)
         if (deleted > 0) {
             log.info("reservation_fence 행 정리: deleted={}, retentionHours={}", deleted, retentionHours)
         }
@@ -33,7 +33,7 @@ class ReservationFenceCleanupScheduler(
     companion object {
         private val DELETE = """
             DELETE FROM reservation_fence
-            WHERE created_at < NOW(6) - INTERVAL ? HOUR
+            WHERE created_at < TIMESTAMPADD(HOUR, ?, NOW(6))
               AND (
                 decision = '${ReservationFence.ABORTED}'
                 OR EXISTS (
