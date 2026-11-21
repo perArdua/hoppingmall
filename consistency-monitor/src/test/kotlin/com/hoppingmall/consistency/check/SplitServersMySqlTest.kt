@@ -100,6 +100,53 @@ class SplitServersMySqlTest {
         assertThat(sweepKeys(id)).isEmpty()
     }
 
+    @Test
+    fun 같은_토픽을_다른_소비자_그룹이_처리한_결제_취소와_취소_결과는_기록_순서가_바뀌어도_INV_10이_아니다() {
+        fixture.order(3, "CANCELLED")
+        fixture.payment(3, 3, "CANCELLED")
+        fixture.outboxEvent("payment", 1, "PaymentCompleted", "3", "payment", "PUBLISHED",
+            """{"paymentId":3,"orderId":3,"transactionId":"tx-3"}""", processedSecondsAgo = 200)
+        fixture.outboxEvent("payment", 2, "PaymentCancelled", "3", "payment-compensation", "PUBLISHED",
+            """{"eventId":"pc-3","paymentId":3,"orderId":3}""", processedSecondsAgo = 190)
+        fixture.outboxEvent("payment", 3, "PaymentCancellationCompleted", "3", "payment-compensation", "PUBLISHED",
+            """{"eventType":"PaymentCancellationCompleted","eventId":"cc-3","orderId":3,"paymentId":3}""", processedSecondsAgo = 189)
+        fixture.sagaLog(3, "payment-completed-tx-3", 180)
+        fixture.sagaLog(3, "cc-3", 150)
+        fixture.sagaLog(3, "pc-3", 140)
+        fixture.order(4, "CANCEL_FAILED")
+        fixture.payment(4, 4, "SUCCESS")
+        fixture.outboxEvent("payment", 4, "PaymentCompleted", "4", "payment", "PUBLISHED",
+            """{"paymentId":4,"orderId":4,"transactionId":"tx-4"}""", processedSecondsAgo = 200)
+        fixture.outboxEvent("payment", 5, "PaymentCancelled", "4", "payment-compensation", "PUBLISHED",
+            """{"eventId":"pc-4","paymentId":4,"orderId":4}""", processedSecondsAgo = 190)
+        fixture.outboxEvent("payment", 6, "PaymentCancellationFailed", "4", "payment-compensation", "PUBLISHED",
+            """{"eventType":"PaymentCancellationFailed","eventId":"cf-4","orderId":4}""", processedSecondsAgo = 189)
+        fixture.sagaLog(4, "payment-completed-tx-4", 180)
+        fixture.sagaLog(4, "cf-4", 150)
+        fixture.sagaLog(4, "pc-4", 140)
+
+        assertThat(recentKeys("INV-10")).isEmpty()
+        assertThat(sweepKeys("INV-10")).isEmpty()
+    }
+
+    @Test
+    fun 결제_완료가_뒤이은_결제_취소와_취소_결과보다_늦게_기록되면_그대로_INV_10이다() {
+        fixture.order(5, "CANCELLED")
+        fixture.payment(5, 5, "CANCELLED")
+        fixture.outboxEvent("payment", 1, "PaymentCompleted", "5", "payment", "PUBLISHED",
+            """{"paymentId":5,"orderId":5,"transactionId":"tx-5"}""", processedSecondsAgo = 200)
+        fixture.outboxEvent("payment", 2, "PaymentCancelled", "5", "payment-compensation", "PUBLISHED",
+            """{"eventId":"pc-5","paymentId":5,"orderId":5}""", processedSecondsAgo = 190)
+        fixture.outboxEvent("payment", 3, "PaymentCancellationCompleted", "5", "payment-compensation", "PUBLISHED",
+            """{"eventType":"PaymentCancellationCompleted","eventId":"cc-5","orderId":5,"paymentId":5}""", processedSecondsAgo = 189)
+        fixture.sagaLog(5, "payment-completed-tx-5", 100)
+        fixture.sagaLog(5, "pc-5", 150)
+        fixture.sagaLog(5, "cc-5", 140)
+
+        assertThat(recentKeys("INV-10")).containsExactlyInAnyOrder("5:1>2", "5:1>3")
+        assertThat(sweepKeys("INV-10")).containsExactlyInAnyOrder("5:1>2", "5:1>3")
+    }
+
     @ParameterizedTest
     @MethodSource("crossSourceIds")
     fun 표가_비어_있으면_전체_훑기는_아무것도_하지_않는다(id: String) {
