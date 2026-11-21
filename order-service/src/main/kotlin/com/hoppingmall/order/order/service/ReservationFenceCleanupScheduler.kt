@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
 @Component
 class ReservationFenceCleanupScheduler(
     private val jdbcTemplate: JdbcTemplate,
-    @Value("#{\${order.reservation.fence.enabled:false} or \${idempotency.claim-by-commit:true}}") private val enabled: Boolean,
+    @Value("#{\${order.reservation.fence.enabled:false} or \${idempotency.claim-by-commit:false}}") private val enabled: Boolean,
     @Value("\${order.reservation.fence.cleanup.retention-hours:24}") private val retentionHours: Long,
     @Value("\${order.reservation.fence.cleanup.batch-size:1000}") private val batchSize: Int
 ) {
