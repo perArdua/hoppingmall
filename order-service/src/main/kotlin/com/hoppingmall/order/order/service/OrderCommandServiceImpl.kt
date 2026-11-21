@@ -110,7 +110,8 @@ class OrderCommandServiceImpl(
         val items = cartItems.groupBy { it.productId }.map { (productId, rows) -> productId to rows.sumOf { it.quantity } }
         val reservationMap = reserveStock(items)
 
-        val fence = reservationFence?.takeIf { it.enabled }
+        val sharedReservationFence = reservationFence?.takeIf { IdempotencyRequestContext.claimKey() != null }
+        val fence = reservationFence?.takeIf { it.enabled } ?: sharedReservationFence
         val response = try {
             createOrderInTransaction(buyerId, request, cartItems, productMap, reservationMap, totalAmount, fence)
         } catch (e: Exception) {
@@ -118,13 +119,22 @@ class OrderCommandServiceImpl(
                 log.info("같은 멱등 키 주문이 먼저 커밋되어 공유 예약을 취소하지 않음: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName)
                 throw e
             }
-            runCatching { inventoryCommandPort.cancelReservations(reservationMap.values.distinct()) }
-                .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName, it) }
+            val reservationIds = reservationMap.values.distinct()
+            val cancellable = if (sharedReservationFence != null) abortedReservations(sharedReservationFence, reservationIds) else reservationIds
+            if (cancellable.isNotEmpty()) {
+                runCatching { inventoryCommandPort.cancelReservations(cancellable) }
+                    .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", cancellable, e.javaClass.simpleName, it) }
+            }
             throw e
         }
         orderMetrics.recordOrderCreated(totalAmount)
         return response
     }
+
+    private fun abortedReservations(fence: ReservationFence, reservationIds: List<String>): List<String> =
+        runCatching { fence.abortForCancel(reservationIds) }
+            .onFailure { log.warn("예약 취소 결정 기록 실패, 취소하지 않고 만료에 맡김: rids={}", reservationIds, it) }
+            .getOrDefault(emptyList())
 
     private fun createOrderInTransaction(
         buyerId: Long,

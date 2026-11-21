@@ -62,6 +62,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 @DisplayName("같은 멱등 키 요청이 함께 쓰는 예약, 커밋 선점 켬 (MySQL)")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -87,6 +88,9 @@ class OrderCreateSameKeySharedReservationMySqlIntegrationTest : MySqlJpaTestSupp
 
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    @Autowired
+    private lateinit var fence: ReservationFence
 
     @MockitoSpyBean
     private lateinit var idempotencyTxRecorder: IdempotencyTxRecorder
@@ -127,18 +131,57 @@ class OrderCreateSameKeySharedReservationMySqlIntegrationTest : MySqlJpaTestSupp
         )
         whenever(inventoryCommandPort.batchReserveStock(any())).thenAnswer { invocation ->
             @Suppress("UNCHECKED_CAST")
-            val items = invocation.arguments[0] as List<Pair<Long, Int>>
-            val requestKey = IdempotencyRequestContext.claimKey() ?: UUID.randomUUID().toString()
-            reservationsByRequestKey.computeIfAbsent(requestKey) {
-                items.associate { (productId, _) -> productId to UUID.randomUUID().toString() }
-            }
+            reserveByRequestKey(invocation.arguments[0] as List<Pair<Long, Int>>)
         }
         whenever(inventoryCommandPort.cancelReservations(any())).thenAnswer { invocation ->
             @Suppress("UNCHECKED_CAST")
-            cancelledReservationIds.addAll(invocation.arguments[0] as List<String>)
+            val cancelled = invocation.arguments[0] as List<String>
+            cancelledReservationIds.addAll(cancelled)
+            reservationsByRequestKey.entries.removeIf { (_, reserved) -> reserved.values.any { it in cancelled } }
             Unit
         }
     }
+
+    @Test
+    fun 같은_키의_다른_요청이_취소를_먼저_커밋한_예약으로는_주문을_만들지_않고_409_ORD009를_주며_다시_보내면_새_예약으로_주문한다() {
+        val firstReservation = AtomicReference<String>()
+        whenever(inventoryCommandPort.batchReserveStock(any())).thenAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val reserved = reserveByRequestKey(invocation.arguments[0] as List<Pair<Long, Int>>)
+            if (firstReservation.compareAndSet(null, reserved.values.single())) {
+                assertThat(fence.abortForCancel(reserved.values)).containsExactlyElementsOf(reserved.values)
+            }
+            reserved
+        }
+        val cartItemId = saveCartItem()
+        val controller = controllerWithClaimByCommit()
+        val key = "same-key-${UUID.randomUUID()}"
+
+        val first = outcome(controller, key, cartItemId)
+        val ordersAfterFirst = orderIds()
+        val cartAfterFirst = cartItemRepository.count()
+        val retried = outcome(controller, key, cartItemId)
+
+        val orderId = orderIds().single()
+        val secondReservation = orderItemReservationIds().single()
+        assertThat(first).isEqualTo("409:ORD009")
+        assertThat(ordersAfterFirst).isEmpty()
+        assertThat(cartAfterFirst).isEqualTo(1)
+        assertThat(cancelledReservationIds).containsExactly(firstReservation.get())
+        assertThat(retried).isEqualTo("201:$orderId")
+        assertThat(secondReservation).isNotEqualTo(firstReservation.get())
+        assertThat(decisionOf(firstReservation.get())).isEqualTo(ReservationFence.ABORTED)
+        assertThat(decisionOf(secondReservation)).isEqualTo(ReservationFence.LINKED)
+    }
+
+    private fun reserveByRequestKey(items: List<Pair<Long, Int>>): Map<Long, String> {
+        val requestKey = IdempotencyRequestContext.claimKey() ?: UUID.randomUUID().toString()
+        return reservationsByRequestKey.computeIfAbsent(requestKey) {
+            items.associate { (productId, _) -> productId to UUID.randomUUID().toString() }
+        }
+    }
+
+    private fun decisionOf(reservationId: String): String? = fence.decisionOf(reservationId)
 
     @Test
     fun 이긴_요청이_커밋하기_전에_늦은_요청이_잠금_대기_시간_초과로_실패해도_이긴_주문의_예약은_취소되지_않는다() {

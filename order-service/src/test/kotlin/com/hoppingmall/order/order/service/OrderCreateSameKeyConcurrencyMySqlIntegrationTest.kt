@@ -109,6 +109,8 @@ abstract class OrderCreateSameKeyScenarios : MySqlJpaTestSupport() {
 
     protected val createdReservations = AtomicInteger()
 
+    private var binlogStart: Pair<String, Long>? = null
+
     @BeforeEach
     fun setUpScenario() {
         jdbcTemplate.update("DELETE FROM cart_items")
@@ -144,6 +146,7 @@ abstract class OrderCreateSameKeyScenarios : MySqlJpaTestSupport() {
         ).id!!
         val controller = controllerWithAspect()
         val key = "same-key-${UUID.randomUUID()}"
+        binlogStart = binlogPosition()
         val ready = CountDownLatch(requests)
         val start = CountDownLatch(1)
         val futures = (1..requests).map {
@@ -157,6 +160,17 @@ abstract class OrderCreateSameKeyScenarios : MySqlJpaTestSupport() {
         start.countDown()
         return futures.map { it.get(60, TimeUnit.SECONDS) }
     }
+
+    protected fun writeCommitsSinceSend(): Int {
+        val (file, position) = binlogStart!!
+        return jdbcTemplate.queryForList("SHOW BINLOG EVENTS IN '$file' FROM $position").count { it["Event_type"] == "Xid" }
+    }
+
+    protected fun fenceDecisions(): List<String> =
+        jdbcTemplate.queryForList("SELECT decision FROM reservation_fence", String::class.java)
+
+    private fun binlogPosition(): Pair<String, Long> =
+        jdbcTemplate.queryForMap("SHOW MASTER STATUS").let { it["File"] as String to (it["Position"] as Number).toLong() }
 
     protected fun count(table: String): Int = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM $table", Int::class.java)!!
 
@@ -232,7 +246,7 @@ class OrderCreateSameKeyClaimByCommitMySqlIntegrationTest : OrderCreateSameKeySc
     }
 
     @Test
-    fun 모두_같은_주문으로_201을_받고_주문_예약_멱등_기록은_하나씩만_남는다() {
+    fun 모두_같은_주문으로_201을_받고_주문_예약_멱등_기록_유지_결정은_하나씩만_남으며_주문_DB_쓰기_커밋은_한_번이다() {
         val outcomes = sendSameKeyConcurrently(REQUESTS)
 
         val orderId = orderIds().single()
@@ -244,6 +258,8 @@ class OrderCreateSameKeyClaimByCommitMySqlIntegrationTest : OrderCreateSameKeySc
         assertThat(count("cart_items")).isZero()
         verify(inventoryCommandPort, never()).cancelReservations(any())
         verify(redisson, never()).getLock(any<String>())
+        assertThat(fenceDecisions()).containsExactly(ReservationFence.LINKED)
+        assertThat(writeCommitsSinceSend()).isEqualTo(1)
     }
 }
 
@@ -259,7 +275,7 @@ class OrderCreateSameKeyRedisLockMySqlIntegrationTest : OrderCreateSameKeyScenar
     }
 
     @Test
-    fun 락을_못_잡은_요청은_IDEM002를_받고_주문과_예약은_하나만_남는다() {
+    fun 락을_못_잡은_요청은_IDEM002를_받고_주문과_예약은_하나만_남으며_결정_펜스는_쓰지_않고_주문_DB_쓰기_커밋은_두_번이다() {
         val outcomes = sendSameKeyConcurrently(REQUESTS)
 
         val orderId = orderIds().single()
@@ -268,6 +284,8 @@ class OrderCreateSameKeyRedisLockMySqlIntegrationTest : OrderCreateSameKeyScenar
         assertThat(count("idempotency_records")).isEqualTo(1)
         assertThat(createdReservations.get()).isEqualTo(1)
         verify(inventoryCommandPort, never()).cancelReservations(any())
+        assertThat(fenceDecisions()).isEmpty()
+        assertThat(writeCommitsSinceSend()).isEqualTo(2)
     }
 
     companion object {
@@ -304,7 +322,7 @@ class OrderCreateSameKeySaveInTxRedisLockMySqlIntegrationTest : OrderCreateSameK
     }
 
     @Test
-    fun 락을_못_잡은_요청은_IDEM002를_받고_멱등_기록은_주문_트랜잭션_안에서_한_번만_저장된다() {
+    fun 락을_못_잡은_요청은_IDEM002를_받고_멱등_기록은_주문_트랜잭션_안에서_한_번만_저장되며_결정_펜스는_쓰지_않는다() {
         val outcomes = sendSameKeyConcurrently(REQUESTS)
 
         val orderId = orderIds().single()
@@ -316,6 +334,8 @@ class OrderCreateSameKeySaveInTxRedisLockMySqlIntegrationTest : OrderCreateSameK
         assertThat(orderItemReservationIds()).containsExactlyElementsOf(createdReservationIds())
         assertThat(count("cart_items")).isZero()
         verify(inventoryCommandPort, never()).cancelReservations(any())
+        assertThat(fenceDecisions()).isEmpty()
+        assertThat(writeCommitsSinceSend()).isEqualTo(1)
     }
 
     companion object {
