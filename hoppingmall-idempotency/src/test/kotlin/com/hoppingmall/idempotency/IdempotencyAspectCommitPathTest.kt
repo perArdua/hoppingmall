@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
@@ -112,7 +113,7 @@ class IdempotencyAspectCommitPathTest {
         @Test
         fun 커밋_선점으로_표시된_엔드포인트도_락을_잡고_선점_보관함을_열지_않는다() {
             stubLock()
-            whenever(idempotent.claimByCommit).thenReturn(true)
+            lenient().whenever(idempotent.claimByCommit).thenReturn(true)
             whenever(idempotent.ttlHours).thenReturn(24L)
             whenever(idempotencyService.findByKey(any())).thenReturn(null)
             var opened: PendingIdempotency? = null
