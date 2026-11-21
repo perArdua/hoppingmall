@@ -244,7 +244,7 @@ WHERE o.deleted_at IS NULL
       AND CAST(JSON_EXTRACT(r.response_body, '$.data.id') AS UNSIGNED) = o.id
   );
 
--- @INV INV-10 | 같은 주문의 결제→주문 이벤트가 outbox 순서와 다른 순서로 처리됨(saga_event_logs 기록 시각 기준)
+-- @INV INV-10 | 같은 주문의 결제→주문 이벤트가 outbox 순서와 다른 순서로 처리됨(saga_event_logs 기록 시각 기준, 같은 토픽을 서로 다른 소비자 그룹이 처리하는 짝은 제외)
 -- @SQL payment recent-events
 SELECT CAST(JSON_EXTRACT(e.event_data, '$.orderId') AS UNSIGNED) AS order_id
 FROM outbox_events e FORCE INDEX (idx_outbox_processed_processed_at)
@@ -261,7 +261,7 @@ SELECT p.id AS payment_id
 FROM payments p
 WHERE p.order_id IN (:ids);
 -- @SQL payment events-by-aggregate
-SELECT e.id AS outbox_id, e.event_type, CAST(JSON_EXTRACT(e.event_data, '$.orderId') AS UNSIGNED) AS order_id,
+SELECT e.id AS outbox_id, e.event_type, e.topic, CAST(JSON_EXTRACT(e.event_data, '$.orderId') AS UNSIGNED) AS order_id,
   CASE e.event_type
     WHEN 'PaymentCompleted' THEN CONCAT('payment-completed-', JSON_UNQUOTE(JSON_EXTRACT(e.event_data, '$.transactionId')))
     ELSE JSON_UNQUOTE(JSON_EXTRACT(e.event_data, '$.eventId'))

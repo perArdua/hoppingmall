@@ -219,6 +219,17 @@ class InvariantFixture(private val jdbc: (String) -> JdbcTemplate) {
         sagaLog(173, "payment-completed-tx-173", 30)
         sagaLog(173, "cf-173", 180)
         sagaLog(173, "earn-173", 10)
+        order(174, "CANCELLED")
+        payment(274, 174, "CANCELLED")
+        outboxEvent("payment", 8, "PaymentCompleted", "274", "payment", "PUBLISHED",
+            """{"paymentId":274,"orderId":174,"transactionId":"tx-174"}""", processedSecondsAgo = 200)
+        outboxEvent("payment", 9, "PaymentCancelled", "274", "payment-compensation", "PUBLISHED",
+            """{"eventId":"pc-174","paymentId":274,"orderId":174}""", processedSecondsAgo = 190)
+        outboxEvent("payment", 10, "PaymentCancellationCompleted", "274", "payment-compensation", "PUBLISHED",
+            """{"eventType":"PaymentCancellationCompleted","eventId":"cc-174","orderId":174,"paymentId":274}""", processedSecondsAgo = 189)
+        sagaLog(174, "payment-completed-tx-174", 180)
+        sagaLog(174, "cc-174", 150)
+        sagaLog(174, "pc-174", 140)
 
         outboxEvent("order", 11, "OrderCreated", "171", "order", "PENDING", "{}", createdMinutesAgo = 5)
         outboxEvent("order", 12, "OrderCreated", "172", "order", "PENDING", "{}", createdMinutesAgo = 0)
