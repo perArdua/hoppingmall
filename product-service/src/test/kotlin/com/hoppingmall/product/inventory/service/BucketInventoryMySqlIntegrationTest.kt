@@ -33,7 +33,7 @@ import kotlin.random.Random
 
 @DisplayName("bucket 모드 재고 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@TestPropertySource(properties = ["inventory.mode=bucket", "inventory.bucket.count=8", "inventory.semaphore.permits=64"])
+@TestPropertySource(properties = ["inventory.mode=bucket", "inventory.bucket.count=8", "inventory.semaphore.permits=64", "inventory.cache.evict-async=false"])
 class BucketInventoryMySqlIntegrationTest : MySqlIntegrationTestSupport() {
 
     @Autowired

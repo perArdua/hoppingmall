@@ -11,6 +11,8 @@ import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.annotation.Import
+import org.springframework.test.context.TestPropertySource
 import java.math.BigDecimal
 import java.util.UUID
 
@@ -100,5 +102,26 @@ class ReservationFenceCleanupMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     companion object {
         private const val RETENTION_HOURS = 24L
+    }
+}
+
+@DisplayName("reservation_fence 행 정리 켜짐 조건 MySQL 통합 테스트")
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
+@Import(ReservationFenceCleanupScheduler::class)
+@TestPropertySource(properties = ["order.reservation.fence.enabled=false", "idempotency.claim-by-commit=true"])
+class ReservationFenceCleanupClaimByCommitMySqlIntegrationTest : MySqlJpaTestSupport() {
+
+    @Autowired
+    private lateinit var cleaner: ReservationFenceCleanupScheduler
+
+    @Test
+    fun fence_플래그가_꺼져도_커밋_선점이_켜져_있으면_보관_기간이_지난_취소_결정을_지운다() {
+        jdbcTemplate.update(
+            "INSERT INTO reservation_fence (reservation_id, decision, created_at) VALUES (?, 'ABORTED', NOW(6) - INTERVAL 25 HOUR)",
+            UUID.randomUUID().toString()
+        )
+
+        assertThat(cleaner.cleanUp()).isEqualTo(1)
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM reservation_fence", Int::class.java)).isZero()
     }
 }

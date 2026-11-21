@@ -1,5 +1,8 @@
 package com.hoppingmall.order.order.service
 
+import com.hoppingmall.idempotency.IdempotencyConflictException
+import com.hoppingmall.idempotency.IdempotencyRequestContext
+import com.hoppingmall.idempotency.PendingIdempotency
 import com.hoppingmall.order.cartItem.domain.CartItem
 import com.hoppingmall.order.cartItem.domain.repository.CartItemRepository
 import com.hoppingmall.order.config.OrderMetrics
@@ -16,6 +19,7 @@ import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -93,6 +97,30 @@ class OrderReserveStockErrorCodeTest {
         )
     }
 
+    @AfterEach
+    fun tearDown() {
+        IdempotencyRequestContext.clear()
+    }
+
+    @Test
+    fun 같은_요청_키_충돌_409는_커밋_선점이_아니면_그대로_던진다() {
+        whenever(inventoryCommandPort.batchReserveStock(any())).thenThrow(conflict())
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
+            .isInstanceOf(HttpClientErrorException.Conflict::class.java)
+        verify(orderRepository, never()).save(any<Order>())
+    }
+
+    @Test
+    fun 같은_요청_키_충돌_409는_커밋_선점_요청이면_멱등_충돌로_바꾼다() {
+        IdempotencyRequestContext.open(PendingIdempotency("claim-key", "POST", "/api/v1/orders", "fp", 24L, claimByCommit = true))
+        whenever(inventoryCommandPort.batchReserveStock(any())).thenThrow(conflict())
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
+            .isInstanceOf(IdempotencyConflictException::class.java)
+        verify(orderRepository, never()).save(any<Order>())
+    }
+
     @Test
     fun 재고_부족_INV002는_ORD007_재고_부족으로_바꾼다() {
         whenever(inventoryCommandPort.batchReserveStock(any())).thenThrow(badRequest("INV002", "재고가 부족합니다."))
@@ -142,6 +170,14 @@ class OrderReserveStockErrorCodeTest {
         assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L))) }
             .isInstanceOf(HttpClientErrorException.BadRequest::class.java)
             .isNotInstanceOf(OrderOutOfStockException::class.java)
+    }
+
+    private fun conflict(): HttpClientErrorException {
+        val body = """{"code":"INV009","message":"같은 요청 키로 내용이 다른 예약 요청이 왔습니다.","data":null}"""
+        return HttpClientErrorException.create(
+            HttpStatus.CONFLICT, "Conflict", HttpHeaders.EMPTY,
+            body.toByteArray(StandardCharsets.UTF_8), StandardCharsets.UTF_8
+        )
     }
 
     private fun badRequest(code: String, message: String): HttpClientErrorException {

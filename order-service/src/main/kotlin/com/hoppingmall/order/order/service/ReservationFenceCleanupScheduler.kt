@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
 @Component
 class ReservationFenceCleanupScheduler(
     private val jdbcTemplate: JdbcTemplate,
-    @Value("\${order.reservation.fence.enabled:false}") private val enabled: Boolean,
+    @Value("#{\${order.reservation.fence.enabled:false} or \${idempotency.claim-by-commit:false}}") private val enabled: Boolean,
     @Value("\${order.reservation.fence.cleanup.retention-hours:24}") private val retentionHours: Long,
     @Value("\${order.reservation.fence.cleanup.batch-size:1000}") private val batchSize: Int
 ) {
@@ -23,7 +23,7 @@ class ReservationFenceCleanupScheduler(
 
     fun cleanUp(): Int {
         if (!enabled) return 0
-        val deleted = jdbcTemplate.update(DELETE, retentionHours, batchSize)
+        val deleted = jdbcTemplate.update(DELETE, -retentionHours, batchSize)
         if (deleted > 0) {
             log.info("reservation_fence 행 정리: deleted={}, retentionHours={}", deleted, retentionHours)
         }
@@ -33,7 +33,7 @@ class ReservationFenceCleanupScheduler(
     companion object {
         private val DELETE = """
             DELETE FROM reservation_fence
-            WHERE created_at < NOW(6) - INTERVAL ? HOUR
+            WHERE created_at < TIMESTAMPADD(HOUR, ?, NOW(6))
               AND (
                 decision = '${ReservationFence.ABORTED}'
                 OR EXISTS (

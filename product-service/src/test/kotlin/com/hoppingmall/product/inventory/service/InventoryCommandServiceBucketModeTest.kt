@@ -25,6 +25,7 @@ import org.mockito.Mock
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argThat
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
@@ -37,6 +38,7 @@ import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.SimpleTransactionStatus
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @DisplayName("InventoryCommandServiceImpl bucket 모드 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -171,6 +173,60 @@ class InventoryCommandServiceBucketModeTest {
         service.batchReserveStock(listOf(1L to 1))
 
         verify(cache).evict(1L)
+    }
+
+    @Test
+    fun 비동기_삭제가_켜지면_커밋_뒤_삭제를_실행기에_넘기고_직접_지우지_않는다() {
+        val cacheManager = mock<CacheManager>()
+        val cache = mock<Cache>()
+        val asyncEvictor = mock<InventoryCacheAsyncEvictor>()
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(cacheManager)
+        whenever(cacheManager.getCache("inventory")).thenReturn(cache)
+        service.asyncCacheEvictor = asyncEvictor
+
+        runAfterCommit { service.batchReserveStock(listOf(1L to 1)) }
+
+        verify(asyncEvictor).submit(argThat { toList() == listOf(1L) })
+        verify(cache, never()).evict(any())
+    }
+
+    @Test
+    fun 비동기_삭제가_꺼져_있으면_커밋_뒤_직접_지운다() {
+        val cacheManager = mock<CacheManager>()
+        val cache = mock<Cache>()
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(cacheManager)
+        whenever(cacheManager.getCache("inventory")).thenReturn(cache)
+
+        runAfterCommit { service.batchReserveStock(listOf(1L to 1)) }
+
+        verify(cache).evict(1L)
+    }
+
+    @Test
+    fun 비동기_삭제가_켜져도_예약_취소의_캐시_삭제는_직접_한다() {
+        val cacheManager = mock<CacheManager>()
+        val cache = mock<Cache>()
+        val asyncEvictor = mock<InventoryCacheAsyncEvictor>()
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(cacheManager)
+        whenever(cacheManager.getCache("inventory")).thenReturn(cache)
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("r1"))).thenReturn(listOf(11L))
+        whenever(inventoryReservationRepository.lockCancellable(listOf(11L))).thenReturn(listOf(arrayOf<Any>(11L, 1L, 2)))
+        service.asyncCacheEvictor = asyncEvictor
+
+        runAfterCommit { service.cancelReservation("r1") }
+
+        verify(cache).evict(1L)
+        verify(asyncEvictor, never()).submit(any())
+    }
+
+    private fun runAfterCommit(block: () -> Unit) {
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            block()
+            TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
     }
 
     @Test

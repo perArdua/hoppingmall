@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import org.springframework.cache.support.SimpleCacheManager
+import org.springframework.test.context.TestPropertySource
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.util.Collections
@@ -21,6 +22,7 @@ import java.util.concurrent.TimeUnit
 
 @DisplayName("재고 예약의 자기 트랜잭션 실행 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
+@TestPropertySource(properties = ["inventory.cache.evict-async=false"])
 class InventoryReserveOwnTransactionMySqlIntegrationTest : MySqlIntegrationTestSupport() {
 
     @Autowired

@@ -10,6 +10,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.dto.response.OrderPriceChange
 import com.hoppingmall.order.order.dto.response.OrderResponse
+import com.hoppingmall.order.order.dto.response.toCreatedResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
 import com.hoppingmall.order.order.exception.OrderCartChangedException
@@ -36,6 +37,9 @@ import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.idempotency.IdempotencyConflictException
+import com.hoppingmall.idempotency.IdempotencyRequestContext
+import com.hoppingmall.idempotency.IdempotencyTxRecorder
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -65,6 +69,9 @@ class OrderCommandServiceImpl(
 
     @Autowired(required = false)
     var reservationFence: ReservationFence? = null
+
+    @Autowired(required = false)
+    var idempotencyTxRecorder: IdempotencyTxRecorder? = null
 
     @Value("\${order.timeout.paying-minutes:15}")
     private var payingTimeoutMinutes: Long = 15
@@ -103,17 +110,31 @@ class OrderCommandServiceImpl(
         val items = cartItems.groupBy { it.productId }.map { (productId, rows) -> productId to rows.sumOf { it.quantity } }
         val reservationMap = reserveStock(items)
 
-        val fence = reservationFence?.takeIf { it.enabled }
+        val sharedReservationFence = reservationFence?.takeIf { IdempotencyRequestContext.claimKey() != null }
+        val fence = reservationFence?.takeIf { it.enabled } ?: sharedReservationFence
         val response = try {
             createOrderInTransaction(buyerId, request, cartItems, productMap, reservationMap, totalAmount, fence)
         } catch (e: Exception) {
-            runCatching { inventoryCommandPort.cancelReservations(reservationMap.values.distinct()) }
-                .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName, it) }
+            if (idempotencyTxRecorder?.claimedByCommittedRequest() == true) {
+                log.info("같은 멱등 키 주문이 먼저 커밋되어 공유 예약을 취소하지 않음: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName)
+                throw e
+            }
+            val reservationIds = reservationMap.values.distinct()
+            val cancellable = if (sharedReservationFence != null) abortedReservations(sharedReservationFence, reservationIds) else reservationIds
+            if (cancellable.isNotEmpty()) {
+                runCatching { inventoryCommandPort.cancelReservations(cancellable) }
+                    .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", cancellable, e.javaClass.simpleName, it) }
+            }
             throw e
         }
         orderMetrics.recordOrderCreated(totalAmount)
         return response
     }
+
+    private fun abortedReservations(fence: ReservationFence, reservationIds: List<String>): List<String> =
+        runCatching { fence.abortForCancel(reservationIds) }
+            .onFailure { log.warn("예약 취소 결정 기록 실패, 취소하지 않고 만료에 맡김: rids={}", reservationIds, it) }
+            .getOrDefault(emptyList())
 
     private fun createOrderInTransaction(
         buyerId: Long,
@@ -156,7 +177,9 @@ class OrderCommandServiceImpl(
             claimCartItems(buyerId, cartItems)
 
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
-            OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
+            val response = OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
+            idempotencyTxRecorder?.recordIfPending { response.toCreatedResponse() }
+            response
         }!!
 
     private fun claimCartItems(buyerId: Long, cartItems: List<CartItem>) {
@@ -200,6 +223,9 @@ class OrderCommandServiceImpl(
             throw e
         } catch (e: HttpClientErrorException.TooManyRequests) {
             throw OrderBusyException()
+        } catch (e: HttpClientErrorException.Conflict) {
+            if (IdempotencyRequestContext.claimKey() != null) throw IdempotencyConflictException()
+            throw e
         }
 
     private fun productErrorCode(e: HttpClientErrorException): String? =

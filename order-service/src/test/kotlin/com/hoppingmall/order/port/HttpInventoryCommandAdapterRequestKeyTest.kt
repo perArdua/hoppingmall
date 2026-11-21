@@ -1,7 +1,10 @@
 package com.hoppingmall.order.port
 
+import com.hoppingmall.idempotency.IdempotencyRequestContext
+import com.hoppingmall.idempotency.PendingIdempotency
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -46,6 +49,35 @@ class HttpInventoryCommandAdapterRequestKeyTest {
         whenever(restTemplateBuilder.readTimeout(any())).thenReturn(restTemplateBuilder)
         whenever(restTemplateBuilder.build()).thenReturn(restTemplate)
         adapter = HttpInventoryCommandAdapter("http://localhost:8083", restTemplateBuilder)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        IdempotencyRequestContext.clear()
+    }
+
+    @Test
+    fun 커밋_선점_요청_안에서는_멱등_키를_예약_요청_키로_보낸다() {
+        whenever(exchange()).thenReturn(ResponseEntity.ok(mapOf(100L to "rsv-100")))
+        IdempotencyRequestContext.open(PendingIdempotency(CLAIM_KEY, "POST", "/api/v1/orders", "fp", 24L, claimByCommit = true))
+
+        adapter.batchReserveStock(listOf(100L to 1))
+        adapter.batchReserveStock(listOf(100L to 1))
+
+        assertThat(sentKeys(2)).containsExactly(CLAIM_KEY, CLAIM_KEY)
+    }
+
+    @Test
+    fun 트랜잭션_안_기록만_켠_요청은_예전처럼_매번_새_요청_키를_보낸다() {
+        whenever(exchange()).thenReturn(ResponseEntity.ok(mapOf(100L to "rsv-100")))
+        IdempotencyRequestContext.open(PendingIdempotency(CLAIM_KEY, "POST", "/api/v1/orders", "fp", 24L))
+
+        adapter.batchReserveStock(listOf(100L to 1))
+        adapter.batchReserveStock(listOf(100L to 1))
+
+        val keys = sentKeys(2)
+        assertThat(keys).doesNotContain(CLAIM_KEY)
+        assertThat(keys.toSet()).hasSize(2)
     }
 
     @Test
@@ -125,5 +157,6 @@ class HttpInventoryCommandAdapterRequestKeyTest {
 
     companion object {
         private const val REQUEST_KEY_HEADER = "X-Reservation-Request-Key"
+        private const val CLAIM_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
 }

@@ -42,6 +42,12 @@ class IdempotencyAspect(
     @Value("\${idempotency.lock-timeout-seconds:0}")
     private var lockTimeoutOverrideSeconds: Long = 0
 
+    @Value("\${idempotency.save-in-tx:true}")
+    private var saveInTx: Boolean = true
+
+    @Value("\${idempotency.claim-by-commit:false}")
+    private var claimByCommit: Boolean = false
+
     @Around("@annotation(idempotent)")
     fun handleIdempotency(joinPoint: ProceedingJoinPoint, idempotent: Idempotent): Any? {
         val requestAttributes = RequestContextHolder.getRequestAttributes() as? ServletRequestAttributes
@@ -59,6 +65,10 @@ class IdempotencyAspect(
             return buildCachedResponse(existing, fingerprint)
         }
 
+        if (claimByCommit && idempotent.claimByCommit) {
+            return proceedClaimingByCommit(joinPoint, idempotent, request, key, scopedKey, fingerprint)
+        }
+
         val lockKey = "idempotency:$scopedKey"
         val lock = redissonClient.getLock(lockKey)
 
@@ -73,27 +83,76 @@ class IdempotencyAspect(
                 return buildCachedResponse(existingAfterLock, fingerprint)
             }
 
-            val result = joinPoint.proceed()
-
-            if (result is ResponseEntity<*> && result.statusCode.is2xxSuccessful) {
-                idempotencyService.save(
-                    key = scopedKey,
-                    httpMethod = request.method,
-                    endpoint = request.requestURI,
-                    responseStatus = result.statusCode.value(),
-                    responseBody = objectMapper.writeValueAsString(result.body),
-                    requestFingerprint = fingerprint,
-                    ttlHours = idempotent.ttlHours
-                )
-                log.info("멱등성 레코드 저장: key={}, endpoint={}", key, request.requestURI)
+            val pending = if (saveInTx) {
+                PendingIdempotency(scopedKey, request.method, request.requestURI, fingerprint, idempotent.ttlHours)
+                    .also { IdempotencyRequestContext.open(it) }
+            } else {
+                null
+            }
+            val result = try {
+                joinPoint.proceed()
+            } finally {
+                if (pending != null) IdempotencyRequestContext.clear()
             }
 
+            if (pending?.savedInTransaction == true) {
+                log.info("멱등성 레코드 트랜잭션 내 저장: key={}, endpoint={}", key, request.requestURI)
+                return result
+            }
+
+            saveIfSuccessful(result, request, key, scopedKey, fingerprint, idempotent)
             return result
         } finally {
             if (lock.isHeldByCurrentThread) {
                 lock.unlock()
             }
         }
+    }
+
+    private fun proceedClaimingByCommit(
+        joinPoint: ProceedingJoinPoint,
+        idempotent: Idempotent,
+        request: HttpServletRequest,
+        key: String,
+        scopedKey: String,
+        fingerprint: String
+    ): Any? {
+        val pending = PendingIdempotency(scopedKey, request.method, request.requestURI, fingerprint, idempotent.ttlHours, claimByCommit = true)
+        IdempotencyRequestContext.open(pending)
+        val result = try {
+            joinPoint.proceed()
+        } catch (e: RuntimeException) {
+            val winner = idempotencyService.findByKey(scopedKey) ?: throw e
+            log.info("멱등성 커밋 선점 경합, 먼저 커밋된 응답 반환: key={}, cause={}", key, e.javaClass.simpleName)
+            return buildCachedResponse(winner, fingerprint)
+        } finally {
+            IdempotencyRequestContext.clear()
+        }
+        if (!pending.savedInTransaction) {
+            saveIfSuccessful(result, request, key, scopedKey, fingerprint, idempotent)
+        }
+        return result
+    }
+
+    private fun saveIfSuccessful(
+        result: Any?,
+        request: HttpServletRequest,
+        key: String,
+        scopedKey: String,
+        fingerprint: String,
+        idempotent: Idempotent
+    ) {
+        if (result !is ResponseEntity<*> || !result.statusCode.is2xxSuccessful) return
+        idempotencyService.save(
+            key = scopedKey,
+            httpMethod = request.method,
+            endpoint = request.requestURI,
+            responseStatus = result.statusCode.value(),
+            responseBody = objectMapper.writeValueAsString(result.body),
+            requestFingerprint = fingerprint,
+            ttlHours = idempotent.ttlHours
+        )
+        log.info("멱등성 레코드 저장: key={}, endpoint={}", key, request.requestURI)
     }
 
     private fun scopedKey(request: HttpServletRequest, key: String): String {
