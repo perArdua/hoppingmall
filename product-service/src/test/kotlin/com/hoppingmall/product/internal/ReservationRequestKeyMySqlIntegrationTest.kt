@@ -159,6 +159,97 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
         assertThat(stock(PRODUCT_A)).isEqualTo(47)
     }
 
+    @Test
+    fun 같은_요청_키의_예약이_확정된_뒤_다시_오면_새_예약을_만들고_재고를_한_번_더_뺀다() {
+        seed(PRODUCT_A, 50)
+        val first = batchReserve(KEY, PRODUCT_A to 3).getValue(PRODUCT_A.toString())
+        confirm(first)
+
+        val second = batchReserve(KEY, PRODUCT_A to 3).getValue(PRODUCT_A.toString())
+
+        assertThat(second).isNotEqualTo(first)
+        assertThat(reservationStatus(first)).isEqualTo("CONFIRMED")
+        assertThat(reservationStatus(second)).isEqualTo("RESERVED")
+        assertThat(stock(PRODUCT_A)).isEqualTo(44)
+    }
+
+    @Test
+    fun 같은_요청_키의_단건_예약이_확정된_뒤_다시_오면_새_예약을_만든다() {
+        seed(PRODUCT_A, 50)
+        val first = reserveOne(KEY, PRODUCT_A, 3)
+        confirm(first)
+
+        val second = reserveOne(KEY, PRODUCT_A, 3)
+
+        assertThat(second).isNotEqualTo(first)
+        assertThat(stock(PRODUCT_A)).isEqualTo(44)
+    }
+
+    @Test
+    fun 같은_요청_키의_여러_상품_예약이_모두_확정된_뒤_다시_오면_상품마다_새_예약을_만든다() {
+        seed(PRODUCT_A, 50)
+        seed(PRODUCT_B, 20)
+        val first = batchReserve(KEY, PRODUCT_A to 3, PRODUCT_B to 2)
+        confirm(*first.values.toTypedArray())
+
+        val second = batchReserve(KEY, PRODUCT_A to 3, PRODUCT_B to 2)
+
+        assertThat(second.values).doesNotContainAnyElementsOf(first.values)
+        assertThat(stock(PRODUCT_A)).isEqualTo(44)
+        assertThat(stock(PRODUCT_B)).isEqualTo(16)
+    }
+
+    @Test
+    fun 같은_요청_키의_예약이_일부만_확정됐으면_409로_거절하고_재고를_그대로_둔다() {
+        seed(PRODUCT_A, 50)
+        seed(PRODUCT_B, 20)
+        val first = batchReserve(KEY, PRODUCT_A to 3, PRODUCT_B to 2)
+        confirm(first.getValue(PRODUCT_A.toString()))
+
+        batchReserveRequest(KEY, PRODUCT_A to 3, PRODUCT_B to 2).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("INV009") }
+        }
+
+        assertThat(stock(PRODUCT_A)).isEqualTo(47)
+        assertThat(stock(PRODUCT_B)).isEqualTo(18)
+    }
+
+    @Test
+    fun 확정된_요청_키로_두_요청이_동시에_오면_새_예약은_하나만_만들고_둘_다_그_예약_id를_받는다() {
+        seed(PRODUCT_A, 50)
+        val confirmed = batchReserve(KEY, PRODUCT_A to 3).getValue(PRODUCT_A.toString())
+        confirm(confirmed)
+
+        val results = dataSource.connection.use { holder ->
+            holder.autoCommit = false
+            try {
+                lockStock(holder, PRODUCT_A)
+                val first = executor.submit<Map<String, String>> { batchReserve(KEY, PRODUCT_A to 3) }
+                awaitLockWaits(1)
+                val second = executor.submit<Map<String, String>> { batchReserve(KEY, PRODUCT_A to 3) }
+                awaitLockWaits(1, RESERVATION_TABLE)
+                holder.commit()
+                listOf(first, second).map { it.get(30, TimeUnit.SECONDS).getValue(PRODUCT_A.toString()) }
+            } finally {
+                holder.rollback()
+                holder.autoCommit = true
+            }
+        }
+
+        assertThat(results[1]).isEqualTo(results[0]).isNotEqualTo(confirmed)
+        assertThat(reservationIds(PRODUCT_A)).containsExactly(confirmed, results[0])
+        assertThat(stock(PRODUCT_A)).isEqualTo(44)
+    }
+
+    private fun confirm(vararg reservationIds: String) {
+        mockMvc.post("/internal/api/v1/inventory/reservations/batch-confirm") {
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(reservationIds.toList())
+            header(TOKEN_HEADER, internalToken)
+        }.andExpect { status { isOk() } }
+    }
+
     private fun batchReserve(requestKey: String?, vararg items: Pair<Long, Int>): Map<String, String> {
         val body = batchReserveRequest(requestKey, *items)
             .andExpect { status { isOk() } }
@@ -183,13 +274,13 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
         return objectMapper.readTree(body).get("reservation_id").asText()
     }
 
-    private fun awaitLockWaits(expected: Long) {
+    private fun awaitLockWaits(expected: Long, table: String = lockedTable) {
         val deadline = System.currentTimeMillis() + LOCK_WAIT_LIMIT_MS
         while (System.currentTimeMillis() < deadline) {
-            if (lockWaitCount(lockedTable) >= expected) return
+            if (lockWaitCount(table) >= expected) return
             Thread.onSpinWait()
         }
-        throw AssertionError("$lockedTable 잠금 대기 ${expected}건이 ${LOCK_WAIT_LIMIT_MS}ms 안에 보이지 않았다: ${lockWaitCount(lockedTable)}건")
+        throw AssertionError("$table 잠금 대기 ${expected}건이 ${LOCK_WAIT_LIMIT_MS}ms 안에 보이지 않았다: ${lockWaitCount(table)}건")
     }
 
     private fun reservationIds(productId: Long): List<String> =
@@ -213,6 +304,7 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
         private const val TOKEN_HEADER = "X-Internal-Token"
         private const val REQUEST_KEY_HEADER = "X-Reservation-Request-Key"
         private const val LOCK_WAIT_LIMIT_MS = 15_000L
+        private const val RESERVATION_TABLE = "inventory_reservations"
     }
 }
 
