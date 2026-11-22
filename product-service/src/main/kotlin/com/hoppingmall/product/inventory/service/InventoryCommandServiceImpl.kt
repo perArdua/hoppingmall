@@ -4,6 +4,7 @@ import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.InventoryReservation
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
+import com.hoppingmall.product.inventory.domain.repository.KeyedReservationInserter
 import com.hoppingmall.product.inventory.dto.request.InventoryAdjustRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
@@ -21,6 +22,8 @@ import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedExcep
 import com.hoppingmall.product.inventory.exception.ReservationRequestKeyConflictException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.exception.ProductNotFoundException
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
@@ -43,16 +46,23 @@ import kotlin.random.Random
 class InventoryCommandServiceImpl(
     private val inventoryRepository: InventoryRepository,
     private val inventoryReservationRepository: InventoryReservationRepository,
+    private val keyedReservationInserter: KeyedReservationInserter,
     private val productRepository: ProductRepository,
     private val bucketStockService: BucketStockService,
     private val reservationGate: InventoryReservationGate,
     private val cacheManagerProvider: ObjectProvider<CacheManager>,
+    meterRegistry: MeterRegistry,
     transactionManager: PlatformTransactionManager
 ) : InventoryCommandService {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     private val reserveTransaction = TransactionTemplate(transactionManager)
+
+    private val keyConflictReplayCounter = Counter.builder("inventory.reserve.replayed")
+        .tag("reason", "key_conflict")
+        .description("Reserves that lost a request key conflict and returned the committed reservations")
+        .register(meterRegistry)
 
     @Autowired(required = false)
     var asyncCacheEvictor: InventoryCacheAsyncEvictor? = null
@@ -242,7 +252,7 @@ class InventoryCommandServiceImpl(
             try {
                 inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) }
             } catch (e: DataIntegrityViolationException) {
-                reserveTransaction.execute { findReplayable(requestKey, items) } ?: throw e
+                replayAfterViolation(requestKey, items, e)
             } catch (e: InventoryInsufficientStockException) {
                 reserveTransaction.execute { findInProgress(requestKey, items) } ?: throw e
             }
@@ -257,6 +267,25 @@ class InventoryCommandServiceImpl(
             return batchReserveInTransaction(items, lockAll, requestKey)
         }
         return replay(existing, items)
+    }
+
+    private fun replayAfterViolation(
+        requestKey: String,
+        items: List<Pair<Long, Int>>,
+        violation: DataIntegrityViolationException
+    ): Map<Long, String> {
+        val keyConflict = KeyedReservationInserter.isRequestKeyConflict(violation)
+        val replayed = try {
+            reserveTransaction.execute { findReplayable(requestKey, items) } ?: throw violation
+        } catch (e: Exception) {
+            if (keyConflict) log.error("요청 키 충돌이 재생으로 끝나지 않음: {}", violation.mostSpecificCause.message)
+            throw e
+        }
+        if (keyConflict) {
+            keyConflictReplayCounter.increment()
+            log.info("요청 키 충돌 뒤 먼저 커밋된 예약을 돌려줌: requestKey={}, count={}", requestKey, replayed.size)
+        }
+        return replayed
     }
 
     private fun findReplayable(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
@@ -342,7 +371,11 @@ class InventoryCommandServiceImpl(
             inventory.decreaseStock(quantity)
         }
 
-        inventoryReservationRepository.save(reservation)
+        if (requestKey != null) {
+            keyedReservationInserter.insert(reservation)
+        } else {
+            inventoryReservationRepository.save(reservation)
+        }
         return reservation.reservationId
     }
 
