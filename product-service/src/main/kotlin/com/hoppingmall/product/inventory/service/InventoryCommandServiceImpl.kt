@@ -360,7 +360,7 @@ class InventoryCommandServiceImpl(
     companion object {
         private const val INVENTORY_CACHE = "inventory"
         private val CONFIRMABLE = listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)
-        private val REPLAYABLE = setOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED, ReservationStatus.CONFIRMED)
-        private val CLOSED = setOf(ReservationStatus.CANCELLED, ReservationStatus.EXPIRED)
+        private val REPLAYABLE = setOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)
+        private val CLOSED = setOf(ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED, ReservationStatus.EXPIRED)
     }
 }
