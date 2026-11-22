@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
-import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
@@ -111,26 +110,23 @@ class IdempotencyAspectCommitPathTest {
         }
 
         @Test
-        fun 커밋_선점으로_표시된_엔드포인트도_락을_잡고_선점_보관함을_열지_않는다() {
-            stubLock()
-            lenient().whenever(idempotent.claimByCommit).thenReturn(true)
+        fun 커밋_선점으로_표시된_엔드포인트는_락_없이_선점_보관함을_연다() {
+            whenever(idempotent.claimByCommit).thenReturn(true)
             whenever(idempotent.ttlHours).thenReturn(24L)
             whenever(idempotencyService.findByKey(any())).thenReturn(null)
-            var opened: PendingIdempotency? = null
-            var claimKey: String? = "unset"
+            var claimKey: String? = null
             whenever(joinPoint.proceed()).thenAnswer {
-                opened = IdempotencyRequestContext.current()
                 claimKey = IdempotencyRequestContext.claimKey()
+                IdempotencyRequestContext.current()!!.savedInTransaction = true
                 ResponseEntity.status(HttpStatus.CREATED).body(mapOf("id" to 1))
             }
 
             aspect.handleIdempotency(joinPoint, idempotent)
 
-            assertThat(opened!!.claimByCommit).isFalse()
-            assertThat(claimKey).isNull()
+            assertThat(claimKey).hasSize(64)
             assertThat(IdempotencyRequestContext.current()).isNull()
-            verify(lock).unlock()
-            verify(idempotencyService).save(any(), eq("POST"), eq("/api/v1/orders"), eq(201), any(), any(), eq(24L))
+            verify(redissonClient, never()).getLock(any<String>())
+            verify(idempotencyService, never()).save(any(), any(), any(), any(), any(), any(), any())
         }
     }
 

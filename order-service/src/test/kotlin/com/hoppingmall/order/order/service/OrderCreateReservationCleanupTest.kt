@@ -230,6 +230,25 @@ class OrderCreateReservationCleanupTest {
     }
 
     @Test
+    fun 커밋_선점_요청이면_같은_키_주문이_먼저_커밋됐어도_펜스가_취소로_정한_예약은_취소한다() {
+        val fence = disabledFence()
+        val recorder: IdempotencyTxRecorder = mock()
+        Mockito.lenient().`when`(recorder.claimedByCommittedRequest()).thenReturn(true)
+        service.reservationFence = fence
+        service.idempotencyTxRecorder = recorder
+        openClaimByCommitRequest()
+        val failure = DataIntegrityViolationException("idempotency_records 중복")
+        whenever(orderItemRepository.saveAll(any<List<OrderItem>>())).thenThrow(failure)
+        whenever(fence.link(any())).thenReturn(emptyList())
+        whenever(fence.abortForCancel(listOf("rsv-1", "rsv-2"))).thenReturn(listOf("rsv-2"))
+
+        assertThatThrownBy { service.createOrder(BUYER_ID, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
+            .isSameAs(failure)
+
+        verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-2"))
+    }
+
+    @Test
     fun 커밋_선점_요청의_예약이_모두_유지거나_결정_전이면_취소하지_않는다() {
         val fence = disabledFence()
         service.reservationFence = fence

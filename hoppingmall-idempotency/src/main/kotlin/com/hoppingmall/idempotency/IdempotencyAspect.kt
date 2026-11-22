@@ -45,8 +45,8 @@ class IdempotencyAspect(
     @Value("\${idempotency.save-in-tx:true}")
     private var saveInTx: Boolean = true
 
-    @Value("\${idempotency.claim-by-commit:false}")
-    private var claimByCommit: Boolean = false
+    @Value("\${idempotency.claim-by-commit:true}")
+    private var claimByCommit: Boolean = true
 
     @Around("@annotation(idempotent)")
     fun handleIdempotency(joinPoint: ProceedingJoinPoint, idempotent: Idempotent): Any? {

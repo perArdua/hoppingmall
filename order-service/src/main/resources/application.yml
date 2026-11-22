@@ -134,6 +134,7 @@ resilience4j:
           - org.springframework.web.client.HttpClientErrorException$NotFound
           - org.springframework.web.client.HttpClientErrorException$BadRequest
           - org.springframework.web.client.HttpClientErrorException$TooManyRequests
+        ignoreExceptionPredicate: com.hoppingmall.order.port.ReservationKeyConflictPredicate
   retry:
     retryAspectOrder: 1
     configs:
