@@ -21,12 +21,14 @@ import org.mockito.Mock
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.cache.CacheManager
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.SimpleTransactionStatus
 
@@ -89,13 +91,29 @@ class InventoryReservationRequestKeyTest {
     }
 
     @Test
-    fun 같은_요청_키의_예약이_확정됐으면_그_예약_id를_그대로_돌려준다() {
+    fun 같은_요청_키의_예약이_확정됐으면_키를_풀고_새로_예약한다() {
         val confirmed = InventoryReservation.create(1L, 2, 600L, KEY).apply { status = ReservationStatus.CONFIRMED }
+        ReflectionTestUtils.setField(confirmed, "id", 7L)
+        val inventory = Inventory.create(productId = 1L, stockQuantity = 10)
         whenever(inventoryReservationRepository.findByRequestKey(KEY)).thenReturn(listOf(confirmed))
+        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(inventory)
+        whenever(inventoryReservationRepository.save(any<InventoryReservation>())).thenAnswer { it.arguments[0] }
 
         val result = service.batchReserveStock(listOf(1L to 2), KEY)
 
-        assertThat(result).isEqualTo(mapOf(1L to confirmed.reservationId))
+        assertThat(result.getValue(1L)).isNotEqualTo(confirmed.reservationId)
+        assertThat(inventory.stockQuantity).isEqualTo(8)
+        verify(inventoryReservationRepository).releaseRequestKey(eq(listOf(7L)), eq(KEY), any())
+    }
+
+    @Test
+    fun 같은_요청_키의_예약이_일부만_확정됐으면_INV009로_거절한다() {
+        val confirmed = InventoryReservation.create(1L, 1, 600L, KEY).apply { status = ReservationStatus.CONFIRMED }
+        val reserved = InventoryReservation.create(2L, 1, 600L, KEY)
+        whenever(inventoryReservationRepository.findByRequestKey(KEY)).thenReturn(listOf(confirmed, reserved))
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 1, 2L to 1), KEY) }
+            .isInstanceOf(ReservationRequestKeyConflictException::class.java)
         verify(inventoryReservationRepository, never()).save(any<InventoryReservation>())
     }
 
