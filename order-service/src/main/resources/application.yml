@@ -133,6 +133,7 @@ resilience4j:
         ignoreExceptions:
           - org.springframework.web.client.HttpClientErrorException$NotFound
           - org.springframework.web.client.HttpClientErrorException$BadRequest
+          - org.springframework.web.client.HttpClientErrorException$Conflict
           - org.springframework.web.client.HttpClientErrorException$TooManyRequests
   retry:
     retryAspectOrder: 1
