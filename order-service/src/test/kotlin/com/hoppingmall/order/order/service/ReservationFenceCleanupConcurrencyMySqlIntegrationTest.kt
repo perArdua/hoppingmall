@@ -61,7 +61,7 @@ class ReservationFenceCleanupConcurrencyMySqlIntegrationTest : OrderMySqlService
                 var round = 0
                 while (!cleanup.isDone || round < MIN_ROUNDS) {
                     val buyerId = BUYER_ID + worker * BUYERS_PER_WORKER + round
-                    val orderId = orderCommandService.createOrder(buyerId, OrderCreateRequest(listOf(newCartItem(buyerId)))).id!!
+                    val orderId = orderCommandService.createOrder(buyerId, OrderCreateRequest(listOf(newCartItem(buyerId)))).id
                     created.incrementAndGet()
                     orderCommandService.cancelOrder(buyerId, orderId)
                     assertThat(fence.abortForCancel(listOf(unfinished[round % unfinished.size]))).isEmpty()
