@@ -1,16 +1,23 @@
 package com.hoppingmall.product.internal
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
+import com.hoppingmall.product.support.MySqlContainerSupport
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
+import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.RepeatedTest
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -20,6 +27,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
 import java.sql.Connection
+import java.sql.DriverManager
+import java.util.UUID
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 
@@ -34,6 +43,12 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
 
     @Autowired
     protected lateinit var inventoryRepository: InventoryRepository
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
+
+    @Value("\${spring.datasource.url}")
+    private lateinit var jdbcUrl: String
 
     @Value("\${internal.service.token}")
     private lateinit var internalToken: String
@@ -364,6 +379,135 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
         assertThat(stock(PRODUCT_A)).isZero()
     }
 
+    @Test
+    fun 같은_요청_키_다섯_요청이_키_충돌로_끝나도_모두_같은_예약_id를_받고_ERROR_로그는_없고_재생_네_번을_센다() {
+        val key = UUID.randomUUID().toString()
+        seed(PRODUCT_A, 50)
+        val replaysBefore = keyConflictReplays()
+
+        val (results, errors) = capturingErrors { whileAllWaitOnStock(List(5) { { reserveResult(key, PRODUCT_A to 3) } }) }
+
+        assertThat(results.map { it.first }).containsOnly(200)
+        assertThat(results.distinct()).hasSize(1)
+        assertThat(reservationIds(PRODUCT_A)).hasSize(1)
+        assertThat(stock(PRODUCT_A)).isEqualTo(47)
+        assertThat(errors).isEmpty()
+        assertThat(keyConflictReplays() - replaysBefore).isEqualTo(4.0)
+    }
+
+    @RepeatedTest(LOG_REPETITIONS)
+    fun 같은_요청_키_다섯_요청이_동시에_와도_ERROR_로그가_없고_응답은_같다() {
+        val key = UUID.randomUUID().toString()
+        seed(PRODUCT_A, 50)
+
+        val (results, errors) = capturingErrors { simultaneously(List(5) { { reserveResult(key, PRODUCT_A to 3) } }) }
+
+        assertThat(results.map { it.first }).containsOnly(200)
+        assertThat(results.distinct()).hasSize(1)
+        assertThat(reservationIds(PRODUCT_A)).hasSize(1)
+        assertThat(stock(PRODUCT_A)).isEqualTo(47)
+        assertThat(errors).isEmpty()
+    }
+
+    @Test
+    fun 여러_상품의_같은_요청_키_충돌이_재생으로_끝나면_ERROR_로그가_없고_재고는_한_번씩만_빠진다() {
+        val key = UUID.randomUUID().toString()
+        seed(PRODUCT_A, 50)
+        seed(PRODUCT_B, 20)
+
+        val (results, errors) = capturingErrors {
+            whileStockLocked(PRODUCT_A, List(2) { { reserveResult(key, PRODUCT_A to 3, PRODUCT_B to 2) } })
+        }
+
+        assertThat(results.map { it.first }).containsOnly(200)
+        assertThat(results.distinct()).hasSize(1)
+        assertThat(stock(PRODUCT_A)).isEqualTo(47)
+        assertThat(stock(PRODUCT_B)).isEqualTo(18)
+        assertThat(errors).isEmpty()
+    }
+
+    @Test
+    fun 수량이_다른_같은_요청_키_충돌은_409이고_ERROR_로그가_남고_재생으로_세지_않는다() {
+        val key = UUID.randomUUID().toString()
+        seed(PRODUCT_A, 50)
+        val replaysBefore = keyConflictReplays()
+
+        val (results, errors) = capturingErrors {
+            whileStockLocked(PRODUCT_A, listOf(3, 2).map { quantity -> { reserveResult(key, PRODUCT_A to quantity) } })
+        }
+
+        assertThat(results.map { it.first }).containsExactlyInAnyOrder(200, 409)
+        assertThat(results.single { it.first == 409 }.second).contains("INV009")
+        assertThat(errors).singleElement().asString().contains("Duplicate entry", "uk_reservation_request_product")
+        assertThat(keyConflictReplays() - replaysBefore).isZero()
+    }
+
+    @Test
+    fun 다른_제약_위반은_ERROR_로그가_남고_재생으로_세지_않는다() {
+        seed(PRODUCT_A, 50)
+        val replaysBefore = keyConflictReplays()
+        jdbcTemplate.execute("CREATE UNIQUE INDEX $OTHER_CONSTRAINT ON inventory_reservations (product_id, quantity)")
+        try {
+            batchReserve("key-1", PRODUCT_A to 3)
+
+            val (result, errors) = capturingErrors { reserveResult("key-2", PRODUCT_A to 3) }
+
+            assertThat(result.first).isEqualTo(409)
+            assertThat(result.second).contains("C003")
+            assertThat(errors).singleElement().asString().contains("Duplicate entry", OTHER_CONSTRAINT)
+            assertThat(stock(PRODUCT_A)).isEqualTo(47)
+            assertThat(keyConflictReplays() - replaysBefore).isZero()
+        } finally {
+            jdbcTemplate.execute("DROP INDEX $OTHER_CONSTRAINT ON inventory_reservations")
+        }
+    }
+
+    private fun keyConflictReplays(): Double =
+        meterRegistry.find("inventory.reserve.replayed").tag("reason", "key_conflict").counter()?.count() ?: 0.0
+
+    private fun <T> capturingErrors(action: () -> T): Pair<T, List<String>> {
+        val root = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as Logger
+        val appender = ListAppender<ILoggingEvent>().apply { start() }
+        root.addAppender(appender)
+        try {
+            val result = action()
+            return result to appender.list.toList().filter { it.level == Level.ERROR }.map { it.formattedMessage }
+        } finally {
+            root.detachAppender(appender)
+            appender.stop()
+        }
+    }
+
+    private fun <T> whileAllWaitOnStock(requests: List<() -> T>): List<T> =
+        DriverManager.getConnection(jdbcUrl, MySqlContainerSupport.username, MySqlContainerSupport.password).use { holder ->
+            holder.autoCommit = false
+            try {
+                lockStock(holder, PRODUCT_A)
+                val pending = requests.map { request -> executor.submit<T> { request() } }
+                awaitWaitingTransactions(holder, requests.size)
+                holder.commit()
+                pending.map { it.get(30, TimeUnit.SECONDS) }
+            } finally {
+                holder.rollback()
+            }
+        }
+
+    private fun awaitWaitingTransactions(observer: Connection, expected: Int) {
+        val deadline = System.currentTimeMillis() + LOCK_WAIT_LIMIT_MS
+        observer.prepareStatement(WAITING_TRANSACTIONS_SQL).use { statement ->
+            statement.setString(1, lockedTable)
+            while (System.currentTimeMillis() < deadline) {
+                val waiting = statement.executeQuery().use { rows ->
+                    rows.next()
+                    rows.getInt(1)
+                }
+                if (waiting >= expected) return
+                Thread.sleep(10)
+            }
+        }
+        throw AssertionError("$lockedTable 잠금을 기다리는 트랜잭션 ${expected}개가 ${LOCK_WAIT_LIMIT_MS}ms 안에 보이지 않았다")
+    }
+
     private fun assertSameReservation(results: List<Pair<Int, String>>, vararg productIds: Long) {
         assertThat(results.map { it.first }).containsOnly(200)
         val bodies = results.map { objectMapper.readValue(it.second, object : TypeReference<Map<String, String>>() {}) }
@@ -470,6 +614,12 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
         private const val LOCK_WAIT_LIMIT_MS = 15_000L
         private const val RESERVATION_TABLE = "inventory_reservations"
         private const val RACE_REPETITIONS = 50
+        private const val LOG_REPETITIONS = 20
+        private const val OTHER_CONSTRAINT = "uk_test_product_quantity"
+        private const val WAITING_TRANSACTIONS_SQL = """
+            SELECT COUNT(DISTINCT l.ENGINE_TRANSACTION_ID) FROM performance_schema.data_locks l
+            WHERE l.OBJECT_SCHEMA = DATABASE() AND l.OBJECT_NAME = ? AND l.LOCK_STATUS = 'WAITING'
+        """
     }
 }
 

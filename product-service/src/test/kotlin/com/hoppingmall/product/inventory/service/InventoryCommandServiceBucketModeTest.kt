@@ -4,6 +4,7 @@ import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.InventoryReservation
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
+import com.hoppingmall.product.inventory.domain.repository.KeyedReservationInserter
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.enums.ReservationStatus
@@ -12,6 +13,8 @@ import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockExc
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.support.withId
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Spy
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
@@ -62,6 +66,12 @@ class InventoryCommandServiceBucketModeTest {
 
     @Mock
     private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
+
+    @Mock
+    private lateinit var keyedReservationInserter: KeyedReservationInserter
+
+    @Spy
+    private val meterRegistry: MeterRegistry = SimpleMeterRegistry()
 
     @Mock
     private lateinit var transactionManager: PlatformTransactionManager
