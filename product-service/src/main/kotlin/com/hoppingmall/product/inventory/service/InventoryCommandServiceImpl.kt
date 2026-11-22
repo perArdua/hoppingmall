@@ -21,6 +21,7 @@ import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedExcep
 import com.hoppingmall.product.inventory.exception.ReservationRequestKeyConflictException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.exception.ProductNotFoundException
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -48,6 +49,8 @@ class InventoryCommandServiceImpl(
     private val cacheManagerProvider: ObjectProvider<CacheManager>,
     transactionManager: PlatformTransactionManager
 ) : InventoryCommandService {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     private val reserveTransaction = TransactionTemplate(transactionManager)
 
@@ -265,7 +268,9 @@ class InventoryCommandServiceImpl(
     private fun findInProgress(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
         val existing = inventoryReservationRepository.findByRequestKey(requestKey)
         if (existing.isEmpty() || existing.any { it.status !in REPLAYABLE }) return null
-        return replay(existing, items)
+        val replayed = replay(existing, items)
+        log.info("재고 부족 뒤 같은 요청 키의 진행 중 예약을 돌려줌: requestKey={}, count={}", requestKey, replayed.size)
+        return replayed
     }
 
     private fun replay(existing: List<InventoryReservation>, items: List<Pair<Long, Int>>): Map<Long, String> {
