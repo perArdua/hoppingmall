@@ -87,7 +87,8 @@ class ReservationFenceCleanupScheduler(
             SELECT /*+ INDEX(f idx_reservation_fence_created_at) */ f.reservation_id, f.created_at,
               CASE WHEN f.decision = '${ReservationFence.ABORTED}'
                 OR EXISTS (
-                  SELECT 1 FROM order_items oi
+                  SELECT /*+ JOIN_ORDER(oi, o) INDEX(oi idx_order_items_reservation_id) INDEX(o PRIMARY) */ 1
+                  FROM order_items oi
                   JOIN orders o ON o.id = oi.order_id
                   WHERE oi.reservation_id = f.reservation_id
                     AND o.status IN ('CANCELLED', 'DELIVERED', 'REFUNDED')

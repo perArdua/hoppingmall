@@ -117,6 +117,26 @@ class ReservationFenceCleanupMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
+    fun 주문_상품_통계가_낡아도_행마다_주문_상품_전체를_훑지_않는다() {
+        jdbcTemplate.execute("ALTER TABLE order_items STATS_AUTO_RECALC = 0")
+        try {
+            val rows = jdbcTemplate.seedFenceRows(STALE_STATS_ROWS, "LINKED", STALE_STATS_STATUSES, hoursAgo = 48)
+            val unfinished = rows.filterIndexed { index, _ -> STALE_STATS_STATUSES[index % STALE_STATS_STATUSES.size] == "PAID" }
+            makeOrderItemStatsStale()
+            val scannedBefore = scannedRows()
+
+            val deleted = cleaner(enabled = true).cleanUp()
+
+            assertThat(scannedRows() - scannedBefore).isLessThan(STALE_STATS_ROWS * SCANS_PER_ROW_LIMIT)
+            assertThat(deleted).isEqualTo(rows.size - unfinished.size)
+            assertThat(remaining()).containsExactlyInAnyOrderElementsOf(unfinished)
+        } finally {
+            jdbcTemplate.execute("ALTER TABLE order_items STATS_AUTO_RECALC = DEFAULT")
+            jdbcTemplate.execute("ANALYZE TABLE order_items")
+        }
+    }
+
+    @Test
     fun 보관_기간이_지난_만료_결정과_끝난_주문의_연결_결정을_지운다() {
         val aborted = fence("ABORTED", hoursAgo = 25)
         val cancelled = fence("LINKED", hoursAgo = 25, orderStatus = "CANCELLED")
@@ -257,6 +277,27 @@ class ReservationFenceCleanupMySqlIntegrationTest : MySqlJpaTestSupport() {
         createStatement().use { it.execute(sql) }
     }
 
+    private fun makeOrderItemStatsStale() {
+        jdbcTemplate.update(
+            "UPDATE mysql.innodb_table_stats SET n_rows = ? WHERE database_name = DATABASE() AND table_name = 'order_items'",
+            STALE_STATS_ROWS
+        )
+        jdbcTemplate.update(
+            """
+            UPDATE mysql.innodb_index_stats SET stat_value = 1
+            WHERE database_name = DATABASE() AND table_name = 'order_items'
+              AND index_name = 'idx_order_items_reservation_id' AND stat_name LIKE 'n_diff_pfx%'
+            """.trimIndent()
+        )
+        jdbcTemplate.execute("FLUSH TABLES order_items")
+    }
+
+    private fun scannedRows(): Long =
+        jdbcTemplate.queryForObject(
+            "SELECT CAST(VARIABLE_VALUE AS UNSIGNED) FROM performance_schema.global_status WHERE VARIABLE_NAME = 'Handler_read_rnd_next'",
+            Long::class.java
+        )!!
+
     private fun recordLocks(): List<String> =
         jdbcTemplate.queryForList(
             """
@@ -297,6 +338,9 @@ class ReservationFenceCleanupMySqlIntegrationTest : MySqlJpaTestSupport() {
         private const val RETENTION_HOURS = 24L
         private const val MAX_RUN_MS = 120_000L
         private const val UNFINISHED_ROWS = 2_500
+        private val STALE_STATS_STATUSES = listOf("CANCELLED", "DELIVERED", "REFUNDED", "PAID")
+        private const val STALE_STATS_ROWS = 3_000
+        private const val SCANS_PER_ROW_LIMIT = 50L
         private const val NEW_RESERVATION = "88888888-8888-4888-8888-888888888888"
     }
 }
