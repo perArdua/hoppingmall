@@ -16,6 +16,7 @@ import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.HttpServerErrorException
 import java.util.Properties
 import java.util.concurrent.TimeUnit
+import java.util.function.Predicate
 
 @DisplayName("재고 명령 서킷 브레이커 설정 검증")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -26,12 +27,11 @@ class InventoryCommandCircuitBreakerConfigTest {
         .getObject()!!
 
     @Test
-    fun 재고_명령_서킷은_기본_설정을_쓰고_404_400_409_429를_무시_예외로_둔다() {
+    fun 재고_명령_서킷은_기본_설정을_쓰고_404_400_429를_무시_예외로_둔다() {
         assertThat(properties.getProperty("$INVENTORY_COMMAND.baseConfig")).isEqualTo("default")
         assertThat(ignoredExceptionNames()).containsExactlyInAnyOrder(
             HttpClientErrorException.NotFound::class.java.name,
             HttpClientErrorException.BadRequest::class.java.name,
-            HttpClientErrorException.Conflict::class.java.name,
             HttpClientErrorException.TooManyRequests::class.java.name
         )
     }
@@ -53,11 +53,24 @@ class InventoryCommandCircuitBreakerConfigTest {
         val circuitBreaker = circuitBreakerFromYaml()
 
         repeat(windowSize()) {
-            circuitBreaker.onError(100, TimeUnit.MILLISECONDS, clientError(HttpStatus.CONFLICT))
+            circuitBreaker.onError(100, TimeUnit.MILLISECONDS, conflict("""{"code":"INV009","message":"내용이 다른 예약 요청","data":null}"""))
         }
 
         assertThat(circuitBreaker.state).isEqualTo(CircuitBreaker.State.CLOSED)
         assertThat(circuitBreaker.metrics.numberOfFailedCalls).isZero()
+    }
+
+    @Test
+    fun 같은_서킷은_요청_키_충돌이_아닌_409를_창_크기만큼_연속으로_받으면_열린다() {
+        listOf("""{"code":"C002"}""", """{"code":"INV004"}""", "", "<html>conflict</html>").forEach { body ->
+            val circuitBreaker = circuitBreakerFromYaml()
+
+            repeat(windowSize()) {
+                circuitBreaker.onError(100, TimeUnit.MILLISECONDS, conflict(body))
+            }
+
+            assertThat(circuitBreaker.state).describedAs("body=%s", body).isEqualTo(CircuitBreaker.State.OPEN)
+        }
     }
 
     @Test
@@ -77,13 +90,17 @@ class InventoryCommandCircuitBreakerConfigTest {
     private fun circuitBreakerFromYaml(): CircuitBreaker {
         @Suppress("UNCHECKED_CAST")
         val ignored = ignoredExceptionNames().map { Class.forName(it) as Class<out Throwable> }.toTypedArray()
-        val config = CircuitBreakerConfig.custom()
+        val builder = CircuitBreakerConfig.custom()
             .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
             .slidingWindowSize(windowSize())
             .minimumNumberOfCalls(intProperty("minimumNumberOfCalls"))
             .failureRateThreshold(intProperty("failureRateThreshold").toFloat())
             .ignoreExceptions(*ignored)
-            .build()
+        properties.getProperty("$INVENTORY_COMMAND.ignoreExceptionPredicate")?.let {
+            @Suppress("UNCHECKED_CAST")
+            builder.ignoreException(Class.forName(it).getDeclaredConstructor().newInstance() as Predicate<Throwable>)
+        }
+        val config = builder.build()
         return CircuitBreakerRegistry.of(config).circuitBreaker("inventory-command")
     }
 
@@ -98,6 +115,9 @@ class InventoryCommandCircuitBreakerConfigTest {
             .takeWhile { it != null }
             .map { it!! }
             .toList()
+
+    private fun conflict(body: String): HttpClientErrorException =
+        HttpClientErrorException.create(HttpStatus.CONFLICT, "error", HttpHeaders.EMPTY, body.toByteArray(), Charsets.UTF_8)
 
     private fun clientError(status: HttpStatus): HttpClientErrorException =
         HttpClientErrorException.create(status, "error", HttpHeaders.EMPTY, ByteArray(0), null)
