@@ -9,7 +9,11 @@ object MySqlContainerSupport {
         MySQLContainer("mysql:8.0.44")
             .withUsername("root")
             .withPassword("test")
-            .withCommand("--innodb-lock-wait-timeout=20")
+            .withCommand(
+                "--innodb-lock-wait-timeout=20",
+                "--innodb-buffer-pool-size=128M",
+                "--innodb-redo-log-capacity=100M"
+            )
             .also { it.start() }
     }
 
