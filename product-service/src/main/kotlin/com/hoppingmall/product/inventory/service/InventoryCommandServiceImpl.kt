@@ -11,6 +11,7 @@ import com.hoppingmall.product.inventory.dto.response.InventoryResponse
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import com.hoppingmall.product.inventory.exception.InvalidReservationRequestKeyException
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
+import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidStockAdjustmentException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidStockChangeQuantityException
@@ -239,6 +240,8 @@ class InventoryCommandServiceImpl(
                 inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) }
             } catch (e: DataIntegrityViolationException) {
                 reserveTransaction.execute { findReplayable(requestKey, items) } ?: throw e
+            } catch (e: InventoryInsufficientStockException) {
+                reserveTransaction.execute { findInProgress(requestKey, items) } ?: throw e
             }
         }
     }
@@ -256,6 +259,12 @@ class InventoryCommandServiceImpl(
     private fun findReplayable(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
         val existing = inventoryReservationRepository.findByRequestKey(requestKey)
         if (existing.isEmpty()) return null
+        return replay(existing, items)
+    }
+
+    private fun findInProgress(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
+        val existing = inventoryReservationRepository.findByRequestKey(requestKey)
+        if (existing.isEmpty() || existing.any { it.status !in REPLAYABLE }) return null
         return replay(existing, items)
     }
 
