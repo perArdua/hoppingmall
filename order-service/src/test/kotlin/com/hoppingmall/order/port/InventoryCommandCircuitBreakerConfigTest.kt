@@ -26,11 +26,12 @@ class InventoryCommandCircuitBreakerConfigTest {
         .getObject()!!
 
     @Test
-    fun 재고_명령_서킷은_기본_설정을_쓰고_404_400_429를_무시_예외로_둔다() {
+    fun 재고_명령_서킷은_기본_설정을_쓰고_404_400_409_429를_무시_예외로_둔다() {
         assertThat(properties.getProperty("$INVENTORY_COMMAND.baseConfig")).isEqualTo("default")
         assertThat(ignoredExceptionNames()).containsExactlyInAnyOrder(
             HttpClientErrorException.NotFound::class.java.name,
             HttpClientErrorException.BadRequest::class.java.name,
+            HttpClientErrorException.Conflict::class.java.name,
             HttpClientErrorException.TooManyRequests::class.java.name
         )
     }
@@ -41,6 +42,18 @@ class InventoryCommandCircuitBreakerConfigTest {
 
         repeat(windowSize()) {
             circuitBreaker.onError(100, TimeUnit.MILLISECONDS, clientError(HttpStatus.TOO_MANY_REQUESTS))
+        }
+
+        assertThat(circuitBreaker.state).isEqualTo(CircuitBreaker.State.CLOSED)
+        assertThat(circuitBreaker.metrics.numberOfFailedCalls).isZero()
+    }
+
+    @Test
+    fun 설정된_무시_예외로_만든_서킷은_같은_요청_키_충돌_409를_창_크기만큼_연속으로_받아도_닫혀_있다() {
+        val circuitBreaker = circuitBreakerFromYaml()
+
+        repeat(windowSize()) {
+            circuitBreaker.onError(100, TimeUnit.MILLISECONDS, clientError(HttpStatus.CONFLICT))
         }
 
         assertThat(circuitBreaker.state).isEqualTo(CircuitBreaker.State.CLOSED)
