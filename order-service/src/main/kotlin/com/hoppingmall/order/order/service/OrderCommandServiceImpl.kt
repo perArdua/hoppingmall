@@ -115,7 +115,7 @@ class OrderCommandServiceImpl(
         val response = try {
             createOrderInTransaction(buyerId, request, cartItems, productMap, reservationMap, totalAmount, fence)
         } catch (e: Exception) {
-            if (idempotencyTxRecorder?.claimedByCommittedRequest() == true) {
+            if (sharedReservationFence == null && idempotencyTxRecorder?.claimedByCommittedRequest() == true) {
                 log.info("같은 멱등 키 주문이 먼저 커밋되어 공유 예약을 취소하지 않음: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName)
                 throw e
             }
