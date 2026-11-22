@@ -108,14 +108,14 @@ class ReservationFenceCleanupMySqlIntegrationTest : MySqlJpaTestSupport() {
 @DisplayName("reservation_fence 행 정리 켜짐 조건 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
 @Import(ReservationFenceCleanupScheduler::class)
-@TestPropertySource(properties = ["order.reservation.fence.enabled=false", "idempotency.claim-by-commit=true"])
+@TestPropertySource(properties = ["order.reservation.fence.enabled=false"])
 class ReservationFenceCleanupClaimByCommitMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     @Autowired
     private lateinit var cleaner: ReservationFenceCleanupScheduler
 
     @Test
-    fun fence_플래그가_꺼져도_커밋_선점이_켜져_있으면_보관_기간이_지난_취소_결정을_지운다() {
+    fun fence_플래그가_꺼져도_기본으로_켜진_커밋_선점_때문에_보관_기간이_지난_취소_결정을_지운다() {
         jdbcTemplate.update(
             "INSERT INTO reservation_fence (reservation_id, decision, created_at) VALUES (?, 'ABORTED', NOW(6) - INTERVAL 25 HOUR)",
             UUID.randomUUID().toString()
