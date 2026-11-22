@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
 import java.sql.Connection
 import java.sql.DriverManager
+import java.util.UUID
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 
@@ -380,10 +381,11 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
 
     @Test
     fun 같은_요청_키_다섯_요청이_키_충돌로_끝나도_모두_같은_예약_id를_받고_ERROR_로그는_없고_재생_네_번을_센다() {
+        val key = UUID.randomUUID().toString()
         seed(PRODUCT_A, 50)
         val replaysBefore = keyConflictReplays()
 
-        val (results, errors) = capturingErrors { whileAllWaitOnStock(List(5) { { reserveResult(KEY, PRODUCT_A to 3) } }) }
+        val (results, errors) = capturingErrors { whileAllWaitOnStock(List(5) { { reserveResult(key, PRODUCT_A to 3) } }) }
 
         assertThat(results.map { it.first }).containsOnly(200)
         assertThat(results.distinct()).hasSize(1)
@@ -395,9 +397,10 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
 
     @RepeatedTest(LOG_REPETITIONS)
     fun 같은_요청_키_다섯_요청이_동시에_와도_ERROR_로그가_없고_응답은_같다() {
+        val key = UUID.randomUUID().toString()
         seed(PRODUCT_A, 50)
 
-        val (results, errors) = capturingErrors { simultaneously(List(5) { { reserveResult(KEY, PRODUCT_A to 3) } }) }
+        val (results, errors) = capturingErrors { simultaneously(List(5) { { reserveResult(key, PRODUCT_A to 3) } }) }
 
         assertThat(results.map { it.first }).containsOnly(200)
         assertThat(results.distinct()).hasSize(1)
@@ -408,11 +411,12 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
 
     @Test
     fun 여러_상품의_같은_요청_키_충돌이_재생으로_끝나면_ERROR_로그가_없고_재고는_한_번씩만_빠진다() {
+        val key = UUID.randomUUID().toString()
         seed(PRODUCT_A, 50)
         seed(PRODUCT_B, 20)
 
         val (results, errors) = capturingErrors {
-            whileStockLocked(PRODUCT_A, List(2) { { reserveResult(KEY, PRODUCT_A to 3, PRODUCT_B to 2) } })
+            whileStockLocked(PRODUCT_A, List(2) { { reserveResult(key, PRODUCT_A to 3, PRODUCT_B to 2) } })
         }
 
         assertThat(results.map { it.first }).containsOnly(200)
@@ -424,11 +428,12 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
 
     @Test
     fun 수량이_다른_같은_요청_키_충돌은_409이고_ERROR_로그가_남고_재생으로_세지_않는다() {
+        val key = UUID.randomUUID().toString()
         seed(PRODUCT_A, 50)
         val replaysBefore = keyConflictReplays()
 
         val (results, errors) = capturingErrors {
-            whileStockLocked(PRODUCT_A, listOf(3, 2).map { quantity -> { reserveResult(KEY, PRODUCT_A to quantity) } })
+            whileStockLocked(PRODUCT_A, listOf(3, 2).map { quantity -> { reserveResult(key, PRODUCT_A to quantity) } })
         }
 
         assertThat(results.map { it.first }).containsExactlyInAnyOrder(200, 409)
