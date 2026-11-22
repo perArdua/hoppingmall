@@ -9,6 +9,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
+import org.junit.jupiter.api.RepeatedTest
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
 import java.sql.Connection
+import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 
 @AutoConfigureMockMvc
@@ -242,6 +244,168 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
         assertThat(stock(PRODUCT_A)).isEqualTo(44)
     }
 
+    @RepeatedTest(RACE_REPETITIONS)
+    fun 마지막_한_개에_같은_요청_키_두_요청이_동시에_오면_둘_다_같은_예약_id를_받고_재고는_한_번만_빠진다() {
+        seed(PRODUCT_A, 1)
+
+        val results = simultaneously(List(2) { { reserveResult(KEY, PRODUCT_A to 1) } })
+
+        assertSameReservation(results, PRODUCT_A)
+    }
+
+    @RepeatedTest(RACE_REPETITIONS)
+    fun 남은_재고가_요청_수량과_같을_때_같은_요청_키_두_요청이_동시에_오면_둘_다_같은_예약_id를_받는다() {
+        seed(PRODUCT_A, 3)
+
+        val results = simultaneously(List(2) { { reserveResult(KEY, PRODUCT_A to 3) } })
+
+        assertSameReservation(results, PRODUCT_A)
+    }
+
+    @RepeatedTest(RACE_REPETITIONS)
+    fun 마지막_한_개에_다른_요청_키_두_요청이_동시에_오면_한쪽은_재고_부족이다() {
+        seed(PRODUCT_A, 1)
+
+        val results = simultaneously(listOf("key-1", "key-2").map { key -> { reserveResult(key, PRODUCT_A to 1) } })
+
+        assertThat(results.map { it.first }).containsExactlyInAnyOrder(200, 400)
+        assertThat(results.single { it.first == 400 }.second).contains("INV002")
+        assertThat(reservationIds(PRODUCT_A)).hasSize(1)
+        assertThat(stock(PRODUCT_A)).isZero()
+    }
+
+    @Test
+    fun 마지막_재고에_같은_요청_키_다섯_요청이_동시에_와도_모두_같은_예약_id를_받는다() {
+        seed(PRODUCT_A, 1)
+
+        val results = simultaneously(List(5) { { reserveResult(KEY, PRODUCT_A to 1) } })
+
+        assertSameReservation(results, PRODUCT_A)
+    }
+
+    @Test
+    fun 여러_상품의_마지막_재고에_같은_요청_키_두_요청이_동시에_오면_상품마다_같은_예약_id를_받는다() {
+        seed(PRODUCT_A, 3)
+        seed(PRODUCT_B, 2)
+
+        val results = whileStockLocked(PRODUCT_A, List(2) { { reserveResult(KEY, PRODUCT_A to 3, PRODUCT_B to 2) } })
+
+        assertSameReservation(results, PRODUCT_A, PRODUCT_B)
+    }
+
+    @Test
+    fun 확정된_요청_키로_마지막_재고에_두_요청이_동시에_오면_둘_다_같은_새_예약_id를_받는다() {
+        seed(PRODUCT_A, 2)
+        val confirmed = batchReserve(KEY, PRODUCT_A to 1).getValue(PRODUCT_A.toString())
+        confirm(confirmed)
+
+        val results = simultaneously(List(2) { { reserveResult(KEY, PRODUCT_A to 1) } })
+
+        assertThat(results.map { it.first }).containsOnly(200)
+        assertThat(results[1]).isEqualTo(results[0])
+        assertThat(results[0].second).doesNotContain(confirmed)
+        assertThat(reservationIds(PRODUCT_A)).hasSize(2)
+        assertThat(stock(PRODUCT_A)).isZero()
+    }
+
+    @Test
+    fun 마지막_재고에_같은_요청_키로_수량이_다른_두_요청이_동시에_오면_진_쪽은_409다() {
+        seed(PRODUCT_A, 3)
+
+        val results = whileStockLocked(PRODUCT_A, listOf(3, 2).map { quantity -> { reserveResult(KEY, PRODUCT_A to quantity) } })
+
+        assertThat(results.map { it.first }).containsExactlyInAnyOrder(200, 409)
+        assertThat(results.single { it.first == 409 }.second).contains("INV009")
+        assertThat(reservationIds(PRODUCT_A)).hasSize(1)
+    }
+
+    @Test
+    fun 같은_요청_키의_예약이_없는_품절은_재고_부족_그대로다() {
+        seed(PRODUCT_A, 0)
+
+        batchReserveRequest(KEY, PRODUCT_A to 1).andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INV002") }
+        }
+
+        assertThat(reservationIds(PRODUCT_A)).isEmpty()
+    }
+
+    @Test
+    fun 같은_요청_키의_예약이_확정된_뒤의_품절은_그_예약을_돌려주지_않고_재고_부족이다() {
+        seed(PRODUCT_A, 3)
+        val confirmed = batchReserve(KEY, PRODUCT_A to 3).getValue(PRODUCT_A.toString())
+        confirm(confirmed)
+
+        batchReserveRequest(KEY, PRODUCT_A to 3).andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INV002") }
+        }
+
+        assertThat(reservationIds(PRODUCT_A)).containsExactly(confirmed)
+        assertThat(reservationStatus(confirmed)).isEqualTo("CONFIRMED")
+        assertThat(stock(PRODUCT_A)).isZero()
+    }
+
+    @Test
+    fun 같은_요청_키의_예약이_취소된_뒤의_품절은_재고_부족이다() {
+        seed(PRODUCT_A, 3)
+        val cancelled = batchReserve(KEY, PRODUCT_A to 3).getValue(PRODUCT_A.toString())
+        mockMvc.post("/internal/api/v1/inventory/reservations/$cancelled/cancel") {
+            header(TOKEN_HEADER, internalToken)
+        }.andExpect { status { isOk() } }
+        batchReserve("other-key", PRODUCT_A to 3)
+
+        batchReserveRequest(KEY, PRODUCT_A to 3).andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INV002") }
+        }
+
+        assertThat(stock(PRODUCT_A)).isZero()
+    }
+
+    private fun assertSameReservation(results: List<Pair<Int, String>>, vararg productIds: Long) {
+        assertThat(results.map { it.first }).containsOnly(200)
+        val bodies = results.map { objectMapper.readValue(it.second, object : TypeReference<Map<String, String>>() {}) }
+        assertThat(bodies.distinct()).hasSize(1)
+        productIds.forEach { productId ->
+            assertThat(reservationIds(productId)).containsExactly(bodies[0].getValue(productId.toString()))
+            assertThat(stock(productId)).isZero()
+        }
+    }
+
+    private fun reserveResult(requestKey: String, vararg items: Pair<Long, Int>): Pair<Int, String> {
+        val response = batchReserveRequest(requestKey, *items).andReturn().response
+        return response.status to response.contentAsString
+    }
+
+    private fun <T> simultaneously(requests: List<() -> T>): List<T> {
+        val start = CyclicBarrier(requests.size)
+        return requests
+            .map { request ->
+                executor.submit<T> {
+                    start.await(30, TimeUnit.SECONDS)
+                    request()
+                }
+            }
+            .map { it.get(30, TimeUnit.SECONDS) }
+    }
+
+    private fun <T> whileStockLocked(productId: Long, requests: List<() -> T>): List<T> =
+        dataSource.connection.use { holder ->
+            holder.autoCommit = false
+            try {
+                lockStock(holder, productId)
+                val pending = requests.map { request -> executor.submit<T> { request() } }
+                awaitLockWaits(requests.size.toLong())
+                holder.commit()
+                pending.map { it.get(30, TimeUnit.SECONDS) }
+            } finally {
+                holder.rollback()
+                holder.autoCommit = true
+            }
+        }
+
     private fun confirm(vararg reservationIds: String) {
         mockMvc.post("/internal/api/v1/inventory/reservations/batch-confirm") {
             contentType = MediaType.APPLICATION_JSON
@@ -305,6 +469,7 @@ abstract class ReservationRequestKeyMySqlIntegrationTest : MySqlIntegrationTestS
         private const val REQUEST_KEY_HEADER = "X-Reservation-Request-Key"
         private const val LOCK_WAIT_LIMIT_MS = 15_000L
         private const val RESERVATION_TABLE = "inventory_reservations"
+        private const val RACE_REPETITIONS = 50
     }
 }
 

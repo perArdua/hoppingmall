@@ -11,6 +11,7 @@ import com.hoppingmall.product.inventory.dto.response.InventoryResponse
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import com.hoppingmall.product.inventory.exception.InvalidReservationRequestKeyException
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
+import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidStockAdjustmentException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidStockChangeQuantityException
@@ -20,6 +21,7 @@ import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedExcep
 import com.hoppingmall.product.inventory.exception.ReservationRequestKeyConflictException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.exception.ProductNotFoundException
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -47,6 +49,8 @@ class InventoryCommandServiceImpl(
     private val cacheManagerProvider: ObjectProvider<CacheManager>,
     transactionManager: PlatformTransactionManager
 ) : InventoryCommandService {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     private val reserveTransaction = TransactionTemplate(transactionManager)
 
@@ -239,6 +243,8 @@ class InventoryCommandServiceImpl(
                 inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) }
             } catch (e: DataIntegrityViolationException) {
                 reserveTransaction.execute { findReplayable(requestKey, items) } ?: throw e
+            } catch (e: InventoryInsufficientStockException) {
+                reserveTransaction.execute { findInProgress(requestKey, items) } ?: throw e
             }
         }
     }
@@ -257,6 +263,14 @@ class InventoryCommandServiceImpl(
         val existing = inventoryReservationRepository.findByRequestKey(requestKey)
         if (existing.isEmpty()) return null
         return replay(existing, items)
+    }
+
+    private fun findInProgress(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
+        val existing = inventoryReservationRepository.findByRequestKey(requestKey)
+        if (existing.isEmpty() || existing.any { it.status !in REPLAYABLE }) return null
+        val replayed = replay(existing, items)
+        log.info("재고 부족 뒤 같은 요청 키의 진행 중 예약을 돌려줌: requestKey={}, count={}", requestKey, replayed.size)
+        return replayed
     }
 
     private fun replay(existing: List<InventoryReservation>, items: List<Pair<Long, Int>>): Map<Long, String> {
