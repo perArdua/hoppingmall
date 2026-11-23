@@ -24,7 +24,7 @@ class ReservationFence(
             try {
                 jdbcTemplate.update(INSERT, rid, LINKED)
             } catch (e: DuplicateKeyException) {
-                if (decisionOf(rid) != LINKED) fenced.add(rid)
+                fenced.add(rid)
             }
         }
         return fenced
