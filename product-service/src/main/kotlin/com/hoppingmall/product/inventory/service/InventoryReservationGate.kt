@@ -60,6 +60,9 @@ class InventoryReservationGate(
             true
         } catch (e: TimeoutException) {
             false
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
         }
     }
 

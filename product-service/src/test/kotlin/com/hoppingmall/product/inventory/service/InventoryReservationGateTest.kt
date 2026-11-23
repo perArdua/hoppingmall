@@ -139,4 +139,30 @@ class InventoryReservationGateTest {
         assertThat(gate.awaitInFlight("key-1", 0)).isTrue()
         assertThat(gate.minAvailable()).isEqualTo(1)
     }
+
+    @Test
+    fun 기다리는_중에_인터럽트되면_기다림을_그만두고_인터럽트_표시를_남긴다() {
+        val gate = InventoryReservationGate(meterRegistry, 2, 0)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            executor.submit {
+                gate.withPermits(listOf(1L), "key-1") {
+                    entered.countDown()
+                    release.await(5, TimeUnit.SECONDS)
+                }
+            }
+            entered.await(5, TimeUnit.SECONDS)
+
+            Thread.currentThread().interrupt()
+            val finished = gate.awaitInFlight("key-1", 5_000)
+
+            assertThat(finished).isFalse()
+            assertThat(Thread.interrupted()).isTrue()
+        } finally {
+            release.countDown()
+            executor.shutdownNow()
+        }
+    }
 }
