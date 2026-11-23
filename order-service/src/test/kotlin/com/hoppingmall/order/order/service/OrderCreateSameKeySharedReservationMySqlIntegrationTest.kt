@@ -174,6 +174,45 @@ class OrderCreateSameKeySharedReservationMySqlIntegrationTest : MySqlJpaTestSupp
         assertThat(decisionOf(secondReservation)).isEqualTo(ReservationFence.LINKED)
     }
 
+    @Test
+    fun 멱등_기록이_없어진_뒤_같은_키로_다시_주문하면_앞_주문의_살아_있는_예약을_나눠_갖지_않고_409_ORD009를_준다() {
+        val controller = controllerWithClaimByCommit()
+        val key = "same-key-${UUID.randomUUID()}"
+        val first = outcome(controller, key, saveCartItem())
+        val firstOrderId = orderIds().single()
+        val firstReservation = orderItemReservationIds().single()
+        jdbcTemplate.update("DELETE FROM idempotency_records")
+
+        val second = outcome(controller, key, saveCartItem())
+
+        assertThat(first).isEqualTo("201:$firstOrderId")
+        assertThat(second).isEqualTo("409:ORD009")
+        assertThat(orderIds()).containsExactly(firstOrderId)
+        assertThat(orderItemReservationIds()).containsExactly(firstReservation)
+        assertThat(cancelledReservationIds).isEmpty()
+        assertThat(decisionOf(firstReservation)).isEqualTo(ReservationFence.LINKED)
+        assertThat(cartItemRepository.count()).isEqualTo(1)
+    }
+
+    @Test
+    fun 앞_주문의_예약이_닫혀_같은_키에_새_예약이_오면_멱등_기록이_없어도_새_주문을_만든다() {
+        val controller = controllerWithClaimByCommit()
+        val key = "same-key-${UUID.randomUUID()}"
+        val first = outcome(controller, key, saveCartItem())
+        val firstReservation = orderItemReservationIds().single()
+        jdbcTemplate.update("DELETE FROM idempotency_records")
+        reservationsByRequestKey.clear()
+
+        val second = outcome(controller, key, saveCartItem())
+
+        val orders = orderIds()
+        assertThat(orders).hasSize(2)
+        assertThat(first).isEqualTo("201:${orders.min()}")
+        assertThat(second).isEqualTo("201:${orders.max()}")
+        assertThat(orderItemReservationIds()).hasSize(2).doesNotHaveDuplicates().contains(firstReservation)
+        assertThat(cancelledReservationIds).isEmpty()
+    }
+
     private fun reserveByRequestKey(items: List<Pair<Long, Int>>): Map<Long, String> {
         val requestKey = IdempotencyRequestContext.claimKey() ?: UUID.randomUUID().toString()
         return reservationsByRequestKey.computeIfAbsent(requestKey) {

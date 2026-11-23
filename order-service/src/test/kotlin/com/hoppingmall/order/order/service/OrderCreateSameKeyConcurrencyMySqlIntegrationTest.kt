@@ -29,6 +29,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
@@ -245,12 +247,13 @@ class OrderCreateSameKeyClaimByCommitMySqlIntegrationTest : OrderCreateSameKeySc
         ReflectionTestUtils.setField(aspect, "claimByCommit", true)
     }
 
-    @Test
-    fun 모두_같은_주문으로_201을_받고_주문_예약_멱등_기록_유지_결정은_하나씩만_남으며_주문_DB_쓰기_커밋은_한_번이다() {
-        val outcomes = sendSameKeyConcurrently(REQUESTS)
+    @ParameterizedTest(name = "동시 {0}건")
+    @ValueSource(ints = [2, 5, REQUESTS])
+    fun 모두_같은_주문으로_201을_받고_주문_예약_멱등_기록_유지_결정은_하나씩만_남으며_주문_DB_쓰기_커밋은_한_번이다(requests: Int) {
+        val outcomes = sendSameKeyConcurrently(requests)
 
         val orderId = orderIds().single()
-        assertThat(outcomes).hasSize(REQUESTS).containsOnly("201:$orderId")
+        assertThat(outcomes).hasSize(requests).containsOnly("201:$orderId")
         assertThat(count("orders")).isEqualTo(1)
         assertThat(count("idempotency_records")).isEqualTo(1)
         assertThat(createdReservations.get()).isEqualTo(1)
