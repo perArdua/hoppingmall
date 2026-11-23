@@ -12,6 +12,7 @@ import com.hoppingmall.product.inventory.dto.response.InventoryResponse
 import com.hoppingmall.product.inventory.enums.ReservationStatus
 import com.hoppingmall.product.inventory.exception.InvalidReservationRequestKeyException
 import com.hoppingmall.product.inventory.exception.InventoryAlreadyExistsException
+import com.hoppingmall.product.inventory.exception.InventoryBusyException
 import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidQuantityException
 import com.hoppingmall.product.inventory.exception.InventoryInvalidStockAdjustmentException
@@ -64,11 +65,19 @@ class InventoryCommandServiceImpl(
         .description("Reserves that lost a request key conflict and returned the committed reservations")
         .register(meterRegistry)
 
+    private val busyReplayCounter = Counter.builder("inventory.reserve.replayed")
+        .tag("reason", "busy")
+        .description("Reserves refused a permit that returned the same request key's in-progress reservations")
+        .register(meterRegistry)
+
     @Autowired(required = false)
     var asyncCacheEvictor: InventoryCacheAsyncEvictor? = null
 
     @Value("\${inventory.reservation.ttl-seconds:600}")
     private var ttlSeconds: Long = 600
+
+    @Value("\${inventory.semaphore.same-key-wait-ms:2000}")
+    private var sameKeyWaitMs: Long = 2000
 
     @Value("\${chaos.inventory.failure-rate:0.0}")
     private var chaosFailureRate: Float = 0.0f
@@ -248,15 +257,31 @@ class InventoryCommandServiceImpl(
             throw InvalidReservationRequestKeyException()
         }
         items.forEach { (_, quantity) -> requirePositiveQuantity(quantity) }
-        return withReserveGate(items.map { it.first }) {
-            try {
-                inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) }
-            } catch (e: DataIntegrityViolationException) {
-                replayAfterViolation(requestKey, items, e)
-            } catch (e: InventoryInsufficientStockException) {
-                reserveTransaction.execute { findInProgress(requestKey, items) } ?: throw e
+        return try {
+            withReserveGate(items.map { it.first }, requestKey) {
+                try {
+                    inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) }
+                } catch (e: DataIntegrityViolationException) {
+                    replayAfterViolation(requestKey, items, e)
+                } catch (e: InventoryInsufficientStockException) {
+                    reserveTransaction.execute { findInProgress(requestKey, items, "재고 부족") } ?: throw e
+                }
             }
+        } catch (e: InventoryBusyException) {
+            replayAfterBusy(requestKey, items) ?: throw e
         }
+    }
+
+    private fun replayAfterBusy(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
+        reservationGate.awaitInFlight(requestKey, busyReplayWaitMs())
+        val replayed = reserveTransaction.execute { findInProgress(requestKey, items, "허가 초과") } ?: return null
+        busyReplayCounter.increment()
+        return replayed
+    }
+
+    private fun busyReplayWaitMs(now: Long = System.currentTimeMillis()): Long {
+        val deadline = ReserveDeadline.current() ?: return sameKeyWaitMs
+        return minOf(sameKeyWaitMs, deadline - ReserveDeadline.MARGIN_MS - now)
     }
 
     private fun replayOrReserve(requestKey: String, items: List<Pair<Long, Int>>, lockAll: Boolean): Map<Long, String> {
@@ -294,11 +319,11 @@ class InventoryCommandServiceImpl(
         return replay(existing, items)
     }
 
-    private fun findInProgress(requestKey: String, items: List<Pair<Long, Int>>): Map<Long, String>? {
+    private fun findInProgress(requestKey: String, items: List<Pair<Long, Int>>, reason: String): Map<Long, String>? {
         val existing = inventoryReservationRepository.findByRequestKey(requestKey)
         if (existing.isEmpty() || existing.any { it.status !in REPLAYABLE }) return null
         val replayed = replay(existing, items)
-        log.info("재고 부족 뒤 같은 요청 키의 진행 중 예약을 돌려줌: requestKey={}, count={}", requestKey, replayed.size)
+        log.info("{} 뒤 같은 요청 키의 진행 중 예약을 돌려줌: requestKey={}, count={}", reason, requestKey, replayed.size)
         return replayed
     }
 
@@ -338,6 +363,9 @@ class InventoryCommandServiceImpl(
 
     private fun <T> withReserveGate(productIds: List<Long>, block: () -> T): T =
         if (bucketStockService.enabled) reservationGate.withPermits(productIds, block) else block()
+
+    private fun <T> withReserveGate(productIds: List<Long>, requestKey: String, block: () -> T): T =
+        if (bucketStockService.enabled) reservationGate.withPermits(productIds, requestKey, block) else block()
 
     private fun <T : Any> inReserveTransaction(block: (Boolean) -> T): T {
         try {
