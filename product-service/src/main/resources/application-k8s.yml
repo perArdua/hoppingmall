@@ -72,3 +72,8 @@ cache:
     # 멀티 인스턴스: 핫키 카운트를 Redis ZSET으로 전역 합산(임계치 50 = 전역/윈도우).
     # local이면 각 인스턴스가 1/N만 세어 과소 탐지 → isHot=false → XFetch 무동작.
     detector-type: redis
+
+inventory:
+  mode: bucket
+  link-check:
+    enabled: true

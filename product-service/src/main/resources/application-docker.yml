@@ -73,3 +73,7 @@ grpc:
       address: dns:///order-service:9094
       negotiation-type: plaintext
 
+inventory:
+  mode: bucket
+  link-check:
+    enabled: true
