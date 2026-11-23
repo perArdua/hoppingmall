@@ -33,10 +33,12 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.cache.CacheManager
+import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.test.util.ReflectionTestUtils
@@ -187,6 +189,51 @@ class InventoryReservationRequestKeyTest {
 
         assertThat(replayCount()).isZero()
     }
+
+    @Test
+    fun 요청_키_예약이_교착으로_롤백되면_트랜잭션을_다시_해_먼저_커밋된_예약을_돌려주고_재시도로_센다() {
+        val winner = InventoryReservation.create(1L, 1, 600L, KEY)
+        whenever(inventoryReservationRepository.findByRequestKey(KEY)).thenReturn(emptyList(), listOf(winner))
+        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(Inventory.create(productId = 1L, stockQuantity = 10))
+        whenever(keyedReservationInserter.insert(any())).thenThrow(deadlock())
+
+        val result = service.batchReserveStock(listOf(1L to 1), KEY)
+
+        assertThat(result).containsExactlyEntriesOf(mapOf(1L to winner.reservationId))
+        assertThat(deadlockRetryCount()).isEqualTo(1.0)
+        assertThat(errorMessages()).isEmpty()
+        verify(transactionManager, times(2)).getTransaction(any())
+    }
+
+    @Test
+    fun 교착이_세_번_이어지면_더_하지_않고_교착_오류를_던진다() {
+        val failure = deadlock()
+        whenever(inventoryReservationRepository.findByRequestKey(KEY)).thenReturn(emptyList())
+        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(Inventory.create(productId = 1L, stockQuantity = 10))
+        whenever(keyedReservationInserter.insert(any())).thenThrow(failure)
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 1), KEY) }.isSameAs(failure)
+        assertThat(deadlockRetryCount()).isEqualTo(2.0)
+        verify(keyedReservationInserter, times(3)).insert(any())
+    }
+
+    @Test
+    fun 교착이_아닌_잠금_실패는_다시_하지_않는다() {
+        val failure = CannotAcquireLockException("insert", SQLException("Lock wait timeout exceeded", "40001", 1205))
+        whenever(inventoryReservationRepository.findByRequestKey(KEY)).thenReturn(emptyList())
+        whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(Inventory.create(productId = 1L, stockQuantity = 10))
+        whenever(keyedReservationInserter.insert(any())).thenThrow(failure)
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 1), KEY) }.isSameAs(failure)
+        assertThat(deadlockRetryCount()).isZero()
+        verify(keyedReservationInserter, times(1)).insert(any())
+    }
+
+    private fun deadlock() =
+        CannotAcquireLockException("insert", SQLException("Deadlock found when trying to get lock", "40001", 1213))
+
+    private fun deadlockRetryCount() =
+        meterRegistry.get("inventory.reserve.retried").tag("reason", "deadlock").counter().count()
 
     private fun failInsert(failure: DataIntegrityViolationException, afterwards: List<InventoryReservation>) {
         whenever(inventoryReservationRepository.findByRequestKey(KEY)).thenReturn(emptyList(), afterwards)

@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
@@ -62,6 +63,11 @@ class InventoryCommandServiceImpl(
     private val keyConflictReplayCounter = Counter.builder("inventory.reserve.replayed")
         .tag("reason", "key_conflict")
         .description("Reserves that lost a request key conflict and returned the committed reservations")
+        .register(meterRegistry)
+
+    private val deadlockRetryCounter = Counter.builder("inventory.reserve.retried")
+        .tag("reason", "deadlock")
+        .description("Request key reserves rolled back by an InnoDB deadlock and run again")
         .register(meterRegistry)
 
     @Autowired(required = false)
@@ -250,11 +256,26 @@ class InventoryCommandServiceImpl(
         items.forEach { (_, quantity) -> requirePositiveQuantity(quantity) }
         return withReserveGate(items.map { it.first }) {
             try {
-                inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) }
+                retryingDeadlock(requestKey) { inReserveTransaction { lockAll -> replayOrReserve(requestKey, items, lockAll) } }
             } catch (e: DataIntegrityViolationException) {
                 replayAfterViolation(requestKey, items, e)
             } catch (e: InventoryInsufficientStockException) {
                 reserveTransaction.execute { findInProgress(requestKey, items) } ?: throw e
+            }
+        }
+    }
+
+    private fun <T> retryingDeadlock(requestKey: String, block: () -> T): T {
+        var attempt = 1
+        while (true) {
+            try {
+                return block()
+            } catch (e: PessimisticLockingFailureException) {
+                if (!KeyedReservationInserter.isDeadlock(e) || attempt >= DEADLOCK_ATTEMPTS) throw e
+                deadlockRetryCounter.increment()
+                log.info("요청 키 예약이 교착으로 롤백되어 다시 함: requestKey={}, attempt={}", requestKey, attempt)
+                ReserveDeadline.check()
+                attempt++
             }
         }
     }
@@ -409,5 +430,6 @@ class InventoryCommandServiceImpl(
         private val CONFIRMABLE = listOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)
         private val REPLAYABLE = setOf(ReservationStatus.RESERVED, ReservationStatus.CLAIMED)
         private val CLOSED = setOf(ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED, ReservationStatus.EXPIRED)
+        private const val DEADLOCK_ATTEMPTS = 3
     }
 }
