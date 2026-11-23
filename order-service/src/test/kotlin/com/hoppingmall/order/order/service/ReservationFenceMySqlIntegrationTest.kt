@@ -124,6 +124,17 @@ class ReservationFenceMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
+    fun 다른_주문이_이미_LINKED로_커밋한_예약은_다음_주문의_link가_충돌로_돌려주고_결정은_그대로다() {
+        val rid = newId()
+        assertThat(orderTx(listOf(rid))).isEmpty()
+
+        val fenced = orderTx(listOf(rid))
+
+        assertThat(fenced).containsExactly(rid)
+        assertThat(stored(rid)).containsExactly(ReservationFence.LINKED)
+    }
+
+    @Test
     fun 주문_트랜잭션이_롤백되면_기다리던_조회는_ABORTED를_쓴다() {
         val rid = newId()
         lateinit var decision: Future<String>
