@@ -14,6 +14,11 @@ spring:
       max-lifetime: 600000
       connection-timeout: 30000
 
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+    baseline-version: 1
+
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
@@ -129,6 +134,7 @@ resilience4j:
           - org.springframework.web.client.HttpClientErrorException$NotFound
           - org.springframework.web.client.HttpClientErrorException$BadRequest
           - org.springframework.web.client.HttpClientErrorException$TooManyRequests
+        ignoreExceptionPredicate: com.hoppingmall.order.port.ReservationKeyConflictPredicate
   retry:
     retryAspectOrder: 1
     configs:
@@ -166,6 +172,7 @@ resilience4j:
         baseConfig: default
 
 springdoc:
+  default-flat-param-object: true
   api-docs:
     path: /v3/api-docs
   swagger-ui:

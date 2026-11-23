@@ -1,16 +1,20 @@
 package com.hoppingmall.payment.payment.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.payment.payment.dto.request.PaymentRequest
 import com.hoppingmall.payment.payment.dto.response.PaymentResponse
 import com.hoppingmall.payment.payment.service.PaymentCommandService
 import com.hoppingmall.payment.payment.service.PaymentQueryService
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Slice
 import com.hoppingmall.common.UserPrincipal
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -22,13 +26,14 @@ class PaymentController(
 ) {
 
     @PostMapping
+    @Idempotent(ttlHours = 24)
     fun processPayment(
         @Valid @RequestBody paymentRequest: PaymentRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<PaymentResponse> {
+    ): ResponseEntity<ApiResponse<PaymentResponse>> {
         val userId = principal.getUserId()
         val paymentResponse = paymentCommandService.processPayment(paymentRequest, userId)
-        return ApiResponse.success(paymentResponse)
+        return ResponseEntity.ok(ApiResponse.success(paymentResponse))
     }
 
     @GetMapping("/{paymentId}")
@@ -44,8 +49,8 @@ class PaymentController(
     @GetMapping
     fun getMyPayments(
         @AuthenticationPrincipal principal: UserPrincipal,
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "10") size: Int
+        @RequestParam(defaultValue = "0") @Min(0) page: Int,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_PAGE_SIZE) size: Int
     ): ApiResponse<Slice<PaymentResponse>> {
         val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
@@ -64,12 +69,17 @@ class PaymentController(
     }
 
     @PostMapping("/{paymentId}/cancel")
+    @Idempotent(ttlHours = 24)
     fun cancelPayment(
         @PathVariable paymentId: Long,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<PaymentResponse> {
+    ): ResponseEntity<ApiResponse<PaymentResponse>> {
         val userId = principal.getUserId()
         val paymentResponse = paymentCommandService.cancelPayment(paymentId, userId)
-        return ApiResponse.success(paymentResponse)
+        return ResponseEntity.ok(ApiResponse.success(paymentResponse))
+    }
+
+    companion object {
+        const val MAX_PAGE_SIZE = 100L
     }
 }

@@ -1,6 +1,7 @@
 package com.hoppingmall.product.grpc
 
 import com.hoppingmall.order.grpc.*
+import com.hoppingmall.product.review.exception.OrderQueryUnavailableException
 import com.hoppingmall.product.review.port.OrderItemInfo
 import com.hoppingmall.product.review.port.OrderQueryPort
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
@@ -21,8 +22,8 @@ class GrpcOrderQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcOrderQueryAdapter::class.java)
 
-    @CircuitBreaker(name = "order-query", fallbackMethod = "isDeliveredFallback")
-    @Retry(name = "grpc")
+    @CircuitBreaker(name = "order-query")
+    @Retry(name = "grpc", fallbackMethod = "isDeliveredFallback")
     override fun isDelivered(orderId: Long, buyerId: Long): Boolean {
         val response = stub.isDelivered(
             DeliveredCheckRequest.newBuilder()
@@ -33,8 +34,8 @@ class GrpcOrderQueryAdapter(
         return response.delivered
     }
 
-    @CircuitBreaker(name = "order-query", fallbackMethod = "findOrderItemByIdFallback")
-    @Retry(name = "grpc")
+    @CircuitBreaker(name = "order-query")
+    @Retry(name = "grpc", fallbackMethod = "findOrderItemByIdFallback")
     override fun findOrderItemById(orderItemId: Long): OrderItemInfo? {
         val response = stub.findOrderItemById(
             OrderItemIdRequest.newBuilder().setOrderItemId(orderItemId).build()
@@ -42,8 +43,8 @@ class GrpcOrderQueryAdapter(
         return response.toReviewOrderItemInfo()
     }
 
-    @CircuitBreaker(name = "order-query", fallbackMethod = "findOrderItemsByOrderIdFallback")
-    @Retry(name = "grpc")
+    @CircuitBreaker(name = "order-query")
+    @Retry(name = "grpc", fallbackMethod = "findOrderItemsByOrderIdFallback")
     override fun findOrderItemsByOrderId(orderId: Long): List<OrderItemInfo> {
         val response = stub.findOrderItemsByOrderId(
             OrderIdRequest.newBuilder().setOrderId(orderId).build()
@@ -52,19 +53,20 @@ class GrpcOrderQueryAdapter(
     }
 
     private fun isDeliveredFallback(orderId: Long, buyerId: Long, e: Exception): Boolean {
-        log.warn("CB fallback: 배송 완료 확인 실패 orderId=$orderId, buyerId=$buyerId", e)
-        return false
+        if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return false
+        log.warn("주문 조회 실패(재시도 뒤): 배송 완료 확인 orderId=$orderId, buyerId=$buyerId", e)
+        throw OrderQueryUnavailableException(e)
     }
 
     private fun findOrderItemByIdFallback(orderItemId: Long, e: Exception): OrderItemInfo? {
         if (e is StatusRuntimeException && e.status.code == Status.Code.NOT_FOUND) return null
-        log.warn("CB fallback: 주문 상품 조회 실패 orderItemId=$orderItemId", e)
-        return null
+        log.warn("주문 조회 실패(재시도 뒤): 주문 상품 orderItemId=$orderItemId", e)
+        throw OrderQueryUnavailableException(e)
     }
 
     private fun findOrderItemsByOrderIdFallback(orderId: Long, e: Exception): List<OrderItemInfo> {
-        log.warn("CB fallback: 주문 상품 목록 조회 실패 orderId=$orderId", e)
-        return emptyList()
+        log.warn("주문 조회 실패(재시도 뒤): 주문 상품 목록 orderId=$orderId", e)
+        throw OrderQueryUnavailableException(e)
     }
 
     private fun OrderItemResponse.toReviewOrderItemInfo() = OrderItemInfo(

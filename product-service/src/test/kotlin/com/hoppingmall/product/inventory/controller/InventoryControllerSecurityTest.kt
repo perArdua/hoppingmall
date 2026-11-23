@@ -1,8 +1,12 @@
 package com.hoppingmall.product.inventory.controller
 
+import com.hoppingmall.common.UserPrincipal
+import com.hoppingmall.idempotency.Idempotent
+import com.hoppingmall.product.inventory.dto.request.InventoryAdjustRequest
 import com.hoppingmall.product.inventory.service.InventoryCommandService
 import com.hoppingmall.product.inventory.service.InventoryQueryService
 import com.hoppingmall.product.support.TestCacheConfig
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -73,11 +77,11 @@ class InventoryControllerSecurityTest {
         }
 
         @Test
-        fun 인증되지_않은_재고_초기화_요청_시_403_응답() {
+        fun 인증되지_않은_재고_초기화_요청_시_401_응답() {
             mockMvc.post("/api/v1/inventories") {
                 contentType = MediaType.APPLICATION_JSON
                 content = inventoryJson
-            }.andExpect { status { isForbidden() } }
+            }.andExpect { status { isUnauthorized() } }
         }
     }
 
@@ -85,7 +89,7 @@ class InventoryControllerSecurityTest {
     @DisplayName("PATCH /api/v1/inventories/{productId}")
     inner class UpdateStock {
 
-        private val updateJson = """{"stock_quantity":50}"""
+        private val updateJson = """{"stock_quantity":50,"expected_stock_quantity":40}"""
 
         @Test
         fun SELLER_역할로_재고_수정_성공() {
@@ -115,6 +119,85 @@ class InventoryControllerSecurityTest {
                 header("X-User-Id", "1")
                 header("x-user-role", "BUYER")
             }.andExpect { status { isForbidden() } }
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/inventories/{productId}/adjustments")
+    inner class AdjustStock {
+
+        private val adjustJson = """{"delta":5}"""
+
+        @Test
+        fun SELLER_역할로_재고_증감_성공() {
+            mockMvc.post("/api/v1/inventories/1/adjustments") {
+                contentType = MediaType.APPLICATION_JSON
+                content = adjustJson
+                header("X-User-Id", "1")
+                header("x-user-role", "SELLER")
+            }.andExpect { status { isOk() } }
+        }
+
+        @Test
+        fun ADMIN_역할로_재고_증감_성공() {
+            mockMvc.post("/api/v1/inventories/1/adjustments") {
+                contentType = MediaType.APPLICATION_JSON
+                content = adjustJson
+                header("X-User-Id", "1")
+                header("x-user-role", "ADMIN")
+            }.andExpect { status { isOk() } }
+        }
+
+        @Test
+        fun BUYER_역할로_재고_증감_시_403_응답() {
+            mockMvc.post("/api/v1/inventories/1/adjustments") {
+                contentType = MediaType.APPLICATION_JSON
+                content = adjustJson
+                header("X-User-Id", "1")
+                header("x-user-role", "BUYER")
+            }.andExpect { status { isForbidden() } }
+        }
+
+        @Test
+        fun 인증되지_않은_재고_증감_요청_시_401_응답() {
+            mockMvc.post("/api/v1/inventories/1/adjustments") {
+                contentType = MediaType.APPLICATION_JSON
+                content = adjustJson
+            }.andExpect { status { isUnauthorized() } }
+        }
+
+        @Test
+        fun 증감_수량이_없으면_400_응답() {
+            mockMvc.post("/api/v1/inventories/1/adjustments") {
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+                header("X-User-Id", "1")
+                header("x-user-role", "SELLER")
+            }.andExpect { status { isBadRequest() } }
+        }
+
+        @Test
+        fun 재고_증감_입구는_멱등성_키를_받는다() {
+            val method = InventoryController::class.java.getMethod(
+                "adjustStock", Long::class.javaPrimitiveType, InventoryAdjustRequest::class.java, UserPrincipal::class.java
+            )
+
+            assertThat(method.getAnnotation(Idempotent::class.java)).isNotNull
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /api/v1/inventories/{productId} 읽은 값")
+    inner class UpdateStockExpected {
+
+        @Test
+        fun 읽은_재고_수량_없이_고치면_400_응답() {
+            mockMvc.patch("/api/v1/inventories/1") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"stock_quantity":50}"""
+                header("X-User-Id", "1")
+                header("x-user-role", "SELLER")
+            }.andExpect { status { isBadRequest() } }
         }
     }
 }

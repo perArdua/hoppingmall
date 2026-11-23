@@ -28,6 +28,12 @@ const BUYER_COUNT = parseInt(__ENV.BUYER_COUNT || '20', 10);
 const PRODUCT_IDS = (__ENV.PRODUCT_IDS || Array.from({ length: 25 }, (_, i) => i + 1).join(','))
   .split(',').map((v) => parseInt(v.trim(), 10));
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+const SHIPPING_ADDRESS = {
+  recipient_name: '부하테스트',
+  recipient_phone: '010-0000-0000',
+  zip_code: '00000',
+  address: '부하 테스트 주소',
+};
 
 const orderOk = new Counter('olc_order_2xx');
 const paymentOk = new Counter('olc_payment_2xx');
@@ -112,11 +118,16 @@ export function lifecycle(data) {
   const cartReq = nextRequest(clientId);
   const cart = http.post(`${BASE}/api/v1/cart-items`, body({ product_id: productId, quantity: 1 }, cartReq),
     { headers: headers(token, cartReq), tags: { name: 'cart' } });
-  const cartItemId = is2xx(cart) ? (cart.json('data') || {}).id : null;
+  const cartItem = is2xx(cart) ? (cart.json('data') || {}) : {};
+  const cartItemId = cartItem.id;
   if (!cartItemId) return;
 
   const orderReq = nextRequest(clientId);
-  const orderPayload = body({ cart_item_ids: [cartItemId] }, orderReq);
+  const orderPayload = body({
+    cart_item_ids: [cartItemId],
+    shipping_address: SHIPPING_ADDRESS,
+    expected_prices: [{ cart_item_id: cartItemId, product_price: cartItem.product_price }],
+  }, orderReq);
   const orderParams = { headers: headers(token, orderReq), tags: { name: 'order' } };
   const order = http.post(`${BASE}/api/v1/orders`, orderPayload, orderParams);
   if (Math.random() < DUP_PROB) {

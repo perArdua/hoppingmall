@@ -78,24 +78,28 @@ class FileUploadControllerSecurityTest {
         }
 
         @Test
-        fun BUYER_역할로_파일_업로드_시_403_응답() {
+        fun BUYER_역할로_리뷰_이미지_업로드_성공() {
+            whenever(fileUploadService.uploadFile(any())).thenReturn(
+                FileUploadResponse(fileUrl = "/uploads/review/test.jpg", fileName = "test.jpg", fileSize = 7L, domain = "review")
+            )
+
             mockMvc.multipart("/api/v1/files/upload") {
                 file(mockFile)
-                param("domain", "product")
+                param("domain", "review")
                 header("X-User-Id", "1")
                 header("x-user-role", "BUYER")
             }.andExpect {
-                status { isForbidden() }
+                status { isCreated() }
             }
         }
 
         @Test
-        fun 인증되지_않은_요청_시_403_응답() {
+        fun 인증되지_않은_요청_시_401_응답() {
             mockMvc.multipart("/api/v1/files/upload") {
                 file(mockFile)
                 param("domain", "product")
             }.andExpect {
-                status { isForbidden() }
+                status { isUnauthorized() }
             }
         }
     }
@@ -106,7 +110,7 @@ class FileUploadControllerSecurityTest {
 
         @Test
         fun SELLER_역할로_상품_이미지_업로드_성공() {
-            whenever(productImageService.uploadProductImage(any())).thenReturn(
+            whenever(productImageService.uploadProductImage(any(), any(), any())).thenReturn(
                 ProductImageResponse(imageUrl = "/uploads/product/test.jpg", fileName = "test.jpg", fileSize = 7L)
             )
 
@@ -121,7 +125,7 @@ class FileUploadControllerSecurityTest {
 
         @Test
         fun ADMIN_역할로_상품_이미지_업로드_성공() {
-            whenever(productImageService.uploadProductImage(any())).thenReturn(
+            whenever(productImageService.uploadProductImage(any(), any(), any())).thenReturn(
                 ProductImageResponse(imageUrl = "/uploads/product/test.jpg", fileName = "test.jpg", fileSize = 7L)
             )
 
@@ -146,11 +150,11 @@ class FileUploadControllerSecurityTest {
         }
 
         @Test
-        fun 인증되지_않은_상품_이미지_업로드_요청_시_403_응답() {
+        fun 인증되지_않은_상품_이미지_업로드_요청_시_401_응답() {
             mockMvc.multipart("/api/v1/products/images/upload") {
                 file(MockMultipartFile("image", "test.jpg", "image/jpeg", "content".toByteArray()))
             }.andExpect {
-                status { isForbidden() }
+                status { isUnauthorized() }
             }
         }
     }

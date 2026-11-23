@@ -4,6 +4,7 @@ import com.hoppingmall.user.domain.Seller
 import com.hoppingmall.user.domain.repository.SellerRepository
 import com.hoppingmall.user.domain.repository.UserRepository
 import com.hoppingmall.user.dto.request.SellerApplyRequest
+import com.hoppingmall.user.dto.response.SellerApplicationResponse
 import com.hoppingmall.user.exception.seller.SellerAlreadyAppliedException
 import com.hoppingmall.user.exception.seller.SellerBusinessNumberDuplicateException
 import com.hoppingmall.user.exception.user.UserNotFoundException
@@ -19,7 +20,7 @@ class SellerCommandServiceImpl(
 ) : SellerCommandService {
 
     @Transactional
-    override fun apply(userId: Long, request: SellerApplyRequest) {
+    override fun apply(userId: Long, request: SellerApplyRequest): SellerApplicationResponse {
         val user = userRepository.findNullableById(userId)
             ?: throw UserNotFoundException()
 
@@ -37,16 +38,17 @@ class SellerCommandServiceImpl(
         if (application != null) {
             application.reapply(request.businessNumber)
             writeApplication { sellerRepository.flush() }
-            return
+            return SellerApplicationResponse.from(application)
         }
 
         val seller = Seller.create(user, request.businessNumber)
-        writeApplication { sellerRepository.save(seller) }
+        val saved = writeApplication { sellerRepository.save(seller) }
+        return SellerApplicationResponse.from(saved)
     }
 
-    private fun writeApplication(write: () -> Unit) {
+    private fun <T> writeApplication(write: () -> T): T {
         try {
-            write()
+            return write()
         } catch (ex: DataIntegrityViolationException) {
             if (ex.mostSpecificCause.message?.contains(Seller.USER_ID_UNIQUE_CONSTRAINT, ignoreCase = true) == true) {
                 throw SellerAlreadyAppliedException()

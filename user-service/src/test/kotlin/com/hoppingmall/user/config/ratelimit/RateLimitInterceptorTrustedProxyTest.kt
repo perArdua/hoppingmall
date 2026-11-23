@@ -72,6 +72,19 @@ class RateLimitInterceptorTrustedProxyTest {
     }
 
     @Test
+    fun 단수가_0이면_게이트웨이_뒤의_서로_다른_클라이언트가_한도_하나를_함께_쓴다() {
+        val interceptor = RateLimitInterceptor(buckets.proxyManager(), trustedProxyCount = 0)
+
+        val statuses = (1..6).map { client ->
+            login(interceptor, remoteAddr = "172.18.0.9", forwardedFor = listOf("198.51.100.$client"))
+        }
+
+        assertThat(statuses.take(5)).containsOnly(200)
+        assertThat(statuses.last()).isEqualTo(429)
+        assertThat(buckets.keys).containsExactly("/api/v1/users/login:POST:172.18.0.9")
+    }
+
+    @Test
     fun 단수가_음수면_인터셉터를_만들_수_없다() {
         assertThatThrownBy { RateLimitInterceptor(buckets.proxyManager(), trustedProxyCount = -1) }
             .isInstanceOf(IllegalArgumentException::class.java)

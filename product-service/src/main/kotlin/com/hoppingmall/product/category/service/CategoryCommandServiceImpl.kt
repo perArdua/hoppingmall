@@ -61,7 +61,8 @@ class CategoryCommandServiceImpl(
     @Caching(evict = [
         CacheEvict(cacheNames = ["category"], key = "#categoryId"),
         CacheEvict(cacheNames = ["categories:root"], allEntries = true),
-        CacheEvict(cacheNames = ["categories:sub"], allEntries = true)
+        CacheEvict(cacheNames = ["categories:sub"], allEntries = true),
+        CacheEvict(cacheNames = ["product"], allEntries = true)
     ])
     override fun updateCategory(categoryId: Long, request: CategoryUpdateRequest): CategoryResponse {
         val category = categoryRepository.findNullableById(categoryId)

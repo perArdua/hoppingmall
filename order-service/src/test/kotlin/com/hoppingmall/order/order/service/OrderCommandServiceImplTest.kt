@@ -9,6 +9,7 @@ import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
+import com.hoppingmall.order.order.exception.OrderCartChangedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderBusyException
@@ -110,6 +111,7 @@ class OrderCommandServiceImplTest {
         whenever(cartItemRepository.findAllById(listOf(1L))).thenReturn(listOf(cartItem))
         whenever(productQueryPort.findProductsByIds(listOf(100L))).thenReturn(listOf(productInfo))
         whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 2))).thenReturn(mapOf(100L to "rsv-1"))
+        whenever(cartItemRepository.deleteUnchanged(1L, 10L, 2)).thenReturn(1)
         whenever(orderRepository.save(any<Order>())).thenAnswer {
             val order = it.arguments[0] as Order
             setEntityId(order, 1L)
@@ -140,6 +142,7 @@ class OrderCommandServiceImplTest {
             .thenReturn(listOf(createProductInfo(id = 100L, sellerId = 5L), createProductInfo(id = 200L, sellerId = 6L)))
         whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 5, 200L to 1)))
             .thenReturn(mapOf(100L to "rsv-100", 200L to "rsv-200"))
+        stubCartClaim()
         whenever(orderRepository.save(any<Order>())).thenAnswer {
             val order = it.arguments[0] as Order
             setEntityId(order, 1L)
@@ -177,7 +180,7 @@ class OrderCommandServiceImplTest {
     }
 
     @Test
-    fun 재고_서비스가_재고_부족으로_400을_응답하면_ORD007_재고_부족_예외로_바꾼다() {
+    fun 재고_서비스가_재고_부족으로_400을_응답하면_409_ORD007_재고_부족_예외로_바꾼다() {
         stubReservableCart()
         whenever(inventoryCommandPort.batchReserveStock(any()))
             .thenThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "INV002", HttpHeaders.EMPTY, """{"code":"INV002"}""".toByteArray(), null))
@@ -187,10 +190,10 @@ class OrderCommandServiceImplTest {
             .extracting { (it as OrderOutOfStockException).errorCode }
             .satisfies({ errorCode ->
                 assertThat(errorCode.code).isEqualTo("ORD007")
-                assertThat(errorCode.status).isEqualTo(HttpStatus.BAD_REQUEST)
+                assertThat(errorCode.status).isEqualTo(HttpStatus.CONFLICT)
             })
         verify(orderRepository, never()).save(any<Order>())
-        verify(cartItemRepository, never()).deleteAllById(any())
+        verify(cartItemRepository, never()).deleteUnchanged(any(), any(), any())
     }
 
     @Test
@@ -207,7 +210,7 @@ class OrderCommandServiceImplTest {
                 assertThat(errorCode.status).isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
             })
         verify(orderRepository, never()).save(any<Order>())
-        verify(cartItemRepository, never()).deleteAllById(any())
+        verify(cartItemRepository, never()).deleteUnchanged(any(), any(), any())
     }
 
     @Test
@@ -245,7 +248,7 @@ class OrderCommandServiceImplTest {
                 assertThat(errorCode.status).isEqualTo(HttpStatus.CONFLICT)
             })
         verify(orderRepository, never()).save(any<Order>())
-        verify(cartItemRepository, never()).deleteAllById(any())
+        verify(cartItemRepository, never()).deleteUnchanged(any(), any(), any())
         verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-1"))
     }
 
@@ -267,6 +270,7 @@ class OrderCommandServiceImplTest {
     fun fence가_켜져_있고_충돌이_없으면_주문_저장_전에_예약을_연결한다() {
         stubCartOfTwoRowsForOneProduct()
         stubOrderSave()
+        stubCartClaim()
         val fence = enabledFence()
         whenever(fence.link(any())).thenReturn(emptyList())
         service.reservationFence = fence
@@ -284,6 +288,7 @@ class OrderCommandServiceImplTest {
     fun fence_플래그가_꺼져_있으면_fence를_부르지_않고_주문을_생성한다() {
         stubCartOfTwoRowsForOneProduct()
         stubOrderSave()
+        stubCartClaim()
         val fence = mock<ReservationFence>()
         whenever(fence.enabled).thenReturn(false)
         service.reservationFence = fence
@@ -293,6 +298,49 @@ class OrderCommandServiceImplTest {
         assertThat(result.status).isEqualTo(OrderStatus.PAYING)
         verify(fence, never()).link(any())
         verify(inventoryCommandPort, never()).cancelReservations(any())
+    }
+
+    @Test
+    fun 읽은_장바구니_행_하나라도_수량이_바뀌었거나_없어서_지우지_못하면_409_ORD017로_끝나고_받은_예약을_한_번_취소한다() {
+        stubCartOfTwoRowsForOneProduct()
+        stubOrderSave()
+        whenever(cartItemRepository.deleteUnchanged(1L, 10L, 1)).thenReturn(1)
+        whenever(cartItemRepository.deleteUnchanged(2L, 10L, 2)).thenReturn(0)
+
+        assertThatThrownBy { service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(1L, 2L))) }
+            .isInstanceOf(OrderCartChangedException::class.java)
+            .extracting { (it as OrderCartChangedException).errorCode }
+            .satisfies({ errorCode ->
+                assertThat(errorCode.code).isEqualTo("ORD017")
+                assertThat(errorCode.status).isEqualTo(HttpStatus.CONFLICT)
+            })
+        verify(inventoryCommandPort, times(1)).cancelReservations(listOf("rsv-1"))
+        verify(orderMetrics, never()).recordOrderCreated(any())
+    }
+
+    @Test
+    fun 장바구니_행은_id_순서로_읽은_구매자와_수량이_그대로일_때만_지운다() {
+        whenever(cartItemRepository.findAllById(listOf(2L, 1L))).thenReturn(
+            listOf(
+                createCartItem(id = 2L, buyerId = 10L, productId = 100L, quantity = 2),
+                createCartItem(id = 1L, buyerId = 10L, productId = 100L, quantity = 1)
+            )
+        )
+        whenever(productQueryPort.findProductsByIds(listOf(100L))).thenReturn(listOf(createProductInfo(id = 100L, sellerId = 5L)))
+        whenever(inventoryCommandPort.batchReserveStock(listOf(100L to 3))).thenReturn(mapOf(100L to "rsv-1"))
+        stubOrderSave()
+        stubCartClaim()
+
+        service.createOrder(10L, OrderCreateRequest(cartItemIds = listOf(2L, 1L)))
+
+        val claims = inOrder(cartItemRepository)
+        claims.verify(cartItemRepository).deleteUnchanged(1L, 10L, 1)
+        claims.verify(cartItemRepository).deleteUnchanged(2L, 10L, 2)
+        verify(inventoryCommandPort, never()).cancelReservations(any())
+    }
+
+    private fun stubCartClaim() {
+        whenever(cartItemRepository.deleteUnchanged(any(), any(), any())).thenReturn(1)
     }
 
     private fun enabledFence(): ReservationFence {
@@ -505,91 +553,6 @@ class OrderCommandServiceImplTest {
 
         assertThatThrownBy { service.cancelOrder(10L, 1L) }
             .isInstanceOf(com.hoppingmall.order.order.exception.OrderInvalidStatusException::class.java)
-    }
-
-    @Test
-    fun 주문_상태를_변경한다() {
-        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
-        setEntityId(order, 1L)
-        order.updateStatus(OrderStatus.PAYING)
-        order.updateStatus(OrderStatus.PAID)
-
-        val orderItem = OrderItem.create(
-            orderId = 1L, sellerId = 5L, productId = 100L,
-            productName = "상품A", productPrice = BigDecimal("50000"),
-            quantity = 1
-        )
-        setEntityId(orderItem, 10L)
-
-        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
-        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
-
-        val result = service.updateOrderStatus(
-            1L,
-            com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.SHIPPED),
-            10L,
-            true
-        )
-
-        assertThat(result.status).isEqualTo(OrderStatus.SHIPPED)
-    }
-
-    @Test
-    fun 관리자가_다른_사용자의_주문_상태를_변경한다() {
-        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
-        setEntityId(order, 1L)
-        order.updateStatus(OrderStatus.PAYING)
-        order.updateStatus(OrderStatus.PAID)
-
-        val orderItem = OrderItem.create(
-            orderId = 1L, sellerId = 5L, productId = 100L,
-            productName = "상품A", productPrice = BigDecimal("50000"),
-            quantity = 1
-        )
-        setEntityId(orderItem, 10L)
-
-        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
-        whenever(orderItemRepository.findByOrderId(1L)).thenReturn(listOf(orderItem))
-
-        val result = service.updateOrderStatus(
-            1L,
-            com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.SHIPPED),
-            99L,
-            true
-        )
-
-        assertThat(result.status).isEqualTo(OrderStatus.SHIPPED)
-    }
-
-    @Test
-    fun 관리자가_아닌_다른_사용자가_주문_상태변경_시_예외가_발생한다() {
-        val order = Order.create(buyerId = 10L, totalAmount = BigDecimal("50000"))
-        setEntityId(order, 1L)
-
-        whenever(orderRepository.findById(1L)).thenReturn(Optional.of(order))
-
-        assertThatThrownBy {
-            service.updateOrderStatus(
-                1L,
-                com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.CANCELLED),
-                99L,
-                false
-            )
-        }.isInstanceOf(OrderAccessDeniedException::class.java)
-    }
-
-    @Test
-    fun 존재하지_않는_주문의_상태변경_시_예외가_발생한다() {
-        whenever(orderRepository.findById(999L)).thenReturn(Optional.empty())
-
-        assertThatThrownBy {
-            service.updateOrderStatus(
-                999L,
-                com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest(status = OrderStatus.CANCELLED),
-                10L,
-                false
-            )
-        }.isInstanceOf(OrderNotFoundException::class.java)
     }
 
     @Test

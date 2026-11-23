@@ -2,9 +2,9 @@ package com.hoppingmall.product.product.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hoppingmall.product.category.domain.Category
+import com.hoppingmall.product.common.file.exception.UnregisteredImageException
 import com.hoppingmall.product.category.domain.repository.CategoryRepository
 import com.hoppingmall.product.common.enums.ProductStatus
-import com.hoppingmall.product.common.file.FileUploadConfig
 import com.hoppingmall.product.inventory.service.InventoryCommandService
 import com.hoppingmall.product.product.domain.BulkImportJob
 import com.hoppingmall.product.product.domain.Product
@@ -29,6 +29,8 @@ import org.mockito.Mock
 import org.mockito.Spy
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.cache.CacheManager
 import org.springframework.cache.support.NoOpCache
@@ -73,7 +75,7 @@ class BulkImportServiceTest {
     private lateinit var cacheManager: CacheManager
 
     @Mock
-    private lateinit var fileUploadConfig: FileUploadConfig
+    private lateinit var productImageLinker: ProductImageLinker
 
     @Spy
     private var bulkImportExecutor: Executor = SyncTaskExecutor()
@@ -125,7 +127,7 @@ class BulkImportServiceTest {
         whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(job))
         whenever(categoryRepository.findAllById(any<List<Long>>())).thenReturn(listOf(category))
         whenever(productRepository.save(any<Product>())).thenReturn(product)
-        whenever(fileUploadConfig.defaultImagePath).thenReturn("/default.jpg")
+        whenever(productImageLinker.link(1L, emptyList())).thenReturn(listOf("/default.jpg"))
         whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenReturn(emptyList())
         whenever(cacheManager.getCache("product")).thenReturn(NoOpCache("product"))
 
@@ -157,7 +159,7 @@ class BulkImportServiceTest {
         whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(job))
         whenever(categoryRepository.findAllById(any<List<Long>>())).thenReturn(listOf(category))
         whenever(productRepository.save(any<Product>())).thenReturn(product)
-        whenever(fileUploadConfig.defaultImagePath).thenReturn("/default.jpg")
+        whenever(productImageLinker.link(1L, emptyList())).thenReturn(listOf("/default.jpg"))
         whenever(productImageRepository.saveAll(any<List<ProductImage>>())).thenReturn(emptyList())
         whenever(cacheManager.getCache("product")).thenReturn(NoOpCache("product"))
 
@@ -213,6 +215,7 @@ class BulkImportServiceTest {
 
         whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(job))
         whenever(categoryRepository.findAllById(listOf(1L))).thenReturn(listOf(category))
+        whenever(productImageLinker.link(1L, listOf("http://img.jpg"))).thenReturn(listOf("http://img.jpg"))
         whenever(productRepository.save(any<Product>())).thenReturn(product)
         whenever(productImageRepository.saveAll(any<List<com.hoppingmall.product.product.domain.ProductImage>>())).thenReturn(emptyList())
         whenever(bulkImportJobRepository.save(any<BulkImportJob>())).thenReturn(job)
@@ -237,7 +240,7 @@ class BulkImportServiceTest {
         whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(job))
         whenever(categoryRepository.findAllById(listOf(1L))).thenReturn(listOf(category))
         whenever(productRepository.save(any<Product>())).thenReturn(product)
-        whenever(fileUploadConfig.defaultImagePath).thenReturn("/default.jpg")
+        whenever(productImageLinker.link(1L, emptyList())).thenReturn(listOf("/default.jpg"))
         whenever(productImageRepository.saveAll(any<List<com.hoppingmall.product.product.domain.ProductImage>>())).thenReturn(emptyList())
         whenever(bulkImportJobRepository.save(any<BulkImportJob>())).thenReturn(job)
         whenever(cacheManager.getCache("product")).thenReturn(NoOpCache("product"))
@@ -315,6 +318,26 @@ class BulkImportServiceTest {
     }
 
     @Test
+    fun processImport에서_업로드하지_않은_이미지_주소의_행은_상품을_만들지_않고_실패_처리한다() {
+        val job = BulkImportJob.create(sellerId = 1L, fileName = "test.csv", totalRows = 1).withId(1L)
+        job.startImport()
+        val category = Category.create(name = "전자기기", parentCategoryId = null, depth = 0).withId(1L)
+        val rows = listOf(BulkProductRow(1, "상품A", "설명", 1L, BigDecimal("1000"), 10, listOf("https://tracker.example.com/a.gif")))
+
+        whenever(bulkImportJobRepository.findById(1L)).thenReturn(Optional.of(job))
+        whenever(categoryRepository.findAllById(listOf(1L))).thenReturn(listOf(category))
+        whenever(productImageLinker.link(1L, listOf("https://tracker.example.com/a.gif"))).thenThrow(UnregisteredImageException())
+        whenever(bulkImportJobRepository.save(any<BulkImportJob>())).thenReturn(job)
+        whenever(objectMapper.writeValueAsString(any())).thenReturn("[]")
+        whenever(cacheManager.getCache("product")).thenReturn(NoOpCache("product"))
+
+        service.processImport(1L, 1L, rows, emptyList())
+
+        assertThat(job.failCount).isEqualTo(1)
+        verify(productRepository, never()).save(any<Product>())
+    }
+
+    @Test
     fun processImport에서_존재하지_않는_카테고리_행을_실패_처리한다() {
         val job = BulkImportJob.create(sellerId = 1L, fileName = "test.csv", totalRows = 1).withId(1L)
         job.startImport()
@@ -385,7 +408,7 @@ class BulkImportServiceTest {
     fun 작업_시작이_거절되면_작업을_FAILED로_바꾼다() {
         val rejectingService = BulkImportService(
             bulkImportValidator, csvParsingService, bulkImportJobRepository, productRepository, productImageRepository,
-            categoryRepository, inventoryCommandService, objectMapper, cacheManager, fileUploadConfig,
+            categoryRepository, inventoryCommandService, objectMapper, cacheManager, productImageLinker,
             Executor { throw RejectedExecutionException("대기열 가득 참") }, transactionManager
         )
         val file = MockMultipartFile("file", "test.csv", "text/csv", "data".toByteArray())

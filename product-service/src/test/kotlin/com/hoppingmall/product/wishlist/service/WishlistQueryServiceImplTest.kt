@@ -70,19 +70,21 @@ class WishlistQueryServiceImplTest {
 
     @Test
     fun 위시리스트_여부를_확인한다_존재하는_경우() {
-        whenever(wishlistRepository.existsByBuyerIdAndProductId(1L, 10L)).thenReturn(true)
+        whenever(wishlistRepository.findIdByBuyerIdAndProductId(1L, 10L)).thenReturn(5L)
 
-        val result = service.isWishlisted(1L, 10L)
+        val result = service.checkWishlist(1L, 10L)
 
-        assertThat(result).isTrue()
+        assertThat(result.wishlisted).isTrue()
+        assertThat(result.wishlistId).isEqualTo(5L)
     }
 
     @Test
     fun 위시리스트_여부를_확인한다_존재하지_않는_경우() {
-        whenever(wishlistRepository.existsByBuyerIdAndProductId(1L, 10L)).thenReturn(false)
+        whenever(wishlistRepository.findIdByBuyerIdAndProductId(1L, 10L)).thenReturn(null)
 
-        val result = service.isWishlisted(1L, 10L)
+        val result = service.checkWishlist(1L, 10L)
 
-        assertThat(result).isFalse()
+        assertThat(result.wishlisted).isFalse()
+        assertThat(result.wishlistId).isNull()
     }
 }

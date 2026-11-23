@@ -23,6 +23,10 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import com.hoppingmall.order.shipping.domain.repository.ShippingRepository
+import com.hoppingmall.order.shipping.service.ShippingCommandServiceImpl
+import com.hoppingmall.order.shipping.domain.Shipping
+import com.hoppingmall.order.shipping.enum.ShippingStatus
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -37,7 +41,7 @@ import java.util.Optional
 @DisplayName("주문 상태 변경 API 권한과 허용 상태")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
 @WebMvcTest(controllers = [OrderController::class])
-@Import(SecurityConfig::class, OrderCommandServiceImpl::class)
+@Import(SecurityConfig::class, OrderCommandServiceImpl::class, ShippingCommandServiceImpl::class)
 class OrderStatusUpdateAuthorizationTest {
 
     @Autowired
@@ -78,6 +82,9 @@ class OrderStatusUpdateAuthorizationTest {
 
     @MockitoBean
     private lateinit var tracer: Tracer
+
+    @MockitoBean
+    private lateinit var shippingRepository: ShippingRepository
 
     @Test
     fun 구매자가_자기_PAYING_주문을_PAID로_바꾸면_403이고_주문은_PAYING에_남는다() {
@@ -128,6 +135,7 @@ class OrderStatusUpdateAuthorizationTest {
     @Test
     fun 판매자는_PAID_주문을_SHIPPED로_바꿀_수_있다() {
         val order = orderOf(OrderStatus.PAID)
+        whenever(orderItemRepository.existsByOrderIdAndSellerId(ORDER_ID, SELLER_ID)).thenReturn(true)
 
         changeStatus(SELLER_ID, "SELLER", OrderStatus.SHIPPED)
             .andExpect {
@@ -162,6 +170,14 @@ class OrderStatusUpdateAuthorizationTest {
         ReflectionTestUtils.setField(order, "id", ORDER_ID)
         pathTo(status).forEach { order.updateStatus(it) }
         whenever(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order))
+        val shipping = Shipping.create(
+            orderId = ORDER_ID, buyerId = BUYER_ID, carrierName = "CJ대한통운",
+            trackingNumber = "1234567890", recipientName = "홍길동",
+            recipientPhone = "010-1234-5678", recipientAddress = "서울시 강남구"
+        )
+        ReflectionTestUtils.setField(shipping, "id", SHIPPING_ID)
+        if (status == OrderStatus.SHIPPED) shipping.updateStatus(ShippingStatus.IN_TRANSIT)
+        whenever(shippingRepository.findByOrderId(ORDER_ID)).thenReturn(shipping)
         return order
     }
 
@@ -174,6 +190,7 @@ class OrderStatusUpdateAuthorizationTest {
 
     companion object {
         private const val ORDER_ID = 1L
+        private const val SHIPPING_ID = 3L
         private const val BUYER_ID = 10L
         private const val SELLER_ID = 20L
         private const val ADMIN_ID = 99L

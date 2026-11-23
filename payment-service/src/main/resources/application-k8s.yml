@@ -15,8 +15,12 @@ spring:
     username: root
     password: ${MYSQL_ROOT_PASSWORD}
 
+  flyway:
+    enabled: true
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: validate
 
   kafka:
     consumer:
@@ -49,6 +53,12 @@ services:
     url: http://order-service.hoppingmall.svc.cluster.local:8084
   product-service:
     url: http://product-service.hoppingmall.svc.cluster.local:8083
+
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
 
 internal:
   service:

@@ -7,6 +7,7 @@ import com.hoppingmall.product.category.exception.CategoryNotFoundException
 import com.hoppingmall.product.category.service.CategoryCommandService
 import com.hoppingmall.product.category.service.CategoryQueryService
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.common.file.UploadedImageLinker
 import com.hoppingmall.product.product.domain.ProductStatistics
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
@@ -23,12 +24,14 @@ import com.hoppingmall.product.review.dto.request.ReviewCreateRequest
 import com.hoppingmall.product.review.port.OrderItemInfo
 import com.hoppingmall.product.review.port.OrderQueryPort
 import com.hoppingmall.product.review.service.ReviewCommandService
+import com.hoppingmall.product.review.service.ProductReviewSummaryService
 import com.hoppingmall.product.review.service.ReviewCommandServiceImpl
 import com.hoppingmall.product.review.service.ReviewQueryService
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
 import com.hoppingmall.product.wishlist.service.WishlistQueryService
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.AfterEach
@@ -64,6 +67,12 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
     @Autowired
     private lateinit var productStatisticsRepository: ProductStatisticsRepository
+
+    @Autowired
+    private lateinit var productReviewSummaryService: ProductReviewSummaryService
+
+    @Autowired
+    private lateinit var uploadedImageLinker: UploadedImageLinker
 
     @Autowired
     private lateinit var categoryCommandService: CategoryCommandService
@@ -146,8 +155,8 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
         productCommandService.updateProduct(productId, updateRequest(categoryId, listOf("new-1.jpg")))
 
-        assertThat(productQueryService.getProductById(productId)!!.imageUrls).containsExactly("new-1.jpg")
-        assertThat(productQueryService.getProducts(page).content.single().imageUrls).containsExactly("new-1.jpg")
+        assertThat(productQueryService.getProductById(productId)!!.imageUrls).containsExactly(UploadedImageSupport.url("new-1.jpg"))
+        assertThat(productQueryService.getProducts(page).content.single().imageUrls).containsExactly(UploadedImageSupport.url("new-1.jpg"))
     }
 
     @Test
@@ -218,7 +227,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
             OrderItemInfo(ORDER_ITEM_ID, ORDER_ID, SELLER_ID, PRODUCT_ID, "리뷰 상품", BigDecimal("10000"), 1, BigDecimal("10000"))
         )
         whenever(orderQueryPort.isDelivered(any(), any())).thenReturn(true)
-        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository)
+        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService, uploadedImageLinker)
         val tx = TransactionTemplate(transactionManager)
         val request = ReviewCreateRequest(orderItemId = ORDER_ITEM_ID, rating = 2, content = "처음 쓴 리뷰 내용입니다")
         val firstId = tx.execute { service.createReview(BUYER_ID, request) }!!.id
@@ -238,7 +247,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
         wishlistCommandService.removeWishlist(BUYER_ID, wishlistId)
 
         assertThat(wishlistQueryService.getWishlists(BUYER_ID, page).content).isEmpty()
-        assertThat(wishlistQueryService.isWishlisted(BUYER_ID, productId)).isFalse()
+        assertThat(wishlistQueryService.checkWishlist(BUYER_ID, productId).wishlisted).isFalse()
     }
 
     @Test
@@ -251,7 +260,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
 
         assertThat(again.id).isNotEqualTo(firstId)
         assertThat(wishlistQueryService.getWishlists(BUYER_ID, page).content.map { it.id }).containsExactly(again.id)
-        assertThat(wishlistQueryService.isWishlisted(BUYER_ID, productId)).isTrue()
+        assertThat(wishlistQueryService.checkWishlist(BUYER_ID, productId).wishlisted).isTrue()
     }
 
     @Test
@@ -298,7 +307,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
                 name = "소프트삭제 상품",
                 description = "소프트삭제 설명",
                 price = BigDecimal("10000"),
-                imageUrls = imageUrls,
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, imageUrls),
                 status = ProductStatus.AVAILABLE
             )
         ).id
@@ -309,7 +318,7 @@ class SoftDeleteRestrictionMySqlIntegrationTest : MySqlIntegrationTestSupport() 
             name = "소프트삭제 상품 수정",
             description = "소프트삭제 설명 수정",
             price = BigDecimal("12000"),
-            imageUrls = imageUrls
+            imageUrls = UploadedImageSupport.register(jdbcTemplate, imageUrls)
         )
 
     companion object {

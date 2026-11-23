@@ -22,6 +22,7 @@ class CategoryController(
 ) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createCategory(
         @Valid @RequestBody request: CategoryCreateRequest
     ): ResponseEntity<ApiResponse<CategoryResponse>> {

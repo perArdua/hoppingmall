@@ -6,10 +6,13 @@ import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
 import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
 import com.hoppingmall.order.order.dto.response.OrderResponse
+import com.hoppingmall.order.order.dto.response.SellerOrderResponse
+import com.hoppingmall.order.order.dto.response.toCreatedResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.service.OrderCommandService
 import com.hoppingmall.order.order.service.OrderQueryService
+import com.hoppingmall.order.shipping.service.ShippingCommandService
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -25,26 +28,25 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "주문")
 class OrderController(
     private val orderCommandService: OrderCommandService,
-    private val orderQueryService: OrderQueryService
+    private val orderQueryService: OrderQueryService,
+    private val shippingCommandService: ShippingCommandService
 ) {
 
-    @Idempotent(ttlHours = 24)
+    @Idempotent(ttlHours = 24, claimByCommit = true)
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: OrderCreateRequest
-    ): ResponseEntity<ApiResponse<OrderResponse>> {
-        val order = orderCommandService.createOrder(userPrincipal.getUserId(), request)
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success(order))
-    }
+    ): ResponseEntity<ApiResponse<OrderResponse>> =
+        orderCommandService.createOrder(userPrincipal.getUserId(), request).toCreatedResponse()
 
     @GetMapping("/{orderId}")
     fun getOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable orderId: Long
     ): ResponseEntity<ApiResponse<OrderResponse>> {
-        val order = orderQueryService.getOrder(orderId, userPrincipal.getUserId())
+        val order = orderQueryService.getOrder(orderId, userPrincipal.getUserId(), userPrincipal.getRole() == "ADMIN")
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 
@@ -55,6 +57,25 @@ class OrderController(
     ): ResponseEntity<ApiResponse<Slice<OrderResponse>>> {
         val orders = orderQueryService.getMyOrders(userPrincipal.getUserId(), pageable)
         return ResponseEntity.ok(ApiResponse.success(orders))
+    }
+
+    @GetMapping("/seller")
+    fun getSellerOrders(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @RequestParam(required = false) status: OrderStatus?,
+        @PageableDefault(size = 20) pageable: Pageable
+    ): ResponseEntity<ApiResponse<Slice<SellerOrderResponse>>> {
+        val orders = orderQueryService.getSellerOrders(userPrincipal.getUserId(), status, pageable)
+        return ResponseEntity.ok(ApiResponse.success(orders))
+    }
+
+    @GetMapping("/seller/{orderId}")
+    fun getSellerOrder(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PathVariable orderId: Long
+    ): ResponseEntity<ApiResponse<SellerOrderResponse>> {
+        val order = orderQueryService.getSellerOrder(orderId, userPrincipal.getUserId())
+        return ResponseEntity.ok(ApiResponse.success(order))
     }
 
     @Idempotent(ttlHours = 24)
@@ -77,13 +98,13 @@ class OrderController(
         if (request.status !in SHIPPING_STATUSES) {
             throw OrderInvalidStatusException()
         }
-        val canChangeAnyOrder = userPrincipal.getRole() in SHIPPING_MANAGER_ROLES
-        val order = orderCommandService.updateOrderStatus(orderId, request, userPrincipal.getUserId(), canChangeAnyOrder)
+        val isAdmin = userPrincipal.getRole() == ADMIN_ROLE
+        val order = shippingCommandService.updateStatusByOrder(userPrincipal.getUserId(), orderId, request.status, isAdmin)
         return ResponseEntity.ok(ApiResponse.success(order))
     }
 
     companion object {
         private val SHIPPING_STATUSES = setOf(OrderStatus.SHIPPED, OrderStatus.DELIVERED)
-        private val SHIPPING_MANAGER_ROLES = setOf("SELLER", "ADMIN")
+        private const val ADMIN_ROLE = "ADMIN"
     }
 }

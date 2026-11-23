@@ -35,6 +35,10 @@ class Order private constructor(
     var deliveredAt: LocalDateTime? = null
         private set
 
+    @Embedded
+    var shippingAddress: OrderShippingAddress? = null
+        private set
+
     companion object {
         val MAX_TOTAL_AMOUNT: BigDecimal = BigDecimal("99999999.99")
 
@@ -43,7 +47,7 @@ class Order private constructor(
             OrderStatus.PAYING to setOf(OrderStatus.PAID, OrderStatus.CANCELLED),
             OrderStatus.PAID to setOf(OrderStatus.SHIPPED, OrderStatus.CANCEL_REQUESTED),
             OrderStatus.CANCEL_REQUESTED to setOf(OrderStatus.CANCELLED, OrderStatus.CANCEL_FAILED),
-            OrderStatus.SHIPPED to setOf(OrderStatus.DELIVERED),
+            OrderStatus.SHIPPED to setOf(OrderStatus.DELIVERED, OrderStatus.PAID),
             OrderStatus.DELIVERED to emptySet(),
             OrderStatus.CANCELLED to emptySet(),
             OrderStatus.CANCEL_FAILED to setOf(OrderStatus.CANCEL_REQUESTED),
@@ -57,12 +61,13 @@ class Order private constructor(
 
         fun create(
             buyerId: Long,
-            totalAmount: BigDecimal
+            totalAmount: BigDecimal,
+            shippingAddress: OrderShippingAddress? = null
         ): Order =
             Order(
                 buyerId = buyerId,
                 totalAmount = totalAmount
-            )
+            ).also { it.shippingAddress = shippingAddress }
     }
 
     fun updateStatus(newStatus: OrderStatus) {
@@ -75,6 +80,9 @@ class Order private constructor(
             deliveredAt = LocalDateTime.now()
         }
     }
+
+    fun autoCancelAt(payingTimeoutMinutes: Long): LocalDateTime? =
+        if (status == OrderStatus.PAYING) updatedAt?.plusMinutes(payingTimeoutMinutes) else null
 
     fun isRefundWindowClosed(deliveredBefore: LocalDateTime): Boolean =
         deliveredAt?.isBefore(deliveredBefore) == true

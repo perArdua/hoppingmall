@@ -1,6 +1,7 @@
 package com.hoppingmall.payment.coupon.controller
 
 import com.hoppingmall.payment.coupon.dto.request.CouponCreateRequest
+import com.hoppingmall.payment.coupon.dto.response.AvailableCouponResponse
 import com.hoppingmall.payment.coupon.dto.response.CouponResponse
 import com.hoppingmall.payment.coupon.dto.response.UserCouponResponse
 import com.hoppingmall.payment.coupon.enum.CouponStatus
@@ -8,6 +9,7 @@ import com.hoppingmall.payment.coupon.service.CouponCommandService
 import com.hoppingmall.payment.coupon.service.CouponQueryService
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.idempotency.Idempotent
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -27,6 +29,7 @@ class CouponController(
 ) {
 
     @PostMapping("/admin/coupons")
+    @ResponseStatus(HttpStatus.CREATED)
     fun createCoupon(
         @Valid @RequestBody request: CouponCreateRequest
     ): ResponseEntity<ApiResponse<CouponResponse>> {
@@ -51,12 +54,18 @@ class CouponController(
     }
 
     @GetMapping("/coupons/available")
-    fun getAvailableCoupons(): ResponseEntity<ApiResponse<List<CouponResponse>>> {
-        val response = couponQueryService.getAvailableCoupons()
+    fun getAvailableCoupons(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
+    ): ResponseEntity<ApiResponse<List<AvailableCouponResponse>>> {
+        val coupons = couponQueryService.getAvailableCoupons()
+        val issuedCouponIds = couponQueryService.getIssuedCouponIds(userPrincipal.getUserId(), coupons.map { it.id })
+        val response = coupons.map { AvailableCouponResponse.of(it, it.id in issuedCouponIds) }
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
     @PostMapping("/coupons/{couponId}/issue")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Idempotent(ttlHours = 24)
     fun issueCoupon(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @PathVariable couponId: Long

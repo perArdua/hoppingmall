@@ -1,6 +1,7 @@
 package com.hoppingmall.order.order.service
 
 import com.hoppingmall.order.order.domain.ReservationFenceEntry
+import com.hoppingmall.order.support.MySqlContainerSupport
 import com.hoppingmall.order.support.MySqlJpaTestSupport
 import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
@@ -11,6 +12,8 @@ import org.junit.jupiter.api.DisplayNameGenerator
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Import
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.datasource.SingleConnectionDataSource
 import org.springframework.test.context.TestPropertySource
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
@@ -196,6 +199,83 @@ class ReservationFenceMySqlIntegrationTest : MySqlJpaTestSupport() {
         assertThat(rowCount()).isEqualTo(1)
     }
 
+    @Test
+    fun 취소_결정은_주문의_LINKED가_커밋되기_전이면_한도까지만_기다리고_취소_대상으로_돌려주지_않는다() {
+        val rid = newId()
+        lateinit var cancellable: List<String>
+        var waitedMs = 0L
+
+        val fenced = orderTx(listOf(rid)) {
+            val startedAt = System.currentTimeMillis()
+            cancellable = executor.submit<List<String>> { fence.abortForCancel(listOf(rid)) }.get(30, TimeUnit.SECONDS)
+            waitedMs = System.currentTimeMillis() - startedAt
+        }
+
+        assertThat(fenced).isEmpty()
+        assertThat(cancellable).isEmpty()
+        assertThat(waitedMs).isGreaterThanOrEqualTo(CANCEL_LOCK_WAIT_MS - LOCK_WAIT_SLACK_MS).isLessThan(SERVER_LOCK_WAIT_MS)
+        assertThat(stored(rid)).containsExactly(ReservationFence.LINKED)
+    }
+
+    @Test
+    fun 주문의_LINKED가_먼저_커밋되면_취소_결정은_그_예약을_취소_대상으로_돌려주지_않는다() {
+        val rid = newId()
+        orderTx(listOf(rid))
+
+        val cancellable = fence.abortForCancel(listOf(rid))
+
+        assertThat(cancellable).isEmpty()
+        assertThat(stored(rid)).containsExactly(ReservationFence.LINKED)
+    }
+
+    @Test
+    fun 취소_결정이_먼저_커밋되면_그_예약을_취소_대상으로_돌려주고_주문의_link는_충돌로_돌려준다() {
+        val rid = newId()
+
+        val cancellable = fence.abortForCancel(listOf(rid))
+        val fenced = orderTx(listOf(rid))
+
+        assertThat(cancellable).containsExactly(rid)
+        assertThat(fenced).containsExactly(rid)
+        assertThat(stored(rid)).containsExactly(ReservationFence.ABORTED)
+    }
+
+    @Test
+    fun 이미_ABORTED인_예약은_다시_취소_대상으로_돌려주고_행은_하나다() {
+        val rid = newId()
+        fence.decide(rid)
+
+        val cancellable = fence.abortForCancel(listOf(rid, rid))
+
+        assertThat(cancellable).containsExactly(rid)
+        assertThat(rowCount()).isEqualTo(1)
+    }
+
+    @Test
+    fun 취소_결정이_줄인_세션_잠금_한도는_기다림이_끝나면_원래대로_돌아온다() {
+        val rid = newId()
+        val single = SingleConnectionDataSource(MySqlContainerSupport.jdbcUrl(DATABASE), MySqlContainerSupport.username, MySqlContainerSupport.password, true)
+        try {
+            val singleJdbc = JdbcTemplate(single)
+            val singleFence = ReservationFence(singleJdbc, false, CANCEL_LOCK_WAIT_SECONDS)
+            val before = sessionLockWait(singleJdbc)
+            lateinit var cancellable: List<String>
+
+            orderTx(listOf(rid)) {
+                cancellable = executor.submit<List<String>> { singleFence.abortForCancel(listOf(rid)) }.get(30, TimeUnit.SECONDS)
+            }
+
+            assertThat(cancellable).isEmpty()
+            assertThat(before).isEqualTo(SERVER_LOCK_WAIT_MS / 1000)
+            assertThat(sessionLockWait(singleJdbc)).isEqualTo(before)
+        } finally {
+            single.destroy()
+        }
+    }
+
+    private fun sessionLockWait(jdbc: JdbcTemplate): Long =
+        jdbc.queryForObject("SELECT @@SESSION.innodb_lock_wait_timeout", Long::class.java)!!
+
     private fun decideWhileOrderHolds(rid: String): Future<String> {
         val enteredAt = AtomicLong(0L)
         val decision = executor.submit<String> {
@@ -230,5 +310,10 @@ class ReservationFenceMySqlIntegrationTest : MySqlJpaTestSupport() {
 
     companion object {
         private const val RACE_REPEATS = 50
+        private const val DATABASE = "order_mysql_test"
+        private const val CANCEL_LOCK_WAIT_SECONDS = 1
+        private const val CANCEL_LOCK_WAIT_MS = 1_000L
+        private const val LOCK_WAIT_SLACK_MS = 100L
+        private const val SERVER_LOCK_WAIT_MS = 20_000L
     }
 }

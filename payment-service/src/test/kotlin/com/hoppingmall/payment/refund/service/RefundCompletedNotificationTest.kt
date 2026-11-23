@@ -144,6 +144,7 @@ class RefundCompletedNotificationTest {
         assertThat(event.eventData["content"] as String).contains("100").contains("19666.67")
         assertThat(metadata(event)["orderId"]).isEqualTo(100)
         assertThat(metadata(event)["paymentId"]).isEqualTo(200)
+        assertThat(metadata(event)["refundId"]).isEqualTo(2)
         assertThat(metadata(event)["amount"]).isEqualTo("19666.67")
         assertThat(metadata(event)["transactionId"]).isEqualTo("txn-refund-777")
     }
@@ -175,7 +176,7 @@ class RefundCompletedNotificationTest {
         assertThat(refund.topic).isEqualTo(cancel.topic)
         assertThat(refund.partitionKey).isEqualTo(cancel.partitionKey)
         assertThat(refund.eventData.keys).isEqualTo(cancel.eventData.keys)
-        assertThat(metadata(refund).keys).isEqualTo(metadata(cancel).keys)
+        assertThat(metadata(refund).keys).isEqualTo(metadata(cancel).keys + "refundId")
     }
 
     @Test

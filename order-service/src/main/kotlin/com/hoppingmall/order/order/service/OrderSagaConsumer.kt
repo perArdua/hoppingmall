@@ -221,6 +221,7 @@ class OrderSagaConsumer(
             order.updateStatus(OrderStatus.CANCEL_REQUESTED)
             order.updateStatus(OrderStatus.CANCELLED)
             orderRepository.save(order)
+            orderRepository.cancelPreparingShipping(event.orderId)
 
             transactionalEventPublisher.publishEvent(
                 aggregateType = "Order",
@@ -331,6 +332,7 @@ class OrderSagaConsumer(
                 order.updateStatus(OrderStatus.CANCEL_REQUESTED)
                 order.updateStatus(OrderStatus.CANCELLED)
                 orderRepository.save(order)
+                orderRepository.cancelPreparingShipping(orderId)
                 log.markStepCompleted(SagaEventLog.RESTORE_CONFIRMED)
                 sagaEventLogRepository.save(log)
                 publishCancellationNotification(eventId, orderId, order.buyerId)
@@ -364,7 +366,8 @@ class OrderSagaConsumer(
                 "userId" to buyerId,
                 "type" to "PAYMENT_CANCELLED",
                 "title" to "주문이 취소되었습니다",
-                "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다."
+                "content" to "주문번호 ${orderId}의 결제 취소가 완료되었습니다.",
+                "metadata" to orderNotificationMetadata(orderId)
             ),
             topic = KafkaTopics.NOTIFICATION,
             partitionKey = orderId.toString()

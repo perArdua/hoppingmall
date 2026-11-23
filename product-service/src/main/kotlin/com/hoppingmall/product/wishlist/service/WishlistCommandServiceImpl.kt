@@ -48,4 +48,11 @@ class WishlistCommandServiceImpl(
 
         wishlist.softDelete()
     }
+
+    override fun removeWishlistByProductId(buyerId: Long, productId: Long) {
+        val wishlist = wishlistRepository.findByBuyerIdAndProductId(buyerId, productId)
+            ?: throw WishlistNotFoundException()
+
+        wishlist.softDelete()
+    }
 }

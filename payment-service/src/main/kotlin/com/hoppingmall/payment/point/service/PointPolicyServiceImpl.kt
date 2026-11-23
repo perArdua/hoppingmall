@@ -5,11 +5,19 @@ import com.hoppingmall.payment.point.domain.PointPolicy
 import com.hoppingmall.payment.point.domain.PointPolicyRepository
 import com.hoppingmall.payment.point.dto.request.PointPolicyRequest
 import com.hoppingmall.payment.point.dto.response.PointPolicyResponse
+import com.hoppingmall.payment.point.exception.PointPolicyConcurrentChangeException
+import com.hoppingmall.payment.point.exception.PointPolicyInvalidException
+import com.hoppingmall.payment.point.exception.PointPolicyNameDuplicatedException
 import com.hoppingmall.payment.point.exception.PointPolicyNotFoundException
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Cacheable
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.PessimisticLockingFailureException
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Service
 @Transactional
@@ -22,8 +30,6 @@ class PointPolicyServiceImpl(
         validatePolicyRequest(request)
         validatePolicyNameNotExists(request.policyName)
 
-        deactivateAllPolicies()
-
         val policy = PointPolicy.create(
             policyName = request.policyName,
             earnRate = request.earnRate,
@@ -31,9 +37,13 @@ class PointPolicyServiceImpl(
             minUseAmount = request.minUseAmount,
             maxUseAmount = request.maxUseAmount,
             description = request.description
-        ).activate()
+        )
+        policy.activate()
 
-        val savedPolicy = pointPolicyRepository.save(policy)
+        val savedPolicy = switchingActivePolicy {
+            pointPolicyRepository.deactivateAll()
+            pointPolicyRepository.saveAndFlush(policy)
+        }
         return PointPolicyResponse.from(savedPolicy)
     }
 
@@ -41,9 +51,12 @@ class PointPolicyServiceImpl(
     override fun updatePolicy(policyId: Long, request: PointPolicyRequest): PointPolicyResponse {
         validatePolicyRequest(request)
 
-        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException()
+        if (policy.policyName != request.policyName) {
+            validatePolicyNameNotExists(request.policyName)
+        }
 
-        val updatedPolicy = policy.update(
+        policy.update(
             policyName = request.policyName,
             earnRate = request.earnRate,
             maxEarnRate = request.maxEarnRate,
@@ -51,29 +64,27 @@ class PointPolicyServiceImpl(
             maxUseAmount = request.maxUseAmount,
             description = request.description
         )
-
-        val savedPolicy = pointPolicyRepository.save(updatedPolicy)
-        return PointPolicyResponse.from(savedPolicy)
+        return PointPolicyResponse.from(pointPolicyRepository.save(policy))
     }
 
     @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun activatePolicy(policyId: Long): PointPolicyResponse {
-        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException()
 
-        deactivateAllPolicies()
-
-        val activatedPolicy = policy.activate()
-        val savedPolicy = pointPolicyRepository.save(activatedPolicy)
-        return PointPolicyResponse.from(savedPolicy)
+        val activated = switchingActivePolicy {
+            pointPolicyRepository.deactivateAllExcept(policyId)
+            policy.activate()
+            pointPolicyRepository.saveAndFlush(policy)
+        }
+        return PointPolicyResponse.from(activated)
     }
 
     @CacheEvict(cacheNames = ["point-policy"], allEntries = true)
     override fun deactivatePolicy(policyId: Long): PointPolicyResponse {
-        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException()
 
-        val deactivatedPolicy = policy.deactivate()
-        val savedPolicy = pointPolicyRepository.save(deactivatedPolicy)
-        return PointPolicyResponse.from(savedPolicy)
+        policy.deactivate()
+        return PointPolicyResponse.from(pointPolicyRepository.save(policy))
     }
 
     @Cacheable(cacheNames = ["point-policy"], key = "'current'", sync = true)
@@ -83,30 +94,39 @@ class PointPolicyServiceImpl(
     }
 
     override fun getPolicyById(policyId: Long): PointPolicyResponse {
-        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException() 
+        val policy = pointPolicyRepository.findByIdOrNull(policyId) ?: throw PointPolicyNotFoundException()
         return PointPolicyResponse.from(policy)
     }
 
+    @Transactional(readOnly = true)
+    override fun getPolicies(pageable: Pageable): Slice<PointPolicyResponse> {
+        return pointPolicyRepository.findAllByOrderByIdDesc(pageable).map { PointPolicyResponse.from(it) }
+    }
+
     private fun validatePolicyRequest(request: PointPolicyRequest) {
-        if (request.earnRate > request.maxEarnRate) {
-            throw IllegalArgumentException("적립률은 최대 적립률을 초과할 수 없습니다")
-        }
-        if (request.minUseAmount > request.maxUseAmount) {
-            throw IllegalArgumentException("최소 사용 금액은 최대 사용 금액을 초과할 수 없습니다")
+        if (request.earnRate <= BigDecimal.ZERO ||
+            request.earnRate > request.maxEarnRate ||
+            request.minUseAmount > request.maxUseAmount
+        ) {
+            throw PointPolicyInvalidException()
         }
     }
 
     private fun validatePolicyNameNotExists(policyName: String) {
         if (pointPolicyRepository.existsByPolicyName(policyName)) {
-            throw IllegalArgumentException("이미 존재하는 정책 이름입니다")
+            throw PointPolicyNameDuplicatedException()
         }
     }
 
-    private fun deactivateAllPolicies() {
-        val activePolicy = pointPolicyRepository.findByIsActiveTrue()
-        activePolicy?.let {
-            val deactivatedPolicy = it.deactivate()
-            pointPolicyRepository.save(deactivatedPolicy)
+    private fun switchingActivePolicy(action: () -> PointPolicy): PointPolicy =
+        try {
+            action()
+        } catch (ex: PessimisticLockingFailureException) {
+            throw PointPolicyConcurrentChangeException()
+        } catch (ex: DataIntegrityViolationException) {
+            if (ex.mostSpecificCause.message?.contains(PointPolicy.ACTIVE_KEY_CONSTRAINT, ignoreCase = true) == true) {
+                throw PointPolicyConcurrentChangeException()
+            }
+            throw ex
         }
-    }
 }

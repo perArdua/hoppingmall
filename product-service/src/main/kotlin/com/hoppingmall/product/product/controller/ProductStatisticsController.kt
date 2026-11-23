@@ -1,6 +1,8 @@
 package com.hoppingmall.product.product.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.page.PageRequestLimits
+import com.hoppingmall.common.page.RangeCheck
 import com.hoppingmall.product.product.dto.response.*
 import com.hoppingmall.product.product.service.ProductStatisticsQueryService
 import org.springframework.data.domain.Page
@@ -74,6 +76,7 @@ class ProductStatisticsController(
         @RequestParam(defaultValue = "7") days: Int,
         @RequestParam(defaultValue = "10") limit: Int
     ): ApiResponse<List<TopProductResponse>> {
+        requireStatisticsRange(days, limit)
         return ApiResponse.success(productStatisticsQueryService.getTopSellingProducts(days, limit))
     }
 
@@ -82,6 +85,7 @@ class ProductStatisticsController(
         @RequestParam(defaultValue = "7") days: Int,
         @RequestParam(defaultValue = "10") limit: Int
     ): ApiResponse<List<TopProductResponse>> {
+        requireStatisticsRange(days, limit)
         return ApiResponse.success(productStatisticsQueryService.getTopRefundProducts(days, limit))
     }
 
@@ -97,6 +101,19 @@ class ProductStatisticsController(
     fun getPeakHours(
         @RequestParam(defaultValue = "7") days: Int
     ): ApiResponse<List<PeakHourResponse>> {
+        PageRequestLimits.requireInRange(RangeCheck(DAYS, days, 1, MAX_DAYS))
         return ApiResponse.success(productStatisticsQueryService.getPeakHours(days))
+    }
+
+    private fun requireStatisticsRange(days: Int, limit: Int) =
+        PageRequestLimits.requireInRange(
+            RangeCheck(DAYS, days, 1, MAX_DAYS),
+            RangeCheck(LIMIT, limit, 1, PageRequestLimits.MAX_PAGE_SIZE)
+        )
+
+    private companion object {
+        const val DAYS = "days"
+        const val LIMIT = "limit"
+        const val MAX_DAYS = 365
     }
 }

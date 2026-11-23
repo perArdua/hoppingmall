@@ -32,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
@@ -106,7 +107,8 @@ class PaymentCancelRequestRepeatAndPendingTest {
             paymentMetrics,
             pointEarnRateStrategy,
             FakeOrderSummaryQueryPort(),
-            transactionManager
+            transactionManager,
+            mock()
         )
         handler = PaymentCancellationRequestedHandler(
             CompensationEventLogService(compensationEventLogRepository),
@@ -216,7 +218,7 @@ class PaymentCancelRequestRepeatAndPendingTest {
 
     private fun stored(payment: Payment): Payment {
         Mockito.lenient().`when`(paymentRepository.findByIdForUpdate(payment.id!!)).thenReturn(payment)
-        Mockito.lenient().`when`(paymentRepository.findByOrderId(payment.orderId)).thenReturn(payment)
+        Mockito.lenient().`when`(paymentRepository.findByActiveOrderId(payment.orderId)).thenReturn(payment)
         return payment
     }
 

@@ -1,7 +1,10 @@
 package com.hoppingmall.notification.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.hoppingmall.notification.dto.response.NotificationResponse
+import com.hoppingmall.notification.enums.NotificationType
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -12,6 +15,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.stereotype.Service
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.io.IOException
+import java.time.LocalDateTime
 
 @Service
 class NotificationSseService(
@@ -68,7 +72,7 @@ class NotificationSseService(
 
     override fun onMessage(message: Message, pattern: ByteArray?) {
         try {
-            val sseMessage = objectMapper.readValue(message.body, SseNotificationMessage::class.java)
+            val sseMessage = objectMapper.readValue(message.body, RedisSseNotificationMessage::class.java).toMessage()
             sendToUser(sseMessage.userId, sseMessage.notification)
         } catch (e: Exception) {
             log.error("Redis SSE 메시지 처리 실패: {}", e.message)
@@ -79,4 +83,54 @@ class NotificationSseService(
 data class SseNotificationMessage(
     val userId: Long,
     val notification: NotificationResponse
-)
+) {
+    fun toRedisMessage(): RedisSseNotificationMessage =
+        RedisSseNotificationMessage(userId, RedisSseNotification.from(notification))
+}
+
+@JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy::class)
+data class RedisSseNotificationMessage(
+    val userId: Long,
+    val notification: RedisSseNotification
+) {
+    fun toMessage(): SseNotificationMessage = SseNotificationMessage(userId, notification.toResponse())
+}
+
+@JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy::class)
+data class RedisSseNotification(
+    val id: Long,
+    val type: NotificationType,
+    val title: String,
+    val content: String,
+    val metadata: String?,
+    val isRead: Boolean,
+    val createdAt: LocalDateTime,
+    val orderId: Long? = null,
+    val refundId: Long? = null
+) {
+    fun toResponse(): NotificationResponse = NotificationResponse(
+        id = id,
+        type = type,
+        title = title,
+        content = content,
+        metadata = metadata,
+        isRead = isRead,
+        createdAt = createdAt,
+        orderId = orderId,
+        refundId = refundId
+    )
+
+    companion object {
+        fun from(response: NotificationResponse): RedisSseNotification = RedisSseNotification(
+            id = response.id,
+            type = response.type,
+            title = response.title,
+            content = response.content,
+            metadata = response.metadata,
+            isRead = response.isRead,
+            createdAt = response.createdAt,
+            orderId = response.orderId,
+            refundId = response.refundId
+        )
+    }
+}

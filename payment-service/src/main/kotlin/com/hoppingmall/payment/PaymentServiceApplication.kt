@@ -4,7 +4,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableScheduling
 
-@SpringBootApplication(scanBasePackages = ["com.hoppingmall.payment", "com.hoppingmall.common", "com.hoppingmall.dlq", "com.hoppingmall.outbox"])
+@SpringBootApplication(scanBasePackages = ["com.hoppingmall.payment", "com.hoppingmall.common", "com.hoppingmall.idempotency", "com.hoppingmall.dlq", "com.hoppingmall.outbox"])
 @EnableScheduling
 class PaymentServiceApplication
 

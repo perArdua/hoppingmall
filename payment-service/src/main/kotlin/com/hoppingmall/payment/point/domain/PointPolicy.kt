@@ -5,29 +5,54 @@ import jakarta.persistence.*
 import java.math.BigDecimal
 
 @Entity
-@Table(name = "point_policies")
-data class PointPolicy(
+@Table(
+    name = "point_policies",
+    uniqueConstraints = [UniqueConstraint(name = PointPolicy.ACTIVE_KEY_CONSTRAINT, columnNames = ["active_key"])]
+)
+class PointPolicy private constructor(
+    policyName: String,
+    earnRate: BigDecimal,
+    maxEarnRate: BigDecimal,
+    minUseAmount: BigDecimal,
+    maxUseAmount: BigDecimal,
+    description: String?
+) : BaseEntity() {
+
     @Column(nullable = false, unique = true)
-    val policyName: String,
+    var policyName: String = policyName
+        private set
 
     @Column(nullable = false, precision = 5, scale = 4)
-    val earnRate: BigDecimal,
+    var earnRate: BigDecimal = earnRate
+        private set
 
     @Column(nullable = false, precision = 5, scale = 4)
-    val maxEarnRate: BigDecimal,
+    var maxEarnRate: BigDecimal = maxEarnRate
+        private set
 
     @Column(nullable = false, precision = 10, scale = 2)
-    val minUseAmount: BigDecimal,
+    var minUseAmount: BigDecimal = minUseAmount
+        private set
 
     @Column(nullable = false, precision = 10, scale = 2)
-    val maxUseAmount: BigDecimal,
+    var maxUseAmount: BigDecimal = maxUseAmount
+        private set
 
     @Column(nullable = false)
-    val isActive: Boolean = false,
+    var isActive: Boolean = false
+        private set
 
     @Column
-    val description: String? = null
-) : BaseEntity() {
+    var description: String? = description
+        private set
+
+    @Column(
+        name = "active_key",
+        insertable = false,
+        updatable = false,
+        columnDefinition = "TINYINT GENERATED ALWAYS AS (CASE WHEN is_active THEN 1 END)"
+    )
+    private val activeKey: Byte? = null
 
     init {
         validatePolicy()
@@ -42,9 +67,13 @@ data class PointPolicy(
         require(minUseAmount <= maxUseAmount) { "최소 사용 금액은 최대 사용 금액을 초과할 수 없습니다" }
     }
 
-    fun activate(): PointPolicy = copy(isActive = true)
+    fun activate() {
+        isActive = true
+    }
 
-    fun deactivate(): PointPolicy = copy(isActive = false)
+    fun deactivate() {
+        isActive = false
+    }
 
     fun update(
         policyName: String,
@@ -53,25 +82,24 @@ data class PointPolicy(
         minUseAmount: BigDecimal,
         maxUseAmount: BigDecimal,
         description: String?
-    ): PointPolicy =
-        copy(
-            policyName = policyName,
-            earnRate = earnRate,
-            maxEarnRate = maxEarnRate,
-            minUseAmount = minUseAmount,
-            maxUseAmount = maxUseAmount,
-            description = description
-        )
+    ) {
+        this.policyName = policyName
+        this.earnRate = earnRate
+        this.maxEarnRate = maxEarnRate
+        this.minUseAmount = minUseAmount
+        this.maxUseAmount = maxUseAmount
+        this.description = description
+        validatePolicy()
+    }
 
     fun calculateEarnPoints(purchaseAmount: BigDecimal): BigDecimal {
         require(purchaseAmount > BigDecimal.ZERO) { "구매 금액은 0보다 커야 합니다" }
         return purchaseAmount * earnRate
     }
 
-    fun canUsePoints(useAmount: BigDecimal): Boolean =
-        useAmount >= minUseAmount && useAmount <= maxUseAmount
-
     companion object {
+        const val ACTIVE_KEY_CONSTRAINT = "uk_point_policies_active_key"
+
         fun create(
             policyName: String,
             earnRate: BigDecimal,
@@ -86,7 +114,6 @@ data class PointPolicy(
                 maxEarnRate = maxEarnRate,
                 minUseAmount = minUseAmount,
                 maxUseAmount = maxUseAmount,
-                isActive = false,
                 description = description
             )
     }

@@ -5,8 +5,12 @@ spring:
     username: root
     password: ${MYSQL_ROOT_PASSWORD}
 
+  flyway:
+    enabled: true
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: validate
 
   kafka:
     consumer:
@@ -50,6 +54,12 @@ services:
     url: http://order-service:8084
   product-service:
     url: http://product-service:8083
+
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
 
 internal:
   service:

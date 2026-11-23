@@ -8,6 +8,7 @@ import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.support.TestCacheConfig
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -68,7 +69,7 @@ class WishlistCheckDeletedProductTest {
             header("x-user-role", "BUYER")
         }.andExpect {
             status { isOk() }
-            jsonPath("$.data") { value(false) }
+            jsonPath("$.data.wishlisted") { value(false) }
         }
     }
 
@@ -90,7 +91,7 @@ class WishlistCheckDeletedProductTest {
             header("x-user-role", "BUYER")
         }.andExpect {
             status { isOk() }
-            jsonPath("$.data") { value(false) }
+            jsonPath("$.data.wishlisted") { value(false) }
         }
     }
 
@@ -104,7 +105,7 @@ class WishlistCheckDeletedProductTest {
             header("x-user-role", "BUYER")
         }.andExpect {
             status { isOk() }
-            jsonPath("$.data") { value(true) }
+            jsonPath("$.data.wishlisted") { value(true) }
         }
     }
 
@@ -117,7 +118,7 @@ class WishlistCheckDeletedProductTest {
                 name = name,
                 description = "찜여부 설명",
                 price = BigDecimal("1000"),
-                imageUrls = listOf("a.jpg"),
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, listOf("a.jpg")),
                 status = ProductStatus.AVAILABLE
             )
         ).id

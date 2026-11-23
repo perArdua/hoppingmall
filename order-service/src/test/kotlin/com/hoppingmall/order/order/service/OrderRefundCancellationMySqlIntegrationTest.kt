@@ -2,23 +2,16 @@ package com.hoppingmall.order.order.service
 
 import com.hoppingmall.common.BusinessException
 import com.hoppingmall.common.GlobalExceptionHandler
-import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.order.internal.InternalOrderController
 import com.hoppingmall.order.order.domain.Order
 import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
-import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
-import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
-import com.hoppingmall.order.port.InventoryCommandPort
-import com.hoppingmall.order.port.PaymentCommandPort
-import com.hoppingmall.order.port.ProductQueryPort
 import com.hoppingmall.order.refund.domain.Refund
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundReason
-import com.hoppingmall.order.support.MySqlJpaTestSupport
-import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.order.support.OrderMySqlServiceTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -31,9 +24,7 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -41,8 +32,7 @@ import java.math.BigDecimal
 
 @DisplayName("환불된 주문의 취소와 끝 상태 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@Import(OrderCommandServiceImpl::class, InternalOrderController::class)
-class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
+class OrderRefundCancellationMySqlIntegrationTest : OrderMySqlServiceTestSupport() {
 
     @Autowired
     private lateinit var orderCommandService: OrderCommandServiceImpl
@@ -59,21 +49,6 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Autowired
     private lateinit var refundRepository: RefundRepository
 
-    @MockitoBean
-    private lateinit var inventoryCommandPort: InventoryCommandPort
-
-    @MockitoBean
-    private lateinit var paymentCommandPort: PaymentCommandPort
-
-    @MockitoBean
-    private lateinit var productQueryPort: ProductQueryPort
-
-    @MockitoBean
-    private lateinit var transactionalEventPublisher: TransactionalEventPublisher
-
-    @MockitoBean
-    private lateinit var orderMetrics: OrderMetrics
-
     private lateinit var mockMvc: MockMvc
 
     @BeforeEach
@@ -88,6 +63,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 전체_환불의_내부_취소_입구는_PAID_주문을_REFUNDED로_보낸다() {
         val orderId = saveOrder("PAID")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
 
@@ -97,6 +73,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 전체_환불의_내부_취소_입구는_SHIPPED_주문을_REFUNDED로_보낸다() {
         val orderId = saveOrder("SHIPPED")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
 
@@ -106,6 +83,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 전체_환불의_내부_취소_입구는_DELIVERED_주문을_REFUNDED로_보낸다() {
         val orderId = saveOrder("DELIVERED")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
 
@@ -115,6 +93,7 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     @Test
     fun 내부_취소_입구를_두_번_불러도_200이고_REFUNDED_그대로다() {
         val orderId = saveOrder("DELIVERED")
+        saveRefund(orderId, complete = true, full = true)
 
         internalCancel(orderId).andExpect { status { isOk() } }
         internalCancel(orderId).andExpect { status { isOk() } }
@@ -165,21 +144,9 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     }
 
     @Test
-    fun 관리자도_공개_상태_변경으로_PAID_주문을_REFUNDED로_보낼_수_없다() {
-        val orderId = saveOrder("PAID")
-
-        assertThatThrownBy {
-            orderCommandService.updateOrderStatus(
-                orderId, OrderStatusUpdateRequest(OrderStatus.valueOf("REFUNDED")), ADMIN_ID, true
-            )
-        }.isInstanceOf(OrderInvalidStatusException::class.java)
-
-        assertThat(orderStatus(orderId)).isEqualTo("PAID")
-    }
-
-    @Test
     fun REFUNDED_주문은_사용자가_취소할_수_없다() {
         val orderId = saveOrder("PAID")
+        saveRefund(orderId, complete = true, full = true)
         internalCancel(orderId).andExpect { status { isOk() } }
 
         assertThatThrownBy { orderCommandService.cancelOrder(BUYER_ID, orderId) }
@@ -188,6 +155,56 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
         assertThat(orderStatus(orderId)).isEqualTo("REFUNDED")
         verifyNoInteractions(inventoryCommandPort)
         verifyNoInteractions(paymentCommandPort)
+    }
+
+    @Test
+    fun 완료된_전체_환불이_없는_PAID_SHIPPED_DELIVERED_주문은_내부_취소_입구가_409_RFD014로_거절하고_상태를_그대로_둔다() {
+        listOf("PAID", "SHIPPED", "DELIVERED").forEach { before ->
+            val orderId = saveOrder(before)
+
+            internalCancel(orderId).andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("RFD014") }
+            }
+
+            assertThat(orderStatus(orderId)).isEqualTo(before)
+        }
+    }
+
+    @Test
+    fun 기한이_한참_지난_배송_완료_주문도_내부_취소_입구로는_REFUNDED가_되지_않는다() {
+        val orderId = saveOrder("DELIVERED")
+        jdbcTemplate.update(
+            "UPDATE orders SET delivered_at = ? WHERE id = ?", java.time.LocalDateTime.now().minusYears(1), orderId
+        )
+
+        internalCancel(orderId).andExpect { status { isConflict() } }
+
+        assertThat(orderStatus(orderId)).isEqualTo("DELIVERED")
+    }
+
+    @Test
+    fun 부분_환불만_완료됐거나_전체_환불이_판매자_확인을_기다리면_내부_취소_입구가_거절한다() {
+        val partial = saveOrder("DELIVERED")
+        saveRefund(partial, complete = true)
+        val pendingFull = saveOrder("DELIVERED")
+        saveRefund(pendingFull, complete = false, full = true)
+
+        internalCancel(partial).andExpect { status { isConflict() } }
+        internalCancel(pendingFull).andExpect { status { isConflict() } }
+
+        assertThat(orderStatus(partial)).isEqualTo("DELIVERED")
+        assertThat(orderStatus(pendingFull)).isEqualTo("DELIVERED")
+    }
+
+    @Test
+    fun 완료된_전체_환불이_있으면_내부_취소_입구가_REFUNDED로_보낸다() {
+        val orderId = saveOrder("DELIVERED")
+        saveRefund(orderId, complete = true, full = true)
+
+        internalCancel(orderId).andExpect { status { isOk() } }
+
+        assertThat(orderStatus(orderId)).isEqualTo("REFUNDED")
     }
 
     private fun internalCancel(orderId: Long) =
@@ -206,11 +223,11 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
         return orderId
     }
 
-    private fun saveRefund(orderId: Long, complete: Boolean, reject: Boolean = false) {
+    private fun saveRefund(orderId: Long, complete: Boolean, reject: Boolean = false, full: Boolean = false) {
         val refund = Refund.create(
             orderId = orderId, paymentId = 900L, buyerId = BUYER_ID, sellerId = SELLER_ID,
             reason = RefundReason.CHANGE_OF_MIND, reasonDetail = null,
-            refundAmount = BigDecimal("10000"), isFullRefund = false
+            refundAmount = BigDecimal(if (full) "30000" else "10000"), isFullRefund = full
         )
         if (complete) {
             refund.approve(BUYER_ID)
@@ -228,6 +245,5 @@ class OrderRefundCancellationMySqlIntegrationTest : MySqlJpaTestSupport() {
     companion object {
         private const val BUYER_ID = 10L
         private const val SELLER_ID = 5L
-        private const val ADMIN_ID = 99L
     }
 }

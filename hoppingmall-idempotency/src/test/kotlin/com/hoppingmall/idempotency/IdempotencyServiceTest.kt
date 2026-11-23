@@ -105,6 +105,7 @@ class IdempotencyServiceTest {
                 endpoint = "/api/v1/payments",
                 responseStatus = 201,
                 responseBody = """{"status":"ok"}""",
+                requestFingerprint = "fp",
                 ttlHours = 24
             )
 
@@ -132,6 +133,7 @@ class IdempotencyServiceTest {
                 endpoint = "/api/v1/items/1",
                 responseStatus = 200,
                 responseBody = """{}""",
+                requestFingerprint = "fp",
                 ttlHours = 12
             )
 
@@ -164,11 +166,47 @@ class IdempotencyServiceTest {
                 endpoint = "/api/test",
                 responseStatus = 200,
                 responseBody = """{}""",
+                requestFingerprint = "fp",
                 ttlHours = 0
             )
 
             val captured = captor.firstValue
             assertThat(captured.expiresAt).isBeforeOrEqualTo(LocalDateTime.now().plusSeconds(1))
+        }
+    }
+
+    @Nested
+    @DisplayName("saveInCurrentTransaction")
+    inner class SaveInCurrentTransaction {
+
+        @Test
+        fun 지문과_만료_시각을_채운_레코드를_저장한다() {
+            val captor = argumentCaptor<IdempotencyRecord>()
+            val saved = IdempotencyRecord(
+                id = 5L,
+                idempotencyKey = "tx-key",
+                httpMethod = "POST",
+                endpoint = "/api/v1/orders",
+                responseStatus = 201,
+                responseBody = """{"id":1}""",
+                expiresAt = LocalDateTime.now().plusHours(24)
+            )
+            whenever(idempotencyRecordRepository.save(captor.capture())).thenReturn(saved)
+
+            val result = idempotencyService.saveInCurrentTransaction(
+                key = "tx-key",
+                httpMethod = "POST",
+                endpoint = "/api/v1/orders",
+                responseStatus = 201,
+                responseBody = """{"id":1}""",
+                requestFingerprint = "fp-tx",
+                ttlHours = 24
+            )
+
+            assertThat(result).isEqualTo(saved)
+            assertThat(captor.firstValue.idempotencyKey).isEqualTo("tx-key")
+            assertThat(captor.firstValue.requestFingerprint).isEqualTo("fp-tx")
+            assertThat(captor.firstValue.expiresAt).isAfter(LocalDateTime.now().plusHours(23))
         }
     }
 

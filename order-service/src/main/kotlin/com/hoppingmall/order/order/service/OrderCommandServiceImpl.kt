@@ -8,19 +8,23 @@ import com.hoppingmall.order.order.domain.OrderItem
 import com.hoppingmall.order.order.domain.repository.OrderItemRepository
 import com.hoppingmall.order.order.domain.repository.OrderRepository
 import com.hoppingmall.order.order.dto.request.OrderCreateRequest
-import com.hoppingmall.order.order.dto.request.OrderStatusUpdateRequest
+import com.hoppingmall.order.order.dto.response.OrderPriceChange
 import com.hoppingmall.order.order.dto.response.OrderResponse
+import com.hoppingmall.order.order.dto.response.toCreatedResponse
 import com.hoppingmall.order.order.enum.OrderStatus
 import com.hoppingmall.order.order.exception.OrderAccessDeniedException
+import com.hoppingmall.order.order.exception.OrderCartChangedException
 import com.hoppingmall.order.order.exception.OrderEmptyItemsException
 import com.hoppingmall.order.order.exception.OrderInvalidStatusException
 import com.hoppingmall.order.order.exception.OrderNotFoundException
 import com.hoppingmall.order.order.exception.OrderBusyException
 import com.hoppingmall.order.order.exception.OrderOutOfStockException
 import com.hoppingmall.order.order.exception.OrderPartiallyRefundedException
+import com.hoppingmall.order.order.exception.OrderPriceChangedException
 import com.hoppingmall.order.order.exception.OrderProductNotFoundException
 import com.hoppingmall.order.order.exception.OrderProductUnavailableException
 import com.hoppingmall.order.order.exception.OrderReservationFencedException
+import com.hoppingmall.order.order.exception.OrderSelfPurchaseException
 import com.hoppingmall.order.order.exception.OrderTotalAmountExceededException
 import com.hoppingmall.order.config.OrderMetrics
 import com.hoppingmall.common.KafkaTopics
@@ -33,11 +37,14 @@ import com.hoppingmall.order.port.ProductQueryUnavailableException
 import com.hoppingmall.order.refund.domain.repository.RefundRepository
 import com.hoppingmall.order.refund.enum.RefundStatus
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import com.hoppingmall.idempotency.IdempotencyConflictException
+import com.hoppingmall.idempotency.IdempotencyRequestContext
+import com.hoppingmall.idempotency.IdempotencyTxRecorder
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.client.HttpClientErrorException
 import java.math.BigDecimal
@@ -63,6 +70,12 @@ class OrderCommandServiceImpl(
     @Autowired(required = false)
     var reservationFence: ReservationFence? = null
 
+    @Autowired(required = false)
+    var idempotencyTxRecorder: IdempotencyTxRecorder? = null
+
+    @Value("\${order.timeout.paying-minutes:15}")
+    private var payingTimeoutMinutes: Long = 15
+
     override fun createOrder(buyerId: Long, request: OrderCreateRequest): OrderResponse {
         val cartItems = cartItemRepository.findAllById(request.cartItemIds)
 
@@ -80,8 +93,16 @@ class OrderCommandServiceImpl(
         productIds.forEach { productId ->
             if (!productMap.containsKey(productId)) throw OrderProductNotFoundException()
         }
+        if (productMap.values.any { it.sellerId == buyerId }) {
+            throw OrderSelfPurchaseException()
+        }
 
-        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(it.productPrice.multiply(BigDecimal(it.quantity))) }
+        val priceChanges = priceChanges(cartItems, productMap, request)
+        if (priceChanges.isNotEmpty()) {
+            throw OrderPriceChangedException(priceChanges)
+        }
+
+        val totalAmount = cartItems.fold(BigDecimal.ZERO) { acc, it -> acc.add(productMap.getValue(it.productId).price.multiply(BigDecimal(it.quantity))) }
         if (totalAmount > Order.MAX_TOTAL_AMOUNT) {
             throw OrderTotalAmountExceededException()
         }
@@ -89,17 +110,31 @@ class OrderCommandServiceImpl(
         val items = cartItems.groupBy { it.productId }.map { (productId, rows) -> productId to rows.sumOf { it.quantity } }
         val reservationMap = reserveStock(items)
 
-        val fence = reservationFence?.takeIf { it.enabled }
+        val sharedReservationFence = reservationFence?.takeIf { IdempotencyRequestContext.claimKey() != null }
+        val fence = reservationFence?.takeIf { it.enabled } ?: sharedReservationFence
         val response = try {
             createOrderInTransaction(buyerId, request, cartItems, productMap, reservationMap, totalAmount, fence)
         } catch (e: Exception) {
-            runCatching { inventoryCommandPort.cancelReservations(reservationMap.values.distinct()) }
-                .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName, it) }
+            if (sharedReservationFence == null && idempotencyTxRecorder?.claimedByCommittedRequest() == true) {
+                log.info("같은 멱등 키 주문이 먼저 커밋되어 공유 예약을 취소하지 않음: rids={}, cause={}", reservationMap.values, e.javaClass.simpleName)
+                throw e
+            }
+            val reservationIds = reservationMap.values.distinct()
+            val cancellable = if (sharedReservationFence != null) abortedReservations(sharedReservationFence, reservationIds) else reservationIds
+            if (cancellable.isNotEmpty()) {
+                runCatching { inventoryCommandPort.cancelReservations(cancellable) }
+                    .onFailure { log.warn("주문 저장 실패 후 예약 취소 실패: rids={}, cause={}", cancellable, e.javaClass.simpleName, it) }
+            }
             throw e
         }
         orderMetrics.recordOrderCreated(totalAmount)
         return response
     }
+
+    private fun abortedReservations(fence: ReservationFence, reservationIds: List<String>): List<String> =
+        runCatching { fence.abortForCancel(reservationIds) }
+            .onFailure { log.warn("예약 취소 결정 기록 실패, 취소하지 않고 만료에 맡김: rids={}", reservationIds, it) }
+            .getOrDefault(emptyList())
 
     private fun createOrderInTransaction(
         buyerId: Long,
@@ -114,27 +149,64 @@ class OrderCommandServiceImpl(
             if (fence != null && fence.link(reservationMap.values).isNotEmpty()) {
                 throw OrderReservationFencedException()
             }
-            val order = orderRepository.save(Order.create(buyerId = buyerId, totalAmount = totalAmount))
+            val order = orderRepository.save(
+                Order.create(
+                    buyerId = buyerId,
+                    totalAmount = totalAmount,
+                    shippingAddress = request.shippingAddress?.toShippingAddress()
+                )
+            )
 
             val orderItems = cartItems.map { cartItem ->
+                val product = productMap.getValue(cartItem.productId)
                 OrderItem.create(
                     orderId = order.id!!,
-                    sellerId = productMap[cartItem.productId]!!.sellerId,
+                    sellerId = product.sellerId,
                     productId = cartItem.productId,
-                    productName = cartItem.productName,
-                    productPrice = cartItem.productPrice,
+                    productName = product.name,
+                    productPrice = product.price,
                     quantity = cartItem.quantity,
-                    reservationId = reservationMap[cartItem.productId]
+                    reservationId = reservationMap[cartItem.productId],
+                    withdrawalRestricted = product.withdrawalRestricted,
+                    withdrawalRestrictionReason = product.withdrawalRestrictionReason
                 )
             }
             val savedOrderItems = orderItemRepository.saveAll(orderItems)
             order.updateStatus(OrderStatus.PAYING)
 
-            cartItemRepository.deleteAllById(request.cartItemIds)
+            claimCartItems(buyerId, cartItems)
 
             log.info("주문 생성: orderId={}, buyerId={}, totalAmount={}, itemCount={}", order.id, buyerId, totalAmount, orderItems.size)
-            OrderResponse.from(order, savedOrderItems)
+            val response = OrderResponse.from(order, savedOrderItems, payingTimeoutMinutes)
+            idempotencyTxRecorder?.recordIfPending { response.toCreatedResponse() }
+            response
         }!!
+
+    private fun claimCartItems(buyerId: Long, cartItems: List<CartItem>) {
+        val claimed = cartItems.sortedBy { it.id }.all { cartItemRepository.deleteUnchanged(it.id!!, buyerId, it.quantity) == 1 }
+        if (!claimed) {
+            throw OrderCartChangedException()
+        }
+    }
+
+    private fun priceChanges(
+        cartItems: List<CartItem>,
+        productMap: Map<Long, ProductInfo>,
+        request: OrderCreateRequest
+    ): List<OrderPriceChange> {
+        val expectedPrices = request.expectedPrices.associate { it.cartItemId to it.productPrice }
+        return cartItems.mapNotNull { cartItem ->
+            val expectedPrice = expectedPrices[cartItem.id] ?: return@mapNotNull null
+            val currentPrice = productMap.getValue(cartItem.productId).price
+            if (expectedPrice.compareTo(currentPrice) == 0) return@mapNotNull null
+            OrderPriceChange(
+                cartItemId = cartItem.id!!,
+                productId = cartItem.productId,
+                expectedPrice = expectedPrice,
+                currentPrice = currentPrice
+            )
+        }
+    }
 
     private fun findProducts(productIds: List<Long>): List<ProductInfo> =
         try {
@@ -151,6 +223,9 @@ class OrderCommandServiceImpl(
             throw e
         } catch (e: HttpClientErrorException.TooManyRequests) {
             throw OrderBusyException()
+        } catch (e: HttpClientErrorException.Conflict) {
+            if (IdempotencyRequestContext.claimKey() != null) throw IdempotencyConflictException()
+            throw e
         }
 
     private fun productErrorCode(e: HttpClientErrorException): String? =
@@ -194,6 +269,7 @@ class OrderCommandServiceImpl(
                         throw OrderPartiallyRefundedException()
                     }
                     target.requestCancellation()
+                    orderRepository.cancelPreparingShipping(orderId)
                     transactionalEventPublisher.publishEvent(
                         aggregateType = "Order",
                         aggregateId = orderId.toString(),
@@ -254,26 +330,6 @@ class OrderCommandServiceImpl(
                 inventoryCommandPort.increaseStock(orderItem.productId, orderItem.quantity)
             }
         }
-    }
-
-    @Transactional
-    override fun updateOrderStatus(orderId: Long, request: OrderStatusUpdateRequest, userId: Long, isAdmin: Boolean): OrderResponse {
-        orderRepository.lockById(orderId)
-        val order = orderRepository.findByIdOrNull(orderId) ?: throw OrderNotFoundException() 
-
-        if (!isAdmin) {
-            throw OrderAccessDeniedException()
-        }
-
-        if (request.status == OrderStatus.SHIPPED && orderRepository.isHeldBySagaTimeout(orderId)) {
-            throw OrderInvalidStatusException()
-        }
-
-        order.updateStatus(request.status)
-        log.info("주문 상태 변경: orderId={}, userId={}, status={}", orderId, userId, request.status)
-
-        val orderItems = orderItemRepository.findByOrderId(orderId)
-        return OrderResponse.from(order, orderItems)
     }
 
     companion object {

@@ -15,7 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicLong
 
-@DataJpaTest(properties = ["spring.jpa.hibernate.ddl-auto=create-drop"])
+@DataJpaTest(properties = ["spring.jpa.hibernate.ddl-auto=create"])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class MySqlJpaTestSupport {

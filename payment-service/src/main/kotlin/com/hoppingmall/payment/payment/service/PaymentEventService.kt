@@ -5,7 +5,6 @@ import com.hoppingmall.payment.payment.dto.event.MembershipRevertRequestEvent
 import com.hoppingmall.payment.payment.dto.event.MembershipUpdateRequestEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCancelledEvent
 import com.hoppingmall.payment.payment.dto.event.PaymentCompletedEvent
-import com.hoppingmall.payment.payment.dto.event.PaymentFailedEvent
 import com.hoppingmall.payment.payment.dto.event.PointEarnRequestEvent
 import com.hoppingmall.payment.payment.enum.MembershipRevertReason
 import org.springframework.stereotype.Service
@@ -102,19 +101,6 @@ class PaymentEventService(
 
     private fun isMembershipUpdateRequested(payment: Payment): Boolean =
         payment.transactionId != null && payment.amount > BigDecimal.ZERO
-
-    fun publishPaymentFailedEvent(payment: Payment) {
-        val eventId = "payment-failed-${payment.id}"
-        val event = PaymentFailedEvent(
-            eventId = eventId,
-            paymentId = payment.id!!,
-            orderId = payment.orderId,
-            userId = payment.userId,
-            amount = payment.amount,
-            reason = payment.errorMessage ?: "결제 실패"
-        )
-        paymentEventPublisher.publishPaymentFailedEvent(event)
-    }
 
     fun publishPaymentCancelledEvent(payment: Payment) {
         val eventId = "payment-cancelled-${payment.id}"

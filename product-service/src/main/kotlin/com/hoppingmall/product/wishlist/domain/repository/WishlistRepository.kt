@@ -29,6 +29,15 @@ interface WishlistRepository : JpaRepository<Wishlist, Long> {
     """)
     fun existsByBuyerIdAndProductId(@Param("buyerId") buyerId: Long, @Param("productId") productId: Long): Boolean
 
+    @Query("""
+        SELECT w.id
+        FROM Wishlist w JOIN Product p ON w.productId = p.id
+        WHERE w.buyerId = :buyerId AND w.productId = :productId
+    """)
+    fun findIdByBuyerIdAndProductId(@Param("buyerId") buyerId: Long, @Param("productId") productId: Long): Long?
+
+    fun findByBuyerIdAndProductId(buyerId: Long, productId: Long): Wishlist?
+
     @Modifying
     @Query(
         value = "DELETE FROM wishlists WHERE buyer_id = :buyerId AND product_id = :productId AND deleted_at IS NOT NULL",

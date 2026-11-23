@@ -9,7 +9,8 @@ enum class AuthErrorCode(
     override val status: HttpStatus
 ) : ErrorCode {
 
-    REFRESH_TOKEN_NOT_FOUND("A001", "리프레시 토큰이 존재하지 않습니다.", HttpStatus.UNAUTHORIZED),
-    REFRESH_TOKEN_MISMATCH("A002", "리프레시 토큰이 일치하지 않습니다.", HttpStatus.UNAUTHORIZED),
-    INVALID_TOKEN("A003", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED)
+    REFRESH_TOKEN_NOT_FOUND("AUTH001", "리프레시 토큰이 존재하지 않습니다.", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_MISMATCH("AUTH002", "리프레시 토큰이 일치하지 않습니다.", HttpStatus.UNAUTHORIZED),
+    INVALID_TOKEN("AUTH003", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_REUSED("AUTH004", "이미 사용된 리프레시 토큰입니다. 다시 로그인해주세요.", HttpStatus.UNAUTHORIZED)
 }

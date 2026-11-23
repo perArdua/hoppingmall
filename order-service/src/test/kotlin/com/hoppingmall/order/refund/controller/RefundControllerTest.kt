@@ -4,6 +4,8 @@ import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
 import com.hoppingmall.order.refund.dto.request.RefundItemRequest
+import com.hoppingmall.order.refund.dto.response.OrderItemRefundResponse
+import com.hoppingmall.order.refund.dto.response.OrderRefundsResponse
 import com.hoppingmall.order.refund.dto.response.RefundResponse
 import com.hoppingmall.order.refund.enum.RefundReason
 import com.hoppingmall.order.refund.enum.RefundStatus
@@ -77,7 +79,7 @@ class RefundControllerTest {
 
         whenever(refundCommandService.requestRefund(1L, request)).thenReturn(response)
 
-        val result = controller.requestRefund(request, buyerPrincipal)
+        val result = controller.requestRefund(request, buyerPrincipal).body!!
 
         assertThat(result.data!!.id).isEqualTo(1L)
     }
@@ -125,7 +127,7 @@ class RefundControllerTest {
 
         whenever(refundCommandService.approveRefund(1L, 5L)).thenReturn(response)
 
-        val result = controller.approveRefund(1L, sellerPrincipal)
+        val result = controller.approveRefund(1L, sellerPrincipal).body!!
 
         assertThat(result.data!!.status).isEqualTo(RefundStatus.COMPLETED)
     }
@@ -137,8 +139,27 @@ class RefundControllerTest {
 
         whenever(refundCommandService.rejectRefund(1L, 5L, request)).thenReturn(response)
 
-        val result = controller.rejectRefund(1L, request, sellerPrincipal)
+        val result = controller.rejectRefund(1L, request, sellerPrincipal).body!!
 
         assertThat(result.data!!.status).isEqualTo(RefundStatus.REJECTED)
+    }
+
+    @Test
+    fun 주문_하나의_환불_현황을_로그인한_사용자_기준으로_조회한다() {
+        val response = OrderRefundsResponse(
+            orderId = 10L,
+            items = listOf(
+                OrderItemRefundResponse(
+                    orderItemId = 1L, productId = 100L, productName = "테스트 상품", quantity = 3,
+                    refundedQuantity = 1, inProgressQuantity = 1, refundableQuantity = 1
+                )
+            ),
+            refunds = listOf(createRefundResponse())
+        )
+        whenever(refundQueryService.getOrderRefunds(10L, 1L)).thenReturn(response)
+
+        val result = controller.getOrderRefunds(10L, buyerPrincipal)
+
+        assertThat(result.data).isEqualTo(response)
     }
 }

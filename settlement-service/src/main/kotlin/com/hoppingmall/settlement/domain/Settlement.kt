@@ -5,6 +5,7 @@ import com.hoppingmall.common.EnumNameConverter
 import com.hoppingmall.settlement.enums.SettlementStatus
 import com.hoppingmall.settlement.exception.SettlementInvalidStatusException
 import jakarta.persistence.*
+import org.hibernate.annotations.ColumnDefault
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -45,6 +46,14 @@ class Settlement private constructor(
     @Column(nullable = false, precision = 12, scale = 2)
     val settlementAmount: BigDecimal,
 
+    @ColumnDefault("0")
+    @Column(nullable = false, precision = 12, scale = 2)
+    val carriedInAmount: BigDecimal,
+
+    @ColumnDefault("0")
+    @Column(nullable = false, precision = 12, scale = 2)
+    val carryOverAmount: BigDecimal,
+
     @Convert(converter = SettlementStatusConverter::class)
     @Column(nullable = false, length = 32)
     var status: SettlementStatus = SettlementStatus.CALCULATED,
@@ -71,7 +80,9 @@ class Settlement private constructor(
             totalRefundAmount: BigDecimal,
             commissionRate: BigDecimal,
             commissionAmount: BigDecimal,
-            settlementAmount: BigDecimal
+            settlementAmount: BigDecimal,
+            carriedInAmount: BigDecimal = BigDecimal.ZERO,
+            carryOverAmount: BigDecimal = BigDecimal.ZERO
         ): Settlement {
             return Settlement(
                 sellerId = sellerId,
@@ -81,7 +92,9 @@ class Settlement private constructor(
                 totalRefundAmount = totalRefundAmount,
                 commissionRate = commissionRate,
                 commissionAmount = commissionAmount,
-                settlementAmount = settlementAmount
+                settlementAmount = settlementAmount,
+                carriedInAmount = carriedInAmount,
+                carryOverAmount = carryOverAmount
             )
         }
     }

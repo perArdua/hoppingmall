@@ -3,6 +3,7 @@ package com.hoppingmall.product.inventory.controller
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
 import com.hoppingmall.idempotency.Idempotent
+import com.hoppingmall.product.inventory.dto.request.InventoryAdjustRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.dto.response.InventoryResponse
@@ -27,6 +28,7 @@ class InventoryController(
 
     @Idempotent(ttlHours = 24)
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun initStock(
         @Valid @RequestBody request: InventoryInitRequest,
         @AuthenticationPrincipal userPrincipal: UserPrincipal
@@ -54,6 +56,18 @@ class InventoryController(
     ): ResponseEntity<ApiResponse<InventoryResponse>> {
         productOwnershipPolicy.checkOwner(productId, userPrincipal)
         val response = inventoryCommandService.updateStock(productId, request)
+        return ResponseEntity.ok(ApiResponse.success(response))
+    }
+
+    @Idempotent(ttlHours = 24)
+    @PostMapping("/{productId}/adjustments")
+    fun adjustStock(
+        @PathVariable productId: Long,
+        @Valid @RequestBody request: InventoryAdjustRequest,
+        @AuthenticationPrincipal userPrincipal: UserPrincipal
+    ): ResponseEntity<ApiResponse<InventoryResponse>> {
+        productOwnershipPolicy.checkOwner(productId, userPrincipal)
+        val response = inventoryCommandService.adjustStock(productId, request)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 }

@@ -5,6 +5,7 @@ import com.hoppingmall.order.order.enum.OrderStatus
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -13,6 +14,28 @@ import java.time.LocalDateTime
 @Repository
 interface OrderRepository : JpaRepository<Order, Long> {
     fun findByBuyerId(buyerId: Long, pageable: Pageable): Slice<Order>
+
+    @Query(
+        "SELECT o FROM Order o WHERE o.status NOT IN :hiddenStatuses " +
+            "AND EXISTS (SELECT 1 FROM OrderItem i WHERE i.orderId = o.id AND i.sellerId = :sellerId) " +
+            "ORDER BY o.id DESC"
+    )
+    fun findSellerOrders(
+        @Param("sellerId") sellerId: Long,
+        @Param("hiddenStatuses") hiddenStatuses: Collection<OrderStatus>,
+        pageable: Pageable
+    ): Slice<Order>
+
+    @Query(
+        "SELECT o FROM Order o WHERE o.status = :status " +
+            "AND EXISTS (SELECT 1 FROM OrderItem i WHERE i.orderId = o.id AND i.sellerId = :sellerId) " +
+            "ORDER BY o.id DESC"
+    )
+    fun findSellerOrdersByStatus(
+        @Param("sellerId") sellerId: Long,
+        @Param("status") status: OrderStatus,
+        pageable: Pageable
+    ): Slice<Order>
 
     @Query(value = "SELECT id FROM orders WHERE id = :id FOR UPDATE", nativeQuery = true)
     fun lockById(@Param("id") id: Long): Long?
@@ -27,6 +50,13 @@ interface OrderRepository : JpaRepository<Order, Long> {
     """
     )
     fun isHeldBySagaTimeout(@Param("orderId") orderId: Long): Boolean
+
+    @Modifying(flushAutomatically = true)
+    @Query(
+        value = "UPDATE shippings SET status = 'CANCELLED', updated_at = NOW(6) WHERE order_id = :orderId AND status = 'PREPARING'",
+        nativeQuery = true
+    )
+    fun cancelPreparingShipping(@Param("orderId") orderId: Long): Int
 
     fun findByStatusAndUpdatedAtBefore(status: OrderStatus, updatedBefore: LocalDateTime, pageable: Pageable): List<Order>
 }

@@ -30,7 +30,7 @@ class SettlementController(
     private val sellerQueryPort: SellerQueryPort
 ) {
 
-    @Operation(description = "정산을 만든다. 요청의 seller_id는 승인된 판매자의 사용자 id(users.id)다. 판매자 행 id(sellers.id)가 아니다. 승인된 판매자의 사용자 id가 아니면 400(STL010).")
+    @Operation(description = "정산을 만든다. 요청의 seller_id는 승인된 판매자의 사용자 id(users.id)다. 판매자 행 id(sellers.id)가 아니다. 승인된 판매자의 사용자 id가 아니면 400(STL010). 매출이 없어도 아직 차감하지 않은 완료 환불이 있으면 만든다(둘 다 없으면 400 STL006). 한 환불은 한 정산에서만 차감한다. 수수료 = (매출 - 환불) × 비율. 지급액 = 매출 - 환불 - 수수료 - 이월받은 금액이고 0 아래로 내려가지 않으며, 모자란 금액은 carry_over_amount로 다음 정산에 넘긴다.")
     @PostMapping("/api/v1/admin/settlements")
     fun createSettlement(
         @Valid @RequestBody request: CreateSettlementRequest

@@ -19,8 +19,8 @@ class GrpcCartItemQueryAdapter(
 
     private val log = LoggerFactory.getLogger(GrpcCartItemQueryAdapter::class.java)
 
-    @CircuitBreaker(name = "cart-query", fallbackMethod = "aggregateCartByProductFallback")
-    @Retry(name = "grpc")
+    @CircuitBreaker(name = "cart-query")
+    @Retry(name = "grpc", fallbackMethod = "aggregateCartByProductFallback")
     override fun aggregateCartByProduct(): List<CartAggregation> {
         val response = stub.aggregateCartByProduct(Empty.getDefaultInstance())
         return response.aggregationsList.map {
@@ -32,7 +32,7 @@ class GrpcCartItemQueryAdapter(
     }
 
     private fun aggregateCartByProductFallback(e: Exception): List<CartAggregation> {
-        log.warn("CB fallback: 장바구니 통계 조회 실패", e)
+        log.warn("장바구니 통계 조회 실패(재시도 뒤)", e)
         return emptyList()
     }
 }

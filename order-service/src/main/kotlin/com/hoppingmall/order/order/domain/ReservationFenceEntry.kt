@@ -3,11 +3,15 @@ package com.hoppingmall.order.order.domain
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "reservation_fence")
+@Table(
+    name = "reservation_fence",
+    indexes = [Index(name = "idx_reservation_fence_created_at", columnList = "created_at")]
+)
 class ReservationFenceEntry(
     @Id
     @Column(name = "reservation_id", length = 36, nullable = false)

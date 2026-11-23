@@ -17,6 +17,7 @@ class InventoryQueryServiceImpl(
     @Cacheable(cacheNames = ["inventory"], key = "#productId", sync = true)
     override fun getStock(productId: Long): InventoryResponse {
         val inventory = inventoryRepository.findByProductId(productId)
+            ?.takeIf { it.deletedAt == null }
             ?: throw InventoryNotFoundException()
 
         val response = InventoryResponse.from(inventory)

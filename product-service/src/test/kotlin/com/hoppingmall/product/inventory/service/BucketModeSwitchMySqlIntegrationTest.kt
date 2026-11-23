@@ -74,7 +74,7 @@ class BucketModeSwitchMySqlIntegrationTest : MySqlIntegrationTestSupport() {
     fun 버킷이_없는_상품의_재고_수정은_버킷을_만들고_새_재고를_나눈다() {
         singleModeInventory(PRODUCT_ID, 10)
 
-        commandService.updateStock(PRODUCT_ID, InventoryUpdateRequest(20))
+        commandService.updateStock(PRODUCT_ID, InventoryUpdateRequest(20, expectedStockQuantity = 10))
 
         assertThat(bucketRows(PRODUCT_ID)).isEqualTo(8)
         assertThat(bucketTotal(PRODUCT_ID)).isEqualTo(20)

@@ -12,7 +12,8 @@ class GrpcPaymentQueryService(
 ) : PaymentQueryServiceGrpcKt.PaymentQueryServiceCoroutineImplBase() {
 
     override suspend fun findPaymentByOrderId(request: PaymentOrderIdRequest): PaymentResponse {
-        val payment = paymentRepository.findByOrderId(request.orderId)
+        val payment = paymentRepository.findByActiveOrderId(request.orderId)
+            ?: paymentRepository.findFirstByOrderIdOrderByIdDesc(request.orderId)
             ?: throw StatusException(Status.NOT_FOUND.withDescription("Payment not found for orderId=${request.orderId}"))
         return paymentResponse {
             id = payment.id!!

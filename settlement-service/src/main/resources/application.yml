@@ -28,6 +28,11 @@ spring:
         use_sql_comments: true
         default_batch_fetch_size: 100
 
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+    baseline-version: 1
+
 server:
   port: 8086
   compression:

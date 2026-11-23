@@ -116,7 +116,7 @@ class ProductSellerOwnershipTest {
 
         mockMvc.patch("/api/v1/inventories/$productId") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"stock_quantity":0}"""
+            content = """{"stock_quantity":0,"expected_stock_quantity":10}"""
             header("X-User-Id", SELLER_A.toString())
             header("x-user-role", "SELLER")
         }.andExpect { status { isForbidden() } }
@@ -181,7 +181,7 @@ class ProductSellerOwnershipTest {
         }.andExpect { status { isCreated() } }
         mockMvc.patch("/api/v1/inventories/$productId") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"stock_quantity":3}"""
+            content = """{"stock_quantity":3,"expected_stock_quantity":10}"""
             header("X-User-Id", SELLER_A.toString())
             header("x-user-role", "SELLER")
         }.andExpect { status { isOk() } }
@@ -207,7 +207,7 @@ class ProductSellerOwnershipTest {
         }.andExpect { status { isOk() } }
         mockMvc.patch("/api/v1/inventories/$productId") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"stock_quantity":4}"""
+            content = """{"stock_quantity":4,"expected_stock_quantity":10}"""
             header("X-User-Id", ADMIN.toString())
             header("x-user-role", "ADMIN")
         }.andExpect { status { isOk() } }

@@ -26,6 +26,7 @@ class InvariantMetrics(
     private val timers = ConcurrentHashMap<String, Timer>()
     private val errors = ConcurrentHashMap<String, Counter>()
     private val cycleTimer: Timer = Timer.builder("invariant.check.cycle.duration").register(meterRegistry)
+    private val sweepTimer: Timer = Timer.builder("invariant.check.sweep.duration").register(meterRegistry)
     @Volatile private var lastCycleSeconds: Double = 0.0
 
     init {
@@ -64,5 +65,9 @@ class InvariantMetrics(
     fun recordCycle(duration: Duration) {
         cycleTimer.record(duration)
         lastCycleSeconds = duration.toNanos() / 1_000_000_000.0
+    }
+
+    fun recordSweep(duration: Duration) {
+        sweepTimer.record(duration)
     }
 }

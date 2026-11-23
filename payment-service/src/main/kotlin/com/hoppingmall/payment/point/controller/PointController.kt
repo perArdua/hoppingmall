@@ -1,13 +1,11 @@
 package com.hoppingmall.payment.point.controller
 
 import com.hoppingmall.common.ApiResponse
-import com.hoppingmall.payment.point.dto.request.PointUseRequest
 import com.hoppingmall.payment.point.dto.response.PointBalanceResponse
 import com.hoppingmall.payment.point.dto.response.PointHistoryResponse
-import com.hoppingmall.payment.point.dto.response.PointUseResponse
-import com.hoppingmall.payment.point.service.PointCommandService
 import com.hoppingmall.payment.point.service.PointQueryService
-import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Slice
 import com.hoppingmall.common.UserPrincipal
@@ -19,8 +17,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/v1/points")
 @Tag(name = "포인트")
 class PointController(
-    private val pointQueryService: PointQueryService,
-    private val pointCommandService: PointCommandService
+    private val pointQueryService: PointQueryService
 ) {
 
     @GetMapping("/my-balance")
@@ -35,8 +32,8 @@ class PointController(
     @GetMapping("/my-history")
     fun getMyPointHistory(
         @AuthenticationPrincipal principal: UserPrincipal,
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "10") size: Int
+        @RequestParam(defaultValue = "0") @Min(0) page: Int,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_PAGE_SIZE) size: Int
     ): ApiResponse<Slice<PointHistoryResponse>> {
         val userId = principal.getUserId()
         val pageable = PageRequest.of(page, size)
@@ -44,13 +41,7 @@ class PointController(
         return ApiResponse.success(history)
     }
 
-    @PostMapping("/use")
-    fun usePoint(
-        @Valid @RequestBody request: PointUseRequest,
-        @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<PointUseResponse> {
-        val userId = principal.getUserId()
-        val result = pointCommandService.usePoint(userId, request)
-        return ApiResponse.success(result)
+    companion object {
+        const val MAX_PAGE_SIZE = 100L
     }
 }

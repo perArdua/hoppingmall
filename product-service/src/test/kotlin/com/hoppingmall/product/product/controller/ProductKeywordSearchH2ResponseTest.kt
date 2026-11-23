@@ -6,6 +6,7 @@ import com.hoppingmall.product.common.enums.ProductStatus
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.service.ProductCommandService
 import com.hoppingmall.product.support.TestCacheConfig
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.hamcrest.Matchers.containsInAnyOrder
 import org.hamcrest.Matchers.hasSize
 import org.junit.jupiter.api.AfterEach
@@ -80,7 +81,7 @@ class ProductKeywordSearchH2ResponseTest {
                 name = name,
                 description = description,
                 price = BigDecimal("1000"),
-                imageUrls = listOf("a.jpg"),
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, listOf("a.jpg")),
                 status = ProductStatus.AVAILABLE
             )
         ).id

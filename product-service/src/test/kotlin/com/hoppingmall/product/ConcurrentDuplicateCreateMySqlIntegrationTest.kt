@@ -4,6 +4,7 @@ import com.hoppingmall.common.BusinessException
 import com.hoppingmall.product.category.dto.request.CategoryCreateRequest
 import com.hoppingmall.product.category.service.CategoryCommandService
 import com.hoppingmall.product.common.enums.ProductStatus
+import com.hoppingmall.product.common.file.UploadedImageLinker
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.product.product.dto.request.ProductCreateRequest
 import com.hoppingmall.product.product.service.ProductCommandService
@@ -11,10 +12,12 @@ import com.hoppingmall.product.review.domain.repository.ReviewRepository
 import com.hoppingmall.product.review.dto.request.ReviewCreateRequest
 import com.hoppingmall.product.review.port.OrderItemInfo
 import com.hoppingmall.product.review.port.OrderQueryPort
+import com.hoppingmall.product.review.service.ProductReviewSummaryService
 import com.hoppingmall.product.review.service.ReviewCommandServiceImpl
 import com.hoppingmall.product.support.MySqlIntegrationTestSupport
 import com.hoppingmall.product.wishlist.dto.request.WishlistCreateRequest
 import com.hoppingmall.product.wishlist.service.WishlistCommandService
+import com.hoppingmall.product.support.UploadedImageSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -49,6 +52,12 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
 
     @Autowired
     private lateinit var productStatisticsRepository: ProductStatisticsRepository
+
+    @Autowired
+    private lateinit var productReviewSummaryService: ProductReviewSummaryService
+
+    @Autowired
+    private lateinit var uploadedImageLinker: UploadedImageLinker
 
     @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
@@ -91,7 +100,7 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
             OrderItemInfo(ORDER_ITEM_ID, ORDER_ID, SELLER_ID, PRODUCT_ID, "동시 리뷰 상품", BigDecimal("10000"), 1, BigDecimal("10000"))
         )
         whenever(orderQueryPort.isDelivered(any(), any())).thenReturn(true)
-        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository)
+        val service = ReviewCommandServiceImpl(reviewRepository, orderQueryPort, productStatisticsRepository, productReviewSummaryService, uploadedImageLinker)
         val tx = TransactionTemplate(transactionManager)
 
         val result = runWhileHolding(
@@ -128,7 +137,7 @@ class ConcurrentDuplicateCreateMySqlIntegrationTest : MySqlIntegrationTestSuppor
                 name = "동시찜 상품",
                 description = "동시찜 설명",
                 price = BigDecimal("10000"),
-                imageUrls = listOf("a.jpg"),
+                imageUrls = UploadedImageSupport.register(jdbcTemplate, listOf("a.jpg")),
                 status = ProductStatus.AVAILABLE
             )
         ).id

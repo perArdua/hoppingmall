@@ -2,15 +2,18 @@ package com.hoppingmall.order.refund.controller
 
 import com.hoppingmall.common.ApiResponse
 import com.hoppingmall.common.UserPrincipal
+import com.hoppingmall.common.page.PageRequestLimits
 import com.hoppingmall.idempotency.Idempotent
 import com.hoppingmall.order.refund.dto.request.RefundApprovalRequest
 import com.hoppingmall.order.refund.dto.request.RefundCreateRequest
+import com.hoppingmall.order.refund.dto.response.OrderRefundsResponse
 import com.hoppingmall.order.refund.dto.response.RefundResponse
 import com.hoppingmall.order.refund.service.RefundCommandService
 import com.hoppingmall.order.refund.service.RefundQueryService
 import jakarta.validation.Valid
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Slice
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
@@ -28,9 +31,9 @@ class RefundController(
     fun requestRefund(
         @Valid @RequestBody request: RefundCreateRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<RefundResponse> {
+    ): ResponseEntity<ApiResponse<RefundResponse>> {
         val buyerId = principal.getUserId()
-        return ApiResponse.success(refundCommandService.requestRefund(buyerId, request))
+        return ResponseEntity.ok(ApiResponse.success(refundCommandService.requestRefund(buyerId, request)))
     }
 
     @GetMapping("/{refundId}")
@@ -49,8 +52,17 @@ class RefundController(
         @RequestParam(defaultValue = "10") size: Int
     ): ApiResponse<Slice<RefundResponse>> {
         val buyerId = principal.getUserId()
+        PageRequestLimits.requireValid(page, size)
         val pageable = PageRequest.of(page, size)
         return ApiResponse.success(refundQueryService.getMyRefunds(buyerId, pageable))
+    }
+
+    @GetMapping("/orders/{orderId}")
+    fun getOrderRefunds(
+        @PathVariable orderId: Long,
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ApiResponse<OrderRefundsResponse> {
+        return ApiResponse.success(refundQueryService.getOrderRefunds(orderId, principal.getUserId()))
     }
 
     @GetMapping("/seller")
@@ -60,6 +72,7 @@ class RefundController(
         @RequestParam(defaultValue = "10") size: Int
     ): ApiResponse<Slice<RefundResponse>> {
         val sellerId = principal.getUserId()
+        PageRequestLimits.requireValid(page, size)
         val pageable = PageRequest.of(page, size)
         return ApiResponse.success(refundQueryService.getSellerRefunds(sellerId, pageable))
     }
@@ -69,9 +82,9 @@ class RefundController(
     fun approveRefund(
         @PathVariable refundId: Long,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<RefundResponse> {
+    ): ResponseEntity<ApiResponse<RefundResponse>> {
         val approverId = principal.getUserId()
-        return ApiResponse.success(refundCommandService.approveRefund(refundId, approverId))
+        return ResponseEntity.ok(ApiResponse.success(refundCommandService.approveRefund(refundId, approverId)))
     }
 
     @Idempotent(ttlHours = 24)
@@ -80,8 +93,8 @@ class RefundController(
         @PathVariable refundId: Long,
         @RequestBody request: RefundApprovalRequest,
         @AuthenticationPrincipal principal: UserPrincipal
-    ): ApiResponse<RefundResponse> {
+    ): ResponseEntity<ApiResponse<RefundResponse>> {
         val approverId = principal.getUserId()
-        return ApiResponse.success(refundCommandService.rejectRefund(refundId, approverId, request))
+        return ResponseEntity.ok(ApiResponse.success(refundCommandService.rejectRefund(refundId, approverId, request)))
     }
 }

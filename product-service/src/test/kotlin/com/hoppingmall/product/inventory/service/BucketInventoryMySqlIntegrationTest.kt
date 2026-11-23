@@ -33,7 +33,7 @@ import kotlin.random.Random
 
 @DisplayName("bucket 모드 재고 MySQL 통합 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
-@TestPropertySource(properties = ["inventory.mode=bucket", "inventory.bucket.count=8", "inventory.semaphore.permits=64"])
+@TestPropertySource(properties = ["inventory.mode=bucket", "inventory.bucket.count=8", "inventory.semaphore.permits=64", "inventory.cache.evict-async=false"])
 class BucketInventoryMySqlIntegrationTest : MySqlIntegrationTestSupport() {
 
     @Autowired
@@ -319,7 +319,7 @@ class BucketInventoryMySqlIntegrationTest : MySqlIntegrationTestSupport() {
         assertThat(bucketStocks(productId)).containsExactly(13, 10, 10, 10, 10, 10, 10, 10)
         assertThat(inventoryRowStock(productId)).isEqualTo(83)
 
-        commandService.updateStock(productId, InventoryUpdateRequest(stockQuantity = 40))
+        commandService.updateStock(productId, InventoryUpdateRequest(stockQuantity = 40, expectedStockQuantity = 83))
 
         assertThat(bucketStocks(productId)).containsOnly(5)
         assertThat(inventoryRowStock(productId)).isEqualTo(40)

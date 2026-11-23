@@ -14,6 +14,11 @@ spring:
       max-lifetime: 600000
       connection-timeout: 30000
 
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+    baseline-version: 1
+
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
@@ -82,7 +87,6 @@ services:
 
 file:
   upload:
-    base-upload-dir: ${FILE_UPLOAD_BASE_DIR:/tmp/hoppingmall}
     max-file-size: 5242880
     allowed-extensions:
       - jpg
@@ -92,7 +96,18 @@ file:
       - webp
     allowed-domains:
       - product
+      - review
     sub-directory: images
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    region: ${STORAGE_REGION:ap-northeast-2}
+    bucket: ${STORAGE_BUCKET:hoppingmall-product}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    path-style-access: ${STORAGE_PATH_STYLE_ACCESS:true}
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:9000/hoppingmall-product}
+    orphan-ttl-hours: 24
+    orphan-cron: "0 30 * * * *"
 
 internal:
   service:
@@ -163,6 +178,7 @@ resilience4j:
         baseConfig: default
 
 springdoc:
+  default-flat-param-object: true
   api-docs:
     path: /v3/api-docs
   swagger-ui:

@@ -5,8 +5,12 @@ spring:
     username: root
     password: ${MYSQL_ROOT_PASSWORD}
 
+  flyway:
+    enabled: true
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -48,6 +52,16 @@ management:
 services:
   order-service:
     url: http://order-service:8084
+
+file:
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://s3mock:9090}
+
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
 
 internal:
   service:

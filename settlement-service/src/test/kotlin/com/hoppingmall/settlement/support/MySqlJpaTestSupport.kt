@@ -15,7 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicLong
 
-@DataJpaTest(properties = ["spring.jpa.hibernate.ddl-auto=create-drop"])
+@DataJpaTest(properties = ["spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate"])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class MySqlJpaTestSupport {
@@ -83,7 +83,7 @@ abstract class MySqlJpaTestSupport {
     companion object {
         private const val LOCK_WAIT_LIMIT_MS = 15_000L
         private const val DATABASE = "settlement_mysql_test"
-        private val CLEANED_TABLES = listOf("settlement_items", "settlement_summaries", "settlements")
+        private val CLEANED_TABLES = listOf("settlement_carry_overs", "settlement_refunds", "settlement_items", "settlement_summaries", "settlements")
 
         @JvmStatic
         @DynamicPropertySource

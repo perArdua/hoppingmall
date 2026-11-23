@@ -45,6 +45,8 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+	implementation("org.flywaydb:flyway-core")
+	implementation("org.flywaydb:flyway-mysql")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("com.github.ben-manes.caffeine:caffeine")
@@ -92,6 +94,24 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+tasks.test {
+	inputs.files("../docker-compose.yml", "../k8s/services/user-service.yml", "../k8s-cd/base/user-service/rollout.yaml")
+		.withPropertyName("deploymentFiles")
+		.withPathSensitivity(PathSensitivity.RELATIVE)
+	useJUnitPlatform {
+		excludeTags("startup")
+	}
+}
+
+tasks.register<Test>("startupCheck") {
+	group = "verification"
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	useJUnitPlatform {
+		includeTags("startup")
+	}
 }
 
 val jacocoExcludedDirs = listOf(

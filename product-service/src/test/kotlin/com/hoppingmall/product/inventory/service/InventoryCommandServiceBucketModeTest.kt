@@ -4,6 +4,7 @@ import com.hoppingmall.product.inventory.domain.Inventory
 import com.hoppingmall.product.inventory.domain.InventoryReservation
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.inventory.domain.repository.InventoryReservationRepository
+import com.hoppingmall.product.inventory.domain.repository.KeyedReservationInserter
 import com.hoppingmall.product.inventory.dto.request.InventoryInitRequest
 import com.hoppingmall.product.inventory.dto.request.InventoryUpdateRequest
 import com.hoppingmall.product.inventory.enums.ReservationStatus
@@ -12,6 +13,8 @@ import com.hoppingmall.product.inventory.exception.InventoryInsufficientStockExc
 import com.hoppingmall.product.inventory.exception.ReservationConfirmFailedException
 import com.hoppingmall.product.product.domain.repository.ProductRepository
 import com.hoppingmall.product.support.withId
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -22,9 +25,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Spy
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.argThat
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
@@ -37,6 +43,7 @@ import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.SimpleTransactionStatus
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @DisplayName("InventoryCommandServiceImpl bucket 모드 테스트")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -60,6 +67,12 @@ class InventoryCommandServiceBucketModeTest {
 
     @Mock
     private lateinit var cacheManagerProvider: ObjectProvider<CacheManager>
+
+    @Mock
+    private lateinit var keyedReservationInserter: KeyedReservationInserter
+
+    @Spy
+    private val meterRegistry: MeterRegistry = SimpleMeterRegistry()
 
     @Mock
     private lateinit var transactionManager: PlatformTransactionManager
@@ -174,6 +187,60 @@ class InventoryCommandServiceBucketModeTest {
     }
 
     @Test
+    fun 비동기_삭제가_켜지면_커밋_뒤_삭제를_실행기에_넘기고_직접_지우지_않는다() {
+        val cacheManager = mock<CacheManager>()
+        val cache = mock<Cache>()
+        val asyncEvictor = mock<InventoryCacheAsyncEvictor>()
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(cacheManager)
+        whenever(cacheManager.getCache("inventory")).thenReturn(cache)
+        service.asyncCacheEvictor = asyncEvictor
+
+        runAfterCommit { service.batchReserveStock(listOf(1L to 1)) }
+
+        verify(asyncEvictor).submit(argThat { toList() == listOf(1L) })
+        verify(cache, never()).evict(any())
+    }
+
+    @Test
+    fun 비동기_삭제가_꺼져_있으면_커밋_뒤_직접_지운다() {
+        val cacheManager = mock<CacheManager>()
+        val cache = mock<Cache>()
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(cacheManager)
+        whenever(cacheManager.getCache("inventory")).thenReturn(cache)
+
+        runAfterCommit { service.batchReserveStock(listOf(1L to 1)) }
+
+        verify(cache).evict(1L)
+    }
+
+    @Test
+    fun 비동기_삭제가_켜져도_예약_취소의_캐시_삭제는_직접_한다() {
+        val cacheManager = mock<CacheManager>()
+        val cache = mock<Cache>()
+        val asyncEvictor = mock<InventoryCacheAsyncEvictor>()
+        whenever(cacheManagerProvider.getIfAvailable()).thenReturn(cacheManager)
+        whenever(cacheManager.getCache("inventory")).thenReturn(cache)
+        whenever(inventoryReservationRepository.findIdsByReservationIdIn(listOf("r1"))).thenReturn(listOf(11L))
+        whenever(inventoryReservationRepository.lockCancellable(listOf(11L))).thenReturn(listOf(arrayOf<Any>(11L, 1L, 2)))
+        service.asyncCacheEvictor = asyncEvictor
+
+        runAfterCommit { service.cancelReservation("r1") }
+
+        verify(cache).evict(1L)
+        verify(asyncEvictor, never()).submit(any())
+    }
+
+    private fun runAfterCommit(block: () -> Unit) {
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            block()
+            TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
+    }
+
+    @Test
     fun 재고_초기화는_버킷도_만든다() {
         whenever(productRepository.existsById(1L)).thenReturn(true)
         whenever(inventoryRepository.existsByProductId(1L)).thenReturn(false)
@@ -188,9 +255,11 @@ class InventoryCommandServiceBucketModeTest {
     fun 재고_변경은_버킷을_다시_나눈다() {
         whenever(inventoryRepository.findByProductIdForUpdate(1L)).thenReturn(Inventory.create(1L, 5).withId(1L))
 
-        service.updateStock(1L, InventoryUpdateRequest(stockQuantity = 9))
+        whenever(bucketStockService.replaceTotal(1L, 5, 9)).thenReturn(true)
 
-        verify(bucketStockService).redistribute(1L, 9)
+        service.updateStock(1L, InventoryUpdateRequest(stockQuantity = 9, expectedStockQuantity = 5))
+
+        verify(bucketStockService).replaceTotal(1L, 5, 9)
     }
 
     @Test
@@ -254,5 +323,70 @@ class InventoryCommandServiceBucketModeTest {
         assertThatThrownBy { service.confirmReservations(ids) }
             .isInstanceOf(ReservationConfirmFailedException::class.java)
         verify(bucketStockService, never()).restore(any(), any())
+    }
+
+    @Test
+    fun 요청_키가_있는_예약은_요청_키와_함께_허가를_얻는다() {
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            (it.arguments[2] as () -> Any).invoke()
+        }
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(emptyList())
+
+        val result = service.batchReserveStock(listOf(1L to 1), "key-1")
+
+        assertThat(result).containsOnlyKeys(1L)
+        verify(reservationGate).withPermits<Any>(eq(listOf(1L)), eq("key-1"), any())
+        verify(reservationGate, never()).awaitInFlight(any(), any())
+    }
+
+    @Test
+    fun 허가를_못_얻은_요청_키_예약은_같은_키가_끝나길_기다렸다가_진행_중_예약을_돌려주고_재생으로_센다() {
+        val inFlight = InventoryReservation.create(1L, 2, 600L, "key-1")
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(InventoryBusyException())
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(listOf(inFlight))
+
+        val result = service.batchReserveStock(listOf(1L to 2), "key-1")
+
+        assertThat(result).containsExactlyEntriesOf(mapOf(1L to inFlight.reservationId))
+        verify(reservationGate).awaitInFlight("key-1", 2_000L)
+        assertThat(meterRegistry.counter("inventory.reserve.replayed", "reason", "busy").count()).isEqualTo(1.0)
+    }
+
+    @Test
+    fun 허가를_못_얻었고_같은_키의_진행_중_예약이_없으면_429를_그대로_던진다() {
+        val busy = InventoryBusyException()
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(busy)
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(emptyList())
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 2), "key-1") }.isSameAs(busy)
+        assertThat(meterRegistry.counter("inventory.reserve.replayed", "reason", "busy").count()).isZero()
+    }
+
+    @Test
+    fun 허가를_못_얻었고_같은_키의_예약이_이미_확정됐으면_429를_그대로_던진다() {
+        val busy = InventoryBusyException()
+        val confirmed = InventoryReservation.create(1L, 2, 600L, "key-1").apply { status = ReservationStatus.CONFIRMED }
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(busy)
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(listOf(confirmed))
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 2), "key-1") }.isSameAs(busy)
+    }
+
+    @Test
+    fun 예약_기한이_있으면_같은_키를_기다리는_시간을_기한_안으로_줄인다() {
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(InventoryBusyException())
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(emptyList())
+        ReserveDeadline.set(System.currentTimeMillis() + 1_000)
+        try {
+            assertThatThrownBy { service.batchReserveStock(listOf(1L to 2), "key-1") }
+                .isInstanceOf(InventoryBusyException::class.java)
+        } finally {
+            ReserveDeadline.clear()
+        }
+
+        val waitMs = argumentCaptor<Long>()
+        verify(reservationGate).awaitInFlight(eq("key-1"), waitMs.capture())
+        assertThat(waitMs.firstValue).isBetween(1L, 1_000L - ReserveDeadline.MARGIN_MS)
     }
 }

@@ -15,7 +15,9 @@ import org.springframework.security.web.SecurityFilterChain
 @EnableWebSecurity
 class SecurityConfig(
     gatewayHeaderAuthenticationFilter: GatewayHeaderAuthenticationFilter,
-    internalTokenFilter: InternalTokenFilter
+    internalTokenFilter: InternalTokenFilter,
+    private val unauthorizedEntryPoint: UnauthorizedEntryPoint,
+    private val forbiddenAccessDeniedHandler: ForbiddenAccessDeniedHandler
 ) : BaseSecurityConfig(gatewayHeaderAuthenticationFilter, internalTokenFilter) {
 
     override fun configureServiceEndpoints(
@@ -23,7 +25,7 @@ class SecurityConfig(
     ) {
         auth
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-            .requestMatchers("/api/v1/files/upload").hasAnyRole("SELLER", "ADMIN")
+            .requestMatchers("/api/v1/files/upload").hasAnyRole("BUYER", "SELLER", "ADMIN")
             .requestMatchers("/api/v1/products/images/upload").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.POST, "/api/v1/products").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.PUT, "/api/v1/products/{productId}").hasAnyRole("SELLER", "ADMIN")
@@ -32,13 +34,41 @@ class SecurityConfig(
             .requestMatchers(HttpMethod.POST, "/api/v1/products/bulk/import").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.POST, "/api/v1/inventories").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/api/v1/inventories/{productId}").hasAnyRole("SELLER", "ADMIN")
+            .requestMatchers(HttpMethod.POST, "/api/v1/inventories/{productId}/adjustments").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers(HttpMethod.POST, "/api/v1/categories").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PUT, "/api/v1/categories/{categoryId}").hasRole("ADMIN")
             .requestMatchers(HttpMethod.DELETE, "/api/v1/categories/{categoryId}").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET, *IDENTITY_REQUIRED_READ_PATHS).authenticated()
+            .requestMatchers(HttpMethod.GET, *VISITOR_READ_PATHS).permitAll()
     }
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
-        return configureBase(http).build()
+        return configureBase(http)
+            .exceptionHandling {
+                it.authenticationEntryPoint(unauthorizedEntryPoint)
+                    .accessDeniedHandler(forbiddenAccessDeniedHandler)
+            }
+            .build()
+    }
+
+    companion object {
+        val IDENTITY_REQUIRED_READ_PATHS = arrayOf(
+            "/api/v1/reviews/my",
+            "/api/v1/products/bulk/**"
+        )
+
+        val VISITOR_READ_PATHS = arrayOf(
+            "/api/v1/products",
+            "/api/v1/products/search",
+            "/api/v1/products/{productId}",
+            "/api/v1/products/seller/{sellerId}",
+            "/api/v1/products/category/{categoryId}",
+            "/api/v1/products/{productId}/reviews",
+            "/api/v1/reviews/{reviewId}",
+            "/api/v1/categories/root",
+            "/api/v1/categories/{categoryId}",
+            "/api/v1/categories/{categoryId}/sub"
+        )
     }
 }

@@ -1,6 +1,8 @@
 package com.hoppingmall.user.auth.controller
 
 import com.hoppingmall.common.ApiResponse
+import com.hoppingmall.common.UserPrincipal
+import com.hoppingmall.user.auth.dto.LogoutRequest
 import com.hoppingmall.user.auth.dto.TokenRefreshRequest
 import com.hoppingmall.user.auth.dto.TokenRefreshResponse
 import com.hoppingmall.user.auth.service.AuthService
@@ -41,9 +43,30 @@ class AuthControllerTest {
 
     @Test
     fun 로그아웃_시_Bearer_접두사_제거_후_서비스에_위임() {
-        val response = authController.logout("Bearer access-token")
+        val response = authController.logout("Bearer access-token", null)
 
         assertThat(response).isEqualTo(ApiResponse.success(Unit))
-        verify(authService).logout("access-token")
+        verify(authService).logout("access-token", null)
+    }
+
+    @Test
+    fun 로그아웃_본문의_리프레시_토큰을_Authorization_없이도_서비스에_넘긴다() {
+        val response = authController.logout(null, LogoutRequest("refresh-token"))
+
+        assertThat(response).isEqualTo(ApiResponse.success(Unit))
+        verify(authService).logout(null, "refresh-token")
+    }
+
+    @Test
+    fun 로그아웃_요청을_문자열로_찍어도_리프레시_토큰은_가린다() {
+        assertThat(LogoutRequest("refresh-token").toString()).doesNotContain("refresh-token")
+    }
+
+    @Test
+    fun 전체_로그아웃은_인증된_사용자_id와_액세스_토큰을_서비스에_넘긴다() {
+        val response = authController.logoutAll(UserPrincipal.of(7L, "BUYER"), "Bearer access-token")
+
+        assertThat(response).isEqualTo(ApiResponse.success(Unit))
+        verify(authService).logoutAll(7L, "access-token")
     }
 }

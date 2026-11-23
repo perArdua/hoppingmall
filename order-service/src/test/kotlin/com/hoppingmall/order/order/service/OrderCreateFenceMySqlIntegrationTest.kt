@@ -13,6 +13,7 @@ import com.hoppingmall.order.support.MySqlJpaTestSupport
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
 import org.junit.jupiter.api.DisplayNameGenerator
@@ -62,6 +63,11 @@ abstract class OrderCreateFenceScenarios : MySqlJpaTestSupport() {
 
     @MockitoBean
     protected lateinit var transactionalEventPublisher: TransactionalEventPublisher
+
+    @BeforeEach
+    fun stubCartClaim() {
+        whenever(cartItemRepository.deleteUnchanged(any(), any(), any())).thenReturn(1)
+    }
 
     protected fun stubCartOfTwoProducts() {
         whenever(cartItemRepository.findAllById(listOf(1L, 2L))).thenReturn(

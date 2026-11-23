@@ -120,6 +120,7 @@ class PaymentNotificationService(
             mapOf(
                 "orderId" to orderId,
                 "paymentId" to paymentId,
+                "refundId" to refundId,
                 "amount" to amount,
                 "transactionId" to transactionId
             )

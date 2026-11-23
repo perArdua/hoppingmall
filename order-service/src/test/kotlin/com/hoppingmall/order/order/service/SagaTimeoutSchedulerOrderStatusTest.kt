@@ -121,6 +121,18 @@ class SagaTimeoutSchedulerOrderStatusTest {
     }
 
     @Test
+    fun 시간_초과_보상이_결제_완료_주문을_취소하면_준비_중인_배송도_함께_취소한다() {
+        val order = givenOrder(OrderStatus.PAYING, OrderStatus.PAID)
+        givenReservation()
+        saga.claimTimeout()
+
+        scheduler.checkTimedOutSagas()
+
+        assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
+        verify(orderRepository).cancelPreparingShipping(ORDER_ID)
+    }
+
+    @Test
     fun 선점한_사이에_사용자가_취소를_요청했으면_재고만_복원하고_역보상은_내지_않는다() {
         val order = givenOrder(OrderStatus.PAYING, OrderStatus.PAID, OrderStatus.CANCEL_REQUESTED)
         givenReservation()

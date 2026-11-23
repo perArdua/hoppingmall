@@ -163,7 +163,7 @@ class RateLimitGlobalFilterTest {
 
         buildFilter().filter(exchange, chainCapturing(mutableListOf())).block()
 
-        assertThat(exchange.response.headers.getFirst("Retry-After")).isEqualTo("60")
+        assertThat(exchange.response.headers.getFirst("Retry-After")!!.toLong()).isBetween(1L, 60L)
     }
 
     @Test

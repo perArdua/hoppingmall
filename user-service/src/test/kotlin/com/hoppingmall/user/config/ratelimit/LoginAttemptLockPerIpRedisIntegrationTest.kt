@@ -5,7 +5,7 @@ import com.hoppingmall.user.auth.JwtProperties
 import com.hoppingmall.user.auth.TokenProviderImpl
 import com.hoppingmall.user.auth.domain.repository.AccessTokenBlacklistRepository
 import com.hoppingmall.user.auth.service.AuthServiceImpl
-import com.hoppingmall.user.auth.service.RefreshTokenService
+import com.hoppingmall.user.auth.service.IssuedTokenInvalidator
 import com.hoppingmall.user.common.vo.Email
 import com.hoppingmall.user.common.vo.Password
 import com.hoppingmall.user.common.vo.PasswordVerifier
@@ -16,6 +16,7 @@ import com.hoppingmall.user.service.UserCommandService
 import com.hoppingmall.user.service.UserQueryServiceImpl
 import com.hoppingmall.user.support.RedisContainerSupport
 import com.hoppingmall.user.support.fixture.fixture
+import com.hoppingmall.user.support.issuingRefreshTokenService
 import com.hoppingmall.user.support.withId
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterAll
@@ -64,11 +65,11 @@ class LoginAttemptLockPerIpRedisIntegrationTest {
         val authService = AuthServiceImpl(
             userQueryService = UserQueryServiceImpl(userRepository, PasswordVerifier(passwordEncoder)),
             tokenProvider = TokenProviderImpl(jwtProperties),
-            refreshTokenService = mock<RefreshTokenService>(),
-            jwtProperties = jwtProperties,
+            refreshTokenService = issuingRefreshTokenService(),
             userRepository = userRepository,
             accessTokenBlacklistRepository = mock<AccessTokenBlacklistRepository>(),
-            loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, Clock.fixed(Instant.parse("2026-11-15T00:00:00Z"), ZoneOffset.UTC))
+            loginAttemptLimiter = RedisLoginAttemptLimiter(redissonClient, Clock.fixed(Instant.parse("2026-11-15T00:00:00Z"), ZoneOffset.UTC)),
+            issuedTokenInvalidator = mock<IssuedTokenInvalidator>()
         )
         mockMvc = MockMvcBuilders.standaloneSetup(UserController(mock<UserCommandService>(), mock(), authService, ClientIpResolver()))
             .setControllerAdvice(GlobalExceptionHandler())

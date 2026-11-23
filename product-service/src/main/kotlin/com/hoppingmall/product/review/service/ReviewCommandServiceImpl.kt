@@ -1,5 +1,6 @@
 package com.hoppingmall.product.review.service
 
+import com.hoppingmall.product.common.file.UploadedImageLinker
 import com.hoppingmall.product.review.port.OrderQueryPort
 import com.hoppingmall.product.product.domain.repository.ProductStatisticsRepository
 import com.hoppingmall.product.review.domain.Review
@@ -24,7 +25,9 @@ import java.math.RoundingMode
 class ReviewCommandServiceImpl(
     private val reviewRepository: ReviewRepository,
     private val orderQueryPort: OrderQueryPort,
-    private val productStatisticsRepository: ProductStatisticsRepository
+    private val productStatisticsRepository: ProductStatisticsRepository,
+    private val productReviewSummaryService: ProductReviewSummaryService,
+    private val uploadedImageLinker: UploadedImageLinker
 ) : ReviewCommandService {
 
     override fun createReview(buyerId: Long, request: ReviewCreateRequest): ReviewResponse {
@@ -38,6 +41,8 @@ class ReviewCommandServiceImpl(
         if (reviewRepository.existsByOrderItemId(request.orderItemId)) {
             throw ReviewAlreadyExistsException()
         }
+
+        linkImage(buyerId, request.imageUrl)
 
         val review = Review.create(
             buyerId = buyerId,
@@ -67,6 +72,8 @@ class ReviewCommandServiceImpl(
             throw ReviewAccessDeniedException()
         }
 
+        linkImage(buyerId, request.imageUrl, review.imageUrl)
+
         review.update(
             rating = request.rating,
             content = request.content,
@@ -91,7 +98,17 @@ class ReviewCommandServiceImpl(
         updateProductReviewStats(review.productId)
     }
 
+    private fun linkImage(buyerId: Long, imageUrl: String?, currentUrl: String? = null) {
+        if (imageUrl == null || imageUrl == currentUrl) return
+        uploadedImageLinker.attach(buyerId, listOf(imageUrl))
+    }
+
     private fun updateProductReviewStats(productId: Long) {
+        updateStatisticsReviewStats(productId)
+        productReviewSummaryService.refresh(productId)
+    }
+
+    private fun updateStatisticsReviewStats(productId: Long) {
         val stats = productStatisticsRepository.findByProductIdForUpdate(productId) ?: return
 
         val avgRating = reviewRepository.averageRatingByProductId(productId)

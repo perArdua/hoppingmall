@@ -28,6 +28,7 @@ class ReviewController(
 
     @Idempotent(ttlHours = 24)
     @PostMapping("/reviews")
+    @ResponseStatus(HttpStatus.CREATED)
     fun createReview(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @Valid @RequestBody request: ReviewCreateRequest
