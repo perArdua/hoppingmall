@@ -29,6 +29,7 @@ import org.mockito.Spy
 import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.argThat
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.inOrder
@@ -322,5 +323,70 @@ class InventoryCommandServiceBucketModeTest {
         assertThatThrownBy { service.confirmReservations(ids) }
             .isInstanceOf(ReservationConfirmFailedException::class.java)
         verify(bucketStockService, never()).restore(any(), any())
+    }
+
+    @Test
+    fun 요청_키가_있는_예약은_요청_키와_함께_허가를_얻는다() {
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            (it.arguments[2] as () -> Any).invoke()
+        }
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(emptyList())
+
+        val result = service.batchReserveStock(listOf(1L to 1), "key-1")
+
+        assertThat(result).containsOnlyKeys(1L)
+        verify(reservationGate).withPermits<Any>(eq(listOf(1L)), eq("key-1"), any())
+        verify(reservationGate, never()).awaitInFlight(any(), any())
+    }
+
+    @Test
+    fun 허가를_못_얻은_요청_키_예약은_같은_키가_끝나길_기다렸다가_진행_중_예약을_돌려주고_재생으로_센다() {
+        val inFlight = InventoryReservation.create(1L, 2, 600L, "key-1")
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(InventoryBusyException())
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(listOf(inFlight))
+
+        val result = service.batchReserveStock(listOf(1L to 2), "key-1")
+
+        assertThat(result).containsExactlyEntriesOf(mapOf(1L to inFlight.reservationId))
+        verify(reservationGate).awaitInFlight("key-1", 2_000L)
+        assertThat(meterRegistry.counter("inventory.reserve.replayed", "reason", "busy").count()).isEqualTo(1.0)
+    }
+
+    @Test
+    fun 허가를_못_얻었고_같은_키의_진행_중_예약이_없으면_429를_그대로_던진다() {
+        val busy = InventoryBusyException()
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(busy)
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(emptyList())
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 2), "key-1") }.isSameAs(busy)
+        assertThat(meterRegistry.counter("inventory.reserve.replayed", "reason", "busy").count()).isZero()
+    }
+
+    @Test
+    fun 허가를_못_얻었고_같은_키의_예약이_이미_확정됐으면_429를_그대로_던진다() {
+        val busy = InventoryBusyException()
+        val confirmed = InventoryReservation.create(1L, 2, 600L, "key-1").apply { status = ReservationStatus.CONFIRMED }
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(busy)
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(listOf(confirmed))
+
+        assertThatThrownBy { service.batchReserveStock(listOf(1L to 2), "key-1") }.isSameAs(busy)
+    }
+
+    @Test
+    fun 예약_기한이_있으면_같은_키를_기다리는_시간을_기한_안으로_줄인다() {
+        whenever(reservationGate.withPermits<Any>(any(), eq("key-1"), any())).thenThrow(InventoryBusyException())
+        whenever(inventoryReservationRepository.findByRequestKey("key-1")).thenReturn(emptyList())
+        ReserveDeadline.set(System.currentTimeMillis() + 1_000)
+        try {
+            assertThatThrownBy { service.batchReserveStock(listOf(1L to 2), "key-1") }
+                .isInstanceOf(InventoryBusyException::class.java)
+        } finally {
+            ReserveDeadline.clear()
+        }
+
+        val waitMs = argumentCaptor<Long>()
+        verify(reservationGate).awaitInFlight(eq("key-1"), waitMs.capture())
+        assertThat(waitMs.firstValue).isBetween(1L, 1_000L - ReserveDeadline.MARGIN_MS)
     }
 }
