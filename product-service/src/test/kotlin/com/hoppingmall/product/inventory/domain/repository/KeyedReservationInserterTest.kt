@@ -90,6 +90,20 @@ class KeyedReservationInserterTest {
     }
 
     @Test
+    fun MySQL_교착은_다시_할_수_있어_ERROR_없이_던진다() {
+        assertRethrown(CannotAcquireLockException("insert", SQLException("Deadlock found when trying to get lock", "40001", 1213)))
+
+        assertThat(errorMessages()).isEmpty()
+    }
+
+    @Test
+    fun 잠금_대기_시간_초과는_교착이_아니라_ERROR를_남긴다() {
+        assertRethrown(CannotAcquireLockException("insert", SQLException("Lock wait timeout exceeded", "40001", 1205)))
+
+        assertThat(errorMessages()).singleElement().asString().contains("Lock wait timeout")
+    }
+
+    @Test
     fun 다른_SQL처럼_추적_주석을_앞에_붙인다() {
         MDC.putCloseable("traceId", "trace-1").use {
             inserter.insert(InventoryReservation.create(1L, 1, 600L, "k"))
