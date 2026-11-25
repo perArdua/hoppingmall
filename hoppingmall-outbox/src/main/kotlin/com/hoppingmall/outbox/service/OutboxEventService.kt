@@ -47,6 +47,12 @@ class OutboxEventService(
         )
     }
 
+    /**
+     * 멈춘(parked) 행은 메시지 쪽 실패로 재시도 3회를 다 써서 status = 'FAILED', processed = true가 되어 발행에서 빠진 행이다.
+     * 원인을 고친 뒤 이 메서드나 다음 SQL로 다시 넣으면 다음 발행 주기에 나간다.
+     * UPDATE outbox_events SET status = 'PENDING', retry_count = 0, processed = false, processed_at = NULL, updated_at = NOW(6) WHERE id IN (...) AND processed = true AND status = 'FAILED';
+     * 정리 작업이 processed = true 행을 7일 뒤 지우므로 그 전에 다시 넣어야 한다.
+     */
     @Transactional
     fun requeueParked(ids: List<Long>): Int {
         if (ids.isEmpty()) return 0
