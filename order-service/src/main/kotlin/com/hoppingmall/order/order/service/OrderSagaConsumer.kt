@@ -36,12 +36,21 @@ class OrderSagaConsumer(
     private enum class RemoteDecision { CONFIRM, TIMEOUT_OWNED, ORDER_CANCELLED, ORDER_CANCELLING }
 
     /**
-     * 동시 소비 수는 payment 토픽 파티션 수까지만 효과가 있고, 넘는 스레드는 파티션을 받지 못해 쉰다.
+     * 동시 소비 수는 payment 토픽 파티션 수까지만 효과가 있다. 그룹 전체 소비자가 파티션보다 많으면 남는 소비자는 쉬므로,
+     * 값은 대략 파티션 수 ÷ order-service 인스턴스 수로 잡는다.
      *
-     * 브로커의 KAFKA_NUM_PARTITIONS=16은 새로 자동 생성되는 토픽에만 적용되므로, 이미 있는 토픽은 한 번 직접 늘려야 한다.
-     * `kafka-topics --bootstrap-server <broker> --alter --topic payment --partitions 16`
-     * `kafka-topics --bootstrap-server <broker> --alter --topic payment-compensation --partitions 16`
-     * 파티션을 늘리면 키(orderId)가 새 파티션으로 한 번 옮겨져 진행 중인 주문의 이벤트 순서가 어긋날 수 있으니, 유입이 적은 시간에 실행한다.
+     * 브로커의 KAFKA_NUM_PARTITIONS=16은 새로 자동 생성되는 토픽에만 적용되므로, 이미 있는 토픽은 한 번 직접 늘린다.
+     * payment는 paymentId(결제당 PaymentCompleted 한 건), payment-compensation은 orderId를 키로 쓴다.
+     * payment-compensation은 새로 만든 환경과 맞추려고 늘릴 뿐이며 그 리스너들은 4개 그대로다.
+     *
+     * 1. 두 토픽 모두 소비 지연이 0이 될 때까지 기다린다.
+     * 2. `kafka-topics --bootstrap-server <broker> --alter --topic payment --partitions 16`
+     *    `kafka-topics --bootstrap-server <broker> --alter --topic payment-compensation --partitions 16`
+     * 3. 5분 이상 유입을 낮게 유지한다. 프로듀서는 메타데이터를 갱신(metadata.max.age.ms 5분)한 뒤에야 새 파티션 수를 쓰므로,
+     *    그 사이 같은 키의 새 레코드가 새 파티션에 먼저 들어가 이전 적체분보다 앞서 처리될 수 있다.
+     *
+     * 파티션은 줄일 수 없다. 같은 토픽을 읽는 다른 소비 그룹(product 통계, payment-service 소비자·보상, order 취소 결과)에도
+     * 새 파티션이 생기며, 모두 auto-offset-reset=earliest라 새 파티션은 0번 오프셋부터 읽는다.
      */
     @KafkaListener(
         topics = [KafkaTopics.PAYMENT],
