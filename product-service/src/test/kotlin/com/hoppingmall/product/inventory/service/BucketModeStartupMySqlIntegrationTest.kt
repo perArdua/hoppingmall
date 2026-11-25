@@ -4,6 +4,7 @@ import com.hoppingmall.product.ProductServiceApplication
 import com.hoppingmall.product.internal.InternalInventoryController
 import com.hoppingmall.product.internal.InternalInventoryController.ReserveRequest
 import com.hoppingmall.product.inventory.domain.Inventory
+import com.hoppingmall.product.inventory.domain.InventoryBucket
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.support.MySqlContainerSupport
 import com.hoppingmall.reservation.grpc.ReservationLinkRequest
@@ -129,21 +130,61 @@ class BucketModeStartupMySqlIntegrationTest {
             .hasMessageContaining("이 인스턴스=bucket(bucket.count=8)")
             .hasMessageContaining(InventoryModeGuard.PROCEDURE)
 
-        databaseConnection().use { connection ->
-            connection.createStatement().executeQuery("SELECT COUNT(*) FROM inventory_buckets").use { rs ->
-                rs.next()
-                assertThat(rs.getInt(1)).isZero()
-            }
+        assertThat(queryForString("SELECT COUNT(*) FROM inventory_buckets")).isEqualTo("0")
+    }
+
+    @Test
+    fun 기록이_없는_DB에_inventories_재고만_있으면_bucket_인스턴스는_기록하지_않고_기동이_실패하고_버킷을_만들지_않는다() {
+        boot(mapOf("inventory.mode" to "single")).use { context ->
+            context.getBean(InventoryRepository::class.java).saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
         }
+        executeSql("DELETE FROM inventory_runtime_mode")
+
+        assertThatThrownBy { boot(inventorySwitches("application-docker.yml")).close() }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("inventories에만 재고가 있어")
+            .hasMessageContaining("이 인스턴스=bucket(bucket.count=8)")
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
+
+        assertThat(queryForString("SELECT COUNT(*) FROM inventory_buckets")).isEqualTo("0")
+        assertThat(queryForString("SELECT COUNT(*) FROM inventory_runtime_mode")).isEqualTo("0")
+    }
+
+    @Test
+    fun 기록_없이_버킷_행이_있는_DB를_bucket_인스턴스로_켜면_bucket과_버킷_수를_기록하고_뜬다() {
+        boot(mapOf("inventory.mode" to "single")).use { context ->
+            context.getBean(InventoryRepository::class.java).saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
+        }
+        executeSql("DELETE FROM inventory_runtime_mode")
+        (0 until 8).forEach { bucketNo ->
+            executeSql(
+                "INSERT INTO inventory_buckets (product_id, bucket_no, stock_quantity) " +
+                    "VALUES ($FIRST, $bucketNo, ${InventoryBucket.shareOf(10, 8, bucketNo)})"
+            )
+        }
+
+        boot(inventorySwitches("application-docker.yml")).use { context ->
+            assertThat(context.isActive).isTrue()
+        }
+
+        assertThat(queryForString("SELECT CONCAT(mode, '/', bucket_count) FROM inventory_runtime_mode WHERE id = 1")).isEqualTo("bucket/8")
     }
 
     private fun recordBucketModeAsProcedure() {
-        databaseConnection().use {
-            it.createStatement().executeUpdate(
-                "UPDATE inventory_runtime_mode SET mode = 'bucket', bucket_count = 8, updated_at = NOW(6) WHERE id = 1"
-            )
-        }
+        executeSql("UPDATE inventory_runtime_mode SET mode = 'bucket', bucket_count = 8, updated_at = NOW(6) WHERE id = 1")
     }
+
+    private fun executeSql(sql: String) {
+        databaseConnection().use { it.createStatement().executeUpdate(sql) }
+    }
+
+    private fun queryForString(sql: String): String? =
+        databaseConnection().use { connection ->
+            connection.createStatement().executeQuery(sql).use { rs ->
+                rs.next()
+                rs.getString(1)
+            }
+        }
 
     private fun databaseConnection() =
         DriverManager.getConnection(MySqlContainerSupport.jdbcUrl(DATABASE), MySqlContainerSupport.username, MySqlContainerSupport.password)
