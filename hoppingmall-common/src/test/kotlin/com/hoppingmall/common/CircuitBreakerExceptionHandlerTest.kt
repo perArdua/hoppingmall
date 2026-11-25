@@ -23,16 +23,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RestController
 import java.time.Duration
 
-@RestController
-class CircuitBreakerTestController(private val registry: CircuitBreakerRegistry) {
-    @GetMapping("/circuit-breaker/{name}")
-    fun call(@PathVariable("name") name: String): String {
-        val circuitBreaker = registry.circuitBreaker(name)
-        circuitBreaker.transitionToOpenState()
-        throw CallNotPermittedException.createCallNotPermittedException(circuitBreaker)
-    }
-}
-
 @DisplayName("서킷 브레이커 호출 거절 응답 테스트")
 @DisplayNameGeneration(ReplaceUnderscores::class)
 class CircuitBreakerExceptionHandlerTest {
@@ -82,6 +72,14 @@ class CircuitBreakerExceptionHandlerTest {
     }
 
     @Test
+    fun 원인_예외_사슬에_호출_거절이_있으면_503과_S003을_응답한다() {
+        mockMvc(providerOf(registry)).perform(get("/circuit-breaker/inventory-command/wrapped"))
+            .andExpect(status().isServiceUnavailable)
+            .andExpect(header().string("Retry-After", "30"))
+            .andExpect(jsonPath("$.code").value("S003"))
+    }
+
+    @Test
     fun 클래스패스에_resilience4j가_있을_때만_핸들러가_등록된다() {
         val contextRunner = ApplicationContextRunner()
             .withUserConfiguration(CircuitBreakerExceptionHandler::class.java)
@@ -104,5 +102,20 @@ class CircuitBreakerExceptionHandlerTest {
         val context = StaticApplicationContext()
         registry?.let { context.beanFactory.registerSingleton("circuitBreakerRegistry", it) }
         return context.getBeanProvider(CircuitBreakerRegistry::class.java)
+    }
+
+    @RestController
+    private class CircuitBreakerTestController(private val registry: CircuitBreakerRegistry) {
+        @GetMapping("/circuit-breaker/{name}")
+        fun call(@PathVariable("name") name: String): String = throw callNotPermitted(name)
+
+        @GetMapping("/circuit-breaker/{name}/wrapped")
+        fun wrapped(@PathVariable("name") name: String): String = throw RuntimeException("wrapped", callNotPermitted(name))
+
+        private fun callNotPermitted(name: String): CallNotPermittedException {
+            val circuitBreaker = registry.circuitBreaker(name)
+            circuitBreaker.transitionToOpenState()
+            return CallNotPermittedException.createCallNotPermittedException(circuitBreaker)
+        }
     }
 }
