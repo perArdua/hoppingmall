@@ -35,7 +35,8 @@ class OutboxEventPublisher(
     private val avroEventConverter: AvroEventConverter,
     transactionManager: PlatformTransactionManager,
     private val clock: Clock = Clock.systemDefaultZone(),
-    private val dataSource: DataSource? = null
+    private val dataSource: DataSource? = null,
+    private val brokerBackoff: OutboxBrokerBackoff = OutboxBrokerBackoff(outboxMetrics)
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
@@ -108,6 +109,7 @@ class OutboxEventPublisher(
 
     @Scheduled(fixedDelayString = "\${outbox.publish.interval-ms:5000}")
     fun publishPendingEvents() = batchLock.withLock {
+        if (brokerBackoff.isBackingOff()) return@withLock
         if (!batchClaim) return@withLock publishBatch()
         while (!Thread.currentThread().isInterrupted) {
             val outcome = publishLockedBatch()
@@ -126,8 +128,8 @@ class OutboxEventPublisher(
             .sortedBy { it.createdAt }
 
         val preparedEvents = prepareEvents(claimedEvents, claim.claimedAt)
-        val halted = !publishPrepared(preparedEvents, claim.claimedAt)
-        return BatchOutcome(locked = claim.ids.size, halted = halted)
+        val outcome = publishPrepared(preparedEvents, claim.claimedAt, BATCH_CLAIM)
+        return BatchOutcome(locked = claim.ids.size, halted = outcome != PublishOutcome.PUBLISHED)
     }
 
     private fun claimLockedBatch(): ClaimedBatch =
@@ -191,7 +193,7 @@ class OutboxEventPublisher(
             }
         }.filter { !it.processed && it.status == OutboxStatus.RETRYING }
 
-        publishPrepared(prepareEvents(claimedEvents))
+        publishPrepared(prepareEvents(claimedEvents), null, BATCH_CLAIM)
     }
 
     private fun prepareEvents(
@@ -215,12 +217,13 @@ class OutboxEventPublisher(
 
     private fun publishPrepared(
         preparedEvents: List<Pair<OutboxEvent, Any>>,
-        claimedAt: LocalDateTime? = null
-    ): Boolean {
-        if (preparedEvents.isEmpty()) return true
+        claimedAt: LocalDateTime?,
+        claimKind: String
+    ): PublishOutcome {
+        if (preparedEvents.isEmpty()) return PublishOutcome.PUBLISHED
 
-        try {
-            val results = kafkaTemplate.executeInTransaction { template ->
+        val results = try {
+            kafkaTemplate.executeInTransaction { template ->
                 ensureClaimFresh(claimedAt)
                 val futures = preparedEvents.map { (event, avroRecord) ->
                     event to template.send(event.topic, event.partitionKey ?: "", avroRecord)
@@ -230,41 +233,120 @@ class OutboxEventPublisher(
                 }
                 ensureClaimFresh(claimedAt)
                 sent
-            } ?: return false
-
-            transactionTemplate.executeWithoutResult {
-                if (claimedAt == null) {
-                    results.forEach { (event, result) -> handlePublishSuccess(event, result) }
-                } else {
-                    markClaimedPublished(results, claimedAt)
-                }
-            }
-            return true
+            } ?: return PublishOutcome.LEFT_CLAIMED
         } catch (e: ClaimExpiredException) {
             logger.warn(
-                "Outbox batch claim expired after ${e.ageMs}ms (limit ${maxClaimAgeMs}ms); " +
+                "Outbox $claimKind claim expired after ${e.ageMs}ms (limit ${maxClaimAgeMs}ms); " +
                     "aborted Kafka transaction and left ${preparedEvents.size} events RETRYING for stale recovery: " +
                     "ids=${preparedEvents.map { it.first.id }}"
             )
-            return false
+            return PublishOutcome.LEFT_CLAIMED
         } catch (e: Exception) {
-            logger.error("Batch publish failed for ${preparedEvents.size} events", e)
-            if (claimedAt != null && claimAgeMs(claimedAt) > maxClaimAgeMs) {
-                logger.warn(
-                    "Outbox batch claim expired before failure handling (limit ${maxClaimAgeMs}ms); " +
-                        "left ${preparedEvents.size} events RETRYING for stale recovery: " +
-                        "ids=${preparedEvents.map { it.first.id }}"
-                )
-                return false
+            logger.error("Outbox publish failed for ${preparedEvents.size} events: ids=${preparedEvents.map { it.first.id }}", e)
+            return handleSendFailure(preparedEvents, e, claimedAt, claimKind)
+        }
+
+        brokerBackoff.recordSuccess()
+        transactionTemplate.executeWithoutResult {
+            if (claimedAt == null) {
+                results.forEach { (event, result) -> handlePublishSuccess(event, result) }
+            } else {
+                markClaimedPublished(results, claimedAt)
             }
+        }
+        return PublishOutcome.PUBLISHED
+    }
+
+    private fun handleSendFailure(
+        preparedEvents: List<Pair<OutboxEvent, Any>>,
+        failure: Exception,
+        claimedAt: LocalDateTime?,
+        claimKind: String
+    ): PublishOutcome {
+        val side = OutboxFailureClassifier.classify(failure)
+        if (claimedAt != null && claimAgeMs(claimedAt) > maxClaimAgeMs) {
+            logger.warn(
+                "Outbox $claimKind claim expired before failure handling (limit ${maxClaimAgeMs}ms); " +
+                    "left ${preparedEvents.size} events RETRYING for stale recovery: " +
+                    "ids=${preparedEvents.map { it.first.id }}"
+            )
+            if (side == OutboxFailureClassifier.Side.BROKER) backOffAfterBrokerFailure(failure)
+            return PublishOutcome.LEFT_CLAIMED
+        }
+        if (side == OutboxFailureClassifier.Side.BROKER) {
+            releaseClaims(preparedEvents.map { it.first }, claimedAt)
+            backOffAfterBrokerFailure(failure)
+            return PublishOutcome.BROKER_FAILED
+        }
+        if (preparedEvents.size == 1) {
             transactionTemplate.executeWithoutResult {
-                preparedEvents.forEach { (event, _) ->
-                    if (!event.processed) recordFailure(event, e, claimedAt)
+                recordFailure(preparedEvents.single().first, failure, claimedAt)
+            }
+            return PublishOutcome.MESSAGE_FAILED
+        }
+        logger.warn(
+            "Outbox batch of ${preparedEvents.size} events was rejected for a message-side reason; " +
+                "publishing them one by one so only the rejected events use a retry"
+        )
+        return publishOneByOne(preparedEvents, claimedAt, claimKind)
+    }
+
+    private fun publishOneByOne(
+        preparedEvents: List<Pair<OutboxEvent, Any>>,
+        claimedAt: LocalDateTime?,
+        claimKind: String
+    ): PublishOutcome {
+        var outcome = PublishOutcome.PUBLISHED
+        preparedEvents.forEachIndexed { index, prepared ->
+            when (publishPrepared(listOf(prepared), claimedAt, claimKind)) {
+                PublishOutcome.PUBLISHED -> Unit
+                PublishOutcome.MESSAGE_FAILED -> outcome = PublishOutcome.MESSAGE_FAILED
+                PublishOutcome.BROKER_FAILED -> {
+                    releaseClaims(preparedEvents.drop(index + 1).map { it.first }, claimedAt)
+                    return PublishOutcome.BROKER_FAILED
+                }
+                PublishOutcome.LEFT_CLAIMED -> return PublishOutcome.LEFT_CLAIMED
+            }
+        }
+        return outcome
+    }
+
+    private fun releaseClaims(events: List<OutboxEvent>, claimedAt: LocalDateTime?) {
+        if (events.isEmpty()) return
+        transactionTemplate.executeWithoutResult {
+            if (claimedAt == null) {
+                events.forEach { event ->
+                    event.releaseClaim()
+                    outboxEventRepository.save(event)
+                }
+            } else {
+                val ids = events.mapNotNull { it.id }
+                val released = outboxEventRepository.releaseClaimedEvents(
+                    ids = ids,
+                    pendingStatus = OutboxStatus.PENDING,
+                    updatedAt = LocalDateTime.now(),
+                    claimedStatus = OutboxStatus.RETRYING,
+                    claimedAt = claimedAt
+                )
+                if (released < ids.size) {
+                    logger.warn(
+                        "Outbox released $released of ${ids.size} claimed events to PENDING; " +
+                            "the rest were re-claimed after claim at $claimedAt: ids=$ids"
+                    )
                 }
             }
-            return false
         }
     }
+
+    private fun backOffAfterBrokerFailure(failure: Exception) {
+        val delayMs = brokerBackoff.recordFailure()
+        logger.warn(
+            "Outbox publishing paused for ${delayMs}ms after a broker-side failure; " +
+                "events go back to PENDING without using a retry: ${failure.message}"
+        )
+    }
+
+    fun isBrokerBackingOff(): Boolean = brokerBackoff.isBackingOff()
 
     fun staleClaimTimestamp(): LocalDateTime? = if (batchClaim) claimTimestamp() else null
 
@@ -277,46 +359,7 @@ class OutboxEventPublisher(
             return
         }
 
-        try {
-            val avroRecord = avroEventConverter.convertJsonToAvro(event.eventType, event.eventData)
-
-            val result = kafkaTemplate.executeInTransaction { template ->
-                ensureClaimFresh(claimedAt)
-                val sent = template.send(
-                    event.topic,
-                    event.partitionKey ?: "",
-                    avroRecord
-                ).get(10, TimeUnit.SECONDS)
-                ensureClaimFresh(claimedAt)
-                sent
-            }
-
-            transactionTemplate.executeWithoutResult {
-                if (claimedAt == null) {
-                    handlePublishSuccess(event, result)
-                } else {
-                    markClaimedPublished(listOf(event to result), claimedAt)
-                }
-            }
-
-        } catch (e: ClaimExpiredException) {
-            logger.warn(
-                "Outbox stale claim expired after ${e.ageMs}ms (limit ${maxClaimAgeMs}ms); " +
-                    "aborted Kafka transaction and left event $eventId RETRYING for stale recovery"
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to publish outbox event: ${event.id}", e)
-            if (claimedAt != null && claimAgeMs(claimedAt) > maxClaimAgeMs) {
-                logger.warn(
-                    "Outbox stale claim expired before failure handling (limit ${maxClaimAgeMs}ms); " +
-                        "left event $eventId RETRYING for stale recovery"
-                )
-                return
-            }
-            transactionTemplate.executeWithoutResult {
-                recordFailure(event, e, claimedAt)
-            }
-        }
+        publishPrepared(prepareEvents(listOf(event), claimedAt), claimedAt, STALE_CLAIM)
     }
 
     private fun handlePublishSuccess(event: OutboxEvent, result: SendResult<String, Any>) {
@@ -386,7 +429,10 @@ class OutboxEventPublisher(
 
         if (willExceedMaxRetry) {
             event.markAsFailedPermanently("Max retries exceeded: $errorMessage")
-            logger.error("Outbox event failed after max retries: eventId=${event.id}, error=$errorMessage")
+            logger.error(
+                "Outbox event parked after max retries for a message-side failure and excluded from publishing; " +
+                    "requeue it manually once fixed: eventId=${event.id}, error=$errorMessage"
+            )
         } else {
             event.markAsFailed(errorMessage)
             logger.warn("Outbox event failed, will retry: eventId=${event.id}, " +
@@ -412,8 +458,12 @@ class OutboxEventPublisher(
 
     private data class BatchOutcome(val locked: Int, val halted: Boolean)
 
+    private enum class PublishOutcome { PUBLISHED, MESSAGE_FAILED, BROKER_FAILED, LEFT_CLAIMED }
+
     companion object {
         private const val BATCH_LIMIT = 100
         private const val MYSQL_PRODUCT_NAME = "MySQL"
+        private const val BATCH_CLAIM = "batch"
+        private const val STALE_CLAIM = "stale"
     }
 }

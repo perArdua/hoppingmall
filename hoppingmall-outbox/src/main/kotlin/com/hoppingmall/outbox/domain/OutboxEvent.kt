@@ -90,6 +90,11 @@ class OutboxEvent(
         this.status = OutboxStatus.RETRYING
         this.updatedAt = LocalDateTime.now()
     }
+
+    fun releaseClaim() {
+        this.status = OutboxStatus.PENDING
+        this.updatedAt = LocalDateTime.now()
+    }
 }
 
 class OutboxStatusConverter : EnumNameConverter<OutboxStatus>(OutboxStatus::class.java)

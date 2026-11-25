@@ -7,6 +7,7 @@ import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
+import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -154,21 +155,24 @@ class OutboxBatchClaimMySqlTest {
     }
 
     @Test
-    fun Kafka_전송이_실패한_배치_뒤에는_이어_돌지_않는다() {
+    fun 브로커가_죽어_실패한_배치는_재시도를_쓰지_않고_PENDING으로_되돌린_뒤_이어_돌지_않고_물러난다() {
         insertPending(250)
         val kafka = countingKafka(fail = true)
+        val publisher = publisher(kafka.template)
 
-        publisher(kafka.template).publishPendingEvents()
+        publisher.publishPendingEvents()
+        publisher.publishPendingEvents()
 
         assertThat(kafka.transactions.get()).isEqualTo(1)
-        assertThat(countByStatus("FAILED")).isEqualTo(100L)
-        assertThat(countByStatus("PENDING")).isEqualTo(150L)
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+        assertThat(countByStatus("FAILED")).isZero()
+        assertThat(countByStatus("RETRYING")).isZero()
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM outbox_events WHERE status = 'FAILED' AND retry_count = 1 AND processed = false",
+                "SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING' AND retry_count = 0 AND processed = false",
                 Long::class.java
             )
-        ).isEqualTo(100L)
+        ).isEqualTo(250L)
     }
 
     @Test
@@ -306,7 +310,7 @@ class OutboxBatchClaimMySqlTest {
         whenever(template.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>()))
             .thenAnswer { invocation ->
                 transactions.incrementAndGet()
-                if (fail) throw RuntimeException("broker down")
+                if (fail) throw KafkaException("Failed to construct kafka producer")
                 (invocation.arguments[0] as KafkaOperations.OperationsCallback<String, Any, Any>).doInOperations(template)
             }
         return CountingKafka(template, transactions, sent)

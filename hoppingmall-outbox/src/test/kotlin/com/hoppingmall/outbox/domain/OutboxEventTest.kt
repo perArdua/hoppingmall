@@ -154,6 +154,21 @@ class OutboxEventTest {
         }
 
         @Test
+        fun releaseClaim_호출_시_재시도_횟수는_그대로_두고_PENDING으로_돌아간다() {
+            val event = createOutboxEvent()
+            event.markAsFailed("first")
+            event.markAsRetrying()
+            val before = LocalDateTime.now().minusSeconds(1)
+
+            event.releaseClaim()
+
+            assertEquals(OutboxStatus.PENDING, event.status)
+            assertEquals(1, event.retryCount)
+            assertFalse(event.processed)
+            assertTrue(event.updatedAt.isAfter(before))
+        }
+
+        @Test
         fun markAsFailedPermanently_호출_시_processedAt이_설정된다() {
             val event = createOutboxEvent()
             val before = LocalDateTime.now().minusSeconds(1)

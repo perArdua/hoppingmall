@@ -59,6 +59,10 @@ class OutboxMaintenanceScheduler(
         logger.warn("Found ${staleEvents.size} stale outbox events, retrying...")
 
         staleEvents.forEach { event ->
+            if (outboxEventPublisher.isBrokerBackingOff()) {
+                logger.warn("Outbox stale recovery paused while publishing backs off after a broker-side failure")
+                return
+            }
             val eventId = event.id ?: return@forEach
             if (event.retryCount >= maxRetries) {
                 transactionTemplate.executeWithoutResult {

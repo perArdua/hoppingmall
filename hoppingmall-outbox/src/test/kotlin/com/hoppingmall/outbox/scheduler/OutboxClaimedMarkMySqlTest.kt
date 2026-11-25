@@ -14,6 +14,8 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.RecordTooLargeException
+import org.apache.kafka.common.errors.TimeoutException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -113,7 +115,7 @@ class OutboxClaimedMarkMySqlTest {
     @Test
     fun 실패_표시_직전에_다른_쪽이_다시_선점한_행은_실패로_바꾸지_않는다() {
         insert(keys("k1", "k2", "k3"))
-        val kafka = fakeKafka(beforeCommit = { reclaim("k3") }, failWith = "broker down")
+        val kafka = fakeKafka(beforeCommit = { reclaim("k3") }, failWith = RecordTooLargeException("record too large"))
 
         batchPublisher(kafka.template).publishPendingEvents()
 
@@ -121,7 +123,7 @@ class OutboxClaimedMarkMySqlTest {
         listOf("k1", "k2").map(::row).forEach {
             assertThat(it["status"]).isEqualTo("FAILED")
             assertThat(it["retry_count"]).isEqualTo(1)
-            assertThat(it["error_message"]).isEqualTo("broker down")
+            assertThat(it["error_message"]).isEqualTo("record too large")
         }
         val stolen = row("k3")
         assertThat(stolen["status"]).isEqualTo("RETRYING")
@@ -186,10 +188,12 @@ class OutboxClaimedMarkMySqlTest {
             val status = if (retry == 0) "PENDING" else "FAILED"
 
             val (old, _) = runAndSnapshot(Seed("same", status, retry, createdAt)) {
-                plainPublisher(fakeKafka(failWith = "broker down").template).publishPendingEvents()
+                plainPublisher(fakeKafka(failWith = RecordTooLargeException("record too large")).template)
+                    .publishPendingEvents()
             }
             val (new, _) = runAndSnapshot(Seed("same", status, retry, createdAt)) {
-                batchPublisher(fakeKafka(failWith = "broker down").template).publishPendingEvents()
+                batchPublisher(fakeKafka(failWith = RecordTooLargeException("record too large")).template)
+                    .publishPendingEvents()
             }
 
             assertSameExceptTimes(old, new)
@@ -246,16 +250,74 @@ class OutboxClaimedMarkMySqlTest {
     }
 
     @Test
-    fun 복구가_선점한_뒤_한도_안에서_Kafka가_실패하면_선점_시각_조건으로_실패를_표시한다() {
+    fun 복구가_선점한_뒤_한도_안에서_메시지_쪽_실패면_선점_시각_조건으로_실패를_표시한다() {
         insertStale("s1")
-        val kafka = fakeKafka(failWith = "broker down")
+        val kafka = fakeKafka(failWith = RecordTooLargeException("record too large"))
 
         scheduler(batchPublisher(kafka.template)).handleStaleEvents()
 
         val failed = row("s1")
         assertThat(failed["status"]).isEqualTo("FAILED")
         assertThat(failed["retry_count"]).isEqualTo(1)
-        assertThat(failed["error_message"]).isEqualTo("broker down")
+        assertThat(failed["error_message"]).isEqualTo("record too large")
+    }
+
+    @Test
+    fun 복구가_선점한_뒤_브로커_실패면_재시도_횟수를_쓰지_않고_PENDING으로_되돌린다() {
+        insertStale("s1")
+        val kafka = fakeKafka(failWith = TimeoutException("broker down"))
+
+        scheduler(batchPublisher(kafka.template)).handleStaleEvents()
+
+        val released = row("s1")
+        assertThat(released["status"]).isEqualTo("PENDING")
+        assertThat(released["retry_count"]).isEqualTo(0)
+        assertThat(released["processed"]).isEqualTo(false)
+        assertThat(released["error_message"]).isNull()
+    }
+
+    @Test
+    fun 브로커_실패면_행을_PENDING으로_되돌리고_다른_쪽이_다시_선점한_행은_건드리지_않는다() {
+        insert(keys("k1", "k2", "k3"))
+        val kafka = fakeKafka(beforeCommit = { reclaim("k3") }, failWith = TimeoutException("broker down"))
+        val publisher = batchPublisher(kafka.template)
+
+        val warnings = captureWarnings { publisher.publishPendingEvents() }
+        publisher.publishPendingEvents()
+
+        assertThat(kafka.attempted.get()).isEqualTo(3)
+        assertThat(kafka.committed).isEmpty()
+        listOf("k1", "k2").map(::row).forEach {
+            assertThat(it["status"]).isEqualTo("PENDING")
+            assertThat(it["retry_count"]).isEqualTo(0)
+            assertThat(it["processed"]).isEqualTo(false)
+            assertThat(it["error_message"]).isNull()
+        }
+        val stolen = row("k3")
+        assertThat(stolen["status"]).isEqualTo("RETRYING")
+        assertThat(time(stolen["updated_at"])).isEqualTo(otherClaimAt)
+        assertThat(warnings).anyMatch { it.contains("released 2 of 3 claimed events") }
+    }
+
+    @Test
+    fun 브로커_실패_뒤_행의_모든_열이_기존_save_방식과_같다() {
+        listOf(0, 2).forEach { retry ->
+            val createdAt = LocalDateTime.now().minusMinutes(1).truncatedTo(ChronoUnit.MICROS)
+            val status = if (retry == 0) "PENDING" else "FAILED"
+
+            val (old, _) = runAndSnapshot(Seed("same", status, retry, createdAt)) {
+                plainPublisher(fakeKafka(failWith = TimeoutException("broker down")).template).publishPendingEvents()
+            }
+            val (new, _) = runAndSnapshot(Seed("same", status, retry, createdAt)) {
+                batchPublisher(fakeKafka(failWith = TimeoutException("broker down")).template).publishPendingEvents()
+            }
+
+            assertSameExceptTimes(old, new)
+            assertThat(new["status"]).isEqualTo("PENDING")
+            assertThat(new["retry_count"]).isEqualTo(retry)
+            assertThat(new["processed"]).isEqualTo(false)
+            assertThat(new["processed_at"]).isNull()
+        }
     }
 
     @Test
@@ -460,7 +522,7 @@ class OutboxClaimedMarkMySqlTest {
     )
 
     @Suppress("UNCHECKED_CAST")
-    private fun fakeKafka(beforeCommit: () -> Unit = {}, failWith: String? = null): FakeKafka {
+    private fun fakeKafka(beforeCommit: () -> Unit = {}, failWith: RuntimeException? = null): FakeKafka {
         val template = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, Any>
         val attempted = AtomicInteger()
         val committed = ConcurrentHashMap<String, AtomicInteger>()
@@ -484,7 +546,7 @@ class OutboxClaimedMarkMySqlTest {
                     val result = (invocation.arguments[0] as KafkaOperations.OperationsCallback<String, Any, Any>)
                         .doInOperations(template)
                     beforeCommit()
-                    if (failWith != null) throw RuntimeException(failWith)
+                    if (failWith != null) throw failWith
                     inFlight.forEach { key -> committed.computeIfAbsent(key) { AtomicInteger() }.incrementAndGet() }
                     result
                 } finally {

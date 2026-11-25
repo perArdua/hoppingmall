@@ -189,6 +189,25 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         @Param("claimedAt") claimedAt: LocalDateTime
     ): Int
 
+    @Modifying(clearAutomatically = true)
+    @Query(
+        """
+        UPDATE OutboxEvent o
+        SET o.status = :pendingStatus,
+            o.updatedAt = :updatedAt
+        WHERE o.id IN :ids
+        AND o.status = :claimedStatus
+        AND o.updatedAt = :claimedAt
+    """
+    )
+    fun releaseClaimedEvents(
+        @Param("ids") ids: List<Long>,
+        @Param("pendingStatus") pendingStatus: OutboxStatus,
+        @Param("updatedAt") updatedAt: LocalDateTime,
+        @Param("claimedStatus") claimedStatus: OutboxStatus,
+        @Param("claimedAt") claimedAt: LocalDateTime
+    ): Int
+
     @Query(
         """
         SELECT COUNT(o) FROM OutboxEvent o
