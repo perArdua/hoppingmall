@@ -4,6 +4,7 @@ import com.hoppingmall.product.ProductServiceApplication
 import com.hoppingmall.product.internal.InternalInventoryController
 import com.hoppingmall.product.internal.InternalInventoryController.ReserveRequest
 import com.hoppingmall.product.inventory.domain.Inventory
+import com.hoppingmall.product.inventory.domain.InventoryBucket
 import com.hoppingmall.product.inventory.domain.repository.InventoryRepository
 import com.hoppingmall.product.support.MySqlContainerSupport
 import com.hoppingmall.reservation.grpc.ReservationLinkRequest
@@ -13,6 +14,7 @@ import io.grpc.Server
 import io.grpc.inprocess.InProcessServerBuilder
 import io.grpc.stub.StreamObserver
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -67,13 +69,14 @@ class BucketModeStartupMySqlIntegrationTest {
     }
 
     @Test
-    fun 단일_모드로_쌓인_재고와_예약이_있는_DB를_배포_프로필_스위치로_켜면_버킷이_채워지고_예약_확정_취소_만료가_된다() {
+    fun 단일_모드로_쌓인_재고와_예약이_있는_DB를_모드_변경_절차대로_배포_프로필_스위치로_켜면_버킷이_채워지고_예약_확정_취소_만료가_된다() {
         val pendingFromSingleMode = boot(mapOf("inventory.mode" to "single")).use { context ->
             val inventories = context.getBean(InventoryRepository::class.java)
             inventories.saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
             inventories.saveAndFlush(Inventory.create(productId = SECOND, stockQuantity = 5))
             context.getBean(InventoryCommandService::class.java).batchReserveStock(listOf(FIRST to 2)).getValue(FIRST)
         }
+        recordBucketModeAsProcedure()
 
         boot(inventorySwitches("application-docker.yml") + FAST_LINK_CHECK).use { context ->
             val jdbc = context.getBean(JdbcTemplate::class.java)
@@ -115,6 +118,77 @@ class BucketModeStartupMySqlIntegrationTest {
         }
     }
 
+    @Test
+    fun 단일_모드로_쓰던_DB를_절차_없이_bucket_인스턴스로_켜면_기동이_실패하고_버킷을_만들지_않는다() {
+        boot(mapOf("inventory.mode" to "single")).use { context ->
+            context.getBean(InventoryRepository::class.java).saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
+        }
+
+        assertThatThrownBy { boot(inventorySwitches("application-docker.yml")).close() }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("DB=single")
+            .hasMessageContaining("이 인스턴스=bucket(bucket.count=8)")
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
+
+        assertThat(queryForString("SELECT COUNT(*) FROM inventory_buckets")).isEqualTo("0")
+    }
+
+    @Test
+    fun 기록이_없는_DB에_inventories_재고만_있으면_bucket_인스턴스는_기록하지_않고_기동이_실패하고_버킷을_만들지_않는다() {
+        boot(mapOf("inventory.mode" to "single")).use { context ->
+            context.getBean(InventoryRepository::class.java).saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
+        }
+        executeSql("DELETE FROM inventory_runtime_mode")
+
+        assertThatThrownBy { boot(inventorySwitches("application-docker.yml")).close() }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("inventories에만 재고가 있어")
+            .hasMessageContaining("이 인스턴스=bucket(bucket.count=8)")
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
+
+        assertThat(queryForString("SELECT COUNT(*) FROM inventory_buckets")).isEqualTo("0")
+        assertThat(queryForString("SELECT COUNT(*) FROM inventory_runtime_mode")).isEqualTo("0")
+    }
+
+    @Test
+    fun 기록_없이_버킷_행이_있는_DB를_bucket_인스턴스로_켜면_bucket과_버킷_수를_기록하고_뜬다() {
+        boot(mapOf("inventory.mode" to "single")).use { context ->
+            context.getBean(InventoryRepository::class.java).saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
+        }
+        executeSql("DELETE FROM inventory_runtime_mode")
+        (0 until 8).forEach { bucketNo ->
+            executeSql(
+                "INSERT INTO inventory_buckets (product_id, bucket_no, stock_quantity) " +
+                    "VALUES ($FIRST, $bucketNo, ${InventoryBucket.shareOf(10, 8, bucketNo)})"
+            )
+        }
+
+        boot(inventorySwitches("application-docker.yml")).use { context ->
+            assertThat(context.isActive).isTrue()
+        }
+
+        assertThat(queryForString("SELECT CONCAT(mode, '/', bucket_count) FROM inventory_runtime_mode WHERE id = 1")).isEqualTo("bucket/8")
+    }
+
+    private fun recordBucketModeAsProcedure() {
+        executeSql("UPDATE inventory_runtime_mode SET mode = 'bucket', bucket_count = 8, updated_at = NOW(6) WHERE id = 1")
+    }
+
+    private fun executeSql(sql: String) {
+        databaseConnection().use { it.createStatement().executeUpdate(sql) }
+    }
+
+    private fun queryForString(sql: String): String? =
+        databaseConnection().use { connection ->
+            connection.createStatement().executeQuery(sql).use { rs ->
+                rs.next()
+                rs.getString(1)
+            }
+        }
+
+    private fun databaseConnection() =
+        DriverManager.getConnection(MySqlContainerSupport.jdbcUrl(DATABASE), MySqlContainerSupport.username, MySqlContainerSupport.password)
+
     private fun boot(switches: Map<String, String>): ConfigurableApplicationContext =
         SpringApplicationBuilder(ProductServiceApplication::class.java)
             .profiles("cache-disabled")
@@ -138,7 +212,8 @@ class BucketModeStartupMySqlIntegrationTest {
         "grpc.server.port" to "-1",
         "grpc.client.order-service.address" to "in-process:$orderServerName",
         "services.order-service.url" to "http://127.0.0.1:1",
-        "dlq.scheduler.enabled" to "false"
+        "dlq.scheduler.enabled" to "false",
+        "inventory.mode-guard.recheck-ms" to "3600000"
     )
 
     private fun inventorySwitches(resource: String): Map<String, String> =
