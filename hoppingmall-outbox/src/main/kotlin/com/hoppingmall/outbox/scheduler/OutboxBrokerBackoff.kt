@@ -21,6 +21,7 @@ class OutboxBrokerBackoff(
     private var backoffUntilMillis = 0L
     private var streakStartedAtMillis = 0L
     private var lastLongBackoffAlertAtMillis: Long? = null
+    private var lastIsolatedFailedHeadId: Long? = null
 
     init {
         outboxMetrics.bindBrokerBackoff { isBackingOff() }
@@ -31,6 +32,18 @@ class OutboxBrokerBackoff(
 
     @Synchronized
     fun shouldIsolateEvents(): Boolean = consecutiveFailures >= ISOLATION_STREAK
+
+    @Synchronized
+    fun recordIsolatedHeadFailure(headId: Long?): Boolean {
+        val repeated = headId != null && headId == lastIsolatedFailedHeadId
+        lastIsolatedFailedHeadId = headId
+        return repeated
+    }
+
+    @Synchronized
+    fun forgetIsolatedHeadFailure() {
+        lastIsolatedFailedHeadId = null
+    }
 
     @Synchronized
     fun recordFailure(): Pause {

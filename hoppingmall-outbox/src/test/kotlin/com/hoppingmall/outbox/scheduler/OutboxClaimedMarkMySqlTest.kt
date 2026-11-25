@@ -220,7 +220,7 @@ class OutboxClaimedMarkMySqlTest {
     }
 
     @Test
-    fun 복구가_선점한_뒤_한도를_넘기면_보내지_않고_행을_RETRYING으로_둔다() {
+    fun 복구가_선점한_뒤_한도를_넘기면_보내지_않고_재시도_없이_PENDING으로_되돌린다() {
         insertStale("s1")
         val kafka = fakeKafka()
         val clock = TestClock(Instant.now().plusNanos(789), stepMillis = 1_000)
@@ -231,7 +231,7 @@ class OutboxClaimedMarkMySqlTest {
         assertThat(kafka.attempted.get()).isZero()
         assertThat(kafka.committed).isEmpty()
         val stale = row("s1")
-        assertThat(stale["status"]).isEqualTo("RETRYING")
+        assertThat(stale["status"]).isEqualTo("PENDING")
         assertThat(stale["retry_count"]).isEqualTo(0)
         assertThat(stale["processed"]).isEqualTo(false)
         assertThat(time(stale["updated_at"])).isAfter(LocalDateTime.now().minusMinutes(1))
