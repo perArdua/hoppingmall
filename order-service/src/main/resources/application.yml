@@ -130,6 +130,9 @@ resilience4j:
         waitDurationInOpenState: 10s
       inventory-command:
         baseConfig: default
+        slidingWindowType: TIME_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 50
         ignoreExceptions:
           - org.springframework.web.client.HttpClientErrorException$NotFound
           - org.springframework.web.client.HttpClientErrorException$BadRequest
