@@ -35,6 +35,14 @@ class OrderSagaConsumer(
 
     private enum class RemoteDecision { CONFIRM, TIMEOUT_OWNED, ORDER_CANCELLED, ORDER_CANCELLING }
 
+    /**
+     * 동시 소비 수는 payment 토픽 파티션 수까지만 효과가 있고, 넘는 스레드는 파티션을 받지 못해 쉰다.
+     *
+     * 브로커의 KAFKA_NUM_PARTITIONS=16은 새로 자동 생성되는 토픽에만 적용되므로, 이미 있는 토픽은 한 번 직접 늘려야 한다.
+     * `kafka-topics --bootstrap-server <broker> --alter --topic payment --partitions 16`
+     * `kafka-topics --bootstrap-server <broker> --alter --topic payment-compensation --partitions 16`
+     * 파티션을 늘리면 키(orderId)가 새 파티션으로 한 번 옮겨져 진행 중인 주문의 이벤트 순서가 어긋날 수 있으니, 유입이 적은 시간에 실행한다.
+     */
     @KafkaListener(
         topics = [KafkaTopics.PAYMENT],
         groupId = OrderConsumerGroups.ORDER_SAGA,
