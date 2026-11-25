@@ -25,6 +25,10 @@ class OutboxMetrics(
         .description("Total number of outbox event publish failures")
         .register(registry)
 
+    private val brokerFailureCounter = Counter.builder("outbox.broker.failure.count")
+        .description("Total number of outbox publish attempts that failed on the broker side")
+        .register(registry)
+
     private val topicPublishedCounters = ConcurrentHashMap<String, Counter>()
     private val topicFailedCounters = ConcurrentHashMap<String, Counter>()
 
@@ -44,6 +48,16 @@ class OutboxMetrics(
         Gauge.builder("outbox.event.failed.current") {
             outboxEventRepository.countByStatus(OutboxStatus.FAILED).toDouble()
         }.description("Failed outbox events").register(registry)
+    }
+
+    fun bindBrokerBackoff(backingOff: () -> Boolean) {
+        Gauge.builder("outbox.broker.backoff.active") {
+            if (backingOff()) 1.0 else 0.0
+        }.description("Whether outbox publishing is paused after a broker-side failure").register(registry)
+    }
+
+    fun recordBrokerFailure() {
+        brokerFailureCounter.increment()
     }
 
     fun recordOutboxPublished(topic: String) {
