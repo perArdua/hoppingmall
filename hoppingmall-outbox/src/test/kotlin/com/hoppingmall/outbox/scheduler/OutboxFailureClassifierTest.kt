@@ -1,11 +1,13 @@
 package com.hoppingmall.outbox.scheduler
 
 import com.hoppingmall.outbox.scheduler.OutboxFailureClassifier.Side
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.kafka.common.InvalidRecordException
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.AuthorizationException
 import org.apache.kafka.common.errors.ClusterAuthorizationException
 import org.apache.kafka.common.errors.DisconnectException
+import org.apache.kafka.common.errors.InvalidConfigurationException
 import org.apache.kafka.common.errors.InvalidTopicException
 import org.apache.kafka.common.errors.NetworkException
 import org.apache.kafka.common.errors.NotEnoughReplicasException
@@ -82,7 +84,7 @@ class OutboxFailureClassifierTest {
             RecordTooLargeException("The message is 2000000 bytes"),
             RecordBatchTooLargeException("batch too large"),
             InvalidTopicException("bad topic"),
-            TopicAuthorizationException("not authorized"),
+            InvalidConfigurationException("Schema being registered is incompatible with an earlier schema"),
             AuthorizationException("not authorized"),
             InvalidRecordException("invalid record")
         ).forEach { failure ->
@@ -109,13 +111,35 @@ class OutboxFailureClassifierTest {
     }
 
     @Test
-    fun 프로듀서_전체를_막는_권한_실패는_한_메시지_탓이_아니므로_브로커_쪽이다() {
+    fun 권한_실패는_잃지_않도록_멈추게_브로커_쪽으로_본다() {
         listOf(
             ClusterAuthorizationException("Cluster authorization failed."),
             TransactionalIdAuthorizationException("Transactional Id authorization failed."),
+            TopicAuthorizationException("Not authorized to access topics: [payment]"),
             KafkaException("Send failed", TransactionalIdAuthorizationException("Transactional Id authorization failed."))
         ).forEach { failure ->
             assertThat(OutboxFailureClassifier.classify(failure)).describedAs(failure.toString()).isEqualTo(Side.BROKER)
+        }
+    }
+
+    @Test
+    fun 스키마_레지스트리_5xx와_입출력_오류는_브로커_쪽이다() {
+        listOf(
+            SerializationException("Error registering Avro schema", RestClientException("Internal Server Error", 500, 50001)),
+            SerializationException("Error registering Avro schema", RestClientException("Service Unavailable", 503, 50003)),
+            SerializationException("Error serializing Avro message", java.io.IOException("stream closed"))
+        ).forEach { failure ->
+            assertThat(OutboxFailureClassifier.classify(failure)).describedAs(failure.toString()).isEqualTo(Side.BROKER)
+        }
+    }
+
+    @Test
+    fun 스키마_레지스트리_4xx는_메시지_쪽이다() {
+        listOf(
+            SerializationException("Error registering Avro schema", RestClientException("Schema not found", 404, 40403)),
+            SerializationException("Error registering Avro schema", RestClientException("Incompatible schema", 409, 409))
+        ).forEach { failure ->
+            assertThat(OutboxFailureClassifier.classify(failure)).describedAs(failure.toString()).isEqualTo(Side.MESSAGE)
         }
     }
 
