@@ -37,10 +37,38 @@ class InventoryCommandCircuitBreakerConfigTest {
     }
 
     @Test
-    fun 설정된_무시_예외로_만든_서킷은_429를_창_크기만큼_연속으로_받아도_닫혀_있다() {
+    fun 재고_명령_서킷은_10초_시간_창에서_최소_50번_호출을_보고_판정한다() {
+        assertThat(property("slidingWindowType")).isEqualTo("TIME_BASED")
+        assertThat(intProperty("slidingWindowSize")).isEqualTo(10)
+        assertThat(minimumNumberOfCalls()).isEqualTo(50)
+    }
+
+    @Test
+    fun 기본_설정은_횟수_기반_창_10개와_최소_호출_5번으로_남는다() {
+        assertThat(properties.getProperty("$DEFAULT_CONFIG.slidingWindowType")).isEqualTo("COUNT_BASED")
+        assertThat(properties.getProperty("$DEFAULT_CONFIG.slidingWindowSize")).isEqualTo("10")
+        assertThat(properties.getProperty("$DEFAULT_CONFIG.minimumNumberOfCalls")).isEqualTo("5")
+    }
+
+    @Test
+    fun 같은_서킷은_최소_호출_수에_못_미치는_5xx만으로는_열리지_않는다() {
         val circuitBreaker = circuitBreakerFromYaml()
 
-        repeat(windowSize()) {
+        repeat(minimumNumberOfCalls() - 1) {
+            circuitBreaker.onError(
+                100, TimeUnit.MILLISECONDS,
+                HttpServerErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, "error", HttpHeaders.EMPTY, ByteArray(0), null)
+            )
+        }
+
+        assertThat(circuitBreaker.state).isEqualTo(CircuitBreaker.State.CLOSED)
+    }
+
+    @Test
+    fun 설정된_무시_예외로_만든_서킷은_429를_판정_최소_호출_수만큼_연속으로_받아도_닫혀_있다() {
+        val circuitBreaker = circuitBreakerFromYaml()
+
+        repeat(minimumNumberOfCalls()) {
             circuitBreaker.onError(100, TimeUnit.MILLISECONDS, clientError(HttpStatus.TOO_MANY_REQUESTS))
         }
 
@@ -49,10 +77,10 @@ class InventoryCommandCircuitBreakerConfigTest {
     }
 
     @Test
-    fun 설정된_무시_예외로_만든_서킷은_같은_요청_키_충돌_409를_창_크기만큼_연속으로_받아도_닫혀_있다() {
+    fun 설정된_무시_예외로_만든_서킷은_같은_요청_키_충돌_409를_판정_최소_호출_수만큼_연속으로_받아도_닫혀_있다() {
         val circuitBreaker = circuitBreakerFromYaml()
 
-        repeat(windowSize()) {
+        repeat(minimumNumberOfCalls()) {
             circuitBreaker.onError(100, TimeUnit.MILLISECONDS, conflict("""{"code":"INV009","message":"내용이 다른 예약 요청","data":null}"""))
         }
 
@@ -61,11 +89,11 @@ class InventoryCommandCircuitBreakerConfigTest {
     }
 
     @Test
-    fun 같은_서킷은_요청_키_충돌이_아닌_409를_창_크기만큼_연속으로_받으면_열린다() {
+    fun 같은_서킷은_요청_키_충돌이_아닌_409를_판정_최소_호출_수만큼_연속으로_받으면_열린다() {
         listOf("""{"code":"C002"}""", """{"code":"INV004"}""", "", "<html>conflict</html>").forEach { body ->
             val circuitBreaker = circuitBreakerFromYaml()
 
-            repeat(windowSize()) {
+            repeat(minimumNumberOfCalls()) {
                 circuitBreaker.onError(100, TimeUnit.MILLISECONDS, conflict(body))
             }
 
@@ -74,10 +102,10 @@ class InventoryCommandCircuitBreakerConfigTest {
     }
 
     @Test
-    fun 같은_서킷은_5xx를_창_크기만큼_연속으로_받으면_열린다() {
+    fun 같은_서킷은_5xx를_판정_최소_호출_수만큼_연속으로_받으면_열린다() {
         val circuitBreaker = circuitBreakerFromYaml()
 
-        repeat(windowSize()) {
+        repeat(minimumNumberOfCalls()) {
             circuitBreaker.onError(
                 100, TimeUnit.MILLISECONDS,
                 HttpServerErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, "error", HttpHeaders.EMPTY, ByteArray(0), null)
@@ -91,9 +119,9 @@ class InventoryCommandCircuitBreakerConfigTest {
         @Suppress("UNCHECKED_CAST")
         val ignored = ignoredExceptionNames().map { Class.forName(it) as Class<out Throwable> }.toTypedArray()
         val builder = CircuitBreakerConfig.custom()
-            .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-            .slidingWindowSize(windowSize())
-            .minimumNumberOfCalls(intProperty("minimumNumberOfCalls"))
+            .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.valueOf(property("slidingWindowType")))
+            .slidingWindowSize(intProperty("slidingWindowSize"))
+            .minimumNumberOfCalls(minimumNumberOfCalls())
             .failureRateThreshold(intProperty("failureRateThreshold").toFloat())
             .ignoreExceptions(*ignored)
         properties.getProperty("$INVENTORY_COMMAND.ignoreExceptionPredicate")?.let {
@@ -104,10 +132,12 @@ class InventoryCommandCircuitBreakerConfigTest {
         return CircuitBreakerRegistry.of(config).circuitBreaker("inventory-command")
     }
 
-    private fun windowSize(): Int = intProperty("slidingWindowSize")
+    private fun minimumNumberOfCalls(): Int = intProperty("minimumNumberOfCalls")
 
-    private fun intProperty(name: String): Int =
-        properties.getProperty("$DEFAULT_CONFIG.$name").toInt()
+    private fun intProperty(name: String): Int = property(name).toInt()
+
+    private fun property(name: String): String =
+        properties.getProperty("$INVENTORY_COMMAND.$name") ?: properties.getProperty("$DEFAULT_CONFIG.$name")
 
     private fun ignoredExceptionNames(): List<String> =
         generateSequence(0) { it + 1 }

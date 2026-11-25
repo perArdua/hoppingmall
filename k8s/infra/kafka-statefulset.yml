@@ -54,6 +54,8 @@ spec:
               value: "1"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "true"
+            - name: KAFKA_NUM_PARTITIONS
+              value: "16"
           resources:
             requests:
               memory: "512Mi"

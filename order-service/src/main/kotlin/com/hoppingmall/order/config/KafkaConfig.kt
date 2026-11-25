@@ -6,6 +6,7 @@ import com.hoppingmall.common.config.kafka.BusinessContextProducerInterceptor
 import com.hoppingmall.dlq.service.DLQCommandService
 import io.confluent.kafka.serializers.KafkaAvroSerializer
 import io.confluent.kafka.serializers.subject.TopicRecordNameStrategy
+import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.errors.SerializationException
@@ -28,7 +29,8 @@ import java.util.UUID
 @Configuration
 @Profile("!test")
 class KafkaConfig(
-    @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService
+    @org.springframework.context.annotation.Lazy private val dlqCommandService: DLQCommandService,
+    private val meterRegistry: MeterRegistry
 ) {
     @Value("\${kafka.consumer.max-poll-interval-ms:300000}")
     private var maxPollIntervalMs: Int = 300_000
@@ -38,6 +40,9 @@ class KafkaConfig(
 
     @Value("\${kafka.consumer.heartbeat-interval-ms:10000}")
     private var heartbeatIntervalMs: Int = 10_000
+
+    @Value("\${kafka.consumer.concurrency:4}")
+    private var concurrency: Int = 4
 
     @Value("\${spring.kafka.producer.bootstrap-servers:\${spring.kafka.consumer.bootstrap-servers}}")
     private lateinit var producerBootstrapServers: String
@@ -126,14 +131,16 @@ class KafkaConfig(
         configProps[ConsumerConfig.FETCH_MIN_BYTES_CONFIG] = 1024
         configProps[ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG] = 500
 
-        return DefaultKafkaConsumerFactory(configProps)
+        val consumerFactory = DefaultKafkaConsumerFactory<String, Any>(configProps)
+        consumerFactory.addListener(MicrometerConsumerListener(meterRegistry))
+        return consumerFactory
     }
 
     @Bean
     fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
-        factory.setConcurrency(4)
+        factory.setConcurrency(concurrency)
         factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
 
         val errorHandler = DefaultErrorHandler(

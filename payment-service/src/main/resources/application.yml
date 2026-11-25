@@ -130,6 +130,9 @@ resilience4j:
       order-query:
         baseConfig: default
         waitDurationInOpenState: 10s
+        slidingWindowType: TIME_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 50
       inventory-command:
         baseConfig: default
   retry:
