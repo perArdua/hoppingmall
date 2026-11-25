@@ -38,6 +38,6 @@ class InventoryRuntimeModeStore(
         private const val INSERT_SQL =
             "INSERT INTO inventory_runtime_mode (id, mode, bucket_count, updated_at) VALUES (?, ?, ?, ?)"
         private const val ANY_BUCKET_SQL = "SELECT 1 FROM inventory_buckets LIMIT 1"
-        private const val ANY_STOCK_SQL = "SELECT 1 FROM inventories WHERE stock_quantity > 0 LIMIT 1"
+        private const val ANY_STOCK_SQL = "SELECT 1 FROM inventories WHERE stock_quantity > 0 AND deleted_at IS NULL LIMIT 1"
     }
 }

@@ -90,6 +90,14 @@ class InventoryModeGuardMySqlIntegrationTest : MySqlIntegrationTestSupport() {
     }
 
     @Test
+    fun 지운_재고_행의_재고는_남은_재고로_보지_않는다() {
+        inventoryRepository.saveAndFlush(Inventory.create(productId = PRODUCT_ID, stockQuantity = 5))
+        jdbcTemplate.update("UPDATE inventories SET deleted_at = NOW(6) WHERE product_id = ?", PRODUCT_ID)
+
+        assertThat(inventoryRuntimeModeStore.hasInventoryStock()).isFalse()
+    }
+
+    @Test
     fun 다른_모드의_두_인스턴스가_빈_DB에서_동시에_뜨면_하나만_기록하고_다른_하나는_기동을_막는다() {
         val guards = mapOf("single" to guard("single"), "bucket" to guard("bucket"))
         val ready = CountDownLatch(guards.size)
