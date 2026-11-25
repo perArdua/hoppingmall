@@ -19,6 +19,7 @@ import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.dao.DataAccessResourceFailureException
 import org.springframework.dao.DuplicateKeyException
 import java.time.LocalDateTime
 
@@ -32,6 +33,9 @@ class InventoryModeGuardTest {
 
     @Mock
     private lateinit var bucketStockService: BucketStockService
+
+    @Mock
+    private lateinit var inventoryModeTerminator: InventoryModeTerminator
 
     @InjectMocks
     private lateinit var guard: InventoryModeGuard
@@ -179,6 +183,60 @@ class InventoryModeGuardTest {
 
         assertThatThrownBy { guard.afterSingletonsInstantiated() }
             .isInstanceOf(DuplicateKeyException::class.java)
+    }
+
+    @Test
+    fun 실행_중_다시_읽은_기록이_같으면_인스턴스를_내리지_않는다() {
+        runAsBucket(8)
+        whenever(inventoryRuntimeModeStore.find()).thenReturn(recorded("bucket", 8))
+
+        guard.recheck()
+
+        verify(inventoryModeTerminator, never()).terminate(any())
+    }
+
+    @Test
+    fun 실행_중_모드가_바뀌면_두_값을_담아_한_번만_인스턴스를_내린다() {
+        runAsSingle()
+        whenever(inventoryRuntimeModeStore.find()).thenReturn(recorded("bucket", 8))
+
+        guard.recheck()
+        guard.recheck()
+
+        val reason = argumentCaptor<String>()
+        verify(inventoryModeTerminator).terminate(reason.capture())
+        assertThat(reason.firstValue)
+            .contains("DB=bucket(bucket.count=8)")
+            .contains("이 인스턴스=single")
+            .contains(InventoryModeGuard.PROCEDURE)
+    }
+
+    @Test
+    fun 실행_중_버킷_수가_바뀌면_인스턴스를_내린다() {
+        runAsBucket(8)
+        whenever(inventoryRuntimeModeStore.find()).thenReturn(recorded("bucket", 16))
+
+        guard.recheck()
+
+        verify(inventoryModeTerminator).terminate(any())
+    }
+
+    @Test
+    fun 실행_중_기록이_없으면_인스턴스를_내리지_않는다() {
+        whenever(inventoryRuntimeModeStore.find()).thenReturn(null)
+
+        guard.recheck()
+
+        verify(inventoryModeTerminator, never()).terminate(any())
+    }
+
+    @Test
+    fun 실행_중_기록을_읽지_못하면_인스턴스를_내리지_않는다() {
+        whenever(inventoryRuntimeModeStore.find()).thenThrow(DataAccessResourceFailureException("connection refused"))
+
+        assertThatCode { guard.recheck() }.doesNotThrowAnyException()
+
+        verify(inventoryModeTerminator, never()).terminate(any())
     }
 
     private fun runAsSingle() {

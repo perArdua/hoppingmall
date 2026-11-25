@@ -118,7 +118,8 @@ class InventoryModeGuardMySqlIntegrationTest : MySqlIntegrationTestSupport() {
 
     private fun guard(mode: String) = InventoryModeGuard(
         inventoryRuntimeModeStore,
-        BucketStockService(inventoryBucketRepository, inventoryBucketLocker, SimpleMeterRegistry(), mode, 8)
+        BucketStockService(inventoryBucketRepository, inventoryBucketLocker, SimpleMeterRegistry(), mode, 8),
+        InventoryModeTerminator { }
     )
 
     companion object {
