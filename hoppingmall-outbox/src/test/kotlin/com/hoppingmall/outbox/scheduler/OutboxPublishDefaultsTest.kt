@@ -30,6 +30,7 @@ class OutboxPublishDefaultsTest {
         .withBean(OutboxMetrics::class.java, { mock<OutboxMetrics>() })
         .withBean(AvroEventConverter::class.java, { mock<AvroEventConverter>() })
         .withBean(PlatformTransactionManager::class.java, { mock<PlatformTransactionManager>() })
+        .withBean(OutboxBrokerBackoff::class.java)
         .withBean(OutboxEventPublisher::class.java)
         .withBean(OutboxPublishWaker::class.java)
 

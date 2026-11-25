@@ -7,7 +7,9 @@ import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
+import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.TimeoutException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -115,6 +117,7 @@ class OutboxBatchClaimMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             converter,
             transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java)),
             Clock.systemDefaultZone(),
             dataSource
         )
@@ -154,25 +157,28 @@ class OutboxBatchClaimMySqlTest {
     }
 
     @Test
-    fun Kafka_전송이_실패한_배치_뒤에는_이어_돌지_않는다() {
+    fun 브로커가_죽어_실패한_배치는_재시도를_쓰지_않고_PENDING으로_되돌린_뒤_이어_돌지_않고_물러난다() {
         insertPending(250)
         val kafka = countingKafka(fail = true)
+        val publisher = publisher(kafka.template)
 
-        publisher(kafka.template).publishPendingEvents()
+        publisher.publishPendingEvents()
+        publisher.publishPendingEvents()
 
         assertThat(kafka.transactions.get()).isEqualTo(1)
-        assertThat(countByStatus("FAILED")).isEqualTo(100L)
-        assertThat(countByStatus("PENDING")).isEqualTo(150L)
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+        assertThat(countByStatus("FAILED")).isZero()
+        assertThat(countByStatus("RETRYING")).isZero()
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM outbox_events WHERE status = 'FAILED' AND retry_count = 1 AND processed = false",
+                "SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING' AND retry_count = 0 AND processed = false",
                 Long::class.java
             )
-        ).isEqualTo(100L)
+        ).isEqualTo(250L)
     }
 
     @Test
-    fun 선점_뒤_한도를_넘긴_배치는_Kafka에_한_건도_보내지_않고_행을_RETRYING으로_남긴다() {
+    fun 선점_뒤_한도를_넘긴_배치는_Kafka에_한_건도_보내지_않고_재시도_없이_PENDING으로_되돌린다() {
         insertPending(50)
         val kafka = transactionalKafka()
 
@@ -185,7 +191,7 @@ class OutboxBatchClaimMySqlTest {
         assertThat(kafka.committed).isEmpty()
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM outbox_events WHERE status = 'RETRYING' AND retry_count = 0 AND processed = false",
+                "SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING' AND retry_count = 0 AND processed = false",
                 Long::class.java
             )
         ).isEqualTo(50L)
@@ -201,12 +207,12 @@ class OutboxBatchClaimMySqlTest {
 
         assertThat(kafka.transactions.get()).isEqualTo(1)
         assertThat(kafka.committed).isEmpty()
-        assertThat(countByStatus("RETRYING")).isEqualTo(100L)
-        assertThat(countByStatus("PENDING")).isEqualTo(200L)
+        assertThat(countByStatus("RETRYING")).isZero()
+        assertThat(countByStatus("PENDING")).isEqualTo(300L)
     }
 
     @Test
-    fun 전송_뒤_커밋_전에_한도를_넘기면_Kafka_트랜잭션을_버리고_행을_RETRYING으로_남긴다() {
+    fun 전송_뒤_커밋_전에_한도를_넘기면_Kafka_트랜잭션을_버리고_재시도_없이_PENDING으로_되돌린다() {
         insertPending(20)
         val clock = TestClock(Instant.now())
         val kafka = transactionalKafka(onSend = { clock.advanceMillis(1_000) })
@@ -216,7 +222,7 @@ class OutboxBatchClaimMySqlTest {
         assertThat(kafka.attempted.get()).isEqualTo(20)
         assertThat(kafka.aborted.get()).isEqualTo(1)
         assertThat(kafka.committed).isEmpty()
-        assertThat(countByStatus("RETRYING")).isEqualTo(20L)
+        assertThat(countByStatus("PENDING")).isEqualTo(20L)
         assertThat(countByStatus("PUBLISHED")).isZero()
     }
 
@@ -234,8 +240,38 @@ class OutboxBatchClaimMySqlTest {
 
         guardedPublisher(template, clock, maxClaimAgeMs = 500).publishPendingEvents()
 
-        assertThat(countByStatus("RETRYING")).isEqualTo(30L)
+        assertThat(countByStatus("PENDING")).isEqualTo(30L)
         assertThat(countByStatus("FAILED")).isZero()
+    }
+
+    @Test
+    fun 전체_장애에서_격리_회차가_전송마다_60초씩_걸려도_선점한_행을_모두_재시도_없이_PENDING으로_되돌린다() {
+        insertPending(100)
+        val clock = TestClock(Instant.now())
+        val transactions = AtomicInteger()
+        @Suppress("UNCHECKED_CAST")
+        val template = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, Any>
+        whenever(template.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>()))
+            .thenAnswer {
+                transactions.incrementAndGet()
+                clock.advanceMillis(60_000)
+                throw TimeoutException("Topic payment not present in metadata after 60000 ms.")
+            }
+        val backoff = OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java), clock = clock)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+
+        guardedPublisher(template, clock, maxClaimAgeMs = 300_000, backoff = backoff).publishPendingEvents()
+
+        assertThat(transactions.get()).isEqualTo(2)
+        assertThat(backoff.isBackingOff()).isTrue()
+        assertThat(countByStatus("RETRYING")).isZero()
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING' AND retry_count = 0 AND processed = false",
+                Long::class.java
+            )
+        ).isEqualTo(100L)
     }
 
     @Test
@@ -276,7 +312,8 @@ class OutboxBatchClaimMySqlTest {
             kafkaTemplate,
             Mockito.mock(OutboxMetrics::class.java),
             converter,
-            transactionManager
+            transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java))
         )
     }
 
@@ -306,7 +343,7 @@ class OutboxBatchClaimMySqlTest {
         whenever(template.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>()))
             .thenAnswer { invocation ->
                 transactions.incrementAndGet()
-                if (fail) throw RuntimeException("broker down")
+                if (fail) throw KafkaException("Failed to construct kafka producer")
                 (invocation.arguments[0] as KafkaOperations.OperationsCallback<String, Any, Any>).doInOperations(template)
             }
         return CountingKafka(template, transactions, sent)
@@ -315,7 +352,8 @@ class OutboxBatchClaimMySqlTest {
     private fun guardedPublisher(
         kafkaTemplate: KafkaTemplate<String, Any>,
         clock: Clock,
-        maxClaimAgeMs: Long
+        maxClaimAgeMs: Long,
+        backoff: OutboxBrokerBackoff = OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java))
     ): OutboxEventPublisher {
         val converter = Mockito.mock(AvroEventConverter::class.java)
         whenever(converter.convertJsonToAvro(any(), any())).thenReturn(Mockito.mock(GenericRecord::class.java))
@@ -325,6 +363,7 @@ class OutboxBatchClaimMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             converter,
             transactionManager,
+            backoff,
             clock
         ).also {
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", maxClaimAgeMs)

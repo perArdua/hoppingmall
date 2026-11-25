@@ -101,8 +101,10 @@ class OutboxPublishWakerTest {
             running.decrementAndGet()
             emptyList<Long>()
         }
+        val metrics = mock<OutboxMetrics>()
         val publisher = OutboxEventPublisher(
-            repository, mock<KafkaTemplate<String, Any>>(), mock<OutboxMetrics>(), mock<AvroEventConverter>(), transactionManager
+            repository, mock<KafkaTemplate<String, Any>>(), metrics, mock<AvroEventConverter>(), transactionManager,
+            OutboxBrokerBackoff(metrics)
         )
         val waker = waker(publisher)
 

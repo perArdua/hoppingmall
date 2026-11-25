@@ -43,7 +43,8 @@ class OutboxMaintenanceSchedulerTest {
 
     private fun createStaleEvent(
         id: Long = 1L,
-        retryCount: Int = 0
+        retryCount: Int = 0,
+        status: OutboxStatus = OutboxStatus.PENDING
     ): OutboxEvent {
         val event = OutboxEvent(
             aggregateType = "Payment",
@@ -52,7 +53,7 @@ class OutboxMaintenanceSchedulerTest {
             eventData = """{"paymentId":1}""",
             topic = "payment",
             partitionKey = "1",
-            status = OutboxStatus.PENDING
+            status = status
         )
         ReflectionTestUtils.setField(event, "id", id)
         if (retryCount > 0) {
@@ -236,5 +237,61 @@ class OutboxMaintenanceSchedulerTest {
         outboxMaintenanceScheduler.handleStaleEvents()
 
         verify(outboxEventPublisher, never()).publishEvent(any(), anyOrNull())
+    }
+
+    @Test
+    fun 브로커_백오프_중에는_지연된_이벤트를_선점하지_않는다() {
+        val staleEvent = createStaleEvent(id = 1L, retryCount = 0)
+
+        whenever(outboxEventRepository.findStaleEvents(any<LocalDateTime>(), eq(50)))
+            .thenReturn(listOf(staleEvent))
+        whenever(outboxEventPublisher.isBrokerBackingOff()).thenReturn(true)
+
+        outboxMaintenanceScheduler.handleStaleEvents()
+
+        verify(outboxEventRepository, never()).claimStaleEvent(any(), any(), any(), any(), any(), any())
+        verify(outboxEventPublisher, never()).publishEvent(any(), anyOrNull())
+        verify(outboxEventRepository, never()).save(any<OutboxEvent>())
+    }
+
+    @Test
+    fun 복구_중_브로커_백오프가_걸리면_남은_지연_이벤트는_다음_실행으로_미룬다() {
+        val first = createStaleEvent(id = 1L)
+        val second = createStaleEvent(id = 2L)
+
+        whenever(outboxEventRepository.findStaleEvents(any<LocalDateTime>(), eq(50)))
+            .thenReturn(listOf(first, second))
+        whenever(outboxEventPublisher.isBrokerBackingOff()).thenReturn(false, true)
+        whenever(outboxEventRepository.claimStaleEvent(any(), any(), any(), any(), any(), any())).thenReturn(1)
+
+        outboxMaintenanceScheduler.handleStaleEvents()
+
+        verify(outboxEventPublisher).publishEvent(1L, null)
+        verify(outboxEventPublisher, never()).publishEvent(eq(2L), anyOrNull())
+    }
+
+    @Test
+    fun 브로커_실패로_PENDING에_돌아간_행은_재시도_소진으로_보지_않고_다시_발행한다() {
+        val released = createStaleEvent(id = 1L, retryCount = 2, status = OutboxStatus.PENDING)
+
+        whenever(outboxEventRepository.findStaleEvents(any<LocalDateTime>(), eq(50)))
+            .thenReturn(listOf(released))
+        whenever(
+            outboxEventRepository.claimStaleEvent(
+                id = eq(1L),
+                nextStatus = eq(OutboxStatus.RETRYING),
+                updatedAt = any(),
+                cutoffDate = any(),
+                maxRetries = eq(3),
+                statuses = eq(listOf(OutboxStatus.PENDING, OutboxStatus.FAILED, OutboxStatus.RETRYING))
+            )
+        ).thenReturn(1)
+
+        outboxMaintenanceScheduler.handleStaleEvents()
+
+        assertThat(released.processed).isFalse()
+        assertThat(released.retryCount).isEqualTo(2)
+        verify(outboxEventRepository, never()).save(any<OutboxEvent>())
+        verify(outboxEventPublisher).publishEvent(1L, null)
     }
 }

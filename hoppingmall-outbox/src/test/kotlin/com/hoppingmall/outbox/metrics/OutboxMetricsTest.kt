@@ -28,6 +28,7 @@ class OutboxMetricsTest {
         whenever(outboxEventRepository.countByStatus(OutboxStatus.PENDING)).thenReturn(3L)
         whenever(outboxEventRepository.countByStatus(OutboxStatus.RETRYING)).thenReturn(2L)
         whenever(outboxEventRepository.countByStatus(OutboxStatus.FAILED)).thenReturn(1L)
+        whenever(outboxEventRepository.countParkedEvents(OutboxStatus.FAILED)).thenReturn(4L)
         outboxMetrics = OutboxMetrics(registry, outboxEventRepository)
     }
 
@@ -89,5 +90,29 @@ class OutboxMetricsTest {
         outboxMetrics.recordOutboxPublished("order-events")
 
         assertThat(registry.counter("outbox.event.published.count").count()).isEqualTo(2.0)
+    }
+
+    @Test
+    fun 재시도를_다_써서_멈춘_행_수를_parked_gauge로_보여준다() {
+        assertThat(registry.get("outbox.parked").gauge().value()).isEqualTo(4.0)
+    }
+
+    @Test
+    fun 브로커_실패_카운터가_증가한다() {
+        outboxMetrics.recordBrokerFailure()
+        outboxMetrics.recordBrokerFailure()
+
+        assertThat(registry.counter("outbox.broker.failure.count").count()).isEqualTo(2.0)
+    }
+
+    @Test
+    fun 브로커_백오프_gauge는_묶은_상태를_0과_1로_보여준다() {
+        var backingOff = false
+        outboxMetrics.bindBrokerBackoff { backingOff }
+        val gauge = registry.get("outbox.broker.backoff.active").gauge()
+
+        assertThat(gauge.value()).isEqualTo(0.0)
+        backingOff = true
+        assertThat(gauge.value()).isEqualTo(1.0)
     }
 }

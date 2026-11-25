@@ -13,6 +13,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -135,6 +138,35 @@ class OutboxEventServiceTest {
             verify(outboxEventRepository).countByStatus(OutboxStatus.RETRYING)
             verify(outboxEventRepository).countByStatus(OutboxStatus.PUBLISHED)
             verify(outboxEventRepository).countByStatus(OutboxStatus.FAILED)
+        }
+    }
+
+    @Nested
+    @DisplayName("requeueParked")
+    inner class RequeueParked {
+
+        @Test
+        fun 멈춘_행을_PENDING으로_되돌리고_바뀐_수를_돌려준다() {
+            whenever(
+                outboxEventRepository.requeueParkedEvents(
+                    ids = eq(listOf(1L, 2L)),
+                    pendingStatus = eq(OutboxStatus.PENDING),
+                    failedStatus = eq(OutboxStatus.FAILED),
+                    updatedAt = any()
+                )
+            ).thenReturn(2)
+
+            val requeued = outboxEventService.requeueParked(listOf(1L, 2L))
+
+            assertEquals(2, requeued)
+        }
+
+        @Test
+        fun 빈_목록이면_아무것도_바꾸지_않는다() {
+            val requeued = outboxEventService.requeueParked(emptyList())
+
+            assertEquals(0, requeued)
+            verify(outboxEventRepository, never()).requeueParkedEvents(any(), any(), any(), any())
         }
     }
 }

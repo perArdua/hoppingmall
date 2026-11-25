@@ -13,8 +13,13 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
+import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.NotEnoughReplicasException
+import org.apache.kafka.common.errors.RecordTooLargeException
+import org.apache.kafka.common.errors.TimeoutException
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DisplayNameGeneration
@@ -29,6 +34,7 @@ import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.timeout
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -49,7 +55,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicInteger
 import javax.sql.DataSource
+import kotlin.random.Random
 
 @DisplayName("OutboxEventPublisher")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
@@ -77,7 +85,8 @@ class OutboxEventPublisherTest {
     fun setUp() {
         Mockito.lenient().`when`(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
         outboxEventPublisher = OutboxEventPublisher(
-            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager
+            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager,
+            OutboxBrokerBackoff(outboxMetrics)
         )
     }
 
@@ -85,7 +94,8 @@ class OutboxEventPublisherTest {
         id: Long = 1L,
         status: OutboxStatus = OutboxStatus.RETRYING,
         retryCount: Int = 0,
-        createdAt: LocalDateTime = LocalDateTime.now()
+        createdAt: LocalDateTime = LocalDateTime.now(),
+        partitionKey: String = "1"
     ): OutboxEvent {
         val event = OutboxEvent(
             aggregateType = "Payment",
@@ -93,7 +103,7 @@ class OutboxEventPublisherTest {
             eventType = "PaymentCompleted",
             eventData = """{"paymentId":1}""",
             topic = "payment",
-            partitionKey = "1",
+            partitionKey = partitionKey,
             status = status,
             createdAt = createdAt
         )
@@ -395,7 +405,7 @@ class OutboxEventPublisherTest {
     }
 
     @Test
-    fun 배치_발행_실패_시_모든_이벤트를_실패_처리한다() {
+    fun 행_단위_선점에서_메시지_쪽_실패면_재시도_횟수를_올려_FAILED로_저장한다() {
         ReflectionTestUtils.setField(outboxEventPublisher, "batchClaim", false)
         val event = createOutboxEvent(id = 1L, status = OutboxStatus.PENDING)
         val avroRecord = mock<GenericRecord>()
@@ -424,13 +434,48 @@ class OutboxEventPublisherTest {
         whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(avroRecord)
         whenever(
             kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
-        ).thenThrow(RuntimeException("Kafka transaction failed"))
+        ).thenThrow(RecordTooLargeException("Kafka rejected the record"))
         whenever(outboxEventRepository.save(any<OutboxEvent>())).thenAnswer { it.arguments[0] as OutboxEvent }
 
         outboxEventPublisher.publishPendingEvents()
 
         assertThat(retryingEvent.status).isEqualTo(OutboxStatus.FAILED)
+        assertThat(retryingEvent.retryCount).isEqualTo(1)
         verify(outboxMetrics).recordOutboxFailed("payment")
+        verify(outboxMetrics, never()).recordBrokerFailure()
+    }
+
+    @Test
+    fun 행_단위_선점에서_브로커_실패면_재시도_횟수를_올리지_않고_PENDING으로_저장한다() {
+        val publisher = batchClaimPublisher(MutableClock(START))
+        ReflectionTestUtils.setField(publisher, "batchClaim", false)
+        val event = createOutboxEvent(id = 1L, status = OutboxStatus.PENDING)
+        val retryingEvent = createOutboxEvent(id = 1L, status = OutboxStatus.RETRYING, retryCount = 2)
+        whenever(
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = 3,
+                limit = 100
+            )
+        ).thenReturn(listOf(event))
+        whenever(outboxEventRepository.claimEventForPublish(any(), any(), any(), any(), any(), any())).thenReturn(1)
+        whenever(outboxEventRepository.findById(1L)).thenReturn(Optional.of(retryingEvent))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(KafkaException("Failed to construct kafka producer"))
+        whenever(outboxEventRepository.save(any<OutboxEvent>())).thenAnswer { it.arguments[0] as OutboxEvent }
+
+        publisher.publishPendingEvents()
+
+        assertThat(retryingEvent.status).isEqualTo(OutboxStatus.PENDING)
+        assertThat(retryingEvent.retryCount).isEqualTo(2)
+        assertThat(retryingEvent.processed).isFalse()
+        verify(outboxEventRepository).save(eq(retryingEvent))
+        verify(outboxMetrics, never()).recordOutboxFailed(any())
+        verify(outboxMetrics).recordBrokerFailure()
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
     }
 
     @Test
@@ -507,7 +552,7 @@ class OutboxEventPublisherTest {
     }
 
     @Test
-    fun 일괄_선점_뒤_한도를_넘기면_Kafka로_보내지_않고_행을_RETRYING으로_둔다() {
+    fun 일괄_선점_뒤_한도를_넘기면_Kafka로_보내지_않고_재시도_없이_PENDING으로_되돌린다() {
         val clock = MutableClock(START)
         val publisher = batchClaimPublisher(clock)
         val event = createOutboxEvent(id = 1L)
@@ -529,13 +574,13 @@ class OutboxEventPublisherTest {
         verify(kafkaTemplate, never()).send(any<String>(), any<String>(), any())
         verify(outboxEventRepository, never()).save(any<OutboxEvent>())
         verify(outboxMetrics, never()).recordOutboxFailed(any())
-        assertThat(event.status).isEqualTo(OutboxStatus.RETRYING)
+        verifyReleased(listOf(1L), LocalDateTime.ofInstant(START, clock.zone))
         assertThat(event.retryCount).isZero()
         assertThat(event.processed).isFalse()
     }
 
     @Test
-    fun 일괄_선점_뒤_전송_중에_한도를_넘기면_커밋하지_않고_행을_RETRYING으로_둔다() {
+    fun 일괄_선점_뒤_전송_중에_한도를_넘기면_커밋하지_않고_재시도_없이_PENDING으로_되돌린다() {
         val clock = MutableClock(START)
         val publisher = batchClaimPublisher(clock)
         val event = createOutboxEvent(id = 1L)
@@ -567,7 +612,7 @@ class OutboxEventPublisherTest {
         verify(outboxEventRepository, never()).save(any<OutboxEvent>())
         verify(outboxMetrics, never()).recordOutboxPublished(any())
         verify(outboxMetrics, never()).recordOutboxFailed(any())
-        assertThat(event.status).isEqualTo(OutboxStatus.RETRYING)
+        verifyReleased(listOf(1L), LocalDateTime.ofInstant(START, clock.zone))
         assertThat(event.retryCount).isZero()
     }
 
@@ -639,11 +684,11 @@ class OutboxEventPublisherTest {
 
         verify(outboxEventRepository, times(1)).lockUnprocessedEventIds(any(), any(), any(), any())
         verify(kafkaTemplate, never()).send(any<String>(), any<String>(), any())
-        assertThat(event.status).isEqualTo(OutboxStatus.RETRYING)
+        verifyReleased(listOf(1L), LocalDateTime.ofInstant(START, clock.zone))
     }
 
     @Test
-    fun 선점이_한도를_넘긴_뒤_Kafka_트랜잭션이_실패하면_행을_FAILED로_바꾸지_않는다() {
+    fun 선점이_한도를_넘긴_뒤_Kafka_트랜잭션이_실패하면_FAILED로_바꾸지_않고_재시도_없이_되돌리고_백오프를_건다() {
         val clock = MutableClock(START)
         val publisher = batchClaimPublisher(clock)
         val event = createOutboxEvent(id = 1L)
@@ -659,13 +704,14 @@ class OutboxEventPublisherTest {
         publisher.publishPendingEvents()
 
         verify(outboxEventRepository, never()).save(any<OutboxEvent>())
+        verifyReleased(listOf(1L), LocalDateTime.ofInstant(START, clock.zone))
         verify(outboxMetrics, never()).recordOutboxFailed(any())
-        assertThat(event.status).isEqualTo(OutboxStatus.RETRYING)
         assertThat(event.retryCount).isZero()
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
     }
 
     @Test
-    fun 선점이_한도_안일_때_Kafka_트랜잭션이_실패하면_기존처럼_FAILED로_바꾼다() {
+    fun 선점이_한도_안일_때_메시지_쪽_실패면_기존처럼_FAILED로_바꾼다() {
         val clock = MutableClock(START)
         val publisher = batchClaimPublisher(clock)
         val event = createOutboxEvent(id = 1L)
@@ -673,7 +719,7 @@ class OutboxEventPublisherTest {
         whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
         whenever(
             kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
-        ).thenThrow(RuntimeException("broker down"))
+        ).thenThrow(RecordTooLargeException("record too large"))
         whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
             .thenReturn(1)
 
@@ -681,10 +727,11 @@ class OutboxEventPublisherTest {
 
         assertThat(event.status).isEqualTo(OutboxStatus.FAILED)
         assertThat(event.retryCount).isEqualTo(1)
+        assertThat(publisher.isBrokerBackingOff()).isFalse()
         verify(outboxEventRepository).markClaimedEventFailed(
             id = eq(1L),
             status = eq(OutboxStatus.FAILED),
-            errorMessage = eq("broker down"),
+            errorMessage = eq("record too large"),
             retryCount = eq(1),
             processed = eq(false),
             processedAt = eq(null),
@@ -985,7 +1032,7 @@ class OutboxEventPublisherTest {
     }
 
     @Test
-    fun 복구_발행은_선점_뒤_한도를_넘기면_보내지_않고_행을_RETRYING으로_둔다() {
+    fun 복구_발행은_선점_뒤_한도를_넘기면_보내지_않고_재시도_없이_PENDING으로_되돌린다() {
         val clock = MutableClock(START)
         val publisher = batchClaimPublisher(clock)
         val claimedAt = LocalDateTime.ofInstant(START, clock.zone)
@@ -1005,7 +1052,7 @@ class OutboxEventPublisherTest {
         verify(outboxEventRepository, never())
             .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
         verify(outboxEventRepository, never()).save(any<OutboxEvent>())
-        assertThat(event.status).isEqualTo(OutboxStatus.RETRYING)
+        verifyReleased(listOf(1L), claimedAt)
     }
 
     @Test
@@ -1039,7 +1086,7 @@ class OutboxEventPublisherTest {
         assertThat(aborted).isTrue()
         verify(outboxEventRepository, never()).markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())
         verify(outboxMetrics, never()).recordOutboxFailed(any())
-        assertThat(event.status).isEqualTo(OutboxStatus.RETRYING)
+        verifyReleased(listOf(1L), LocalDateTime.ofInstant(START, clock.zone))
     }
 
     @Test
@@ -1061,11 +1108,11 @@ class OutboxEventPublisherTest {
         verify(outboxEventRepository, never())
             .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
         verify(outboxMetrics, never()).recordOutboxFailed(any())
-        assertThat(event.status).isEqualTo(OutboxStatus.RETRYING)
+        verifyReleased(listOf(1L), LocalDateTime.ofInstant(START, clock.zone))
     }
 
     @Test
-    fun 복구_발행이_한도_안에서_Kafka가_실패하면_선점_시각_조건으로_실패를_표시한다() {
+    fun 복구_발행이_한도_안에서_메시지_쪽_실패면_선점_시각_조건으로_실패를_표시한다() {
         val clock = MutableClock(START)
         val publisher = batchClaimPublisher(clock)
         val claimedAt = LocalDateTime.ofInstant(START, clock.zone)
@@ -1074,7 +1121,7 @@ class OutboxEventPublisherTest {
         whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
         whenever(
             kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
-        ).thenThrow(RuntimeException("broker down"))
+        ).thenThrow(RecordTooLargeException("record too large"))
         whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
             .thenReturn(1)
 
@@ -1083,7 +1130,7 @@ class OutboxEventPublisherTest {
         verify(outboxEventRepository).markClaimedEventFailed(
             id = eq(1L),
             status = eq(OutboxStatus.FAILED),
-            errorMessage = eq("broker down"),
+            errorMessage = eq("record too large"),
             retryCount = eq(1),
             processed = eq(false),
             processedAt = eq(null),
@@ -1116,12 +1163,842 @@ class OutboxEventPublisherTest {
         verify(outboxEventRepository, never()).markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())
     }
 
-    private fun batchClaimPublisher(clock: Clock): OutboxEventPublisher =
+    @Test
+    fun 브로커_실패는_재시도_횟수를_올리지_않고_선점_시각_조건으로_PENDING으로_되돌린다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        val event = createOutboxEvent(id = 1L, retryCount = 2)
+        stubSingleClaim(event)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(KafkaException("Failed to construct kafka producer"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+
+        publisher.publishPendingEvents()
+
+        verify(outboxEventRepository).releaseClaimedEvents(
+            ids = eq(listOf(1L)),
+            pendingStatus = eq(OutboxStatus.PENDING),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(LocalDateTime.ofInstant(START, clock.zone))
+        )
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        verify(outboxEventRepository, never()).save(any<OutboxEvent>())
+        verify(outboxMetrics, never()).recordOutboxFailed(any())
+        verify(outboxMetrics).recordBrokerFailure()
+        assertThat(event.retryCount).isEqualTo(2)
+        assertThat(event.processed).isFalse()
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+    }
+
+    @Test
+    fun 브로커_실패로_되돌릴_때_다른_쪽이_다시_선점한_행은_건너뛰고_경고를_남긴다() {
+        val publisher = batchClaimPublisher(MutableClock(START))
+        stubSingleClaim(createOutboxEvent(id = 1L))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(TimeoutException("Timeout expired after 60000ms while awaiting InitProducerId"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(0)
+
+        val warnings = captureWarnings { publisher.publishPendingEvents() }
+
+        assertThat(warnings).anyMatch { it.contains("released 0 of 1 claimed events") }
+        assertThat(warnings).anyMatch { it.contains("paused for 1000ms after a broker-side failure") }
+    }
+
+    @Test
+    fun 배치에_나쁜_행이_하나_있으면_그_행만_재시도_횟수가_오르고_나머지는_발행된다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        val claimedAt = LocalDateTime.ofInstant(START, clock.zone)
+        val now = LocalDateTime.now()
+        val first = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(3), partitionKey = "k1")
+        val bad = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(2), partitionKey = "bad")
+        val third = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(1), partitionKey = "k3")
+        val avroRecord = mock<GenericRecord>()
+        whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(listOf(1L, 2L, 3L))
+        whenever(outboxEventRepository.claimEventsForPublish(any(), any(), any(), any(), any(), any())).thenReturn(3)
+        whenever(outboxEventRepository.findAllById(listOf(1L, 2L, 3L))).thenReturn(listOf(first, bad, third))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(avroRecord)
+        whenever(kafkaTemplate.send(eq("payment"), any<String>(), eq(avroRecord))).thenAnswer { invocation ->
+            val key = invocation.arguments[1] as String
+            if (key == "bad") {
+                CompletableFuture.failedFuture<SendResult<String, Any>>(RecordTooLargeException("record too large"))
+            } else {
+                CompletableFuture.completedFuture(createSendResult("payment", key, avroRecord))
+            }
+        }
+        runKafkaCallbackDirectly()
+        val published = mutableListOf<Long>()
+        whenever(outboxEventRepository.markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val ids = it.arguments[0] as List<Long>
+            published.addAll(ids)
+            ids.size
+        }
+        val failedIds = mutableListOf<Long>()
+        whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
+            .thenAnswer {
+                failedIds.add(it.arguments[0] as Long)
+                1
+            }
+
+        publisher.publishPendingEvents()
+
+        assertThat(published).containsExactly(1L, 3L)
+        assertThat(failedIds).containsExactly(2L)
+        verify(outboxEventRepository).markClaimedEventFailed(
+            id = eq(2L),
+            status = eq(OutboxStatus.FAILED),
+            errorMessage = anyOrNull(),
+            retryCount = eq(1),
+            processed = eq(false),
+            processedAt = anyOrNull(),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+        assertThat(bad.retryCount).isEqualTo(1)
+        assertThat(bad.errorMessage).contains("record too large")
+        assertThat(first.retryCount).isZero()
+        assertThat(third.retryCount).isZero()
+        verify(outboxMetrics, times(1)).recordOutboxFailed("payment")
+        verify(outboxMetrics, times(2)).recordOutboxPublished("payment")
+        verify(outboxMetrics, never()).recordBrokerFailure()
+        verify(outboxEventRepository, never()).releaseClaimedEvents(any(), any(), any(), any(), any())
+        assertThat(publisher.isBrokerBackingOff()).isFalse()
+    }
+
+    @Test
+    fun 하나씩_보내다가_브로커_실패가_나면_남은_행은_PENDING으로_되돌리고_멈춘다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        val claimedAt = LocalDateTime.ofInstant(START, clock.zone)
+        val now = LocalDateTime.now()
+        val bad = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(3), partitionKey = "bad")
+        val second = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(2), partitionKey = "k2")
+        val third = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(1), partitionKey = "k3")
+        val avroRecord = mock<GenericRecord>()
+        whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(listOf(1L, 2L, 3L))
+        whenever(outboxEventRepository.claimEventsForPublish(any(), any(), any(), any(), any(), any())).thenReturn(3)
+        whenever(outboxEventRepository.findAllById(listOf(1L, 2L, 3L))).thenReturn(listOf(bad, second, third))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(avroRecord)
+        val secondSends = AtomicInteger()
+        whenever(kafkaTemplate.send(eq("payment"), any<String>(), eq(avroRecord))).thenAnswer { invocation ->
+            val key = invocation.arguments[1] as String
+            when {
+                key == "bad" ->
+                    CompletableFuture.failedFuture<SendResult<String, Any>>(RecordTooLargeException("record too large"))
+                key == "k2" && secondSends.incrementAndGet() > 1 ->
+                    CompletableFuture.failedFuture<SendResult<String, Any>>(TimeoutException("Expiring 1 record(s)"))
+                else -> CompletableFuture.completedFuture(createSendResult("payment", key, avroRecord))
+            }
+        }
+        runKafkaCallbackDirectly()
+        whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
+            .thenReturn(1)
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+
+        publisher.publishPendingEvents()
+
+        verify(outboxEventRepository).markClaimedEventFailed(
+            id = eq(1L),
+            status = eq(OutboxStatus.FAILED),
+            errorMessage = anyOrNull(),
+            retryCount = eq(1),
+            processed = eq(false),
+            processedAt = anyOrNull(),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+        verify(outboxEventRepository).releaseClaimedEvents(
+            ids = eq(listOf(2L)),
+            pendingStatus = eq(OutboxStatus.PENDING),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+        verify(outboxEventRepository).releaseClaimedEvents(
+            ids = eq(listOf(3L)),
+            pendingStatus = eq(OutboxStatus.PENDING),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+        verify(kafkaTemplate, times(1)).send(eq("payment"), eq("k3"), eq(avroRecord))
+        verify(outboxEventRepository, never()).markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())
+        assertThat(second.retryCount).isZero()
+        assertThat(third.retryCount).isZero()
+        verify(outboxMetrics).recordBrokerFailure()
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+    }
+
+    @Test
+    fun 하나씩_보내다가_선점_한도를_넘기면_보내지_않은_행은_재시도_없이_되돌리고_멈춘다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        val now = LocalDateTime.now()
+        val bad = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(2), partitionKey = "bad")
+        val second = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(1), partitionKey = "k2")
+        val avroRecord = mock<GenericRecord>()
+        whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(listOf(1L, 2L))
+        whenever(outboxEventRepository.claimEventsForPublish(any(), any(), any(), any(), any(), any())).thenReturn(2)
+        whenever(outboxEventRepository.findAllById(listOf(1L, 2L))).thenReturn(listOf(bad, second))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(avroRecord)
+        whenever(kafkaTemplate.send(eq("payment"), any<String>(), eq(avroRecord))).thenAnswer { invocation ->
+            val key = invocation.arguments[1] as String
+            if (key == "bad") {
+                CompletableFuture.failedFuture<SendResult<String, Any>>(RecordTooLargeException("record too large"))
+            } else {
+                CompletableFuture.completedFuture(createSendResult("payment", key, avroRecord))
+            }
+        }
+        runKafkaCallbackDirectly()
+        whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
+            .thenAnswer {
+                clock.advanceMillis(MAX_CLAIM_AGE_MS + 1)
+                1
+            }
+
+        publisher.publishPendingEvents()
+
+        verify(kafkaTemplate, times(1)).send(eq("payment"), eq("k2"), eq(avroRecord))
+        verify(outboxEventRepository, never()).markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())
+        verifyReleased(listOf(2L), LocalDateTime.ofInstant(START, clock.zone))
+        assertThat(second.retryCount).isZero()
+    }
+
+    @Test
+    fun 백오프_중에는_예약_실행과_깨우기_모두_발행하지_않는다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        stubSingleClaim(createOutboxEvent(id = 1L))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(KafkaException("Failed to construct kafka producer"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+        val waker = OutboxPublishWaker(publisher, true)
+
+        try {
+            publisher.publishPendingEvents()
+            publisher.publishPendingEvents()
+            waker.wake()
+
+            verify(outboxEventRepository, Mockito.after(300).times(1)).lockUnprocessedEventIds(any(), any(), any(), any())
+            assertThat(publisher.isBrokerBackingOff()).isTrue()
+
+            clock.advanceMillis(1_000)
+            waker.wake()
+
+            verify(outboxEventRepository, timeout(1_000).times(2)).lockUnprocessedEventIds(any(), any(), any(), any())
+        } finally {
+            waker.shutdown()
+        }
+    }
+
+    @Test
+    fun 브로커가_돌아와_한_번_발행에_성공하면_백오프_단계가_처음으로_돌아간다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        val avroRecord = mock<GenericRecord>()
+        stubSingleClaim(createOutboxEvent(id = 1L))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(avroRecord)
+        whenever(kafkaTemplate.send(eq("payment"), eq("1"), eq(avroRecord)))
+            .thenReturn(CompletableFuture.completedFuture(createSendResult("payment", "1", avroRecord)))
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(TimeoutException("broker down"))
+            .thenAnswer { invocation ->
+                @Suppress("UNCHECKED_CAST")
+                val callback = invocation.arguments[0] as KafkaOperations.OperationsCallback<String, Any, Any>
+                callback.doInOperations(kafkaTemplate)
+            }
+            .thenThrow(TimeoutException("broker down"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+        whenever(outboxEventRepository.markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())).thenReturn(1)
+
+        publisher.publishPendingEvents()
+        clock.advanceMillis(1_000)
+        publisher.publishPendingEvents()
+        assertThat(publisher.isBrokerBackingOff()).isFalse()
+        publisher.publishPendingEvents()
+        clock.advanceMillis(999)
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+        clock.advanceMillis(1)
+
+        assertThat(publisher.isBrokerBackingOff()).isFalse()
+        verify(outboxEventRepository, times(1)).markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())
+        verify(outboxMetrics, times(2)).recordBrokerFailure()
+    }
+
+    @Test
+    fun 격리_회차에서_혼자_실패한_머리는_처음엔_재시도_없이_되돌리고_다음_격리_회차에도_혼자_실패하면_재시도를_쓴다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val poison = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(4), partitionKey = "a")
+        val other = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(3), partitionKey = "b")
+        val third = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(2), partitionKey = "c")
+        val sameKeyAsPoison = createOutboxEvent(id = 4L, createdAt = now.minusSeconds(1), partitionKey = "a")
+        val poisonRecord = mock<GenericRecord>()
+        stubClaim(poison, other, third, sameKeyAsPoison)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenAnswer {
+            if ((it.arguments[1] as String).contains("poison")) poisonRecord else mock<GenericRecord>()
+        }
+        ReflectionTestUtils.setField(poison, "eventData", """{"poison":true}""")
+        stubSendsFailing(setOf(poisonRecord)) { TimeoutException("Topic missing not present in metadata after 60000 ms.") }
+        runKafkaCallbackDirectly()
+        val published = mutableListOf<List<Long>>()
+        whenever(outboxEventRepository.markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val ids = it.arguments[0] as List<Long>
+            published.add(ids)
+            ids.size
+        }
+        whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
+            .thenReturn(1)
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+        val firstClaim = LocalDateTime.ofInstant(clock.instant(), clock.zone)
+        publisher.publishPendingEvents()
+
+        assertThat(published).containsExactly(listOf(2L, 3L))
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        verifyReleased(listOf(1L), firstClaim)
+        verifyReleased(listOf(4L), firstClaim)
+        assertThat(poison.retryCount).isZero()
+        assertThat(backoff.shouldIsolateEvents()).isFalse()
+
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+        val secondClaim = LocalDateTime.ofInstant(clock.instant(), clock.zone)
+        publisher.publishPendingEvents()
+
+        assertThat(published).containsExactly(listOf(2L, 3L), listOf(2L, 3L))
+        verify(outboxEventRepository).markClaimedEventFailed(
+            id = eq(1L),
+            status = eq(OutboxStatus.FAILED),
+            errorMessage = anyOrNull(),
+            retryCount = eq(1),
+            processed = eq(false),
+            processedAt = anyOrNull(),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(secondClaim)
+        )
+        verifyReleased(listOf(4L), secondClaim)
+        assertThat(poison.retryCount).isEqualTo(1)
+        assertThat(sameKeyAsPoison.retryCount).isZero()
+        verify(kafkaTemplate, times(4)).executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+    }
+
+    @Test
+    fun 전체_장애에서_전송마다_60초가_걸려도_격리_회차는_두_번만_보내고_모든_행을_재시도_없이_되돌린다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        ReflectionTestUtils.setField(publisher, "maxClaimAgeMs", 300_000L)
+        val now = LocalDateTime.now()
+        val events = (1L..5L).map { createOutboxEvent(id = it, createdAt = now.minusSeconds(10 - it), partitionKey = "k$it") }
+        stubClaim(*events.toTypedArray())
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenAnswer {
+            clock.advanceMillis(60_000)
+            throw TimeoutException("Topic payment not present in metadata after 60000 ms.")
+        }
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(5)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+        val claimedAt = LocalDateTime.ofInstant(clock.instant(), clock.zone)
+
+        publisher.publishPendingEvents()
+
+        verify(kafkaTemplate, times(2)).executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        verifyReleased(listOf(1L, 2L, 3L, 4L, 5L), claimedAt)
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        assertThat(events).allMatch { it.retryCount == 0 }
+        assertThat(backoff.isBackingOff()).isTrue()
+    }
+
+    @Test
+    fun 부분_장애로_머리와_나머지가_함께_실패하면_아무것도_재시도를_쓰지_않고_머리_의심도_잊는다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val head = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(2), partitionKey = "a")
+        val other = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(1), partitionKey = "b")
+        stubClaim(head, other)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(NotEnoughReplicasException("Messages are rejected since there are fewer in-sync replicas than required."))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(2)
+        backoff.recordIsolatedHeadFailure(1L)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+
+        publisher.publishPendingEvents()
+
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        verifyReleased(listOf(1L, 2L), LocalDateTime.ofInstant(START.plusSeconds(60), clock.zone))
+        assertThat(head.retryCount).isZero()
+        assertThat(other.retryCount).isZero()
+        assertThat(backoff.recordIsolatedHeadFailure(1L)).isFalse()
+    }
+
+    @Test
+    fun 격리_회차에서_머리가_나가면_회복으로_보고_같은_회차에_나머지를_한_배치로_보낸다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val events = (1L..3L).map { createOutboxEvent(id = it, createdAt = now.minusSeconds(10 - it), partitionKey = "k$it") }
+        stubClaim(*events.toTypedArray())
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        stubSendsFailing(emptySet()) { IllegalStateException("unused") }
+        runKafkaCallbackDirectly()
+        val published = mutableListOf<List<Long>>()
+        whenever(outboxEventRepository.markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val ids = it.arguments[0] as List<Long>
+            published.add(ids)
+            ids.size
+        }
+        backoff.recordIsolatedHeadFailure(1L)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+
+        publisher.publishPendingEvents()
+
+        assertThat(published).containsExactly(listOf(1L), listOf(2L, 3L))
+        verify(kafkaTemplate, times(2)).executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        assertThat(backoff.shouldIsolateEvents()).isFalse()
+        assertThat(backoff.isBackingOff()).isFalse()
+        assertThat(backoff.recordIsolatedHeadFailure(1L)).isFalse()
+        verify(outboxEventRepository, never()).releaseClaimedEvents(any(), any(), any(), any(), any())
+    }
+
+    @Test
+    fun 격리_회차에서_머리가_메시지_쪽으로_실패하면_머리에_재시도를_쓰고_같은_키는_되돌리고_나머지는_보낸다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val head = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(3), partitionKey = "a")
+        val other = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(2), partitionKey = "b")
+        val sameKey = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(1), partitionKey = "a")
+        val badRecord = mock<GenericRecord>()
+        stubClaim(head, other, sameKey)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any()))
+            .thenReturn(badRecord, mock<GenericRecord>(), mock<GenericRecord>())
+        stubSendsFailing(setOf(badRecord)) { RecordTooLargeException("record too large") }
+        runKafkaCallbackDirectly()
+        val published = mutableListOf<List<Long>>()
+        whenever(outboxEventRepository.markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val ids = it.arguments[0] as List<Long>
+            published.add(ids)
+            ids.size
+        }
+        whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
+            .thenReturn(1)
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+
+        publisher.publishPendingEvents()
+
+        assertThat(published).containsExactly(listOf(2L))
+        assertThat(head.retryCount).isEqualTo(1)
+        assertThat(sameKey.retryCount).isZero()
+        verifyReleased(listOf(3L), LocalDateTime.ofInstant(START.plusSeconds(60), clock.zone))
+    }
+
+    @Test
+    fun 격리_회차에서_머리만_있고_같은_키_행뿐이면_비교할_수_없어_모두_되돌리고_물러난다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val head = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(2), partitionKey = "a")
+        val sameKey = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(1), partitionKey = "a")
+        stubClaim(head, sameKey)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(TimeoutException("broker down"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(2)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+
+        publisher.publishPendingEvents()
+
+        verify(kafkaTemplate, times(1)).executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        verifyReleased(listOf(1L, 2L), LocalDateTime.ofInstant(START.plusSeconds(60), clock.zone))
+        assertThat(backoff.isBackingOff()).isTrue()
+    }
+
+    @Test
+    fun 격리_회차에서_나머지가_메시지_쪽으로_거부되면_머리는_재시도_없이_되돌리고_나머지는_한_건씩_보낸다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val head = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(3), partitionKey = "a")
+        val bad = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(2), partitionKey = "b")
+        val good = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(1), partitionKey = "c")
+        val headRecord = mock<GenericRecord>()
+        val badRecord = mock<GenericRecord>()
+        stubClaim(head, bad, good)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any()))
+            .thenReturn(headRecord, badRecord, mock<GenericRecord>())
+        whenever(kafkaTemplate.send(eq("payment"), any<String>(), any())).thenAnswer { invocation ->
+            when (invocation.arguments[2]) {
+                headRecord -> CompletableFuture.failedFuture<SendResult<String, Any>>(TimeoutException("partition offline"))
+                badRecord -> CompletableFuture.failedFuture<SendResult<String, Any>>(RecordTooLargeException("too large"))
+                else -> CompletableFuture.completedFuture(createSendResult("payment", "c", invocation.arguments[2]))
+            }
+        }
+        runKafkaCallbackDirectly()
+        whenever(outboxEventRepository.markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())).thenReturn(1)
+        whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
+            .thenReturn(1)
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+
+        publisher.publishPendingEvents()
+
+        val claimedAt = LocalDateTime.ofInstant(START.plusSeconds(60), clock.zone)
+        verifyReleased(listOf(1L), claimedAt)
+        assertThat(head.retryCount).isZero()
+        assertThat(bad.retryCount).isEqualTo(1)
+        verify(outboxEventRepository).markClaimedEventsProcessed(
+            ids = eq(listOf(3L)),
+            publishedStatus = any(),
+            processedAt = any(),
+            updatedAt = any(),
+            claimedStatus = any(),
+            claimedAt = eq(claimedAt)
+        )
+    }
+
+    @Test
+    fun 행_단위_선점에서는_한_건씩_보내는_회차가_선점_한도의_절반을_넘기면_남은_행을_재시도_없이_되돌린다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        ReflectionTestUtils.setField(publisher, "batchClaim", false)
+        val now = LocalDateTime.now()
+        val pending = (1L..3L).map { createOutboxEvent(id = it, status = OutboxStatus.PENDING, createdAt = now.minusSeconds(10 - it), partitionKey = "k$it") }
+        val retrying = (1L..3L).map { createOutboxEvent(id = it, createdAt = now.minusSeconds(10 - it), partitionKey = "k$it") }
+        val badRecord = mock<GenericRecord>()
+        whenever(
+            outboxEventRepository.findUnprocessedEvents(
+                status = OutboxStatus.PENDING,
+                retryStatus = OutboxStatus.FAILED,
+                maxRetries = 3,
+                limit = 100
+            )
+        ).thenReturn(pending)
+        whenever(outboxEventRepository.claimEventForPublish(any(), any(), any(), any(), any(), any())).thenReturn(1)
+        retrying.forEach { event -> whenever(outboxEventRepository.findById(event.id!!)).thenReturn(Optional.of(event)) }
+        whenever(avroEventConverter.convertJsonToAvro(any(), any()))
+            .thenReturn(badRecord, mock<GenericRecord>(), mock<GenericRecord>())
+        stubSendsFailing(setOf(badRecord)) { RecordTooLargeException("record too large") }
+        runKafkaCallbackDirectly()
+        whenever(outboxEventRepository.save(any<OutboxEvent>())).thenAnswer {
+            val saved = it.arguments[0] as OutboxEvent
+            if (saved.status == OutboxStatus.FAILED) clock.advanceMillis(MAX_CLAIM_AGE_MS / 2 + 1)
+            saved
+        }
+
+        publisher.publishPendingEvents()
+
+        assertThat(retrying[0].status).isEqualTo(OutboxStatus.FAILED)
+        assertThat(retrying[0].retryCount).isEqualTo(1)
+        assertThat(retrying.drop(1)).allMatch { it.status == OutboxStatus.PENDING && it.retryCount == 0 }
+        verify(kafkaTemplate, times(1)).send(eq("payment"), eq("k2"), any())
+        verify(kafkaTemplate, times(1)).send(eq("payment"), eq("k3"), any())
+    }
+
+    @Test
+    fun 격리_회차에서_머리와_나머지가_모두_브로커_쪽으로_실패하면_장애로_보고_재시도_없이_모두_되돌린다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val claimedAt = LocalDateTime.ofInstant(START.plusSeconds(60), clock.zone)
+        val now = LocalDateTime.now()
+        val first = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(2), partitionKey = "a")
+        val second = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(1), partitionKey = "b")
+        stubClaim(first, second)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(KafkaException("Failed to construct kafka producer"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(2)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+
+        publisher.publishPendingEvents()
+
+        verify(kafkaTemplate, times(2)).executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        verify(outboxEventRepository).releaseClaimedEvents(
+            ids = eq(listOf(1L, 2L)),
+            pendingStatus = eq(OutboxStatus.PENDING),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        assertThat(first.retryCount).isZero()
+        assertThat(second.retryCount).isZero()
+        assertThat(backoff.isBackingOff()).isTrue()
+        assertThat(backoff.shouldIsolateEvents()).isTrue()
+    }
+
+    @Test
+    fun 한_건씩_다시_보낼_때_실패한_행과_같은_키의_뒤_행은_보내지_않고_재시도_없이_되돌린다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        val claimedAt = LocalDateTime.ofInstant(START, clock.zone)
+        val now = LocalDateTime.now()
+        val firstOfA = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(3), partitionKey = "a")
+        val firstOfB = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(2), partitionKey = "b")
+        val secondOfA = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(1), partitionKey = "a")
+        val badRecord = mock<GenericRecord>()
+        stubClaim(firstOfA, firstOfB, secondOfA)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any()))
+            .thenReturn(badRecord, mock<GenericRecord>(), mock<GenericRecord>())
+        stubSendsFailing(setOf(badRecord)) { RecordTooLargeException("record too large") }
+        runKafkaCallbackDirectly()
+        val published = mutableListOf<Long>()
+        whenever(outboxEventRepository.markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())).thenAnswer {
+            @Suppress("UNCHECKED_CAST")
+            val ids = it.arguments[0] as List<Long>
+            published.addAll(ids)
+            ids.size
+        }
+        whenever(outboxEventRepository.markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any()))
+            .thenReturn(1)
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+
+        publisher.publishPendingEvents()
+
+        assertThat(published).containsExactly(2L)
+        verify(kafkaTemplate, times(3)).send(eq("payment"), eq("a"), any())
+        verify(outboxEventRepository).releaseClaimedEvents(
+            ids = eq(listOf(3L)),
+            pendingStatus = eq(OutboxStatus.PENDING),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+        assertThat(firstOfA.retryCount).isEqualTo(1)
+        assertThat(secondOfA.retryCount).isZero()
+        verify(outboxMetrics, never()).recordBrokerFailure()
+    }
+
+    @Test
+    fun Kafka_트랜잭션이_결과_없이_끝나면_커밋_여부를_모르므로_행을_되돌리지_않고_ERROR를_남긴다() {
+        val publisher = batchClaimPublisher(MutableClock(START))
+        val event = createOutboxEvent(id = 1L)
+        stubSingleClaim(event)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenReturn(null)
+
+        val errors = captureLogs(Level.ERROR) { publisher.publishPendingEvents() }
+
+        assertThat(errors).anyMatch { it.contains("returned no result") && it.contains("ids=[1]") }
+        verify(outboxEventRepository, never()).releaseClaimedEvents(any(), any(), any(), any(), any())
+        verify(outboxEventRepository, never()).markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        assertThat(event.retryCount).isZero()
+        assertThat(publisher.isBrokerBackingOff()).isFalse()
+    }
+
+    @Test
+    fun 격리_회차에서_결과_없이_끝난_전송의_행만_선점한_채로_두고_시도하지_않은_행은_되돌린다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val head = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(3), partitionKey = "a")
+        val second = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(2), partitionKey = "b")
+        val third = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(1), partitionKey = "a")
+        stubClaim(head, second, third)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenReturn(null).thenThrow(TimeoutException("broker down")).thenReturn(null)
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+        val firstClaim = LocalDateTime.ofInstant(clock.instant(), clock.zone)
+
+        publisher.publishPendingEvents()
+
+        verifyReleased(listOf(2L, 3L), firstClaim)
+
+        clock.advanceMillis(60_000)
+        val secondClaim = LocalDateTime.ofInstant(clock.instant(), clock.zone)
+        publisher.publishPendingEvents()
+
+        verifyReleased(listOf(1L, 3L), secondClaim)
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+    }
+
+    @Test
+    fun 브로커_실패_뒤_되돌리기가_DB_오류로_실패해도_백오프는_건다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        stubSingleClaim(createOutboxEvent(id = 1L))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(KafkaException("Failed to construct kafka producer"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any()))
+            .thenThrow(IllegalStateException("database down"))
+
+        assertThatThrownBy { publisher.publishPendingEvents() }.hasMessage("database down")
+
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+        verify(outboxMetrics).recordBrokerFailure()
+    }
+
+    @Test
+    fun 백오프가_5분_넘게_이어지면_첫_선점_행_id와_함께_ERROR를_5분에_한_번만_남긴다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        stubSingleClaim(createOutboxEvent(id = 1L))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(KafkaException("Failed to construct kafka producer"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+        backoff.recordFailure()
+        clock.advanceMillis(300_001)
+
+        val errors = captureLogs(Level.ERROR) {
+            publisher.publishPendingEvents()
+            clock.advanceMillis(31_000)
+            publisher.publishPendingEvents()
+        }.filter { it.contains("has been backing off") }
+
+        assertThat(errors).hasSize(1)
+        assertThat(errors[0]).contains("2 consecutive broker-side failures", "first claimed event id=1")
+        verify(outboxEventRepository, times(2)).lockUnprocessedEventIds(any(), any(), any(), any())
+    }
+
+    @Test
+    fun 복구_발행이_브로커_실패면_재시도_횟수를_올리지_않고_선점_시각_조건으로_PENDING으로_되돌린다() {
+        val clock = MutableClock(START)
+        val publisher = batchClaimPublisher(clock)
+        val claimedAt = LocalDateTime.ofInstant(START, clock.zone)
+        val event = createOutboxEvent(id = 1L, retryCount = 2)
+        whenever(outboxEventRepository.findById(1L)).thenReturn(Optional.of(event))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(KafkaException("Failed to construct kafka producer"))
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+
+        publisher.publishEvent(1L, claimedAt)
+
+        verify(outboxEventRepository).releaseClaimedEvents(
+            ids = eq(listOf(1L)),
+            pendingStatus = eq(OutboxStatus.PENDING),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        verify(outboxMetrics, never()).recordOutboxFailed(any())
+        assertThat(event.retryCount).isEqualTo(2)
+        assertThat(event.processed).isFalse()
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+    }
+
+    @Test
+    fun 선점_시각_없는_복구_발행이_브로커_실패면_재시도_횟수를_올리지_않고_PENDING으로_save한다() {
+        val publisher = batchClaimPublisher(MutableClock(START))
+        val event = createOutboxEvent(id = 1L, retryCount = 1)
+        whenever(outboxEventRepository.findById(1L)).thenReturn(Optional.of(event))
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenThrow(TimeoutException("Topic payment not present in metadata after 60000 ms."))
+        whenever(outboxEventRepository.save(any<OutboxEvent>())).thenAnswer { it.arguments[0] as OutboxEvent }
+
+        publisher.publishEvent(1L)
+
+        assertThat(event.status).isEqualTo(OutboxStatus.PENDING)
+        assertThat(event.retryCount).isEqualTo(1)
+        verify(outboxEventRepository).save(eq(event))
+        verify(outboxMetrics, never()).recordOutboxFailed(any())
+        assertThat(publisher.isBrokerBackingOff()).isTrue()
+    }
+
+    private fun batchClaimPublisher(
+        clock: Clock,
+        backoff: OutboxBrokerBackoff = noJitterBackoff(clock)
+    ): OutboxEventPublisher =
         OutboxEventPublisher(
-            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager, clock
+            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager, backoff, clock
         ).also {
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", MAX_CLAIM_AGE_MS)
         }
+
+    private fun verifyReleased(ids: List<Long>, claimedAt: LocalDateTime) {
+        verify(outboxEventRepository).releaseClaimedEvents(
+            ids = eq(ids),
+            pendingStatus = eq(OutboxStatus.PENDING),
+            updatedAt = any(),
+            claimedStatus = eq(OutboxStatus.RETRYING),
+            claimedAt = eq(claimedAt)
+        )
+    }
+
+    private fun noJitterBackoff(clock: Clock) = OutboxBrokerBackoff(outboxMetrics, 1_000, 30_000, clock, NoJitter)
+
+    private fun stubClaim(vararg events: OutboxEvent) {
+        val ids = events.map { it.id!! }
+        whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(ids)
+        whenever(outboxEventRepository.claimEventsForPublish(any(), any(), any(), any(), any(), any())).thenReturn(ids.size)
+        whenever(outboxEventRepository.findAllById(ids)).thenReturn(events.toList())
+    }
+
+    private fun stubSendsFailing(failingRecords: Set<Any>, failure: () -> Exception) {
+        whenever(kafkaTemplate.send(eq("payment"), any<String>(), any())).thenAnswer { invocation ->
+            val record = invocation.arguments[2]
+            if (failingRecords.any { it === record }) {
+                CompletableFuture.failedFuture<SendResult<String, Any>>(failure())
+            } else {
+                CompletableFuture.completedFuture(createSendResult("payment", invocation.arguments[1] as String, record))
+            }
+        }
+    }
 
     private fun stubSingleClaim(event: OutboxEvent, onRefetch: () -> Unit = {}) {
         whenever(outboxEventRepository.lockUnprocessedEventIds("PENDING", "FAILED", 3, 100)).thenReturn(listOf(1L))
@@ -1154,7 +2031,7 @@ class OutboxEventPublisherTest {
     private fun publisherWith(dataSource: DataSource): OutboxEventPublisher =
         OutboxEventPublisher(
             outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager,
-            Clock.systemDefaultZone(), dataSource
+            OutboxBrokerBackoff(outboxMetrics), Clock.systemDefaultZone(), dataSource
         )
 
     private fun dataSource(productName: String): DataSource {
@@ -1191,6 +2068,11 @@ class OutboxEventPublisherTest {
             appender.stop()
         }
         return appender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+    }
+
+    private object NoJitter : Random() {
+        override fun nextBits(bitCount: Int): Int = 0
+        override fun nextDouble(): Double = 0.0
     }
 
     private class MutableClock(private var now: Instant) : Clock() {

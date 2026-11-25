@@ -86,6 +86,7 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         DELETE FROM outbox_events
         WHERE processed = true
         AND processed_at < :cutoffDate
+        AND status <> 'FAILED'
         LIMIT $OUTBOX_CLEANUP_BATCH_SIZE
     """,
         nativeQuery = true
@@ -189,6 +190,25 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         @Param("claimedAt") claimedAt: LocalDateTime
     ): Int
 
+    @Modifying(clearAutomatically = true)
+    @Query(
+        """
+        UPDATE OutboxEvent o
+        SET o.status = :pendingStatus,
+            o.updatedAt = :updatedAt
+        WHERE o.id IN :ids
+        AND o.status = :claimedStatus
+        AND o.updatedAt = :claimedAt
+    """
+    )
+    fun releaseClaimedEvents(
+        @Param("ids") ids: List<Long>,
+        @Param("pendingStatus") pendingStatus: OutboxStatus,
+        @Param("updatedAt") updatedAt: LocalDateTime,
+        @Param("claimedStatus") claimedStatus: OutboxStatus,
+        @Param("claimedAt") claimedAt: LocalDateTime
+    ): Int
+
     @Query(
         """
         SELECT COUNT(o) FROM OutboxEvent o
@@ -196,6 +216,36 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
     """
     )
     fun countByStatus(@Param("status") status: OutboxStatus): Long
+
+    @Query(
+        """
+        SELECT COUNT(o) FROM OutboxEvent o
+        WHERE o.processed = true
+        AND o.status = :failedStatus
+    """
+    )
+    fun countParkedEvents(@Param("failedStatus") failedStatus: OutboxStatus): Long
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        """
+        UPDATE OutboxEvent o
+        SET o.status = :pendingStatus,
+            o.retryCount = 0,
+            o.processed = false,
+            o.processedAt = null,
+            o.updatedAt = :updatedAt
+        WHERE o.id IN :ids
+        AND o.processed = true
+        AND o.status = :failedStatus
+    """
+    )
+    fun requeueParkedEvents(
+        @Param("ids") ids: List<Long>,
+        @Param("pendingStatus") pendingStatus: OutboxStatus,
+        @Param("failedStatus") failedStatus: OutboxStatus,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
 
     @Query(
         """
