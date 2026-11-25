@@ -102,7 +102,7 @@ class InventoryModeGuardTest {
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("DB=bucket(bucket.count=8)")
             .hasMessageContaining("이 인스턴스=single")
-            .hasMessageContaining(InventoryModeGuard.PROCEDURE_DOC)
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
         verify(inventoryRuntimeModeStore, never()).insert(any())
     }
 
@@ -115,7 +115,7 @@ class InventoryModeGuardTest {
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("DB=bucket(bucket.count=8)")
             .hasMessageContaining("이 인스턴스=bucket(bucket.count=16)")
-            .hasMessageContaining(InventoryModeGuard.PROCEDURE_DOC)
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
     }
 
     @Test
@@ -128,7 +128,7 @@ class InventoryModeGuardTest {
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("inventory_buckets")
             .hasMessageContaining("이 인스턴스=single")
-            .hasMessageContaining(InventoryModeGuard.PROCEDURE_DOC)
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
         verify(inventoryRuntimeModeStore, never()).insert(any())
     }
 
@@ -143,7 +143,7 @@ class InventoryModeGuardTest {
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("inventories")
             .hasMessageContaining("이 인스턴스=bucket(bucket.count=8)")
-            .hasMessageContaining(InventoryModeGuard.PROCEDURE_DOC)
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
         verify(inventoryRuntimeModeStore, never()).insert(any())
     }
 

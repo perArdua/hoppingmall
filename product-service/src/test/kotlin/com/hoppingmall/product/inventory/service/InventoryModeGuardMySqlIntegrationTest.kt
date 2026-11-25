@@ -112,7 +112,7 @@ class InventoryModeGuardMySqlIntegrationTest : MySqlIntegrationTestSupport() {
         assertThat(refused).hasSize(1)
         assertThat(refused.values.single().exceptionOrNull())
             .isInstanceOf(IllegalStateException::class.java)
-            .hasMessageContaining(InventoryModeGuard.PROCEDURE_DOC)
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
         assertThat(inventoryRuntimeModeStore.find()!!.mode).isEqualTo(started.single())
     }
 

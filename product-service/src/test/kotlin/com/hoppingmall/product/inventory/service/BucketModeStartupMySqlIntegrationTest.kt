@@ -127,7 +127,7 @@ class BucketModeStartupMySqlIntegrationTest {
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("DB=single")
             .hasMessageContaining("이 인스턴스=bucket(bucket.count=8)")
-            .hasMessageContaining(InventoryModeGuard.PROCEDURE_DOC)
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE)
 
         databaseConnection().use { connection ->
             connection.createStatement().executeQuery("SELECT COUNT(*) FROM inventory_buckets").use { rs ->
