@@ -86,6 +86,7 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
         DELETE FROM outbox_events
         WHERE processed = true
         AND processed_at < :cutoffDate
+        AND status <> 'FAILED'
         LIMIT $OUTBOX_CLEANUP_BATCH_SIZE
     """,
         nativeQuery = true

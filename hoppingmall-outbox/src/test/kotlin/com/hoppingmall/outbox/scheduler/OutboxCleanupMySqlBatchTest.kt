@@ -1,6 +1,7 @@
 package com.hoppingmall.outbox.scheduler
 
 import com.hoppingmall.outbox.domain.OutboxEvent
+import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.repository.OutboxEventRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -70,7 +71,7 @@ class OutboxCleanupMySqlBatchTest {
             jdbcTemplate.execute("ANALYZE TABLE outbox_events")
 
             val plan = jdbcTemplate.queryForMap(
-                "EXPLAIN DELETE FROM outbox_events WHERE processed = true AND processed_at < ? LIMIT 1000",
+                "EXPLAIN DELETE FROM outbox_events WHERE processed = true AND processed_at < ? AND status <> 'FAILED' LIMIT 1000",
                 LocalDateTime.now().minusDays(7)
             )
 
@@ -81,13 +82,34 @@ class OutboxCleanupMySqlBatchTest {
         }
     }
 
-    private fun event(processed: Boolean, processedAt: LocalDateTime?): OutboxEvent =
+    @Test
+    fun 재시도를_다_써서_멈춘_행은_오래되어도_정리하지_않는다() {
+        jdbcTemplate.update("DELETE FROM outbox_events")
+        val old = LocalDateTime.now().minusDays(30)
+        outboxEventRepository.saveAll(
+            (1..3).map { event(processed = true, processedAt = old) } +
+                (1..2).map { event(processed = true, processedAt = old, status = OutboxStatus.FAILED) }
+        )
+
+        outboxMaintenanceScheduler.cleanupProcessedEvents()
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outbox_events", Long::class.java)).isEqualTo(2L)
+        assertThat(outboxEventRepository.countParkedEvents(OutboxStatus.FAILED)).isEqualTo(2L)
+        jdbcTemplate.update("DELETE FROM outbox_events")
+    }
+
+    private fun event(
+        processed: Boolean,
+        processedAt: LocalDateTime?,
+        status: OutboxStatus = if (processed) OutboxStatus.PUBLISHED else OutboxStatus.PENDING
+    ): OutboxEvent =
         OutboxEvent(
             aggregateType = "Payment",
             aggregateId = "1",
             eventType = "PaymentCompleted",
             eventData = "{}",
             topic = "payment",
+            status = status,
             processedAt = processedAt
         ).also { it.processed = processed }
 
