@@ -48,6 +48,10 @@ class OutboxMetrics(
         Gauge.builder("outbox.event.failed.current") {
             outboxEventRepository.countByStatus(OutboxStatus.FAILED).toDouble()
         }.description("Failed outbox events").register(registry)
+
+        Gauge.builder("outbox.parked") {
+            outboxEventRepository.countParkedEvents(OutboxStatus.FAILED).toDouble()
+        }.description("Outbox events parked after max retries and excluded from publishing").register(registry)
     }
 
     fun bindBrokerBackoff(backingOff: () -> Boolean) {

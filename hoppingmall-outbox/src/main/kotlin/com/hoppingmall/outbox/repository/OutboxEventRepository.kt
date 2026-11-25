@@ -218,6 +218,36 @@ interface OutboxEventRepository : JpaRepository<OutboxEvent, Long> {
 
     @Query(
         """
+        SELECT COUNT(o) FROM OutboxEvent o
+        WHERE o.processed = true
+        AND o.status = :failedStatus
+    """
+    )
+    fun countParkedEvents(@Param("failedStatus") failedStatus: OutboxStatus): Long
+
+    @Modifying(clearAutomatically = true)
+    @Query(
+        """
+        UPDATE OutboxEvent o
+        SET o.status = :pendingStatus,
+            o.retryCount = 0,
+            o.processed = false,
+            o.processedAt = null,
+            o.updatedAt = :updatedAt
+        WHERE o.id IN :ids
+        AND o.processed = true
+        AND o.status = :failedStatus
+    """
+    )
+    fun requeueParkedEvents(
+        @Param("ids") ids: List<Long>,
+        @Param("pendingStatus") pendingStatus: OutboxStatus,
+        @Param("failedStatus") failedStatus: OutboxStatus,
+        @Param("updatedAt") updatedAt: LocalDateTime
+    ): Int
+
+    @Query(
+        """
         SELECT o FROM OutboxEvent o
         WHERE o.processed = false
         AND o.updatedAt < :cutoffDate

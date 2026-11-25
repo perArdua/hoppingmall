@@ -28,6 +28,7 @@ class OutboxMetricsTest {
         whenever(outboxEventRepository.countByStatus(OutboxStatus.PENDING)).thenReturn(3L)
         whenever(outboxEventRepository.countByStatus(OutboxStatus.RETRYING)).thenReturn(2L)
         whenever(outboxEventRepository.countByStatus(OutboxStatus.FAILED)).thenReturn(1L)
+        whenever(outboxEventRepository.countParkedEvents(OutboxStatus.FAILED)).thenReturn(4L)
         outboxMetrics = OutboxMetrics(registry, outboxEventRepository)
     }
 
@@ -89,6 +90,11 @@ class OutboxMetricsTest {
         outboxMetrics.recordOutboxPublished("order-events")
 
         assertThat(registry.counter("outbox.event.published.count").count()).isEqualTo(2.0)
+    }
+
+    @Test
+    fun 재시도를_다_써서_멈춘_행_수를_parked_gauge로_보여준다() {
+        assertThat(registry.get("outbox.parked").gauge().value()).isEqualTo(4.0)
     }
 
     @Test

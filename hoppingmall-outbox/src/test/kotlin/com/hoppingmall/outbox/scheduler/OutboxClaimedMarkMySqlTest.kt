@@ -9,6 +9,8 @@ import com.hoppingmall.outbox.domain.OutboxEvent
 import com.hoppingmall.outbox.domain.OutboxStatus
 import com.hoppingmall.outbox.metrics.OutboxMetrics
 import com.hoppingmall.outbox.repository.OutboxEventRepository
+import com.hoppingmall.outbox.service.OutboxEventService
+import com.hoppingmall.outbox.service.OutboxEventWriter
 import jakarta.persistence.EntityManager
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -318,6 +320,45 @@ class OutboxClaimedMarkMySqlTest {
             assertThat(new["processed"]).isEqualTo(false)
             assertThat(new["processed_at"]).isNull()
         }
+    }
+
+    @Test
+    fun 멈춘_행은_parked로_세고_수동으로_다시_넣으면_다음_발행에_나간다() {
+        val at = LocalDateTime.now().minusMinutes(5).truncatedTo(ChronoUnit.MICROS)
+        jdbcTemplate.batchUpdate(
+            "INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, event_data, topic, partition_key, " +
+                "status, retry_count, error_message, created_at, updated_at, processed, processed_at) " +
+                "VALUES ('Payment', 'agg-1', 'PaymentCompleted', '{}', 'payment', ?, ?, ?, ?, ?, ?, true, ?)",
+            listOf(
+                arrayOf<Any?>("parked", "FAILED", 3, "Max retries exceeded: bad", Timestamp.valueOf(at), Timestamp.valueOf(at), Timestamp.valueOf(at)),
+                arrayOf<Any?>("done", "PUBLISHED", 0, null, Timestamp.valueOf(at), Timestamp.valueOf(at), Timestamp.valueOf(at))
+            )
+        )
+        val parkedId = jdbcTemplate.queryForObject(
+            "SELECT id FROM outbox_events WHERE partition_key = 'parked'", Long::class.java
+        )!!
+        val doneId = jdbcTemplate.queryForObject(
+            "SELECT id FROM outbox_events WHERE partition_key = 'done'", Long::class.java
+        )!!
+        val service = OutboxEventService(outboxEventRepository, Mockito.mock(OutboxEventWriter::class.java))
+
+        assertThat(outboxEventRepository.countParkedEvents(OutboxStatus.FAILED)).isEqualTo(1L)
+        val requeued = TransactionTemplate(transactionManager).execute { service.requeueParked(listOf(parkedId, doneId)) }
+
+        assertThat(requeued).isEqualTo(1)
+        assertThat(outboxEventRepository.countParkedEvents(OutboxStatus.FAILED)).isZero()
+        val requeuedRow = row("parked")
+        assertThat(requeuedRow["status"]).isEqualTo("PENDING")
+        assertThat(requeuedRow["retry_count"]).isEqualTo(0)
+        assertThat(requeuedRow["processed"]).isEqualTo(false)
+        assertThat(requeuedRow["processed_at"]).isNull()
+        assertThat(row("done")["status"]).isEqualTo("PUBLISHED")
+
+        val kafka = fakeKafka()
+        batchPublisher(kafka.template).publishPendingEvents()
+
+        assertThat(kafka.committed.keys).containsExactly("parked")
+        assertThat(row("parked")["status"]).isEqualTo("PUBLISHED")
     }
 
     @Test
