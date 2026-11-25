@@ -13,6 +13,8 @@ import com.hoppingmall.order.order.service.OrderSagaConsumer
 import com.hoppingmall.order.port.InventoryCommandPort
 import com.hoppingmall.order.port.PaymentQueryPort
 import com.hoppingmall.outbox.service.TransactionalEventPublisher
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import jakarta.persistence.EntityManagerFactory
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -27,9 +29,11 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.annotation.EnableKafka
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry
+import org.springframework.kafka.core.ConsumerFactory
+import org.springframework.kafka.core.MicrometerConsumerListener
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer
 
-@DisplayName("Kafka 리스너 동시 소비 수 설정")
+@DisplayName("Kafka 리스너 동시 소비 수와 소비자 지표 설정")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores::class)
 class KafkaListenerConcurrencyTest {
 
@@ -53,6 +57,7 @@ class KafkaListenerConcurrencyTest {
         .withBean(KafkaEventMapper::class.java, { mock<KafkaEventMapper>() })
         .withBean(SagaCompensationMetrics::class.java, { mock<SagaCompensationMetrics>() })
         .withBean(ObjectMapper::class.java, { ObjectMapper() })
+        .withBean(MeterRegistry::class.java, { SimpleMeterRegistry() })
 
     @Test
     fun 결제_완료_리스너는_따로_정하지_않으면_16개로_소비한다() {
@@ -82,6 +87,27 @@ class KafkaListenerConcurrencyTest {
             assertThat(concurrency(context, KafkaTopics.PAYMENT_COMPENSATION, OrderConsumerGroups.ORDER_SAGA)).isEqualTo(2)
             assertThat(concurrency(context, KafkaTopics.PAYMENT_COMPENSATION, OrderConsumerGroups.ORDER_CANCELLATION_RESULT)).isEqualTo(2)
             assertThat(concurrency(context, KafkaTopics.PAYMENT, OrderConsumerGroups.ORDER_SAGA)).isEqualTo(16)
+        }
+    }
+
+    @Test
+    fun 리스너용_소비자는_Kafka_클라이언트_지표를_미터_레지스트리에_등록한다() {
+        contextRunner.run { context ->
+            assertThat(context).hasNotFailed()
+            val listeners = context.getBean(ConsumerFactory::class.java).listeners
+            assertThat(listeners).hasSize(1)
+            assertThat(listeners.single()).isInstanceOf(MicrometerConsumerListener::class.java)
+        }
+    }
+
+    @Test
+    fun 소비자를_만들면_파티션_지연_지표가_생긴다() {
+        contextRunner.run { context ->
+            assertThat(context).hasNotFailed()
+            context.getBean(ConsumerFactory::class.java).createConsumer().use {
+                val meterRegistry = context.getBean(MeterRegistry::class.java)
+                assertThat(meterRegistry.find("kafka.consumer.fetch.manager.records.lag.max").meters()).isNotEmpty()
+            }
         }
     }
 
