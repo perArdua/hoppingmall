@@ -15,6 +15,7 @@ import org.apache.kafka.common.errors.RecordTooLargeException
 import org.apache.kafka.common.errors.SerializationException
 import org.apache.kafka.common.errors.TimeoutException
 import org.apache.kafka.common.errors.TopicAuthorizationException
+import org.apache.kafka.common.errors.TransactionalIdAuthorizationException
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -83,7 +84,6 @@ class OutboxFailureClassifierTest {
             InvalidTopicException("bad topic"),
             TopicAuthorizationException("not authorized"),
             AuthorizationException("not authorized"),
-            ClusterAuthorizationException("not authorized"),
             InvalidRecordException("invalid record")
         ).forEach { failure ->
             assertThat(OutboxFailureClassifier.classify(failure)).describedAs(failure.toString()).isEqualTo(Side.MESSAGE)
@@ -106,6 +106,17 @@ class OutboxFailureClassifierTest {
 
         assertThat(OutboxFailureClassifier.classify(registryDown)).isEqualTo(Side.BROKER)
         assertThat(OutboxFailureClassifier.classify(registryTimeout)).isEqualTo(Side.BROKER)
+    }
+
+    @Test
+    fun 프로듀서_전체를_막는_권한_실패는_한_메시지_탓이_아니므로_브로커_쪽이다() {
+        listOf(
+            ClusterAuthorizationException("Cluster authorization failed."),
+            TransactionalIdAuthorizationException("Transactional Id authorization failed."),
+            KafkaException("Send failed", TransactionalIdAuthorizationException("Transactional Id authorization failed."))
+        ).forEach { failure ->
+            assertThat(OutboxFailureClassifier.classify(failure)).describedAs(failure.toString()).isEqualTo(Side.BROKER)
+        }
     }
 
     @Test
