@@ -13,6 +13,7 @@ import io.grpc.Server
 import io.grpc.inprocess.InProcessServerBuilder
 import io.grpc.stub.StreamObserver
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -67,13 +68,14 @@ class BucketModeStartupMySqlIntegrationTest {
     }
 
     @Test
-    fun 단일_모드로_쌓인_재고와_예약이_있는_DB를_배포_프로필_스위치로_켜면_버킷이_채워지고_예약_확정_취소_만료가_된다() {
+    fun 단일_모드로_쌓인_재고와_예약이_있는_DB를_모드_변경_절차대로_배포_프로필_스위치로_켜면_버킷이_채워지고_예약_확정_취소_만료가_된다() {
         val pendingFromSingleMode = boot(mapOf("inventory.mode" to "single")).use { context ->
             val inventories = context.getBean(InventoryRepository::class.java)
             inventories.saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
             inventories.saveAndFlush(Inventory.create(productId = SECOND, stockQuantity = 5))
             context.getBean(InventoryCommandService::class.java).batchReserveStock(listOf(FIRST to 2)).getValue(FIRST)
         }
+        recordBucketModeAsProcedure()
 
         boot(inventorySwitches("application-docker.yml") + FAST_LINK_CHECK).use { context ->
             val jdbc = context.getBean(JdbcTemplate::class.java)
@@ -114,6 +116,37 @@ class BucketModeStartupMySqlIntegrationTest {
             assertThat(inventoryRowStock(jdbc, FIRST)).isEqualTo(8)
         }
     }
+
+    @Test
+    fun 단일_모드로_쓰던_DB를_절차_없이_bucket_인스턴스로_켜면_기동이_실패하고_버킷을_만들지_않는다() {
+        boot(mapOf("inventory.mode" to "single")).use { context ->
+            context.getBean(InventoryRepository::class.java).saveAndFlush(Inventory.create(productId = FIRST, stockQuantity = 10))
+        }
+
+        assertThatThrownBy { boot(inventorySwitches("application-docker.yml")).close() }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("DB=single")
+            .hasMessageContaining("이 인스턴스=bucket(bucket.count=8)")
+            .hasMessageContaining(InventoryModeGuard.PROCEDURE_DOC)
+
+        databaseConnection().use { connection ->
+            connection.createStatement().executeQuery("SELECT COUNT(*) FROM inventory_buckets").use { rs ->
+                rs.next()
+                assertThat(rs.getInt(1)).isZero()
+            }
+        }
+    }
+
+    private fun recordBucketModeAsProcedure() {
+        databaseConnection().use {
+            it.createStatement().executeUpdate(
+                "UPDATE inventory_runtime_mode SET mode = 'bucket', bucket_count = 8, updated_at = NOW(6) WHERE id = 1"
+            )
+        }
+    }
+
+    private fun databaseConnection() =
+        DriverManager.getConnection(MySqlContainerSupport.jdbcUrl(DATABASE), MySqlContainerSupport.username, MySqlContainerSupport.password)
 
     private fun boot(switches: Map<String, String>): ConfigurableApplicationContext =
         SpringApplicationBuilder(ProductServiceApplication::class.java)
