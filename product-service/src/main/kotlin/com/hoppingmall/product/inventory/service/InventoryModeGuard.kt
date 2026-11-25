@@ -14,6 +14,7 @@ import java.time.LocalDateTime
  * inventory_runtime_mode(id=1) 기록과 비교해 다르면 기동을 막는다. 기록이 없으면 첫 인스턴스가 기록한다.
  * 실행 중에도 InventoryModeRecheckJob이 기록을 다시 읽어(기본 5초) 다르면 인스턴스를 내린다.
  * "먼저 모두 내린다"는 이 클래스가 강제하지 못한다. 내리지 않고 기록을 바꾸면 기존 인스턴스가 약 5초 안에 스스로 내려가고, 다시 뜰 때 기동 검사에 막힌다.
+ * inventory_runtime_mode 행은 서비스 전체의 kill switch로도 동작한다. 잘못 UPDATE하면 모든 인스턴스가 약 5초 안에 내려가고 고칠 때까지 반복해서 기동에 실패한다.
  *
  * 모드 변경 절차. 모드가 섞인 롤링·카나리 전환은 허용하지 않는다.
  * 1. product-service 인스턴스를 모두 내린다.

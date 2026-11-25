@@ -212,7 +212,8 @@ class BucketModeStartupMySqlIntegrationTest {
         "grpc.server.port" to "-1",
         "grpc.client.order-service.address" to "in-process:$orderServerName",
         "services.order-service.url" to "http://127.0.0.1:1",
-        "dlq.scheduler.enabled" to "false"
+        "dlq.scheduler.enabled" to "false",
+        "inventory.mode-guard.recheck-ms" to "3600000"
     )
 
     private fun inventorySwitches(resource: String): Map<String, String> =

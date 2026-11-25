@@ -62,7 +62,8 @@ class ProfileStartupCheckTest {
         "--spring.kafka.consumer.bootstrap-servers=$UNREACHABLE_KAFKA",
         "--spring.kafka.producer.bootstrap-servers=$UNREACHABLE_KAFKA",
         "--server.port=0",
-        "--grpc.server.port=0"
+        "--grpc.server.port=0",
+        "--inventory.mode-guard.recheck-ms=3600000"
     )
 
     companion object {
