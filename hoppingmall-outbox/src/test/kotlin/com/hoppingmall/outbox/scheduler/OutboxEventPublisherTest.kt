@@ -83,7 +83,8 @@ class OutboxEventPublisherTest {
     fun setUp() {
         Mockito.lenient().`when`(transactionManager.getTransaction(any())).thenReturn(SimpleTransactionStatus())
         outboxEventPublisher = OutboxEventPublisher(
-            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager
+            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager,
+            OutboxBrokerBackoff(outboxMetrics)
         )
     }
 
@@ -1488,8 +1489,8 @@ class OutboxEventPublisherTest {
 
     private fun batchClaimPublisher(clock: Clock): OutboxEventPublisher =
         OutboxEventPublisher(
-            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager, clock,
-            null, OutboxBrokerBackoff(outboxMetrics, 1_000, 30_000, clock, NoJitter)
+            outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager,
+            OutboxBrokerBackoff(outboxMetrics, 1_000, 30_000, clock, NoJitter), clock
         ).also {
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", MAX_CLAIM_AGE_MS)
         }
@@ -1525,7 +1526,7 @@ class OutboxEventPublisherTest {
     private fun publisherWith(dataSource: DataSource): OutboxEventPublisher =
         OutboxEventPublisher(
             outboxEventRepository, kafkaTemplate, outboxMetrics, avroEventConverter, transactionManager,
-            Clock.systemDefaultZone(), dataSource
+            OutboxBrokerBackoff(outboxMetrics), Clock.systemDefaultZone(), dataSource
         )
 
     private fun dataSource(productName: String): DataSource {

@@ -529,6 +529,7 @@ class OutboxClaimedMarkMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             converter,
             transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java)),
             clock
         ).also {
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", 500L)
@@ -544,6 +545,7 @@ class OutboxClaimedMarkMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             passingConverter(),
             transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java)),
             clock
         ).also { ReflectionTestUtils.setField(it, "batchClaim", false) }
 

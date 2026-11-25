@@ -34,9 +34,9 @@ class OutboxEventPublisher(
     private val outboxMetrics: OutboxMetrics,
     private val avroEventConverter: AvroEventConverter,
     transactionManager: PlatformTransactionManager,
+    private val brokerBackoff: OutboxBrokerBackoff,
     private val clock: Clock = Clock.systemDefaultZone(),
-    private val dataSource: DataSource? = null,
-    private val brokerBackoff: OutboxBrokerBackoff = OutboxBrokerBackoff(outboxMetrics)
+    private val dataSource: DataSource? = null
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)

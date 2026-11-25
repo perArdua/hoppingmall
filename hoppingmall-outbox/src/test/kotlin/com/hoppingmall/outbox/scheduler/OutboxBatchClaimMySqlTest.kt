@@ -116,6 +116,7 @@ class OutboxBatchClaimMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             converter,
             transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java)),
             Clock.systemDefaultZone(),
             dataSource
         )
@@ -280,7 +281,8 @@ class OutboxBatchClaimMySqlTest {
             kafkaTemplate,
             Mockito.mock(OutboxMetrics::class.java),
             converter,
-            transactionManager
+            transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java))
         )
     }
 
@@ -329,6 +331,7 @@ class OutboxBatchClaimMySqlTest {
             Mockito.mock(OutboxMetrics::class.java),
             converter,
             transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java)),
             clock
         ).also {
             ReflectionTestUtils.setField(it, "maxClaimAgeMs", maxClaimAgeMs)

@@ -486,7 +486,8 @@ class OutboxBatchClaimSkewMySqlTest {
             kafkaTemplate,
             Mockito.mock(OutboxMetrics::class.java),
             converter,
-            transactionManager
+            transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java))
         )
     }
 

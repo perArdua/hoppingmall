@@ -143,6 +143,7 @@ class OutboxPublishH2Test {
             Mockito.mock(OutboxMetrics::class.java),
             Mockito.mock(AvroEventConverter::class.java),
             transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java)),
             dataSource = dataSource
         )
 
@@ -163,7 +164,8 @@ class OutboxPublishH2Test {
             Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, Any>,
             Mockito.mock(OutboxMetrics::class.java),
             Mockito.mock(AvroEventConverter::class.java),
-            transactionManager
+            transactionManager,
+            OutboxBrokerBackoff(Mockito.mock(OutboxMetrics::class.java))
         )
 
         assertThatThrownBy { publisher.publishPendingEvents() }
@@ -203,7 +205,7 @@ class OutboxPublishH2Test {
     @Configuration
     @EntityScan(basePackageClasses = [OutboxEvent::class])
     @EnableJpaRepositories(basePackageClasses = [OutboxEventRepository::class])
-    @Import(OutboxEventPublisher::class, OutboxPublishWaker::class, OutboxEventWriter::class)
+    @Import(OutboxEventPublisher::class, OutboxBrokerBackoff::class, OutboxPublishWaker::class, OutboxEventWriter::class)
     class TestConfig {
 
         @Bean
