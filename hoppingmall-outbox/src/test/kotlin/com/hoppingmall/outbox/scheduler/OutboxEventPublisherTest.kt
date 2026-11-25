@@ -1815,6 +1815,59 @@ class OutboxEventPublisherTest {
     }
 
     @Test
+    fun Kafka_트랜잭션이_결과_없이_끝나면_커밋_여부를_모르므로_행을_되돌리지_않고_ERROR를_남긴다() {
+        val publisher = batchClaimPublisher(MutableClock(START))
+        val event = createOutboxEvent(id = 1L)
+        stubSingleClaim(event)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenReturn(null)
+
+        val errors = captureLogs(Level.ERROR) { publisher.publishPendingEvents() }
+
+        assertThat(errors).anyMatch { it.contains("returned no result") && it.contains("ids=[1]") }
+        verify(outboxEventRepository, never()).releaseClaimedEvents(any(), any(), any(), any(), any())
+        verify(outboxEventRepository, never()).markClaimedEventsProcessed(any(), any(), any(), any(), any(), any())
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+        assertThat(event.retryCount).isZero()
+        assertThat(publisher.isBrokerBackingOff()).isFalse()
+    }
+
+    @Test
+    fun 격리_회차에서_결과_없이_끝난_전송의_행만_선점한_채로_두고_시도하지_않은_행은_되돌린다() {
+        val clock = MutableClock(START)
+        val backoff = noJitterBackoff(clock)
+        val publisher = batchClaimPublisher(clock, backoff)
+        val now = LocalDateTime.now()
+        val head = createOutboxEvent(id = 1L, createdAt = now.minusSeconds(3), partitionKey = "a")
+        val second = createOutboxEvent(id = 2L, createdAt = now.minusSeconds(2), partitionKey = "b")
+        val third = createOutboxEvent(id = 3L, createdAt = now.minusSeconds(1), partitionKey = "a")
+        stubClaim(head, second, third)
+        whenever(avroEventConverter.convertJsonToAvro(any(), any())).thenReturn(mock<GenericRecord>())
+        whenever(
+            kafkaTemplate.executeInTransaction(any<KafkaOperations.OperationsCallback<String, Any, Any>>())
+        ).thenReturn(null).thenThrow(TimeoutException("broker down")).thenReturn(null)
+        whenever(outboxEventRepository.releaseClaimedEvents(any(), any(), any(), any(), any())).thenReturn(1)
+        repeat(3) { backoff.recordFailure() }
+        clock.advanceMillis(60_000)
+        val firstClaim = LocalDateTime.ofInstant(clock.instant(), clock.zone)
+
+        publisher.publishPendingEvents()
+
+        verifyReleased(listOf(2L, 3L), firstClaim)
+
+        clock.advanceMillis(60_000)
+        val secondClaim = LocalDateTime.ofInstant(clock.instant(), clock.zone)
+        publisher.publishPendingEvents()
+
+        verifyReleased(listOf(1L, 3L), secondClaim)
+        verify(outboxEventRepository, never())
+            .markClaimedEventFailed(any(), any(), anyOrNull(), any(), any(), anyOrNull(), any(), any(), any())
+    }
+
+    @Test
     fun 브로커_실패_뒤_되돌리기가_DB_오류로_실패해도_백오프는_건다() {
         val clock = MutableClock(START)
         val publisher = batchClaimPublisher(clock)

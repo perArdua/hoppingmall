@@ -241,6 +241,7 @@ class OutboxEventPublisher(
                 releaseClaims(preparedEvents.map { it.first }, claimedAt)
                 PublishOutcome.LEFT_CLAIMED
             }
+            SendAttempt.Unconfirmed -> PublishOutcome.LEFT_CLAIMED
         }
     }
 
@@ -260,7 +261,7 @@ class OutboxEventPublisher(
                 }
                 ensureClaimFresh(claimedAt)
                 sent
-            } ?: return SendAttempt.Unsent
+            } ?: return unconfirmed(preparedEvents)
         } catch (e: ClaimExpiredException) {
             logger.warn(
                 "Outbox $claimKind claim expired after ${e.ageMs}ms (limit ${maxClaimAgeMs}ms); " +
@@ -273,6 +274,14 @@ class OutboxEventPublisher(
             return SendAttempt.Failed(e, OutboxFailureClassifier.classify(e))
         }
         return SendAttempt.Sent(results)
+    }
+
+    private fun unconfirmed(preparedEvents: List<Pair<OutboxEvent, Any>>): SendAttempt {
+        logger.error(
+            "Outbox Kafka transaction returned no result, so whether it committed is unknown; " +
+                "left ${preparedEvents.size} events RETRYING for stale recovery: ids=${preparedEvents.map { it.first.id }}"
+        )
+        return SendAttempt.Unconfirmed
     }
 
     private fun markPublished(results: List<Pair<OutboxEvent, SendResult<String, Any>>>, claimedAt: LocalDateTime?) {
@@ -403,6 +412,10 @@ class OutboxEventPublisher(
                 releaseClaims(allEvents, claimedAt)
                 return PublishOutcome.LEFT_CLAIMED
             }
+            SendAttempt.Unconfirmed -> {
+                releaseClaims(allEvents.drop(1), claimedAt)
+                return PublishOutcome.LEFT_CLAIMED
+            }
             is SendAttempt.Failed -> headAttempt
         }
         if (headFailure.side == OutboxFailureClassifier.Side.MESSAGE) {
@@ -438,6 +451,10 @@ class OutboxEventPublisher(
             }
             SendAttempt.Unsent -> {
                 releaseClaims(allEvents, claimedAt)
+                PublishOutcome.LEFT_CLAIMED
+            }
+            SendAttempt.Unconfirmed -> {
+                releaseClaims(listOf(headEvent) + sameKeyAsHead.map { it.first }, claimedAt)
                 PublishOutcome.LEFT_CLAIMED
             }
         }
@@ -641,6 +658,7 @@ class OutboxEventPublisher(
         class Sent(val results: List<Pair<OutboxEvent, SendResult<String, Any>>>) : SendAttempt
         class Failed(val failure: Exception, val side: OutboxFailureClassifier.Side) : SendAttempt
         object Unsent : SendAttempt
+        object Unconfirmed : SendAttempt
     }
 
     companion object {
