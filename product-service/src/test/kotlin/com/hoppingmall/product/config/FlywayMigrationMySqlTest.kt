@@ -37,7 +37,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:SQL:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
     }
 
     @Test
@@ -65,12 +65,12 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
         assertThat(jdbc(database).queryForList("SELECT status FROM dlq_messages", String::class.java)).containsExactly("PENDING")
     }
 
     @Test
-    fun 기준선_뒤의_표와_열이_이미_있는_기존_DB에_붙이면_V3_V4는_건너뛰고_데이터를_그대로_둔다() {
+    fun 기준선_뒤의_표와_열이_이미_있는_기존_DB에_붙이면_V3_V4_V5는_건너뛰고_데이터를_그대로_둔다() {
         val database = freshDatabase("existing_with_later_objects")
         legacyUpdateRunner(database).run { context -> assertThat(context).hasNotFailed() }
         jdbc(database).update(
@@ -86,7 +86,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
         assertThat(jdbc(database).queryForList("SELECT object_key FROM uploaded_files", String::class.java))
             .containsExactly("product/images/kept.jpg")
         assertThat(jdbc(database).queryForList("SELECT withdrawal_restriction_reason FROM products WHERE withdrawal_restricted = 1", String::class.java))
@@ -110,7 +110,7 @@ class FlywayMigrationMySqlTest {
             assertThat(context).hasNotFailed()
         }
 
-        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true")
+        assertThat(history(database)).containsExactly("1:BASELINE:true", "2:SQL:true", "3:SQL:true", "4:SQL:true", "5:SQL:true")
         LEGACY_ENUM_COLUMNS.forEach {
             assertThat(columnType(database, it.table, it.column)).isEqualTo("varchar(32)")
             assertThat(columnNullable(database, it.table, it.column)).isEqualTo(if (it.nullable) "YES" else "NO")
@@ -147,6 +147,7 @@ class FlywayMigrationMySqlTest {
 
     private fun dropObjectsAddedAfterBaseline(database: String) {
         jdbc(database).execute("DROP TABLE uploaded_files")
+        jdbc(database).execute("DROP TABLE inventory_runtime_mode")
         jdbc(database).execute("ALTER TABLE products DROP COLUMN withdrawal_restricted, DROP COLUMN withdrawal_restriction_reason")
     }
 
