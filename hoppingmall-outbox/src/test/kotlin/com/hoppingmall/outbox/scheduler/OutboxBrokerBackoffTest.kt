@@ -38,7 +38,7 @@ class OutboxBrokerBackoffTest {
     fun 브로커_실패가_이어지면_1초_2초_4초로_늘고_최대값에서_멈춘다() {
         val backoff = backoff()
 
-        val delays = (1..8).map { backoff.recordFailure() }
+        val delays = (1..8).map { backoff.recordFailure().delayMs }
 
         assertThat(delays).containsExactly(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 30_000L, 30_000L, 30_000L)
         verify(outboxMetrics, times(8)).recordBrokerFailure()
@@ -49,8 +49,8 @@ class OutboxBrokerBackoffTest {
         val lowest = backoff(jitter = 0.999_999)
         val highest = backoff(jitter = 0.0)
 
-        val lowDelays = (1..7).map { lowest.recordFailure() }
-        val highDelays = (1..7).map { highest.recordFailure() }
+        val lowDelays = (1..7).map { lowest.recordFailure().delayMs }
+        val highDelays = (1..7).map { highest.recordFailure().delayMs }
 
         listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 30_000L, 30_000L).forEachIndexed { i, base ->
             assertThat(lowDelays[i]).isGreaterThanOrEqualTo(base * 8 / 10).isLessThanOrEqualTo(base)
@@ -63,7 +63,7 @@ class OutboxBrokerBackoffTest {
     fun 실제_난수로도_대기는_기준의_80퍼센트와_기준_사이에_있다() {
         val backoff = OutboxBrokerBackoff(outboxMetrics, 1_000, 30_000, clock)
 
-        val delays = (1..200).map { backoff.recordFailure() }
+        val delays = (1..200).map { backoff.recordFailure().delayMs }
 
         assertThat(delays.take(5).zip(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L)))
             .allMatch { (delay, base) -> delay in (base * 8 / 10)..base }
@@ -92,7 +92,7 @@ class OutboxBrokerBackoffTest {
         clock.advanceMillis(1_000)
 
         assertThat(backoff.isBackingOff()).isFalse()
-        assertThat(backoff.recordFailure()).isEqualTo(2_000L)
+        assertThat(backoff.recordFailure().delayMs).isEqualTo(2_000L)
     }
 
     @Test
@@ -103,14 +103,67 @@ class OutboxBrokerBackoffTest {
         backoff.recordSuccess()
 
         assertThat(backoff.isBackingOff()).isFalse()
-        assertThat(backoff.recordFailure()).isEqualTo(1_000L)
+        assertThat(backoff.recordFailure().delayMs).isEqualTo(1_000L)
+    }
+
+    @Test
+    fun 브로커_실패가_3번_이어지면_행을_한_건씩_가려_보내야_하고_성공하면_풀린다() {
+        val backoff = backoff()
+
+        repeat(2) { backoff.recordFailure() }
+        assertThat(backoff.shouldIsolateEvents()).isFalse()
+
+        backoff.recordFailure()
+        assertThat(backoff.shouldIsolateEvents()).isTrue()
+
+        backoff.recordSuccess()
+        assertThat(backoff.shouldIsolateEvents()).isFalse()
+    }
+
+    @Test
+    fun 백오프가_5분을_넘겨_이어지면_알림을_내고_5분에_한_번으로_묶는다() {
+        val backoff = backoff()
+
+        val first = backoff.recordFailure()
+        clock.advanceMillis(300_000)
+        val atFiveMinutes = backoff.recordFailure()
+        clock.advanceMillis(1)
+        val overFiveMinutes = backoff.recordFailure()
+        clock.advanceMillis(60_000)
+        val withinRateLimit = backoff.recordFailure()
+        clock.advanceMillis(240_000)
+        val nextWindow = backoff.recordFailure()
+
+        assertThat(first.longBackoffAlert).isFalse()
+        assertThat(atFiveMinutes.longBackoffAlert).isFalse()
+        assertThat(overFiveMinutes.longBackoffAlert).isTrue()
+        assertThat(overFiveMinutes.streakMs).isEqualTo(300_001L)
+        assertThat(overFiveMinutes.consecutiveFailures).isEqualTo(3)
+        assertThat(withinRateLimit.longBackoffAlert).isFalse()
+        assertThat(nextWindow.longBackoffAlert).isTrue()
+    }
+
+    @Test
+    fun 성공하면_오래_물러난_시간도_처음부터_다시_잰다() {
+        val backoff = backoff()
+        backoff.recordFailure()
+        clock.advanceMillis(400_000)
+        assertThat(backoff.recordFailure().longBackoffAlert).isTrue()
+
+        backoff.recordSuccess()
+        clock.advanceMillis(1_000)
+        val restarted = backoff.recordFailure()
+
+        assertThat(restarted.longBackoffAlert).isFalse()
+        assertThat(restarted.streakMs).isZero()
+        assertThat(restarted.consecutiveFailures).isEqualTo(1)
     }
 
     @Test
     fun 설정한_처음_대기와_최대_대기를_쓴다() {
         val backoff = backoff(initialMs = 500, maxMs = 3_000)
 
-        val delays = (1..5).map { backoff.recordFailure() }
+        val delays = (1..5).map { backoff.recordFailure().delayMs }
 
         assertThat(delays).containsExactly(500L, 1_000L, 2_000L, 3_000L, 3_000L)
     }
@@ -119,7 +172,7 @@ class OutboxBrokerBackoffTest {
     fun 실패가_아주_많이_이어져도_대기가_넘치지_않고_최대값이다() {
         val backoff = backoff()
 
-        val last = (1..100).map { backoff.recordFailure() }.last()
+        val last = (1..100).map { backoff.recordFailure().delayMs }.last()
 
         assertThat(last).isEqualTo(30_000L)
     }

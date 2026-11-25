@@ -19,6 +19,8 @@ class OutboxBrokerBackoff(
 
     private var consecutiveFailures = 0
     private var backoffUntilMillis = 0L
+    private var streakStartedAtMillis = 0L
+    private var lastLongBackoffAlertAtMillis: Long? = null
 
     init {
         outboxMetrics.bindBrokerBackoff { isBackingOff() }
@@ -28,18 +30,28 @@ class OutboxBrokerBackoff(
     fun isBackingOff(): Boolean = clock.millis() < backoffUntilMillis
 
     @Synchronized
-    fun recordFailure(): Long {
+    fun shouldIsolateEvents(): Boolean = consecutiveFailures >= ISOLATION_STREAK
+
+    @Synchronized
+    fun recordFailure(): Pause {
+        val now = clock.millis()
+        if (consecutiveFailures == 0) streakStartedAtMillis = now
         consecutiveFailures++
         val delayMs = jittered(baseDelayMs())
-        backoffUntilMillis = clock.millis() + delayMs
+        backoffUntilMillis = now + delayMs
         outboxMetrics.recordBrokerFailure()
-        return delayMs
+        val streakMs = now - streakStartedAtMillis
+        val lastAlert = lastLongBackoffAlertAtMillis
+        val alert = streakMs > LONG_BACKOFF_ALERT_MS && (lastAlert == null || now - lastAlert >= LONG_BACKOFF_ALERT_MS)
+        if (alert) lastLongBackoffAlertAtMillis = now
+        return Pause(delayMs, consecutiveFailures, streakMs, alert)
     }
 
     @Synchronized
     fun recordSuccess() {
         consecutiveFailures = 0
         backoffUntilMillis = 0L
+        lastLongBackoffAlertAtMillis = null
     }
 
     private fun baseDelayMs(): Long {
@@ -50,7 +62,16 @@ class OutboxBrokerBackoff(
     private fun jittered(delayMs: Long): Long =
         delayMs - (delayMs * JITTER_RATIO * random.nextDouble()).toLong()
 
+    data class Pause(
+        val delayMs: Long,
+        val consecutiveFailures: Int,
+        val streakMs: Long,
+        val longBackoffAlert: Boolean
+    )
+
     companion object {
+        private const val ISOLATION_STREAK = 3
+        private const val LONG_BACKOFF_ALERT_MS = 300_000L
         private const val JITTER_RATIO = 0.2
         private const val MAX_DOUBLINGS = 30
     }
