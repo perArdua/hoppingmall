@@ -35,7 +35,11 @@ class OrderSagaConsumer(
 
     private enum class RemoteDecision { CONFIRM, TIMEOUT_OWNED, ORDER_CANCELLED, ORDER_CANCELLING }
 
-    @KafkaListener(topics = [KafkaTopics.PAYMENT], groupId = OrderConsumerGroups.ORDER_SAGA)
+    @KafkaListener(
+        topics = [KafkaTopics.PAYMENT],
+        groupId = OrderConsumerGroups.ORDER_SAGA,
+        concurrency = "\${order.saga.consumer.concurrency:16}"
+    )
     fun handlePaymentCompleted(message: String) {
         val event = kafkaEventMapper.readValue(message, PaymentCompletedEvent::class.java)
         val eventId = "payment-completed-${event.transactionId}"

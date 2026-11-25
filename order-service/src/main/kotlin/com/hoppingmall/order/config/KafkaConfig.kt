@@ -39,6 +39,9 @@ class KafkaConfig(
     @Value("\${kafka.consumer.heartbeat-interval-ms:10000}")
     private var heartbeatIntervalMs: Int = 10_000
 
+    @Value("\${kafka.consumer.concurrency:4}")
+    private var concurrency: Int = 4
+
     @Value("\${spring.kafka.producer.bootstrap-servers:\${spring.kafka.consumer.bootstrap-servers}}")
     private lateinit var producerBootstrapServers: String
 
@@ -133,7 +136,7 @@ class KafkaConfig(
     fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, Any>()
         factory.consumerFactory = consumerFactory()
-        factory.setConcurrency(4)
+        factory.setConcurrency(concurrency)
         factory.setRecordInterceptor(BusinessContextConsumerInterceptor())
 
         val errorHandler = DefaultErrorHandler(
